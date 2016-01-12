@@ -21,15 +21,14 @@ from __future__ import absolute_import
 
 import numpy
 import sys 
+import h5json
  
 from . import base
 from .base import phil, with_phil
 from .dataset import readtime_dtype
 from .datatype import Datatype
 from .objectid import GroupID, DatasetID, TypeID
-
-#from hdf5db import Hdf5db
-from .. import hdf5dtype
+ 
 
 class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
@@ -83,7 +82,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         value_json = attr_json['value']
 
         #dtype = readtime_dtype(attr.dtype, [])
-        dtype = hdf5dtype.createDataType(type_json)
+        dtype = h5json.createDataType(type_json)
         
         #shape = attr.shape
         if 'dims' in shape_json:
@@ -200,7 +199,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     
             # Make HDF5 datatype and dataspace for the H5A calls
             if use_htype is None:
-                type_json = hdf5dtype.getTypeItem(dtype)
+                type_json = h5json.getTypeItem(dtype)
                 #htype = h5t.py_create(original_dtype, logical=True)
                 #htype2 = h5t.py_create(original_dtype)  # Must be bit-for-bit representation rather than logical
             else:

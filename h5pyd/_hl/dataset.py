@@ -19,6 +19,8 @@ import six
 from six.moves import xrange
 
 import numpy
+import h5json
+
 from h5py.h5t import check_dtype
 
 #from . import base
@@ -29,10 +31,7 @@ from .objectid import ObjectID, TypeID, DatasetID
 from . import selections as sel
 #from . import selections2 as sel2
 from .datatype import Datatype
-
-#from ..hdf5db import Hdf5db
-from .. import hdf5dtype
-
+ 
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
 
 def readtime_dtype(basetype, names):
@@ -95,7 +94,7 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
             dtype = data.dtype
         else:
             dtype = numpy.dtype(dtype)
-        type_json = hdf5dtype.getTypeItem(dtype)
+        type_json = h5json.getTypeItem(dtype)
         #tid = h5t.py_create(dtype, logical=1)
 
     # Legacy
@@ -329,7 +328,7 @@ class Dataset(HLObject):
         self._local = None #local()
         # make a numpy dtype out of the type json
         
-        self._dtype = hdf5dtype.createDataType(self.id.type_json)
+        self._dtype = h5json.createDataType(self.id.type_json)
         
         if self.id.shape_json['class'] == 'H5S_SCALAR':
             self._shape = []

@@ -15,13 +15,11 @@ from __future__ import absolute_import
 
 import posixpath as pp
 import sys
+import h5json
 
 #from ..h5t import TypeID
 from .base import HLObject, phil, with_phil
-
-#from hdf5db import Hdf5db
-from .. import hdf5dtype
-
+ 
 from .objectid import ObjectID, TypeID
 
 class Datatype(HLObject):
@@ -52,7 +50,7 @@ class Datatype(HLObject):
                 raise ValueError("%s is not a TypeID" % bind)
             HLObject.__init__(self, bind)
             
-            self._dtype = hdf5dtype.createDataType(self.id.type_json)
+            self._dtype = h5json.createDataType(self.id.type_json)
              
             
     @with_phil
