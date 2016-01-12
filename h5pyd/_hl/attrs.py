@@ -63,7 +63,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         elif isinstance(parent.id, DatasetID):
             self._req_prefix = "/datasets/" + parent.id.uuid + "/attributes/"
         else:
-            print "unknown id"
+            # "unknown id"
             self._req_prefix = "<unknown>"
             
 
