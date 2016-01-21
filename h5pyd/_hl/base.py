@@ -74,6 +74,7 @@ def guess_dtype(data):
         if type(data) == six.text_type:
            return h5t.special_dtype(vlen=six.text_type)
     """
+    print("guess_dtype")
     return None
  
 class Reference():
@@ -96,7 +97,7 @@ class Reference():
         
     @with_phil
     def __init__(self, bind):
-        """ Create a new Datatype object by binding to a low-level TypeID.
+        """ Create a new reference by binding to a group/dataset/committed type
         """
         with phil:
             self._id = bind._id
@@ -105,6 +106,34 @@ class Reference():
     @with_phil
     def __repr__(self):
         return "<HDF5 object reference>"
+        
+class RegionReference():
+
+    """
+        Represents an HDF5 region reference      
+    """
+    @property
+    def id(self):
+        """ Low-level identifier appropriate for this object """
+        return self._id
+        
+    @property
+    def objref(self):
+        """ Weak reference to object """
+        return self._objref  # return weak ref to ref'd object
+      
+        
+    @with_phil
+    def __init__(self, bind):
+        """ Create a new reference by binding to a group/dataset/committed type
+        """
+        with phil:
+            self._id = bind._id
+            self._objref = weakref.ref(bind) 
+                    
+    @with_phil
+    def __repr__(self):
+        return "<HDF5 region reference>"
         
 
 class CommonStateObject(object):
@@ -312,7 +341,7 @@ class HLObject(CommonStateObject):
         req = self.id.endpoint + req
             
         headers = {'host': self.id.domain}
-        #self.log.info("GET: " + req)
+        self.log.info("GET: " + req)
         rsp = requests.get(req, headers=headers)
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
@@ -335,7 +364,7 @@ class HLObject(CommonStateObject):
         data = json.dumps(body)
             
         headers = {'host': self.id.domain}
-        #self.log.info("PUT: " + req)
+        self.log.info("PUT: " + req)
         rsp = requests.put(req, data=data, headers=headers)
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
@@ -358,7 +387,8 @@ class HLObject(CommonStateObject):
         data = json.dumps(body)
             
         headers = {'host': self.id.domain}
-        #self.log.info("PST: " + req)
+        self.log.info("PST: " + req)
+        print("post dataset:", data)
         rsp = requests.post(req, data=data, headers=headers)
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
@@ -377,7 +407,7 @@ class HLObject(CommonStateObject):
         req = self.id.endpoint + req
         
         headers = {'host': self.id.domain}
-        #self.log.info("DEL: " + req)
+        self.log.info("DEL: " + req)
         rsp = requests.delete(req, headers=headers)
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:

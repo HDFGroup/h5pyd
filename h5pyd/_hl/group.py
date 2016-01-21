@@ -244,6 +244,8 @@ class Group(HLObject, MutableMappingHDF5):
 
     def __getitem__(self, name):
         """ Open an object in the file """
+        print("group.__getitem__:", name)
+        print("group.__getitem__(type):", type(name))
          
         def getObjByUuid(collection_type, uuid):
             """ Utility method to get an obj based on collection type and uuid """

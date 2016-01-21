@@ -33,11 +33,16 @@ class TestObjRef(TestCase):
         self.assertTrue('g1' in r)
         g1 = r['g1']
         
+        
         g11 = g1.create_group('g1.1')
         
         g11_ref = g11.ref 
         print(g11_ref)
-        
+        print("uuid:", g11_ref.id.uuid)
+        print("domain:", g11_ref.id.domain)
+        print("type:", g11_ref.id.objtype_code)
+        #print("g11_ref_tolist:", g11_ref.tolist())
+         
         # todo - fix
         #self.assertTrue(isinstance(g11_ref, h5py.Reference))
          
@@ -45,18 +50,28 @@ class TestObjRef(TestCase):
         r.create_group('g2')
         self.assertEqual(len(r), 2)
         g2 = r['g2']
-        
+        """
         g11ref = g2[g11_ref]
-        print(g11ref)
-        print(g11ref.name)
-        
+        print("g11ref:", g11ref)
+        print("g11ref name:", g11ref.name)
+        print("g11ref type:", type(g11ref))
+        g11ref.create_group("foo")
+        """
         
         # todo - special_dtype not implemented
-        #dt = h5py.special_dtype(ref=h5py.Reference)
-        #print dt
-        
-        dset = g1.create_dataset('ints', (10,), dtype='i8')
-        
+        dt = h5py.special_dtype(ref=h5py.Reference)
+        print("dt:", dt)
+        print("dt.kind:", dt.kind)
+        print("dt.meta:", dt.metadata['ref'])
+        self.assertTrue(dt.metadata['ref'] is h5py.Reference)
+            
+        dset = g1.create_dataset('myrefs', (10,), dtype=dt)
+        print("dset.dtype.kind:", dset.dtype.kind)
+        ref = h5py.check_dtype(ref=dset.dtype)
+        print("check_dtype:", ref)
+        null_ref = dset[0]
+        print("null_ref:", null_ref)
+        dset[0] = g11_ref
         #g2.attrs['dataset'] = dset.ref
         
         # todo - references as data will need h5pyd equivalent of h5t module

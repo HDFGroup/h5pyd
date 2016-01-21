@@ -24,7 +24,7 @@ import h5json
 from h5py.h5t import check_dtype
 
 #from . import base
-from .base import HLObject
+from .base import HLObject, Reference, RegionReference
 from .base import phil, with_phil
 from .objectid import ObjectID, TypeID, DatasetID
 #from . import filters
@@ -94,8 +94,21 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
             dtype = data.dtype
         else:
             dtype = numpy.dtype(dtype)
-        type_json = h5json.getTypeItem(dtype)
-        #tid = h5t.py_create(dtype, logical=1)
+            
+        if dtype.kind == 'S' and dtype.metadata['ref']:
+            type_json = {}
+            type_json["class"] = "H5T_REFERENCE"
+            meta_type = dtype.metadata['ref']
+            if meta_type is Reference:
+                type_json["base"] = "H5T_STD_REF_OBJ"
+            elif meta_type is RegionReference:
+                type_json["base"] = "H5T_STD_REF_DSETREG"
+            else:
+                errmsg = "Unexpected metadata type"
+                raise ValueError(errmsg)
+        else:
+            type_json = h5json.getTypeItem(dtype)
+            #tid = h5t.py_create(dtype, logical=1)
 
     # Legacy
     if any((compression, shuffle, fletcher32, maxshape,scaleoffset)) and chunks is False:
@@ -802,6 +815,7 @@ class Dataset(HLObject):
         
             
         body['value'] = val.tolist()
+        print("body[value]:", body['value'])
         self.PUT(req, body=body)
         """
         mspace = h5s.create_simple(mshape_pad, (h5s.UNLIMITED,)*len(mshape_pad))

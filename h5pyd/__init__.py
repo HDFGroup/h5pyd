@@ -23,11 +23,13 @@ from __future__ import absolute_import
 #from .highlevel import *
 
 from . import version
+from .h5type import special_dtype, check_dtype
 from ._hl.files import File
 from ._hl.group import Group, SoftLink, ExternalLink, HardLink
 from ._hl.dataset import Dataset
 from ._hl.datatype import Datatype
 from ._hl.attrs import AttributeManager
+from ._hl.base import Reference, RegionReference
 
 
 #from .h5 import get_config

@@ -54,6 +54,15 @@ class ObjectID:
         return self._endpoint
         
     @property
+    def objtype_code(self):
+        """ return one char code to denote what type of object
+        g: group
+        d: dataset
+        t: committed datatype
+        """
+        return self._objtype_code
+        
+    @property
     def parent(self):
         """parent obj - none for anonymous obj"""
         return self._parent
@@ -69,7 +78,7 @@ class ObjectID:
         return self._obj_json
         
 
-    def __init__(self, parent, item, domain=None, endpoint=None, mode='r', **kwds):
+    def __init__(self, parent, item, objtype_code=None, domain=None, endpoint=None, mode='r', **kwds):
         """Create a new objectId.
         """
         #print "object init:", item
@@ -84,6 +93,8 @@ class ObjectID:
         self._obj_json = item
             
         self._endpoint = None
+        
+        self._objtype_code = objtype_code
           
         with phil:
             if parent is not None:
@@ -125,7 +136,7 @@ class TypeID(ObjectID):
         """
          
         with phil:
-            ObjectID.__init__(self, parent, item, domain=domain, endpoint=endpoint)
+            ObjectID.__init__(self, parent, item,  objtype_code='t', domain=domain, endpoint=endpoint)
             
 
 class DatasetID(ObjectID):
@@ -158,7 +169,7 @@ class DatasetID(ObjectID):
         """
          
         with phil:
-            ObjectID.__init__(self, parent, item, domain=domain, endpoint=endpoint)
+            ObjectID.__init__(self, parent, item, objtype_code='d', domain=domain, endpoint=endpoint)
                         
 class GroupID(ObjectID):
     
@@ -168,5 +179,5 @@ class GroupID(ObjectID):
         """
          
         with phil:
-            ObjectID.__init__(self, parent, item, domain=domain, mode=mode, endpoint=endpoint)
+            ObjectID.__init__(self, parent, item, objtype_code='g', domain=domain, mode=mode, endpoint=endpoint)
              
