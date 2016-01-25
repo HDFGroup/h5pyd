@@ -23,7 +23,7 @@ from __future__ import absolute_import
 #from .highlevel import *
 
 from . import version
-from .h5type import special_dtype, check_dtype
+from ._hl.h5type import special_dtype, check_dtype
 from ._hl.files import File
 from ._hl.group import Group, SoftLink, ExternalLink, HardLink
 from ._hl.dataset import Dataset

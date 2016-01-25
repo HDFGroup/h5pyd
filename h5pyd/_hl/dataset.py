@@ -19,9 +19,6 @@ import six
 from six.moves import xrange
 
 import numpy
-import h5json
-
-from h5py.h5t import check_dtype
 
 #from . import base
 from .base import HLObject, Reference, RegionReference
@@ -31,6 +28,7 @@ from .objectid import ObjectID, TypeID, DatasetID
 from . import selections as sel
 #from . import selections2 as sel2
 from .datatype import Datatype
+from .h5type import getTypeItem, createDataType, check_dtype, special_dtype
  
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
 
@@ -107,7 +105,7 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
                 errmsg = "Unexpected metadata type"
                 raise ValueError(errmsg)
         else:
-            type_json = h5json.getTypeItem(dtype)
+            type_json = getTypeItem(dtype)
             #tid = h5t.py_create(dtype, logical=1)
 
     # Legacy
@@ -341,7 +339,7 @@ class Dataset(HLObject):
         self._local = None #local()
         # make a numpy dtype out of the type json
         
-        self._dtype = h5json.createDataType(self.id.type_json)
+        self._dtype = createDataType(self.id.type_json)
         
         if self.id.shape_json['class'] == 'H5S_SCALAR':
             self._shape = []
@@ -463,6 +461,9 @@ class Dataset(HLObject):
             # This is necessary because in the case of array types, NumPy
             # discards the array information at the top level.
             new_dtype = readtime_dtype(self.dtype, names)
+            
+        if new_dtype.kind == 'S' and check_dtype(ref=self.dtype):
+            new_dtype = special_dtype(ref=Reference)
         # todo - will need the following once we have binary transfers
         # mtype = h5t.py_create(new_dtype)
         mtype = new_dtype
@@ -499,16 +500,17 @@ class Dataset(HLObject):
         # === Scalar dataspaces =================
 
         if self.shape == ():
-            fspace = self.id.get_space()
-            selection = sel2.select_read(fspace, args)
-            arr = numpy.ndarray(selection.mshape, dtype=new_dtype)
-            for mspace, fspace in selection:
-                self.id.read(mspace, fspace, arr, mtype)
-            if len(names) == 1:
-                arr = arr[names[0]]
-            if selection.mshape is None:
-                return arr[()]
+            #fspace = self.id.get_space()
+            #selection = sel2.select_read(fspace, args)
+            
+            arr = numpy.ndarray((), dtype=new_dtype)
+            req = "/datasets/" + self.id.uuid + "/value"
+            rsp = self.GET(req)
+            data = rsp['value']
+            arr[()] = data
+            
             return arr
+            
 
         # === Everything else ===================
 
@@ -697,7 +699,7 @@ class Dataset(HLObject):
 
         # Generally we try to avoid converting the arrays on the Python
         # side.  However, for compound literals this is unavoidable.
-       
+        #print("__setitem__, dkind:", self.dtype.kind)
         vlen = check_dtype(vlen=self.dtype)
         if vlen is not None and vlen not in (bytes, six.text_type):
             try:
@@ -735,6 +737,10 @@ class Dataset(HLObject):
             if cast_compound:
                 val = val.astype(numpy.dtype([(names[0], dtype)]))
         else:
+            print("default convert to numpy")
+            if isinstance(val, Reference):
+                print("serialize Reference")
+                val = val.tolist()
             val = numpy.asarray(val, order='C')
 
         # Check for array dtype compatibility and convert
@@ -813,7 +819,10 @@ class Dataset(HLObject):
             if selection.step:
                 body['step'] = list(selection.step)
         
-            
+        print("type value:", type(val))  
+        print("value dtype:", val.dtype)
+        print("value kind:", val.dtype.kind)
+        print("value shape:", val.shape)  
         body['value'] = val.tolist()
         print("body[value]:", body['value'])
         self.PUT(req, body=body)

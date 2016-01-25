@@ -23,6 +23,6 @@ setup(name='h5pyd',
       license='BSD',
       packages = ['h5pyd', 'h5pyd._hl'],
       #requires = ['h5py (>=2.5.0)', 'h5json>=1.0.2'],
-      install_requires = ['h5py>=2.5.0',  'h5json>=1.0.2', 'six'],
-      setup_requires = ['h5py>=2.5.0', 'pkgconfig', 'six'],
+      install_requires = ['six'],
+      setup_requires = ['pkgconfig', 'six'],
       zip_safe=False)

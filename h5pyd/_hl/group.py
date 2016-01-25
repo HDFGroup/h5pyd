@@ -19,7 +19,7 @@ import sys
 import numpy
 import collections
 import json
-import h5json
+
 
 from . import base
 from .base import HLObject, MutableMappingHDF5, Reference, phil, with_phil
@@ -29,6 +29,7 @@ from . import dataset
 from .dataset import Dataset
 from . import datatype
 from .datatype import Datatype
+from . import h5type
 
 
 
@@ -436,7 +437,7 @@ class Group(HLObject, MutableMappingHDF5):
         elif isinstance(obj, numpy.dtype):
             # print "create named type"
             
-            type_json = h5json.getTypeItem(obj)
+            type_json = h5type.getTypeItem(obj)
             #print "type_json:", type_json
             req = "/datatypes"
       

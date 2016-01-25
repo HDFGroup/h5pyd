@@ -107,6 +107,20 @@ class Reference():
     def __repr__(self):
         return "<HDF5 object reference>"
         
+    @with_phil
+    def tolist(self):
+        if self._id.objtype_code == 'd' :
+            return [("datasets/" + self._id.id),]
+        elif self._id.objtype_code == 'g':
+            return [("groups/" + self._id.id),]
+        elif self._id.objtype_code == 't':
+            return [("datatypes/" + self._id.id),]
+        else:
+            raise TypeError("Unexpected id type")
+            
+        
+        
+        
 class RegionReference():
 
     """
@@ -279,7 +293,7 @@ class HLObject(CommonStateObject):
     def file(self):
         """ Return a File instance associated with this object """
         from . import files
-        return files.File(self._id)
+        return files.File(self._id.domain, endpoint=self._id.endpoint, mode=self._id.mode)
 
     @property
     def name(self):
@@ -365,6 +379,7 @@ class HLObject(CommonStateObject):
             
         headers = {'host': self.id.domain}
         self.log.info("PUT: " + req)
+        self.log.info("BODY: " + str(data))
         rsp = requests.put(req, data=data, headers=headers)
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
