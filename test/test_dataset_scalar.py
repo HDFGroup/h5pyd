@@ -37,8 +37,6 @@ class TestScalarDataset(TestCase):
         
         self.assertEqual(dset.file.filename, filename)
         f.close()
-        val = dset[()]
-        print("val:", val)
     
     
 if __name__ == '__main__':

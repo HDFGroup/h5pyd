@@ -164,8 +164,10 @@ class File(Group):
                 mode = 'a'        
             
             if endpoint is None:
-                # todo - get default from env variable
-                endpoint = "http://127.0.0.1:5000"
+                if "H5SERV_ENDPOINT" in os.environ:
+                    endpoint = os.environ["H5SERV_ENDPOINT"]
+                else:
+                    endpoint = "http://127.0.0.1:5000"
                 
             root_json = None
                 
