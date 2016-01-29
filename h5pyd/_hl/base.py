@@ -437,8 +437,12 @@ class HLObject(CommonStateObject):
         self.log = logging.getLogger("h5pyd")
         if not self.log.handlers:
             # setup logging
+            log_path = os.getcwd()
+            if not os.access(log_path, os.W_OK):
+                log_path = "/tmp"
+            log_file = os.path.join(log_path, "h5pyd.log")
             self.log.setLevel(logging.INFO)
-            fh = logging.FileHandler("h5pyd.log")
+            fh = logging.FileHandler(log_file)
             self.log.addHandler(fh)
             
     
