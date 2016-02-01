@@ -25,15 +25,18 @@ from common import ut, TestCase
         
 class TestDatasetCompound(TestCase):
     def test_create_compound_dset(self):
-        filename = self.getFileName("create_compoound_dset")
+        filename = self.getFileName("create_compound_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
+        
+        #curl -v --header "Host: create_compound_dset.h5pyd_test.hdfgroup.org" http://127.0.0.1:5000
+          
 
         count = 10
   
         dt = np.dtype([('real', np.float), ('img', np.float)])
         dset = f.create_dataset('complex', (count,), dtype=dt)
-   
+        
         elem = dset[0]
         for i in range(count):
             theta = (4.0 * math.pi)*(float(i)/float(count))

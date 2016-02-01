@@ -180,6 +180,103 @@ def getTypeItem(dt):
             fields.append(field)
             type_info['fields'] = fields
     return type_info
+    
+    
+"""
+    Get size of an item in bytes.
+    For variable length types (e.g. variable length strings),
+    return the string "H5T_VARIABLE"
+"""
+def getItemSize(typeItem):
+    # handle the case where we are passed a primitive type first
+    if type(typeItem) in [six.string_types, six.text_type, six.binary_type]:
+        for type_prefix in ("H5T_STD_I", "H5T_STD_U", "H5T_IEEE_F"): 
+            if typeItem.startswith(type_prefix):
+                num_bits = typeItem[len(type_prefix):]
+                if num_bits[-2:] in ('LE', 'BE'):
+                    num_bits = num_bits[:-2]
+                try:
+                    return int(num_bits) // 8
+                except ValueError:
+                    raise TypeError("Invalid Type")
+        # none of the expect primative types mathched
+        raise TypeError("Invalid Type")   
+    if type(typeItem) != dict:
+        raise TypeError("invalid type")
+
+    item_size = 0
+    if 'class' not in typeItem:
+        raise KeyError("'class' not provided")
+    typeClass = typeItem['class']
+
+       
+    if typeClass == 'H5T_INTEGER':
+        if 'base' not in typeItem:
+            raise KeyError("'base' not provided")
+        item_size = getItemSize(typeItem['base'])
+         
+    elif typeClass == 'H5T_FLOAT':
+        if 'base' not in typeItem:
+            raise KeyError("'base' not provided")
+        item_size = getItemSize(typeItem['base'])
+        
+    elif typeClass == 'H5T_STRING':
+        if 'length' not in typeItem:
+            raise KeyError("'length' not provided")
+        item_size = typeItem["length"]    
+          
+    elif typeClass == 'H5T_VLEN':
+        item_size = "H5T_VARIABLE"
+    elif typeClass == 'H5T_OPAQUE':
+        if 'size' not in typeItem:
+            raise KeyError("'size' not provided")
+        item_size = int(typeItem['size'])
+        
+    elif typeClass == 'H5T_ARRAY':
+        if 'dims' not in typeItem:
+            raise KeyError("'dims' must be provided for array types")
+        if 'base' not in typeItem:
+            raise KeyError("'base' not provided")
+        item_size = getItemSize(typeItem['base'])
+        
+    elif typeClass == 'H5T_ENUM':
+        if 'base' not in typeItem:
+            raise KeyError("'base' must be provided for enum types")
+        item_size = getItemSize(typeItem['base'])
+        
+    elif typeClass == 'H5T_REFERENCE':
+        item_size = "H5T_VARIABLE"
+    elif typeClass == 'H5T_COMPOUND':
+        if 'fields' not in typeItem:
+            raise KeyError("'fields' not provided for compound type")
+        fields = typeItem['fields']
+        if type(fields) is not list:
+            raise TypeError("Type Error: expected list type for 'fields'")
+        if not fields:
+            raise KeyError("no 'field' elements provided")
+        # add up the size of each sub-field
+        for field in fields:
+            if type(field) != dict:
+                raise TypeError("Expected dictionary type for field")
+            if 'type' not in field:
+                raise KeyError("'type' missing from field")
+            subtype_size = getItemSize(field['type']) # recursive call
+            if subtype_size == "H5T_VARIABLE":
+                item_size = "H5T_VARIABLE"
+                break  # don't need to look at the rest
+                
+            item_size += subtype_size           
+    else:
+        raise TypeError("Invalid type class")
+     
+    # calculate array type    
+    if 'dims' in typeItem and type(item_size) is int:
+        dims = typeItem['dims']
+        for dim in dims:
+            item_size *= dim   
+                
+    return item_size
+
 
 """
     Get element type info - either a complete type or element of a compound type

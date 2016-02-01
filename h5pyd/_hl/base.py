@@ -74,7 +74,7 @@ def guess_dtype(data):
         if type(data) == six.text_type:
            return h5t.special_dtype(vlen=six.text_type)
     """
-    print("guess_dtype")
+    #print("guess_dtype")
     return None
  
 class Reference():
@@ -345,7 +345,7 @@ class HLObject(CommonStateObject):
         return attrs.AttributeManager(self)
         
         
-    def GET(self, req):
+    def GET(self, req, format="json"):
         if self.id.endpoint is None:
             raise IOError("object not initialized")
         if self.id.domain is None:
@@ -355,16 +355,21 @@ class HLObject(CommonStateObject):
         req = self.id.endpoint + req
             
         headers = {'host': self.id.domain}
+        if format == "binary":
+            headers['accept'] =  'application/octet-stream'
         self.log.info("GET: " + req)
         rsp = requests.get(req, headers=headers)
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
              raise IOError(rsp.reason)
-        #print "rsp text", rsp.text    
-        rsp_json = json.loads(rsp.text)
-         
-                
-        return rsp_json
+        #print "rsp text", rsp.text   
+        if rsp.headers['Content-Type'] == "application/octet-stream":
+            self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
+            return rsp.content
+        else: 
+            # assume JSON
+            rsp_json = json.loads(rsp.text)    
+            return rsp_json
         
     def PUT(self, req, body=None):
         if self.id.endpoint is None:
@@ -403,7 +408,6 @@ class HLObject(CommonStateObject):
             
         headers = {'host': self.id.domain}
         self.log.info("PST: " + req)
-        print("post dataset:", data)
         rsp = requests.post(req, data=data, headers=headers)
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):

@@ -28,7 +28,7 @@ from .objectid import ObjectID, TypeID, DatasetID
 from . import selections as sel
 #from . import selections2 as sel2
 from .datatype import Datatype
-from .h5type import getTypeItem, createDataType, check_dtype, special_dtype
+from .h5type import getTypeItem, createDataType, check_dtype, special_dtype, getItemSize
  
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
 
@@ -324,6 +324,7 @@ class Dataset(HLObject):
         arr = numpy.ndarray((1,), dtype=self.dtype)
         dcpl = self._dcpl.get_fill_value(arr)
         return arr[0]
+      
 
     def __init__(self, bind):
         """ Create a new Dataset object by binding to a low-level DatasetID.
@@ -340,11 +341,14 @@ class Dataset(HLObject):
         # make a numpy dtype out of the type json
         
         self._dtype = createDataType(self.id.type_json)
+        self._item_size = getItemSize(self.id.type_json)
         
         if self.id.shape_json['class'] == 'H5S_SCALAR':
             self._shape = []
         else:
             self._shape = self.id.shape_json['dims']
+            
+        
         # self._local.astype = None #todo
 
     def resize(self, size, axis=None):
@@ -544,43 +548,52 @@ class Dataset(HLObject):
         sel_query = selection.getQueryParam()
         if sel_query:
             req += "?" + sel_query
-        rsp = self.GET(req)
+         
+        if self._item_size != 'H5T_VARIABLE':
+            format = "binary"
+        else:
+            format = "json"
+        rsp = self.GET(req, format=format)
         #print "value:", rsp['value']
         #print "new_dtype:", new_dtype
         
-        # need some special conversion for compound types --
-        # each element must be a tuple, but the JSON decoder
-        # gives us a list instead.
-        data = rsp['value']
-        if len(mtype) > 1 and type(data) in (list, tuple):
-            converted_data = []
-            for i in range(len(data)):
-                converted_data.append(self.toTuple(data[i]))
-            data = converted_data
+        if type(rsp) is bytes:
+            arr1d = numpy.fromstring(rsp, dtype=mtype)
+            arr = numpy.reshape(arr1d, mshape)
+        else:    
+            # need some special conversion for compound types --
+            # each element must be a tuple, but the JSON decoder
+            # gives us a list instead.
+            data = rsp['value']
+            if len(mtype) > 1 and type(data) in (list, tuple):
+                converted_data = []
+                for i in range(len(data)):
+                    converted_data.append(self.toTuple(data[i]))
+                data = converted_data
             
-        arr = numpy.empty(mshape, dtype=mtype)
-        arr[...] = data
+            arr = numpy.empty(mshape, dtype=mtype)
+            arr[...] = data
         
-        """    
-        if self.id.type_json['class'] == 'H5T_COMPOUND':
-            arr = numpy.empty(mshape, dtype=new_dtype)
-        else:
-            arr = numpy.array(rsp['value'], dtype=new_dtype)
-        """
-        """
-        #todo
-        mspace = h5s.create_simple(mshape)
-        fspace = selection._id
-        self.id.read(mspace, fspace, arr, mtype)
-        """
+            """    
+            if self.id.type_json['class'] == 'H5T_COMPOUND':
+                arr = numpy.empty(mshape, dtype=new_dtype)
+            else:
+                arr = numpy.array(rsp['value'], dtype=new_dtype)
+            """
+            """
+            #todo
+            mspace = h5s.create_simple(mshape)
+            fspace = selection._id
+            self.id.read(mspace, fspace, arr, mtype)
+            """
 
-        # Patch up the output for NumPy
-        if len(names) == 1:
-            arr = arr[names[0]]     # Single-field recarray convention
-        if arr.shape == ():
-            arr = numpy.asscalar(arr)
-        if single_element:
-            arr = arr[0]
+            # Patch up the output for NumPy
+            if len(names) == 1:
+                arr = arr[names[0]]     # Single-field recarray convention
+            if arr.shape == ():
+                arr = numpy.asscalar(arr)
+            if single_element:
+                arr = arr[0]
         return arr
         
     def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None):
@@ -737,9 +750,7 @@ class Dataset(HLObject):
             if cast_compound:
                 val = val.astype(numpy.dtype([(names[0], dtype)]))
         else:
-            print("default convert to numpy")
             if isinstance(val, Reference):
-                print("serialize Reference")
                 val = val.tolist()
             val = numpy.asarray(val, order='C')
 
@@ -819,12 +830,12 @@ class Dataset(HLObject):
             if selection.step:
                 body['step'] = list(selection.step)
         
-        print("type value:", type(val))  
-        print("value dtype:", val.dtype)
-        print("value kind:", val.dtype.kind)
-        print("value shape:", val.shape)  
+        #print("type value:", type(val))  
+        #print("value dtype:", val.dtype)
+        #print("value kind:", val.dtype.kind)
+        #print("value shape:", val.shape)  
         body['value'] = val.tolist()
-        print("body[value]:", body['value'])
+        #print("body[value]:", body['value'])
         self.PUT(req, body=body)
         """
         mspace = h5s.create_simple(mshape_pad, (h5s.UNLIMITED,)*len(mshape_pad))
