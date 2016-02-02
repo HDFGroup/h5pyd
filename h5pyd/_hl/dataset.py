@@ -549,18 +549,17 @@ class Dataset(HLObject):
         if sel_query:
             req += "?" + sel_query
          
-        if self._item_size != 'H5T_VARIABLE':
-            format = "binary"
-        else:
-            format = "json"
-        rsp = self.GET(req, format=format)
+        # get binary if available
+        rsp = self.GET(req, format="binary")
         #print "value:", rsp['value']
         #print "new_dtype:", new_dtype
         
         if type(rsp) is bytes:
+            # got binary response
             arr1d = numpy.fromstring(rsp, dtype=mtype)
             arr = numpy.reshape(arr1d, mshape)
-        else:    
+        else:   
+            # got JSON response 
             # need some special conversion for compound types --
             # each element must be a tuple, but the JSON decoder
             # gives us a list instead.
