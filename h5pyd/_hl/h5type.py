@@ -160,26 +160,161 @@ def getTypeResponse(typeItem):
                 response[k] = typeItem[k]
     return response
 
+ 
 
 """
     Return type info.
           For primitive types, return string with typename
           For compound types return array of dictionary items
 """
+
 def getTypeItem(dt):
+     
+    predefined_int_types = {
+        'int8':    'H5T_STD_I8',
+        'uint8':   'H5T_STD_U8',
+        'int16':   'H5T_STD_I16',
+        'uint16':  'H5T_STD_U16',
+        'int32':   'H5T_STD_I32',
+        'uint32':  'H5T_STD_U32',
+        'int64':   'H5T_STD_I64',
+        'uint64':  'H5T_STD_U64'
+    }
+    predefined_float_types = {
+        'float32': 'H5T_IEEE_F32',
+        'float64': 'H5T_IEEE_F64'
+    }
+    
     type_info = {}
-    if len(dt) <= 1:
-        type_info = getTypeElement(dt)
-    else:
+    if len(dt) > 1:
+        # compound type
         names = dt.names
         type_info['class'] = 'H5T_COMPOUND'
         fields = []
         for name in names:
             field = { 'name': name }
-            field['type'] = getTypeElement(dt[name])
+            field['type'] = getTypeItem(dt[name])
             fields.append(field)
             type_info['fields'] = fields
+    elif dt.shape:
+        # array type
+        if dt.base == dt:
+            raise TypeError("Expected base type to be different than parent")
+        # array type
+        type_info['dims'] = dt.shape
+        type_info['class'] = 'H5T_ARRAY'
+        type_info['base'] = getTypeItem(dt.base)
+    elif dt.kind == 'O':
+        # vlen string or data
+        #
+        # check for h5py variable length extension
+        vlen_check = check_dtype(vlen=dt.base)
+        if vlen_check is not None and type(vlen_check) != np.dtype:
+            vlen_check = np.dtype(vlen_check)
+        ref_check = check_dtype(ref=dt.base)
+        if vlen_check == six.binary_type:
+            type_info['class'] = 'H5T_STRING'
+            type_info['length'] = 'H5T_VARIABLE'
+            type_info['charSet'] = 'H5T_CSET_ASCII'
+            type_info['strPad'] = 'H5T_STR_NULLTERM'
+        elif vlen_check == six.text_type:
+            type_info['class'] = 'H5T_STRING'
+            type_info['length'] = 'H5T_VARIABLE'
+            type_info['charSet'] = 'H5T_CSET_UTF8'
+            type_info['strPad'] = 'H5T_STR_NULLTERM'
+        elif type(vlen_check) == np.dtype:
+            # vlen data
+            type_info['class'] = 'H5T_VLEN'
+            type_info['size'] = 'H5T_VARIABLE'
+            type_info['base'] = getTypeItem(vlen_check)
+        elif vlen_check is not None:
+            #unknown vlen type
+            raise TypeError("Unknown h5py vlen type: " + str(vlen_check))
+        elif ref_check is not None:
+            # a reference type
+            type_info['class'] = 'H5T_REFERENCE'
+
+            if ref_check is Reference:
+                type_info['base'] = 'H5T_STD_REF_OBJ'  # objref
+            elif ref_check is RegionReference:
+                type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
+            else:
+                raise TypeError("unexpected reference type")
+        else:
+            raise TypeError("unknown object type")
+    elif dt.kind == 'V':
+        # void type
+        type_info['class'] = 'H5T_OPAQUE'
+        type_info['size'] = dt.itemsize
+        type_info['tag'] = ''  # todo - determine tag
+    elif dt.base.kind == 'S':
+        # Fixed length string type
+        type_info['class'] = 'H5T_STRING'
+        type_info['charSet'] = 'H5T_CSET_ASCII'
+        type_info['length'] = dt.itemsize
+        type_info['strPad'] = 'H5T_STR_NULLPAD'
+    elif dt.base.kind == 'U':
+        # Fixed length unicode type
+        raise TypeError("Fixed length unicode type is not supported")
+         
+    elif dt.kind == 'b':
+        # boolean type - h5py stores as enum
+        if dt.base == dt:
+            raise TypeError("Expected base type to be different than parent")
+        baseType = getBaseType(dt)
+        type_info['class'] = 'H5T_ENUM'
+        type_info['mapping'] = {"false": 0, "true": 1}
+        type_info['base'] = getTypeItem(dt.base)
+    elif dt.kind == 'f':
+        # floating point type
+        type_info['class'] = 'H5T_FLOAT'
+        byteorder = 'LE'
+        if dt.byteorder == '>':
+            byteorder = 'BE'
+        if dt.name in predefined_float_types:
+            #maps to one of the HDF5 predefined types
+            type_info['base'] = predefined_float_types[dt.base.name] + byteorder
+        else:
+            raise TypeError("Unexpected floating point type: " + dt.name)
+    elif dt.kind == 'i' or dt.kind == 'u':
+        # integer type
+        
+        # assume LE unless the numpy byteorder is '>'
+        byteorder = 'LE'
+        if dt.base.byteorder == '>':
+            byteorder = 'BE'
+             
+        # numpy integer type - but check to see if this is the hypy
+        # enum extension
+        mapping = check_dtype(enum=dt)
+
+        if mapping:
+            # yes, this is an enum!
+            type_info['class'] = 'H5T_ENUM'
+            type_info['mapping'] = mapping
+            if dt.name not in predefined_int_types:
+                raise TypeError("Unexpected integer type: " + dt.name)
+            #maps to one of the HDF5 predefined types
+            base_info = { "class": "H5T_INTEGER" }
+            base_info['base'] = predefined_int_types[dt.name] + byteorder
+            type_info["base"] = base_info
+        else:
+            type_info['class'] = 'H5T_INTEGER'
+            base_name = dt.name
+            
+            if dt.name not in predefined_int_types:
+                raise TypeError("Unexpected integer type: " + dt.name)
+           
+            type_info['base'] = predefined_int_types[base_name] + byteorder
+             
+    else:
+        # unexpected kind
+        raise TypeError("unexpected dtype kind: " + dt.kind)
+            
+                 
     return type_info
+    
+ 
     
     
 """
@@ -276,184 +411,7 @@ def getItemSize(typeItem):
             item_size *= dim   
                 
     return item_size
-
-
-"""
-    Get element type info - either a complete type or element of a compound type
-    Returns dictionary
-    Note: only getTypeItem should call this!
-"""
-
-def getTypeElement(dt):
-    if len(dt) > 1:
-        raise Exception("unexpected numpy type passed to getTypeElement")
-
-    type_info = {}
-
-    if dt.kind == 'O':
-        # numpy object type - assume this is a h5py variable length extension
-        h5t_check = check_dtype(vlen=dt)
-        if h5t_check is not None:
-
-            if h5t_check == six.binary_type:
-                type_info['class'] = 'H5T_STRING'
-                type_info['length'] = 'H5T_VARIABLE'
-                type_info['charSet'] = 'H5T_CSET_ASCII'
-                type_info['strPad'] = 'H5T_STR_NULLTERM'
-            elif h5t_check == six.text_type:
-                type_info['class'] = 'H5T_STRING'
-                type_info['length'] = 'H5T_VARIABLE'
-                type_info['charSet'] = 'H5T_CSET_UTF8'
-                type_info['strPad'] = 'H5T_STR_NULLTERM'
-            elif type(h5t_check) == np.dtype:
-                # vlen data
-                type_info['class'] = 'H5T_VLEN'
-                type_info['size'] = 'H5T_VARIABLE'
-                type_info['base'] = getBaseType(h5t_check)
-            else:
-                #unknown vlen type
-                raise TypeError("Unknown h5py vlen type: " + h5t_check)
-        else:
-            # check for reference type
-            h5t_check = check_dtype(ref=dt)
-            if h5t_check is not None:
-                type_info['class'] = 'H5T_REFERENCE'
-
-                if h5t_check is Reference:
-                    type_info['base'] = 'H5T_STD_REF_OBJ'  # objref
-                elif h5t_check is RegionReference:
-                    type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
-                else:
-                    raise TypeError("unexpected reference type")
-            else:
-                raise TypeError("unknown object type")
-    elif dt.kind == 'V':
-        baseType = getBaseType(dt)
-        if dt.shape:
-            # array type
-            type_info['dims'] = dt.shape
-            type_info['class'] = 'H5T_ARRAY'
-            type_info['base'] = baseType
-        elif baseType['class'] == 'H5T_OPAQUE':
-            # expecting this to be an opaque type
-            type_info = baseType  # just promote the base type
-        else:
-            raise TypeError("unexpected Void type")
-    elif dt.kind == 'S':
-        # String type
-        baseType = getBaseType(dt)
-        type_info = baseType  # just use base type
-    elif dt.kind == 'U':
-        # Unicode String type
-        baseType = getBaseType(dt)
-        type_info = baseType  # just use base type
-    elif dt.kind == 'i' or dt.kind == 'u':
-        # integer type
-        baseType = getBaseType(dt)
-        # numpy integer type - but check to see if this is the hypy
-        # enum extension
-        mapping = check_dtype(enum=dt)
-
-        if mapping:
-            # yes, this is an enum!
-            type_info['class'] = 'H5T_ENUM'
-            type_info['mapping'] = mapping
-            type_info['base'] = baseType
-        else:
-            type_info = baseType  # just use base type
-    elif dt.kind == 'b':
-        # boolean type - h5py stores as enum
-        baseType = getBaseType(dt)
-        type_info['class'] = 'H5T_ENUM'
-        type_info['mapping'] = {"false": 0, "true": 1}
-        type_info['base'] = baseType
-    elif dt.kind == 'f':
-        # floating point type
-        baseType = getBaseType(dt)
-        type_info = baseType  # just use base type
-    else:
-        # unexpected kind
-        raise TypeError("unexpected dtype kind: " + dt.kind)
-
-    return type_info
-
-"""
-Get Base type info for given type element.
-"""
-def getBaseType(dt):
-    if len(dt) > 1:
-        raise TypeError("unexpected numpy type passed to getTypeElement")
-
-    predefined_int_types = {
-        'int8':    'H5T_STD_I8',
-        'uint8':   'H5T_STD_U8',
-        'int16':   'H5T_STD_I16',
-        'uint16':  'H5T_STD_U16',
-        'int32':   'H5T_STD_I32',
-        'uint32':  'H5T_STD_U32',
-        'int64':   'H5T_STD_I64',
-        'uint64':  'H5T_STD_U64'
-    }
-    predefined_float_types = {
-        'float32': 'H5T_IEEE_F32',
-        'float64': 'H5T_IEEE_F64'
-    }
-    type_info = {}
-
-    #type_info['base_size'] = dt.base.itemsize
-
-    # primitive type
-    if dt.base.kind == 'S':
-        # Fixed length string type
-        type_info['class'] = 'H5T_STRING'
-        type_info['charSet'] = 'H5T_CSET_ASCII'
-        type_info['length'] = dt.base.itemsize
-        type_info['strPad'] = 'H5T_STR_NULLPAD'
-    elif dt.base.kind == 'V':
-            type_info['class'] = 'H5T_OPAQUE'
-            type_info['size'] = dt.itemsize
-            type_info['tag'] = ''  # todo - determine tag
-    elif dt.base.kind == 'i' or dt.base.kind == 'u':
-        type_info['class'] = 'H5T_INTEGER'
-        byteorder = 'LE'
-        if dt.base.byteorder == '>':
-            byteorder = 'BE'
-        if dt.base.name in predefined_int_types:
-            #maps to one of the HDF5 predefined types
-            type_info['base'] = predefined_int_types[dt.base.name] + byteorder
-    elif dt.base.kind == 'b':
-        type_info['class'] = 'H5T_INTEGER'
-        byteorder = 'LE'
-        if dt.base.byteorder == '>':
-            byteorder = 'BE'
-        type_info['base'] = 'H5T_STD_I8' + byteorder
-    elif dt.base.kind == 'f':
-        type_info['class'] = 'H5T_FLOAT'
-        byteorder = 'LE'
-        if dt.base.byteorder == '>':
-            byteorder = 'BE'
-        if dt.base.name in predefined_float_types:
-            #maps to one of the HDF5 predefined types
-            type_info['base'] = predefined_float_types[dt.base.name] + byteorder
-    elif dt.base.kind == 'O':
-        # check for reference type
-        h5t_check = check_dtype(ref=dt)
-        if h5t_check is not None:
-            type_info['class'] = 'H5T_REFERENCE'
-            if h5t_check is Reference:
-                type_info['base'] = 'H5T_STD_REF_OBJ'  # objref
-            elif h5t_check is RegionReference:
-                type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
-            else:
-                raise TypeError("unexpected reference type")
-        else:
-            raise TypeError("unknown object type")
-    else:
-        # unexpected kind
-        raise TypeError("unexpected dtype base kind: " + dt.base.kind)
-
-    return type_info
-
+ 
 
 def getNumpyTypename(hdf5TypeName, typeClass=None):
     predefined_int_types = {
