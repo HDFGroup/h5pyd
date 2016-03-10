@@ -550,7 +550,7 @@ class Dataset(HLObject):
             req += "?" + sel_query
          
         # get binary if available
-        rsp = self.GET(req, format="binary")
+        rsp = self.GET(req, format="json") #format="binary")
         #print "value:", rsp['value']
         #print "new_dtype:", new_dtype
         
