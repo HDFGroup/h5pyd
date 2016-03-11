@@ -384,7 +384,7 @@ class HLObject(CommonStateObject):
             
         headers = {'host': self.id.domain}
         self.log.info("PUT: " + req)
-        self.log.info("BODY: " + str(data))
+        # self.log.info("BODY: " + str(data))
         rsp = requests.put(req, data=data, headers=headers)
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
