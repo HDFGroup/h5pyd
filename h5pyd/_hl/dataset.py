@@ -14,6 +14,7 @@ from __future__ import absolute_import
 
 import posixpath as pp
 import sys
+import base64
 
 import six
 from six.moves import xrange
@@ -550,7 +551,9 @@ class Dataset(HLObject):
             req += "?" + sel_query
          
         # get binary if available
-        rsp = self.GET(req, format="json") #format="binary")
+        #rsp = self.GET(req, format="json")
+        rsp = self.GET(req, format="binary")
+        
         #print "value:", rsp['value']
         #print "new_dtype:", new_dtype
         
@@ -701,6 +704,11 @@ class Dataset(HLObject):
         match.
         """
         
+        if self._item_size != "H5T_VARIABLE":
+            use_base64 = True   # may need to set this to false below for some types
+        else:
+            use_base64 = False  # never use for variable length types
+        
         args = args if isinstance(args, tuple) else (args,)
 
         # Sort field indices from the slicing
@@ -712,6 +720,7 @@ class Dataset(HLObject):
         # Generally we try to avoid converting the arrays on the Python
         # side.  However, for compound literals this is unavoidable.
         #print("__setitem__, dkind:", self.dtype.kind)
+        # For h5pyd, do extra check and convert type on client side for efficiency
         vlen = check_dtype(vlen=self.dtype)
         if vlen is not None and vlen not in (bytes, six.text_type):
             try:
@@ -734,7 +743,8 @@ class Dataset(HLObject):
         elif self.dtype.kind == "O" or \
           (self.dtype.kind == 'V' and \
           (not isinstance(val, numpy.ndarray) or val.dtype.kind != 'V') and \
-          (self.dtype.subdtype == None)):
+          (self.dtype.subdtype == None)) or \
+          (self.dtype.str != val.dtype.str):
             if len(names) == 1 and self.dtype.fields is not None:
                 # Single field selected for write, from a non-array source
                 if not names[0] in self.dtype.fields:
@@ -751,6 +761,7 @@ class Dataset(HLObject):
         else:
             if isinstance(val, Reference):
                 val = val.tolist()
+                use_base64 = False
             val = numpy.asarray(val, order='C')
 
         # Check for array dtype compatibility and convert
@@ -832,8 +843,14 @@ class Dataset(HLObject):
         #print("type value:", type(val))  
         #print("value dtype:", val.dtype)
         #print("value kind:", val.dtype.kind)
-        #print("value shape:", val.shape)  
-        body['value'] = val.tolist()
+        #print("value shape:", val.shape) 
+        if use_base64:
+            data = val.tostring()
+            data = base64.b64encode(data)
+            data = data.decode("ascii")
+            body['value_base64'] = data
+        else:
+            body['value'] = val.tolist()
         #print("body[value]:", body['value'])
         self.PUT(req, body=body)
         """
