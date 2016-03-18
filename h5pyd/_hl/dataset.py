@@ -710,7 +710,20 @@ class Dataset(HLObject):
             use_base64 = False  # never use for variable length types
         
         args = args if isinstance(args, tuple) else (args,)
-
+        
+        # get the val dtype if we're passed a numpy array
+        val_dtype = None
+        try:
+            val_dtype = val.dtype
+        except AttributeError:
+            pass # not a numpy object, just leave dtype as None
+        
+        if isinstance(val, Reference):
+            #print("convert reference")
+            # h5pyd References are just strings
+            val = val.tolist()
+            
+       
         # Sort field indices from the slicing
         names = tuple(x for x in args if isinstance(x, six.string_types))
         args = tuple(x for x in args if not isinstance(x, six.string_types))
@@ -731,7 +744,7 @@ class Dataset(HLObject):
                                        for x in val], dtype=self.dtype)
                 except ValueError:
                     pass
-            if vlen == val.dtype:
+            if vlen == val_dtype:
                 if val.ndim > 1:
                     tmp = numpy.empty(shape=val.shape[:-1], dtype=object)
                     tmp.ravel()[:] = [i for i in val.reshape(
@@ -740,9 +753,12 @@ class Dataset(HLObject):
                     tmp = numpy.array([None], dtype=object)
                     tmp[0] = val
                 val = tmp
-        elif self.dtype.kind == "O" or \
+
+        elif val_dtype is None or \
+          self.dtype.kind == "O" or \
           (self.dtype.kind == 'V' and \
-          (not isinstance(val, numpy.ndarray) or val.dtype.kind != 'V') and \
+          (not isinstance(val, numpy.ndarray) or \
+          val.dtype.kind != 'V') and \
           (self.dtype.subdtype == None)) or \
           (self.dtype.str != val.dtype.str):
             if len(names) == 1 and self.dtype.fields is not None:
@@ -754,15 +770,11 @@ class Dataset(HLObject):
             else:
                 dtype = self.dtype
                 cast_compound = False
-
             val = numpy.asarray(val, dtype=dtype, order='C')
             if cast_compound:
                 val = val.astype(numpy.dtype([(names[0], dtype)]))
-        else:
-            if isinstance(val, Reference):
-                val = val.tolist()
-                use_base64 = False
-            val = numpy.asarray(val, order='C')
+        
+            
 
         # Check for array dtype compatibility and convert
         if self.dtype.subdtype is not None:
@@ -850,8 +862,11 @@ class Dataset(HLObject):
             data = data.decode("ascii")
             body['value_base64'] = data
         else:
-            body['value'] = val.tolist()
-        #print("body[value]:", body['value'])
+            if type(val) is not list:
+                val = val.tolist()
+            val = self._decode(val)
+            body['value'] = val 
+          
         self.PUT(req, body=body)
         """
         mspace = h5s.create_simple(mshape_pad, (h5s.UNLIMITED,)*len(mshape_pad))

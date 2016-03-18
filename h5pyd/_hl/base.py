@@ -109,6 +109,8 @@ class Reference():
         
     @with_phil
     def tolist(self):
+        if type(self._id.id) is not str:
+            raise TypeError("Expected string id")
         if self._id.objtype_code == 'd' :
             return [("datasets/" + self._id.id),]
         elif self._id.objtype_code == 'g':
@@ -203,6 +205,31 @@ class CommonStateObject(object):
         if lcpl:
             return name, get_lcpl(coding)
         return name
+        
+    def _decode(self, item, encoding="ascii"):
+        """decode any byte items to python 3 strings
+        """
+        ret_val = None
+        if type(item) is bytes:
+            ret_val = item.decode(encoding)
+        elif type(item) is list:
+            ret_val = []
+            for x in item:
+                ret_val.append(self._decode(x, encoding))
+        elif type(item) is tuple:
+            ret_val = []
+            for x in item:
+                ret_val.append(self._decode(x, encoding))
+            ret_val = tuple(ret_val)
+        elif type(item) is dict:
+            ret_val = {}
+            for k in dict:
+                ret_val[k] = self._decode(item[k], encoding)
+        else:
+            ret_val = item
+        return ret_val
+                
+        
 
     def _d(self, name):
         """ Decode a name according to the current file settings.

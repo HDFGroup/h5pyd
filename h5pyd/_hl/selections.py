@@ -179,7 +179,7 @@ class Selection(object):
         if self._select_type == 'SEL_NONE':
             npoints = 0
         elif self._select_type == 'SEL_ALL':
-            dims = self._shape['dims']
+            dims = self._shape
             npoints = 1
             for nextent in dims:
                 npoints *= nextent
@@ -283,7 +283,7 @@ class SimpleSelection(Selection):
         if self.shape == ():
             if len(args) > 0 and args[0] not in (Ellipsis, ()):
                 raise TypeError("Invalid index for scalar dataset (only ..., () allowed)")
-            self.select_type = 'SEL_ALL'
+            self._select_type = 'SEL_ALL'
             return self
 
         start, count, step, scalar = _handle_simple(self.shape,args)
@@ -306,7 +306,7 @@ class SimpleSelection(Selection):
         if self._select_type == 'SEL_NONE':
             npoints = 0
         elif self._select_type == 'SEL_ALL':
-            dims = self._shape['dims']
+            dims = self._shape
             npoints = 1
             for nextent in dims:
                 npoints *= nextent

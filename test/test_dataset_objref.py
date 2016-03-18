@@ -38,7 +38,7 @@ class TestObjRef(TestCase):
         g11 = g1.create_group('g1.1')
         
         g11_ref = g11.ref 
-        print("g11_ref:", g11_ref)
+        #print("g11_ref:", g11_ref)
         #print("uuid:", g11_ref.id.uuid)
         #print("domain:", g11_ref.id.domain)
         #print("type:", g11_ref.id.objtype_code)
@@ -54,9 +54,9 @@ class TestObjRef(TestCase):
         #print("json dump:", json.dumps(g2.__dict__))
         """
         g11ref = g2[g11_ref]
-        print("g11ref:", g11ref)
-        print("g11ref name:", g11ref.name)
-        print("g11ref type:", type(g11ref))
+        #print("g11ref:", g11ref)
+        #print("g11ref name:", g11ref.name)
+        #print("g11ref type:", type(g11ref))
         g11ref.create_group("foo")
         """
         d1 = g2.create_dataset('d1', (10,), dtype='i8')
@@ -64,27 +64,27 @@ class TestObjRef(TestCase):
         d1_ref = d1.ref
         
         dt = h5py.special_dtype(ref=h5py.Reference)
-        print("dt:", dt)
-        print("dt.kind:", dt.kind)
-        print("dt.meta:", dt.metadata['ref'])
+        #print("dt:", dt)
+        #print("dt.kind:", dt.kind)
+        #print("dt.meta:", dt.metadata['ref'])
         self.assertTrue(dt.metadata['ref'] is h5py.Reference)
             
         dset = g1.create_dataset('myrefs', (10,), dtype=dt)
-        print("dset kind:", dset.dtype.kind)
-        print("dset.dtype.kind:", dset.dtype.kind)
+        #print("dset kind:", dset.dtype.kind)
+        #print("dset.dtype.kind:", dset.dtype.kind)
         ref = h5py.check_dtype(ref=dset.dtype)
-        print("check_dtype:", ref)
+        #print("check_dtype:", ref)
         null_ref = dset[0]
-        print("null_ref:", null_ref)
+        #print("null_ref:", null_ref)
         dset[0] = g11_ref
         dset[1] = d1_ref
         #g2.attrs['dataset'] = dset.ref
         
         # todo - references as data will need h5pyd equivalent of h5t module
         # g2.attrs.create('dataset', dset.ref, dtype=dt)  
-        print("g11_ref type:", type(g11_ref))
+        #print("g11_ref type:", type(g11_ref))
         a_ref = dset[0]
-        print("a_ref", type(a_ref) )
+        #print("a_ref", type(a_ref) )
          
         f.close()
         
