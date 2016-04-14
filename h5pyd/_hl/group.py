@@ -691,7 +691,7 @@ class Group(HLObject, MutableMappingHDF5):
                         if nargs == 1:
                             retval = func(link_name)
                         else:
-                            retval = func(link_name, parent)
+                            retval = func(link_name, obj)
                         if retval is not None:
                             # caller indicates to end iteration
                             break
