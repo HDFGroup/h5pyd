@@ -13,7 +13,7 @@ import sys
 import h5pyd
 import numpy as np
 
-endpoint="http://127.0.0.1:5000"
+endpoint="http://192.168.1.100:5000"
 
 cube_side = 64
 if len(sys.argv) > 1:

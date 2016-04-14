@@ -651,15 +651,21 @@ class Group(HLObject, MutableMappingHDF5):
         tovisit = collections.OrderedDict()
         tovisit[self.id.uuid] = self
         
-        nargs = func.func_code.co_argcount
+        if six.PY3:
+            nargs = func.__code__.co_argcount
+        else:
+            nargs = func.func_code.co_argcount
          
         while len(tovisit) > 0:
             (parent_uuid, parent) = tovisit.popitem(last=True)
             if parent.name != '/':
                 if nargs == 1:
-                    func(parent.name)
+                    retval = func(parent.name)
                 else:
-                    func(parent.name, parent)
+                    retval = func(parent.name, parent)
+                if retval is not None:
+                    # caller indicates to end iteration
+                    break
             visited[self.id.uuid] = True
             if parent.id.__class__ is GroupID:
                 req = "/groups/" + parent.id.uuid + "/links"
