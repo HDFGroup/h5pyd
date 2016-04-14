@@ -672,12 +672,30 @@ class Group(HLObject, MutableMappingHDF5):
                 rsp_json = self.GET(req)
                 links = rsp_json['links']
                 for link in links:
-                    if link['class'] != 'H5L_TYPE_HARD':
-                        continue  # ignore soft/external links
-                    if link['id'] in visited:
-                        continue  # already been there    
-                    obj = parent.__getitem__(link['title'])
-                    tovisit[obj.id.uuid] = obj
+                    obj = None
+                    if link['class'] == 'H5L_TYPE_SOFT':      
+                        obj = SoftLink(link['h5path'])
+                    elif link['class'] == 'H5L_TYPE_EXTERNAL':
+                        obj = ExternalLink(link['h5domain'], link['h5path'])
+                    elif link['class'] ==  'H5L_TYPE_UDLINK':
+                        obj = UserDefinedLink()
+                    elif link['class'] == 'H5L_TYPE_HARD':
+                        if link['id'] in visited:
+                            continue  # already been there    
+                        obj = parent.__getitem__(link['title'])
+                        tovisit[obj.id.uuid] = obj
+                        obj = None
+                    if obj is not None:
+                        # call user func directly for non-hardlinks
+                        link_name = parent.name + '/' + link['title']
+                        if nargs == 1:
+                            retval = func(link_name)
+                        else:
+                            retval = func(link_name, parent)
+                        if retval is not None:
+                            # caller indicates to end iteration
+                            break
+                        
             
         """
         with phil:
@@ -752,3 +770,15 @@ class ExternalLink(object):
 
     def __repr__(self):
         return '<ExternalLink to "%s" in file "%s"' % (self.path, self.filename)
+        
+class UserDefinedLink(object):
+
+    """
+        Represents a user-defined link
+    """  
+
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return '<UDLink >' 

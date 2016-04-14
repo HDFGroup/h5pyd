@@ -99,7 +99,7 @@ class TestGroup(TestCase):
         
         # create a external hardlink
         r['myexternallink'] = h5py.ExternalLink(link_target_filename, "somepath")
-        print("link_target_filename:", link_target_filename)
+        #print("link_target_filename:", link_target_filename)
         # test getclass
         g1_class = r.get('g1', getclass=True)
         self.assertEqual(g1_class, h5py.Group)
@@ -108,6 +108,7 @@ class TestGroup(TestCase):
         link_class = r.get('mysoftlink', getclass=True, getlink=True)
         self.assertEqual(link_class, h5py.SoftLink)
         softlink = r.get('mysoftlink', getlink=True)
+        #print("softlink class:", softlink.__class__.__name__)
         self.assertEqual(softlink.path, '/g1/g1.1')
         
         try:
