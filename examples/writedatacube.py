@@ -14,7 +14,7 @@ import h5pyd
 #import h5py as h5pyd
 import numpy as np
 
-endpoint="http://192.168.1.100:5000"
+endpoint="http://127.0.0.1:5000"
 
 cube_side = 256
 
