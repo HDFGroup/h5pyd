@@ -41,9 +41,9 @@ def dump(name, obj):
     elif class_name == "ExternalLink":
         desc = '{' + obj.filename + '//' + obj.path + '}'
     if desc is None:
-        print("{0:25}{1}".format(name, class_name))
+        print("{0:24} {1}".format(name, class_name))
     else:
-        print("{0:25}{1} {2}".format(name, class_name, desc))
+        print("{0:24} {1} {2}".format(name, class_name, desc))
     if verbose and obj_id is not None:
         print("    id: {0}".format(obj_id))
           
@@ -52,7 +52,8 @@ def dump(name, obj):
 # Usage
 #
 def printUsage():
-    print("usage: h5ls [-r] [-a] urls")
+    print("usage: python h5ls.py [-r] [-a] [-e endpoint] urls")
+    print("example: python h5ls.py -r -e http://data.hdfgroup.org:7253 tall.test.data.hdfgroup.org")
     sys.exit() 
  
 #
@@ -73,7 +74,7 @@ while argn < len(sys.argv):
     elif arg in ("-h", "--help"):
          printUsage()
     elif arg in ("-e", "--endpoint"):
-         endpoint = sys.argv[arn+1]
+         endpoint = sys.argv[argn+1]
          argn += 2
     elif arg[0] == '-':
          printUsage()         
@@ -90,7 +91,11 @@ for url in urls:
         f.visititems(dump)
     else:
         for k in f:
-            dump(k, f[k])
+            item = f.get(k, getlink=True)
+            if item.__class__.__name__ == "HardLink":
+                # follow hardlinks
+                item = f.get(k)
+            dump(k, item)
     f.close()         
 
  
