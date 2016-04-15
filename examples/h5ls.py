@@ -8,7 +8,6 @@ import sys
 recursive = False
 verbose = False
 endpoint = "http://127.0.0.1:5000"
-#f = None
 
 def getShapeText(dset):
     shape_text = "Scalar"
