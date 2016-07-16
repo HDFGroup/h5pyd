@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 ##############################################################################
 # Copyright by The HDF Group.                                                #
 # All rights reserved.                                                       #
@@ -13,11 +14,11 @@
 import os
 import sys
 
-tests = ( 'test_attribute', 'test_committedtype', 'test_dataset_compound',
-    'test_dataset_extend', 'test_dataset_getitem', 'test_file', 'test_group',
-    'test_objref' )
- 
-    
+tests = ('test_attribute', 'test_committedtype', 'test_dataset_compound',
+         'test_dataset_extend', 'test_dataset_getitem', 'test_file',
+         'test_group', 'test_objref')
+
+
 #
 # Run tests
 #
@@ -27,6 +28,6 @@ for file_name in tests:
     rc = os.system('python ' + file_name + '.py')
     if rc != 0:
         sys.exit("Failed")
- 
+
 os.chdir('..')
 print("Done!")
