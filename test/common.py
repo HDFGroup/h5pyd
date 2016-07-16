@@ -53,8 +53,8 @@ else:
     del testfile
 
 
- 
-   
+
+
 
 
 class TestCase(ut.TestCase):
@@ -62,17 +62,17 @@ class TestCase(ut.TestCase):
     """
         Base class for unit tests.
     """
-    
-        
+
+
     @property
     def endpoint(self):
-        endpoint = "http://" + get(server) + ":" + get(port)
+        endpoint = "http://" + config.get('server') + ":" + config.get('port')
         return endpoint
-        
+
     @property
     def base_domain(self):
         return  self.test_dir + ".h5pyd_test.hdfgroup.org"
-    
+
     @classmethod
     def setUpClass(cls):
         pass
@@ -82,11 +82,11 @@ class TestCase(ut.TestCase):
     def tearDownClass(cls):
         pass
         #shutil.rmtree(cls.tempdir)
-        
+
     def setUp(self):
         self.test_dir = str(int(time.time()))
         #self.f = h5py.File(self.mktemp(), 'w')
-        
+
     def tearDown(self):
         try:
             if self.f:
@@ -130,11 +130,11 @@ class TestCase(ut.TestCase):
             self.assertTrue(
                 np.isscalar(dset) and np.isscalar(arr),
                 'Scalar/array mismatch ("%r" vs "%r")%s' % (dset, arr, message)
-                )
+            )
             self.assertTrue(
                 dset - arr < precision,
                 "Scalars differ by more than %.3f%s" % (precision, message)
-                )
+            )
             return
 
         self.assertTrue(
@@ -145,7 +145,7 @@ class TestCase(ut.TestCase):
             dset.dtype == arr.dtype,
             "Dtype mismatch (%s vs %s)%s" % (dset.dtype, arr.dtype, message)
             )
-            
+
         if arr.dtype.names is not None:
             for n in arr.dtype.names:
                 message = '[FIELD %s] %s' % (n, message)
@@ -163,10 +163,10 @@ class TestCase(ut.TestCase):
 
     def assertNumpyBehavior(self, dset, arr, s):
         """ Apply slicing arguments "s" to both dset and arr.
-        
+
         Succeeds if the results of the slicing are identical, or the
         exception raised is of the same type for both.
-        
+
         "arr" must be a Numpy array; "dset" may be a NumPy array or dataset.
         """
         exc = None
@@ -174,13 +174,13 @@ class TestCase(ut.TestCase):
             arr_result = arr[s]
         except Exception as e:
             exc = type(e)
-            
+
         if exc is None:
             self.assertArrayEqual(dset[s], arr_result)
         else:
             with self.assertRaises(exc):
                 dset[s]
-                
+
     def getFileName(self, basename):
         if config.get("use_h5py"):
             if not op.isdir("out"):
@@ -188,6 +188,3 @@ class TestCase(ut.TestCase):
             return "out/" + basename + ".h5"
         else:
             return basename + "." + config.get("domain")
-            
-        
-  
