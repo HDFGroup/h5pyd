@@ -758,7 +758,7 @@ class ExternalLink(object):
         self._path = str(path)
 
     def __repr__(self):
-        return '<ExternalLink to "%s" in file "%s"' % (self.path, self.filename)
+        return '<ExternalLink to "%s" in file "%s">' % (self.path, self.filename)
 
 class UserDefinedLink(object):
 
