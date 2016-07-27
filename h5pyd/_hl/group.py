@@ -32,7 +32,6 @@ from .datatype import Datatype
 from . import h5type
 
 
-
 class Group(HLObject, MutableMappingHDF5):
 
     """ Represents an HDF5 group.
@@ -40,14 +39,14 @@ class Group(HLObject, MutableMappingHDF5):
 
     def __init__(self, bind):
         #print "group init, bind:", bind
-                
+
         """ Create a new Group object by binding to a low-level GroupID.
         """
-        
+
         with phil:
             if not isinstance(bind, GroupID):
                 raise ValueError("%s is not a GroupID" % bind)
-            HLObject.__init__(self, bind)        
+            HLObject.__init__(self, bind)
 
     def create_group(self, name):
         """ Create and return a new subgroup.
@@ -57,19 +56,18 @@ class Group(HLObject, MutableMappingHDF5):
         """
         if self.id.mode == 'r':
             raise ValueError("Unable to create group (No write intent on file)")
-            
+
         if self.__contains__(name):
             raise ValueError("Unable to create link (Name alredy exists)")
-            
-            
-        body = {'link': { 'id': self.id.uuid, 
-                          'name': name 
+
+        body = {'link': { 'id': self.id.uuid,
+                          'name': name
                } }
         rsp = self.POST('/groups', body=body)
-      
+
         group_json = rsp #json.loads(rsp.text)
         groupId = GroupID(self, group_json)
-        
+
         subGroup = Group(groupId)
         if self._name:
             if self._name[-1] == '/':
@@ -77,7 +75,7 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 subGroup._name = self._name + '/' + name
         return subGroup
-        
+
     def create_dataset(self, name, shape=None, dtype=None, data=None, **kwds):
         """ Create a new HDF5 dataset
 
@@ -130,14 +128,14 @@ class Group(HLObject, MutableMappingHDF5):
         track_times
             (T/F) Enable dataset creation timestamps.
         """
-        
+
         if self.id.mode == 'r':
             raise ValueError("Unable to create dataset (No write intent on file)")
-        
+
         with phil:
             dsid = dataset.make_new_dset(self, shape, dtype, data, **kwds)
             dset = dataset.Dataset(dsid)
-            
+
             if name is not None:
                 #print 'fname:', self._name
                 if self._name:
@@ -147,7 +145,6 @@ class Group(HLObject, MutableMappingHDF5):
                         dset._name = self._name + '/' + name
                 self[name] = dset
             return dset
-        
 
     def require_dataset(self, name, shape, dtype, exact=False, **kwds):
         """ Open a dataset, creating it if it doesn't exist.
@@ -162,7 +159,7 @@ class Group(HLObject, MutableMappingHDF5):
         Raises TypeError if an incompatible object already exists, or if the
         shape or dtype don't match according to the above rules.
         """
-            
+
         with phil:
             if not name in self:
                 return self.create_dataset(name, *(shape, dtype), **kwds)
@@ -181,15 +178,14 @@ class Group(HLObject, MutableMappingHDF5):
                 raise TypeError("Datatypes cannot be safely cast (existing %s vs new %s)" % (dset.dtype, dtype))
 
             return dset
-        
-        
+
     def require_group(self, name):
         """ Return a group, creating it if it doesn't exist.
 
         TypeError is raised if something with that name already exists that
         isn't a group.
         """
-         
+
         with phil:
             if not name in self:
                 return self.create_group(name)
@@ -197,14 +193,13 @@ class Group(HLObject, MutableMappingHDF5):
             if not isinstance(grp, Group):
                 raise TypeError("Incompatible object (%s) already exists" % grp.__class__.__name__)
             return grp
-            
-        
+
     def get_link_json(self, name):
         """ Return parent_uuid and json description of link for given path """
-         
+
         parent_uuid = self.id.uuid
-        tgt_json = None        
-        
+        tgt_json = None
+
         if name[0] == '/':
             #abs path, start with root
             # get root_uuid
@@ -212,62 +207,62 @@ class Group(HLObject, MutableMappingHDF5):
             parent_uuid = rsp['root']
             # make a fake tgt_json to represent 'link' to root group
             tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid }
-            
-        path = name.split('/')         
-                      
+
+        path = name.split('/')
+
         for name in path:
-            if not name: 
+            if not name:
                 continue
-            
-            if not parent_uuid:   
+
+            if not parent_uuid:
                 raise KeyError("Unable to open object (Component not found)")
-                 
+
             req = "/groups/" + parent_uuid + "/links/" + name
-            
+
             try:
                 rsp_json = self.GET(req)
             except IOError as ioe:
                 raise KeyError("Unable to open object (Component not found)")
-                
+
             if "link" not in rsp_json:
                 raise IOError("Unexpected Error")
             tgt_json = rsp_json['link']
-            
+
             #print "link_json", link_json
             if tgt_json['class'] == 'H5L_TYPE_HARD':
                 #print "hard link, collection:", link_json['collection']
                 if tgt_json['collection'] == 'groups':
-                    parent_uuid = tgt_json['id']    
+                    parent_uuid = tgt_json['id']
                 else:
-                    parent_uuid = None              
-        
-        return parent_uuid, tgt_json    
+                    parent_uuid = None
+
+        return parent_uuid, tgt_json
 
     def __getitem__(self, name):
         """ Open an object in the file """
         #print("group.__getitem__:", name)
         #print("group.__getitem__(type):", type(name))
-         
+
         def getObjByUuid(collection_type, uuid):
             """ Utility method to get an obj based on collection type and uuid """
             if collection_type == 'groups':
                 req = "/groups/" + uuid
                 group_json = self.GET(req)
-                tgt = Group(GroupID(self, group_json))       
+                tgt = Group(GroupID(self, group_json))
             elif link_json['collection'] == 'datatypes':
                 req = "/datatypes/" + uuid
                 datatype_json = self.GET(req)
-                tgt = Datatype(TypeID(self, datatype_json))               
+                tgt = Datatype(TypeID(self, datatype_json))
             elif link_json['collection'] == 'datasets':
                 req = "/datasets/" + uuid
                 dataset_json = self.GET(req)
-                tgt = Dataset(DatasetID(self, dataset_json))       
+                tgt = Dataset(DatasetID(self, dataset_json))
             else:
                 raise IOError("Unexpected Error - collection type: " + link_json['collection'])
             return tgt
-        
+
         tgt = None
-        
+
         if isinstance(name, Reference):
             tgt = name.objref()  # weak reference to ref object
             if tgt is not None:
@@ -281,11 +276,10 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 raise IOError("Unexpected Error - ObjectID type: " + name.__class__.__name__)
             return tgt
-                
-        
+
         parent_uuid, link_json = self.get_link_json(name)
         link_class = link_json['class']
-        
+
         if link_class == 'H5L_TYPE_HARD':
             #print "hard link, collection:", link_json['collection']
             tgt = getObjByUuid(link_json['collection'], link_json['id'])
@@ -295,14 +289,16 @@ class Group(HLObject, MutableMappingHDF5):
             tgt = getObjByUuid(soft_json['collection'], soft_json['id'])
 
         elif link_class == 'H5L_TYPE_EXTERNAL':
-            # try to get a handle to the file
-            raise IOError("Not implemented")           
-            
+            # try to get a handle to the file and return the linked object...
+            from .files import File
+            f = File(link_json['h5domain'], endpoint=self.id.endpoint)
+            return f[link_json['h5path']]
+
         elif link_class == 'H5L_TYPE_USER_DEFINED':
             raise IOError("Unable to fetch user-defined link")
         else:
-            raise IOEror("Unexpected error, invalid link class:" + link_json['class'])
-            
+            raise IOError("Unexpected error, invalid link class:" + link_json['class'])
+
         # assign name
         if name[0] == '/':
             tgt._name = name
@@ -315,8 +311,6 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 tgt._name = name
         return tgt
-                 
-                   
 
     def get(self, name, default=None, getclass=False, getlink=False):
         """ Retrieve an item or other information.
@@ -342,7 +336,7 @@ class Group(HLObject, MutableMappingHDF5):
         >>> if cls == SoftLink:
         ...     print '"foo" is a soft link!'
         """
-        
+
         with phil:
             if not (getclass or getlink):
                 try:
@@ -365,27 +359,25 @@ class Group(HLObject, MutableMappingHDF5):
                     return Datatype
                 else:
                     raise TypeError("Unknown object type")
-                 
 
             elif getlink:
                 parent_uuid, link_json = self.get_link_json(name)
                 typecode = link_json['class']
-                 
+
                 if typecode == 'H5L_TYPE_SOFT':
                     if getclass:
                         return SoftLink
-                    
+
                     return SoftLink(link_json['h5path'])
                 elif typecode == 'H5L_TYPE_EXTERNAL':
                     if getclass:
                         return ExternalLink
-                    
+
                     return ExternalLink(link_json['h5domain'], link_json['h5path'])
                 elif typecode == 'H5L_TYPE_HARD':
                     return HardLink if getclass else HardLink()
                 else:
                     raise TypeError("Unknown link type")
-        
 
     def __setitem__(self, name, obj):
         """ Add an object to the group.  The name must not already be in use.
@@ -411,14 +403,14 @@ class Group(HLObject, MutableMappingHDF5):
             values are stored as scalar datasets. Raise ValueError if we
             can't understand the resulting array dtype.
         """
-         
+
         #name, lcpl = self._e(name, lcpl=True)
 
         if isinstance(obj, HLObject):
             body = {'id': obj.id.uuid }
             req = "/groups/" + self.id.uuid + "/links/" + name
             self.PUT(req, body=body)
-            
+
         elif isinstance(obj, SoftLink):
             body = {'h5path': obj.path }
             req = "/groups/" + self.id.uuid + "/links/" + name
@@ -436,20 +428,20 @@ class Group(HLObject, MutableMappingHDF5):
 
         elif isinstance(obj, numpy.dtype):
             # print "create named type"
-            
+
             type_json = h5type.getTypeItem(obj)
             #print "type_json:", type_json
             req = "/datatypes"
-      
+
             body = {'type': type_json }
             rsp = self.POST(req, body=body)
             body['id'] = rsp['id']
-             
+
             type_id = TypeID(self, body)
             req = "/groups/" + self.id.uuid + "/links/" + name
             body = {'id': type_id.uuid }
             self.PUT(req, body=body)
-             
+
             #htype = h5t.py_create(obj)
             #htype.commit(self.id, name, lcpl=lcpl)
 
@@ -457,7 +449,6 @@ class Group(HLObject, MutableMappingHDF5):
             pass #todo
             #ds = self.create_dataset(None, data=obj, dtype=base.guess_dtype(obj))
             #h5o.link(ds.id, self.id, name, lcpl=lcpl)
-        
 
     def __delitem__(self, name):
         """ Delete (unlink) an item from this group. """
@@ -467,9 +458,9 @@ class Group(HLObject, MutableMappingHDF5):
 
     def __len__(self):
         """ Number of members attached to this group """
-        req = "/groups/" + self.id.uuid 
+        req = "/groups/" + self.id.uuid
         rsp_json = self.GET(req)
-        return rsp_json['linkCount'] 
+        return rsp_json['linkCount']
         #return self.id.get_num_objs()
 
     def __iter__(self):
@@ -483,7 +474,6 @@ class Group(HLObject, MutableMappingHDF5):
         for x in self.id.__iter__():
             yield self._d(x)
         """
-        
 
     def __contains__(self, name):
         """ Test if a member name exists """
@@ -650,12 +640,12 @@ class Group(HLObject, MutableMappingHDF5):
         visited[self.id.uuid] = True
         tovisit = collections.OrderedDict()
         tovisit[self.id.uuid] = self
-        
+
         if six.PY3:
             nargs = func.__code__.co_argcount
         else:
             nargs = func.func_code.co_argcount
-         
+
         while len(tovisit) > 0:
             (parent_uuid, parent) = tovisit.popitem(last=True)
             if parent.name != '/':
@@ -673,7 +663,7 @@ class Group(HLObject, MutableMappingHDF5):
                 links = rsp_json['links']
                 for link in links:
                     obj = None
-                    if link['class'] == 'H5L_TYPE_SOFT':      
+                    if link['class'] == 'H5L_TYPE_SOFT':
                         obj = SoftLink(link['h5path'])
                     elif link['class'] == 'H5L_TYPE_EXTERNAL':
                         obj = ExternalLink(link['h5domain'], link['h5path'])
@@ -681,7 +671,7 @@ class Group(HLObject, MutableMappingHDF5):
                         obj = UserDefinedLink()
                     elif link['class'] == 'H5L_TYPE_HARD':
                         if link['id'] in visited:
-                            continue  # already been there    
+                            continue  # already been there
                         obj = parent.__getitem__(link['title'])
                         tovisit[obj.id.uuid] = obj
                         obj = None
@@ -695,8 +685,7 @@ class Group(HLObject, MutableMappingHDF5):
                         if retval is not None:
                             # caller indicates to end iteration
                             break
-                        
-            
+
         """
         with phil:
             def proxy(name):
@@ -770,15 +759,15 @@ class ExternalLink(object):
 
     def __repr__(self):
         return '<ExternalLink to "%s" in file "%s"' % (self.path, self.filename)
-        
+
 class UserDefinedLink(object):
 
     """
         Represents a user-defined link
-    """  
+    """
 
     def __init__(self):
         pass
 
     def __repr__(self):
-        return '<UDLink >' 
+        return '<UDLink >'
