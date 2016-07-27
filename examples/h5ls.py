@@ -46,6 +46,18 @@ def dump(name, obj):
     if verbose and obj_id is not None:
         print("    id: {0}".format(obj_id))
           
+#
+# Get Group based on URL
+#
+def getGroupFromUrl(url):
+
+    try:
+        f = h5py.File(url, 'r', endpoint=endpoint)
+        return f['/']
+    except OSError as err:
+        print("OSError: {0}".format(err))
+         
+        sys.exit()
 
 #
 # Usage
@@ -82,19 +94,21 @@ while argn < len(sys.argv):
          argn += 1 
             
 if len(urls) == 0:
-    printUsage()
+    # add a generic url
+    urls.append("hdfgroup.org")
         
 for url in urls:
-    f = h5py.File(url, 'r', endpoint=endpoint)
+    grp = getGroupFromUrl(url)
+    dump('/', grp)
     if recursive:
-        f.visititems(dump)
+        grp.visititems(dump)
     else:
-        for k in f:
-            item = f.get(k, getlink=True)
+        for k in grp:
+            item = grp.get(k, getlink=True)
             if item.__class__.__name__ == "HardLink":
                 # follow hardlinks
-                item = f.get(k)
+                item = grp.get(k)
             dump(k, item)
-    f.close()         
+    grp.file.close()         
 
  
