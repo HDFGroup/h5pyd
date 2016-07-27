@@ -54,7 +54,7 @@ Just remove the install directory and all contents to uninstall.
 Reporting bugs (and general feedback)
 -------------------------------------
 
-Create new issues at http://github.com/HDFGroup/h5json/issues for any problems you find. 
+Create new issues at http://github.com/HDFGroup/h5pyd/issues for any problems you find. 
 
 For general questions/feedback, please use the hdf list (hdf-forum@lists.hdfgroup.org).
 

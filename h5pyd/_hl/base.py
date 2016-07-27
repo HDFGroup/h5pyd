@@ -41,6 +41,7 @@ _phil = FakeLock()
 # Python alias for access from other modules
 phil = _phil
 
+
 def with_phil(func):
     """ Locking decorator """
     """
@@ -370,7 +371,18 @@ class HLObject(CommonStateObject):
         """ Attributes attached to this object """
         from . import attrs
         return attrs.AttributeManager(self)
-        
+
+    def verifyCert(self):
+        # default to not validate CERT for https requests, unless
+        # the H5PYD_VERIFY_CERT environment variable is set and True
+        #
+        # TBD: set default to True once the signing authority of data.hdfgroup.org is 
+        # recognized
+        if "H5PYD_VERIFY_CERT" in os.environ:
+            verify_cert = os.environ["H5PYD_VERIFY_CERT"].upper()
+            if verify_cert.startswith('T'):
+                return True
+        return False    
         
     def GET(self, req, format="json"):
         if self.id.endpoint is None:
@@ -385,7 +397,8 @@ class HLObject(CommonStateObject):
         if format == "binary":
             headers['accept'] =  'application/octet-stream'
         self.log.info("GET: " + req)
-        rsp = requests.get(req, headers=headers)
+         
+        rsp = requests.get(req, headers=headers, verify=self.verifyCert())
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
              raise IOError(rsp.reason)
@@ -412,7 +425,7 @@ class HLObject(CommonStateObject):
         headers = {'host': self.id.domain}
         self.log.info("PUT: " + req)
         # self.log.info("BODY: " + str(data))
-        rsp = requests.put(req, data=data, headers=headers)
+        rsp = requests.put(req, data=data, headers=headers, verify=self.verifyCert())
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
             raise IOError(rsp.reason)
@@ -435,7 +448,7 @@ class HLObject(CommonStateObject):
             
         headers = {'host': self.id.domain}
         self.log.info("PST: " + req)
-        rsp = requests.post(req, data=data, headers=headers)
+        rsp = requests.post(req, data=data, headers=headers, verify=self.verifyCert())
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
             raise IOError(rsp.reason)
@@ -454,7 +467,7 @@ class HLObject(CommonStateObject):
         
         headers = {'host': self.id.domain}
         self.log.info("DEL: " + req)
-        rsp = requests.delete(req, headers=headers)
+        rsp = requests.delete(req, headers=headers, verify=False)
         #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)

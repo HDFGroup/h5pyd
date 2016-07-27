@@ -175,7 +175,7 @@ class File(Group):
             req = endpoint + "/"
             
             headers = {'host': domain_name}
-            rsp = requests.get(req, headers=headers)           
+            rsp = requests.get(req, headers=headers, verify=self.verifyCert())           
             
             if rsp.status_code == 200:
                 root_json = json.loads(rsp.text)
@@ -188,14 +188,14 @@ class File(Group):
                 raise IOError("domain already exists")
             if rsp.status_code == 200 and mode == 'w':
                 # delete existing domain
-                rsp = requests.delete(req, headers=headers)
+                rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
                 if rsp.status_code != 200:
                     # failed to delete
                     raise IOError(rsp.reason)
                 root_json = None
             if root_json is None:
                 # create the domain
-                rsp = requests.put(req, headers=headers)
+                rsp = requests.put(req, headers=headers, verify=self.verifyCert())
                 if rsp.status_code != 201:
                     raise IOError(rsp.reason)
                 root_json = json.loads(rsp.text)
@@ -216,7 +216,7 @@ class File(Group):
             # get the group json for the root group
             req = endpoint + "/groups/" + root_uuid
             
-            rsp = requests.get(req, headers=headers)
+            rsp = requests.get(req, headers=headers, verify=self.verifyCert())
             
             #print "req:", req
             
