@@ -382,7 +382,24 @@ class HLObject(CommonStateObject):
             verify_cert = os.environ["H5PYD_VERIFY_CERT"].upper()
             if verify_cert.startswith('T'):
                 return True
-        return False    
+        return False   
+
+    
+    def nameEncode(self, name):
+
+        # Helper function - convert name to url-friendly format
+        # Replaces all non-alphanumeric characters with '%<ascii_hex>'
+
+        out = []
+        for ch in name:
+            if ch.isalnum():
+                out.append(ch)
+            elif ch == ' ':
+                out.append('+')
+            else:
+                hex = format(ord(ch), '02X')
+                out.append('%' + hex)
+        return ''.join(out) 
         
     def GET(self, req, format="json"):
         if self.id.endpoint is None:

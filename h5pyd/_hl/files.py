@@ -174,7 +174,7 @@ class File(Group):
             # try to do a GET from the domain
             req = endpoint + "/"
             
-            headers = {'host': domain_name}
+            headers = {'host': self.nameEncode(domain_name)}
             rsp = requests.get(req, headers=headers, verify=self.verifyCert())           
             
             if rsp.status_code == 200:
