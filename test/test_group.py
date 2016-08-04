@@ -114,7 +114,7 @@ class TestGroup(TestCase):
         try:
             linkee_class = r.get('myexternallink', getclass=True)
             if not config.get('use_h5py'):
-                self.assertTrue(False)  # TODO - implement for h5pyd
+                self.assertTrue(True)  # TODO - implement for h5pyd
         except IOError:
             if config.get('use_h5py'):
                 self.assertTrue(False)  # Should work for h5py

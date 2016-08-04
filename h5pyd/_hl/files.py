@@ -195,6 +195,8 @@ class File(Group):
                 root_json = None
             if root_json is None:
                 # create the domain
+                if mode not in ('w', 'a'):
+                    raise IOError("File not found")
                 rsp = requests.put(req, headers=headers, verify=self.verifyCert())
                 if rsp.status_code != 201:
                     raise IOError(rsp.reason)

@@ -291,7 +291,11 @@ class Group(HLObject, MutableMappingHDF5):
         elif link_class == 'H5L_TYPE_EXTERNAL':
             # try to get a handle to the file and return the linked object...
             from .files import File
-            f = File(link_json['h5domain'], endpoint=self.id.endpoint)
+            try:
+                f = File(link_json['h5domain'], endpoint=self.id.endpoint, mode='r')
+            except IOError:
+                # unable to find external link
+                raise KeyError("Unable to open file: " + link_json['h5domain'])
             return f[link_json['h5path']]
 
         elif link_class == 'H5L_TYPE_USER_DEFINED':
