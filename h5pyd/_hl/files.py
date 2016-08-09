@@ -12,59 +12,59 @@
 
 from __future__ import absolute_import
 
-import weakref
-import sys
+# import weakref
+# import sys
 import os
-import uuid
+# import uuid
 
 import six
 
 import requests
 import json
 
-from . import objectid
-from .objectid import ObjectID, GroupID
-from . import base
-from .base import HLObject
+# from . import objectid
+from .objectid import GroupID
+# from . import base
+# from .base import HLObject
 from .base import phil
-from . import group
+# from . import group
 from .group import Group
 from .. import version
 
 
-
 hdf5_version = version.hdf5_version_tuple[0:3]
 
-def make_fapl(driver, libver, **kwds):
-    """ Set up a file access property list """
-    plist = h5p.create(h5p.FILE_ACCESS)
 
-    if libver is not None:
-        if libver in libver_dict:
-            low = libver_dict[libver]
-            high = h5f.LIBVER_LATEST
-        else:
-            low, high = (libver_dict[x] for x in libver)
-        plist.set_libver_bounds(low, high)
+# def make_fapl(driver, libver, **kwds):
+#     """ Set up a file access property list """
+#     plist = h5p.create(h5p.FILE_ACCESS)
 
-    if driver is None or (driver == 'windows' and sys.platform == 'win32'):
-        return plist
+#     if libver is not None:
+#         if libver in libver_dict:
+#             low = libver_dict[libver]
+#             high = h5f.LIBVER_LATEST
+#         else:
+#             low, high = (libver_dict[x] for x in libver)
+#         plist.set_libver_bounds(low, high)
 
-    if(driver == 'sec2'):
-        plist.set_fapl_sec2(**kwds)
-    elif(driver == 'stdio'):
-        plist.set_fapl_stdio(**kwds)
-    elif(driver == 'core'):
-        plist.set_fapl_core(**kwds)
-    elif(driver == 'family'):
-        plist.set_fapl_family(memb_fapl=plist.copy(), **kwds)
-    elif(driver == 'mpio'):
-        kwds.setdefault('info', mpi4py.MPI.Info())
-        plist.set_fapl_mpio(**kwds)
-    else:
-        raise ValueError('Unknown driver type "%s"' % driver)
+#     if driver is None or (driver == 'windows' and sys.platform == 'win32'):
+#         return plist
 
-    return plist
+#     if(driver == 'sec2'):
+#         plist.set_fapl_sec2(**kwds)
+#     elif(driver == 'stdio'):
+#         plist.set_fapl_stdio(**kwds)
+#     elif(driver == 'core'):
+#         plist.set_fapl_core(**kwds)
+#     elif(driver == 'family'):
+#         plist.set_fapl_family(memb_fapl=plist.copy(), **kwds)
+#     elif(driver == 'mpio'):
+#         kwds.setdefault('info', mpi4py.MPI.Info())
+#         plist.set_fapl_mpio(**kwds)
+#     else:
+#         raise ValueError('Unknown driver type "%s"' % driver)
+
+#     return plist
 
 
 class File(Group):
@@ -85,7 +85,6 @@ class File(Group):
     def filename(self):
         """File name on disk"""
         return self.id.domain
-        
 
     @property
     def driver(self):
@@ -104,17 +103,15 @@ class File(Group):
     @property
     def libver(self):
         """File format version bounds (2-tuple: low, high)"""
-        #bounds = self.id.get_access_plist().get_libver_bounds()
-        #return tuple(libver_dict_r[x] for x in bounds)
+        # bounds = self.id.get_access_plist().get_libver_bounds()
+        # return tuple(libver_dict_r[x] for x in bounds)
         return ("0.0.1",)
 
     @property
     def userblock_size(self):
         """ User block size (in bytes) """
-        
+
         return 0
-       
-        
 
     def __init__(self, domain_name, mode=None, endpoint=None, **kwds):
         """Create a new file object.
@@ -138,10 +135,9 @@ class File(Group):
         Additional keywords
             Passed on to the selected file driver.
         """
-        
+
         self._endpoint = None
-         
-         
+
         with phil:
             """
             if isinstance(name, _objects.ObjectID):
@@ -158,28 +154,29 @@ class File(Group):
                 fapl = make_fapl(driver, libver, **kwds)
             """
             if mode and mode not in ('r', 'r+', 'w', 'w-', 'x', 'a'):
-                raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
-                
+                raise ValueError(
+                    "Invalid mode; must be one of r, r+, w, w-, x, a")
+
             if mode is None:
-                mode = 'a'        
-            
+                mode = 'a'
+
             if endpoint is None:
                 if "H5SERV_ENDPOINT" in os.environ:
                     endpoint = os.environ["H5SERV_ENDPOINT"]
                 else:
                     endpoint = "http://127.0.0.1:5000"
-                
+
             root_json = None
-                
+
             # try to do a GET from the domain
             req = endpoint + "/"
-            
+
             headers = {'host': domain_name}
-            rsp = requests.get(req, headers=headers, verify=self.verifyCert())           
-            
+            rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+
             if rsp.status_code == 200:
                 root_json = json.loads(rsp.text)
-                
+
             if rsp.status_code != 200 and mode in ('r', 'r+'):
                 # file must exist
                 raise IOError(rsp.reason)
@@ -188,7 +185,8 @@ class File(Group):
                 raise IOError("domain already exists")
             if rsp.status_code == 200 and mode == 'w':
                 # delete existing domain
-                rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
+                rsp = requests.delete(req, headers=headers,
+                                      verify=self.verifyCert())
                 if rsp.status_code != 200:
                     # failed to delete
                     raise IOError(rsp.reason)
@@ -197,42 +195,43 @@ class File(Group):
                 # create the domain
                 if mode not in ('w', 'a'):
                     raise IOError("File not found")
-                rsp = requests.put(req, headers=headers, verify=self.verifyCert())
+                rsp = requests.put(req, headers=headers,
+                                   verify=self.verifyCert())
                 if rsp.status_code != 201:
                     raise IOError(rsp.reason)
                 root_json = json.loads(rsp.text)
-                
+
             if 'root' not in root_json:
                 raise IOError("Unexpected error")
             if 'created' not in root_json:
                 raise IOError("Unexpected error")
             if 'lastModified' not in root_json:
                 raise IOError("Unexpected error")
-                
+
             if mode in ('w', 'w-', 'x', 'a'):
                 mode = 'r+'
-                
-            #print "root_json:", root_json
+
+            # print "root_json:", root_json
             root_uuid = root_json['root']
-            
+
             # get the group json for the root group
             req = endpoint + "/groups/" + root_uuid
-            
+
             rsp = requests.get(req, headers=headers, verify=self.verifyCert())
-            
-            #print "req:", req
-            
+
+            # print "req:", req
+
             if rsp.status_code != 200:
                 raise IOError("Unexpected Error")
             group_json = json.loads(rsp.text)
-            
-            self._id = GroupID(None, group_json, domain=domain_name, 
-                endpoint=endpoint, mode=mode)
-                
-            self._name = '/' 
+
+            self._id = GroupID(None, group_json, domain=domain_name,
+                               endpoint=endpoint, mode=mode)
+
+            self._name = '/'
             self._created = root_json['created']
-            self._modified = root_json['lastModified']       
-                    
+            self._modified = root_json['lastModified']
+
             Group.__init__(self, self._id)
 
     def close(self):
@@ -261,8 +260,8 @@ class File(Group):
             filename = self.filename
             if isinstance(filename, bytes):  # Can't decode fname
                 filename = filename.decode('utf8', 'replace')
-            r = six.u('<HDF5 file "%s" (mode %s)>') % (os.path.basename(filename),
-                                                 self.mode)
+            r = (six.u('<HDF5 file "%s" (mode %s)>') %
+                 (os.path.basename(filename), self.mode))
 
         if six.PY3:
             return r
