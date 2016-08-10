@@ -19,31 +19,38 @@ if config.get("use_h5py"):
     import h5py
 else:
     import h5pyd as h5py
-    
-from common import ut, TestCase
 
-        
+from common import ut, TestCase
+from datetime import datetime
+import six
+
+
 class TestScalarDataset(TestCase):
     def test_scalar_dset(self):
         filename = self.getFileName("scalar_dset")
         print("filename:", filename)
-        f = h5py.File(filename, "w")     
-        
+        f = h5py.File(filename, "w")
+
         dset = f.create_dataset('scalar', data=42, dtype='i8')
- 
+
         val = dset[()]
         print("val:", val)
         self.assertEqual(val, 42)
         self.assertEqual(dset.shape, ())
-        
+
         dset[()] = 24
         val = dset[()]
         print("val:", val)
         self.assertEqual(val, 24)
-        
+
         self.assertEqual(dset.file.filename, filename)
+
+        # Check dataset's last modified time
+        self.assertTrue(isinstance(dset.modified, datetime))
+        self.assertEqual(dset.modified.tzname(), six.u('UTC'))
+
         f.close()
-    
-    
+
+
 if __name__ == '__main__':
     ut.main()

@@ -13,29 +13,33 @@
 from __future__ import absolute_import
 
 import posixpath
-import warnings
+# import warnings
 import weakref
 import os
-import sys
+# import sys
 import json
 import requests
 import logging
 import logging.handlers
-#from .reference import Reference
+# from .reference import Reference
 from collections import (
     Mapping, MutableMapping, MappingView, KeysView, ValuesView, ItemsView
 )
-
 import six
+from datetime import datetime
+import pytz
+
 
 class FakeLock():
     def __init__(self):
         pass
+
     def __enter__(self):
         pass
+
     def __exit__(self, a, b, c):
         pass
-        
+
 _phil = FakeLock()
 
 # Python alias for access from other modules
@@ -56,15 +60,15 @@ def with_phil(func):
 
     functools.update_wrapper(wrapper, func, ('__name__', '__doc__'))
     return wrapper
-    
-    
+
+
 def guess_dtype(data):
     """ Attempt to guess an appropriate dtype for the object, returning None
     if nothing is appropriate (or if it should be left up the the array
     constructor to figure out)
     """
     """
-    #todo
+    # todo
     with phil:
         if isinstance(data, h5r.RegionReference):
             return h5t.special_dtype(ref=h5r.RegionReference)
@@ -75,83 +79,86 @@ def guess_dtype(data):
         if type(data) == six.text_type:
            return h5t.special_dtype(vlen=six.text_type)
     """
-    #print("guess_dtype")
+    # print("guess_dtype")
     return None
- 
+
+
+def parse_lastmodified(datestr):
+    """Turn last modified datetime string into a datetime object."""
+    return datetime.strptime(
+        datestr, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=pytz.UTC)
+
+
 class Reference():
 
     """
         Represents an HDF5 object reference
 
-         
+
     """
     @property
     def id(self):
         """ Low-level identifier appropriate for this object """
         return self._id
-        
+
     @property
     def objref(self):
         """ Weak reference to object """
         return self._objref  # return weak ref to ref'd object
-      
-        
+
     @with_phil
     def __init__(self, bind):
         """ Create a new reference by binding to a group/dataset/committed type
         """
         with phil:
             self._id = bind._id
-            self._objref = weakref.ref(bind) 
-                    
+            self._objref = weakref.ref(bind)
+
     @with_phil
     def __repr__(self):
         return "<HDF5 object reference>"
-        
+
     @with_phil
     def tolist(self):
         if type(self._id.id) is not str:
             raise TypeError("Expected string id")
-        if self._id.objtype_code == 'd' :
-            return [("datasets/" + self._id.id),]
+        if self._id.objtype_code == 'd':
+            return [("datasets/" + self._id.id), ]
         elif self._id.objtype_code == 'g':
-            return [("groups/" + self._id.id),]
+            return [("groups/" + self._id.id), ]
         elif self._id.objtype_code == 't':
-            return [("datatypes/" + self._id.id),]
+            return [("datatypes/" + self._id.id), ]
         else:
             raise TypeError("Unexpected id type")
-            
-        
-        
-        
+
+
 class RegionReference():
 
     """
-        Represents an HDF5 region reference      
+        Represents an HDF5 region reference
     """
     @property
     def id(self):
         """ Low-level identifier appropriate for this object """
         return self._id
-        
+
     @property
     def objref(self):
         """ Weak reference to object """
         return self._objref  # return weak ref to ref'd object
-      
-        
+
     @with_phil
     def __init__(self, bind):
         """ Create a new reference by binding to a group/dataset/committed type
         """
         with phil:
             self._id = bind._id
-            self._objref = weakref.ref(bind) 
-                    
+            self._objref = weakref.ref(bind)
+
     @with_phil
     def __repr__(self):
         return "<HDF5 region reference>"
-        
+
 
 class CommonStateObject(object):
 
@@ -206,7 +213,7 @@ class CommonStateObject(object):
         if lcpl:
             return name, get_lcpl(coding)
         return name
-        
+
     def _decode(self, item, encoding="ascii"):
         """decode any byte items to python 3 strings
         """
@@ -229,8 +236,6 @@ class CommonStateObject(object):
         else:
             ret_val = item
         return ret_val
-                
-        
 
     def _d(self, name):
         """ Decode a name according to the current file settings.
@@ -308,26 +313,27 @@ class HLObject(CommonStateObject):
 
     """
         Base class for high-level interface objects.
-        self._name = name 
-            self._id = root_json['root']   
+        self._name = name
+            self._id = root_json['root']
             self._mode = mode
             self._created = root_json['created']
-            self._modified = root_json['lastModified']   
-            self._endpoint = endpoint   
-            
+            self._modified = root_json['lastModified']
+            self._endpoint = endpoint
+
     """
 
     @property
     def file(self):
         """ Return a File instance associated with this object """
         from . import files
-        return files.File(self._id.domain, endpoint=self._id.endpoint, mode=self._id.mode)
+        return files.File(self._id.domain, endpoint=self._id.endpoint,
+                          mode=self._id.mode)
 
     @property
     def name(self):
         """ Return the full name of this object.  None if anonymous. """
         return self._name
-        #return self._d(h5i.get_name(self.id))
+        # return self._d(h5i.get_name(self.id))
 
     @property
     def parent(self):
@@ -340,7 +346,6 @@ class HLObject(CommonStateObject):
             raise ValueError("Parent of an anonymous object is undefined")
         return self.file[posixpath.dirname(self.name)]
 
-
     @property
     def id(self):
         """ Low-level identifier appropriate for this object """
@@ -350,7 +355,7 @@ class HLObject(CommonStateObject):
     def ref(self):
         """ An (opaque) HDF5 reference to this object """
         return Reference(self)
-        #return h5r.create(self.id, b'.', h5r.OBJECT)
+        # return h5r.create(self.id, b'.', h5r.OBJECT)
 
     @property
     def regionref(self):
@@ -364,7 +369,7 @@ class HLObject(CommonStateObject):
         .selection property).
         """
         return "todo"
-        #return _RegionProxy(self)
+        # return _RegionProxy(self)
 
     @property
     def attrs(self):
@@ -372,108 +377,114 @@ class HLObject(CommonStateObject):
         from . import attrs
         return attrs.AttributeManager(self)
 
+    @property
+    def modified(self):
+        """Last modified time as a datetime object"""
+        return self.id._modified
+
     def verifyCert(self):
         # default to not validate CERT for https requests, unless
         # the H5PYD_VERIFY_CERT environment variable is set and True
         #
-        # TBD: set default to True once the signing authority of data.hdfgroup.org is 
+        # TBD: set default to True once the signing authority of data.hdfgroup.org is
         # recognized
         if "H5PYD_VERIFY_CERT" in os.environ:
             verify_cert = os.environ["H5PYD_VERIFY_CERT"].upper()
             if verify_cert.startswith('T'):
                 return True
-        return False   
-        
+        return False
+
     def GET(self, req, format="json"):
         if self.id.endpoint is None:
             raise IOError("object not initialized")
         if self.id.domain is None:
             raise IOError("no domain defined")
-         
+
         # try to do a GET from the domain
         req = self.id.endpoint + req
-            
+
         headers = {'host': self.id.domain}
         if format == "binary":
-            headers['accept'] =  'application/octet-stream'
+            headers['accept'] = 'application/octet-stream'
         self.log.info("GET: " + req)
-         
+
         rsp = requests.get(req, headers=headers, verify=self.verifyCert())
-        #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
+        # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
-             raise IOError(rsp.reason)
-        #print "rsp text", rsp.text   
+            raise IOError(rsp.reason)
+        # print "rsp text", rsp.text
         if rsp.headers['Content-Type'] == "application/octet-stream":
-            self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
+            self.log.info("returning binary content, length: " +
+                          rsp.headers['Content-Length'])
             return rsp.content
-        else: 
+        else:
             # assume JSON
-            rsp_json = json.loads(rsp.text)    
+            rsp_json = json.loads(rsp.text)
             return rsp_json
-        
+
     def PUT(self, req, body=None):
         if self.id.endpoint is None:
             raise IOError("object not initialized")
         if self.id.domain is None:
             raise IOError("no domain defined")
-         
+
         # try to do a PUT to the domain
         req = self.id.endpoint + req
-        
+
         data = json.dumps(body)
-            
+
         headers = {'host': self.id.domain}
         self.log.info("PUT: " + req)
         # self.log.info("BODY: " + str(data))
-        rsp = requests.put(req, data=data, headers=headers, verify=self.verifyCert())
-        #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
+        rsp = requests.put(req, data=data, headers=headers,
+                           verify=self.verifyCert())
+        # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
             raise IOError(rsp.reason)
-        
+
         if rsp.text:
-            rsp_json = json.loads(rsp.text)    
+            rsp_json = json.loads(rsp.text)
             return rsp_json
-        
-        
+
     def POST(self, req, body=None):
         if self.id.endpoint is None:
             raise IOError("object not initialized")
         if self.id.domain is None:
             raise IOError("no domain defined")
-         
+
         # try to do a POST to the domain
         req = self.id.endpoint + req
-        
+
         data = json.dumps(body)
-            
+
         headers = {'host': self.id.domain}
         self.log.info("PST: " + req)
-        rsp = requests.post(req, data=data, headers=headers, verify=self.verifyCert())
-        #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
+        rsp = requests.post(req, data=data, headers=headers,
+                            verify=self.verifyCert())
+        # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
             raise IOError(rsp.reason)
-        
+
         rsp_json = json.loads(rsp.text)
         return rsp_json
-        
+
     def DELETE(self, req):
         if self.id.endpoint is None:
             raise IOError("object not initialized")
         if self.id.domain is None:
             raise IOError("no domain defined")
-         
+
         # try to do a DELETE of the resource
         req = self.id.endpoint + req
-        
+
         headers = {'host': self.id.domain}
         self.log.info("DEL: " + req)
         rsp = requests.delete(req, headers=headers, verify=False)
-        #self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
+        # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
         rsp_json = json.loads(rsp.text)
         return rsp
-        
 
     def __init__(self, oid):
         """ Setup this object, given its low-level identifier """
@@ -488,8 +499,7 @@ class HLObject(CommonStateObject):
             self.log.setLevel(logging.INFO)
             fh = logging.FileHandler(log_file)
             self.log.addHandler(fh)
-            
-    
+
     def __hash__(self):
         return hash(self.id)
 
@@ -521,11 +531,11 @@ class ValuesViewHDF5(ValuesView):
 
     """
         Wraps e.g. a Group or AttributeManager to provide a value view.
-        
+
         Note that __contains__ will have poor performance as it has
         to scan all the links or attributes.
     """
-    
+
     def __contains__(self, value):
         with phil:
             for key in self._mapping:
@@ -544,7 +554,7 @@ class ItemsViewHDF5(ItemsView):
     """
         Wraps e.g. a Group or AttributeManager to provide an items view.
     """
-        
+
     def __contains__(self, item):
         with phil:
             key, val = item
@@ -563,11 +573,11 @@ class MappingHDF5(Mapping):
     """
         Wraps a Group, AttributeManager or DimensionManager object to provide
         an immutable mapping interface.
-        
+
         We don't inherit directly from MutableMapping because certain
         subclasses, for example DimensionManager, are read-only.
     """
-    
+
     if six.PY3:
         def keys(self):
             """ Get a view object on member names """
@@ -606,7 +616,7 @@ class MappingHDF5(Mapping):
             """ Get an iterator over (name, object) pairs """
             for x in self:
                 yield (x, self.get(x))
-                
+
 
 class MutableMappingHDF5(MappingHDF5, MutableMapping):
 
@@ -617,5 +627,3 @@ class MutableMappingHDF5(MappingHDF5, MutableMapping):
     """
 
     pass
-    
-
