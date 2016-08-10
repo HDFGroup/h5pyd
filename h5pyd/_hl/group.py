@@ -440,6 +440,7 @@ class Group(HLObject, MutableMappingHDF5):
             body = {'type': type_json }
             rsp = self.POST(req, body=body)
             body['id'] = rsp['id']
+            body['lastModified'] = rsp['lastModified']
 
             type_id = TypeID(self, body)
             req = "/groups/" + self.id.uuid + "/links/" + name

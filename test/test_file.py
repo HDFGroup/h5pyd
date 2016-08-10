@@ -16,12 +16,14 @@ if config.get("use_h5py"):
     import h5py
 else:
     import h5pyd as h5py
-    
-from common import ut, TestCase
 
-        
+from common import ut, TestCase
+from datetime import datetime
+import six
+
+
 class TestFile(TestCase):
-    
+
     def test_version(self):
         version = h5py.version.version
         # should be of form "n.n.n"
@@ -29,26 +31,25 @@ class TestFile(TestCase):
         self.assertTrue(n>=1)
         m = version[(n+1):].find('.')
         self.assertTrue(n>=1)
-         
-        
+
     def test_create(self):
         filename = self.getFileName("new_file")
         print("filename:", filename)
-         
+
         f = h5py.File(filename, 'w')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 0)
         self.assertEqual(f.mode, 'r+')
-        self.assertTrue('/' in f)      
+        self.assertTrue('/' in f)
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
         f.close()
         self.assertEqual(f.id.id, 0)
-        
-        
+
+
         # re-open as read-write
         f = h5py.File(filename, 'r+')
         self.assertTrue(f.id.id is not None)
@@ -58,7 +59,7 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 1)
         f.close()
         self.assertEqual(f.id.id, 0)
-        
+
         # re-open as read-only
         f = h5py.File(filename, 'r')
         self.assertEqual(f.filename, filename)
@@ -66,21 +67,25 @@ class TestFile(TestCase):
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 1)
         self.assertEqual(f.mode, 'r')
-        self.assertTrue('/' in f)      
+        self.assertTrue('/' in f)
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
-        
+
+        # Check domain's last modified time
+        self.assertTrue(isinstance(f.modified, datetime))
+        self.assertEqual(f.modified.tzname(), six.u('UTC'))
+
         try:
             f.create_group("another_subgrp")
             self.assertTrue(False)  # expect exception
         except ValueError:
             pass
         self.assertEqual(len(f.keys()), 1)
-        
+
         f.close()
         self.assertEqual(f.id.id, 0)
-        
+
         # open in truncate mode
         f = h5py.File(filename, 'w')
         self.assertEqual(f.filename, filename)
@@ -88,14 +93,14 @@ class TestFile(TestCase):
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 0)
         self.assertEqual(f.mode, 'r+')
-        self.assertTrue('/' in f)      
+        self.assertTrue('/' in f)
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
-        
+
         f.close()
         self.assertEqual(f.id.id, 0)
-           
+
         # verify open of non-existent file throws exception
         try:
             filename = self.getFileName("no_file_here")
@@ -104,13 +109,7 @@ class TestFile(TestCase):
             self.assertTrue(False) #expect exception
         except IOError:
             pass
-        
 
-         
-        
+
 if __name__ == '__main__':
     ut.main()
-
-
-     
-    
