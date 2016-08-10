@@ -24,7 +24,7 @@ from __future__ import absolute_import
 
 # from base import HLObject
 # from . import base
-from .base import phil
+from .base import phil, parse_lastmodified
 # from .. import version
 
 
@@ -88,6 +88,8 @@ class ObjectID:
             raise IOError("Unexpected Error")
 
         self._uuid = item['id']
+
+        self._modified = parse_lastmodified(item['lastModified'])
 
         self._obj_json = item
 

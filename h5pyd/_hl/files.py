@@ -26,7 +26,7 @@ import json
 from .objectid import GroupID
 # from . import base
 # from .base import HLObject
-from .base import phil
+from .base import phil, parse_lastmodified
 # from . import group
 from .group import Group
 from .. import version
@@ -110,8 +110,12 @@ class File(Group):
     @property
     def userblock_size(self):
         """ User block size (in bytes) """
-
         return 0
+
+    @property
+    def modified(self):
+        """Last modified time of the domain as a datetime object."""
+        return self._modified
 
     def __init__(self, domain_name, mode=None, endpoint=None, **kwds):
         """Create a new file object.
@@ -230,7 +234,7 @@ class File(Group):
 
             self._name = '/'
             self._created = root_json['created']
-            self._modified = root_json['lastModified']
+            self._modified = parse_lastmodified(root_json['lastModified'])
 
             Group.__init__(self, self._id)
 

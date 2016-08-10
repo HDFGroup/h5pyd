@@ -25,8 +25,9 @@ import logging.handlers
 from collections import (
     Mapping, MutableMapping, MappingView, KeysView, ValuesView, ItemsView
 )
-
 import six
+from datetime import datetime
+import pytz
 
 
 class FakeLock():
@@ -80,6 +81,12 @@ def guess_dtype(data):
     """
     # print("guess_dtype")
     return None
+
+
+def parse_lastmodified(datestr):
+    """Turn last modified datetime string into a datetime object."""
+    return datetime.strptime(
+        datestr, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=pytz.UTC)
 
 
 class Reference():
@@ -369,6 +376,11 @@ class HLObject(CommonStateObject):
         """ Attributes attached to this object """
         from . import attrs
         return attrs.AttributeManager(self)
+
+    @property
+    def modified(self):
+        """Last modified time as a datetime object"""
+        return self.id._modified
 
     def verifyCert(self):
         # default to not validate CERT for https requests, unless
