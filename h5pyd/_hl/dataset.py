@@ -232,7 +232,7 @@ class Dataset(HLObject):
             shape_json = rsp['shape']
             dims = shape_json['dims']
 
-        return dims
+        return tuple(dims)
 
     @shape.setter
     def shape(self, shape):

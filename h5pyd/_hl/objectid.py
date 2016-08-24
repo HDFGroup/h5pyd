@@ -76,6 +76,11 @@ class ObjectID:
         """json representation of the object"""
         return self._obj_json
 
+    @property
+    def modified(self):
+        """last modified timestamp"""
+        return self._modified
+
     def __init__(self, parent, item, objtype_code=None, domain=None,
                  endpoint=None, mode='r', **kwds):
         """Create a new objectId.
