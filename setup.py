@@ -12,7 +12,7 @@ here = path.abspath(path.dirname(__file__))
 # Get the long description from the README file
 with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
-    
+
 setup(name='h5pyd',
       version='0.1.0',
       description='h5py compatible client lib for HDF REST API',
@@ -21,8 +21,8 @@ setup(name='h5pyd',
       author='John Readey',
       author_email='jreadey@hdfgrouup.org',
       license='BSD',
-      packages = ['h5pyd', 'h5pyd._hl'],
-      #requires = ['h5py (>=2.5.0)', 'h5json>=1.0.2'],
-      install_requires = ['six'],
-      setup_requires = ['pkgconfig', 'six'],
+      packages=['h5pyd', 'h5pyd._hl'],
+      # requires=['h5py (>=2.5.0)', 'h5json>=1.0.2'],
+      install_requires=['six', 'pytz'],
+      setup_requires=['pkgconfig', 'six'],
       zip_safe=False)
