@@ -13,15 +13,12 @@
 from __future__ import absolute_import
 
 import posixpath
-# import warnings
 import weakref
 import os
-# import sys
 import json
 import requests
 import logging
 import logging.handlers
-# from .reference import Reference
 from collections import (
     Mapping, MutableMapping, MappingView, KeysView, ValuesView, ItemsView
 )
@@ -85,6 +82,8 @@ def guess_dtype(data):
 
 def parse_lastmodified(datestr):
     """Turn last modified datetime string into a datetime object."""
+    # format: 2016-06-30T06:17:16.563536Z
+    # format: "2016-08-04T06:44:04Z"
     return datetime.strptime(
         datestr, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=pytz.UTC)
 
@@ -383,16 +382,16 @@ class HLObject(CommonStateObject):
         return self.id._modified
 
     def verifyCert(self):
-        # default to not validate CERT for https requests, unless
+        # default to validate CERT for https requests, unless
         # the H5PYD_VERIFY_CERT environment variable is set and True
         #
         # TBD: set default to True once the signing authority of data.hdfgroup.org is
         # recognized
         if "H5PYD_VERIFY_CERT" in os.environ:
             verify_cert = os.environ["H5PYD_VERIFY_CERT"].upper()
-            if verify_cert.startswith('T'):
-                return True
-        return False
+            if verify_cert.startswith('F'):
+                return False
+        return True
 
     def GET(self, req, format="json"):
         if self.id.endpoint is None:

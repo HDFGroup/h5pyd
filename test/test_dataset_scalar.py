@@ -34,13 +34,11 @@ class TestScalarDataset(TestCase):
         dset = f.create_dataset('scalar', data=42, dtype='i8')
 
         val = dset[()]
-        print("val:", val)
         self.assertEqual(val, 42)
         self.assertEqual(dset.shape, ())
 
         dset[()] = 24
         val = dset[()]
-        print("val:", val)
         self.assertEqual(val, 24)
 
         self.assertEqual(dset.file.filename, filename)

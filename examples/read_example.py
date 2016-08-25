@@ -28,7 +28,7 @@ def visit_item_obj(name, obj):
     
 print("version:", h5py.version.version)
 
-f = h5py.File("tall.test.hdfgroup.org", "r")
+f = h5py.File("tall.data.hdfgroup.org", "r", endpoint="https://data.hdfgroup.org:7258")
 
 # print("filename,", f.filename)
 print("name:", f.name)

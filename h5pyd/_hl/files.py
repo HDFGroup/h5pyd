@@ -176,7 +176,8 @@ class File(Group):
             req = endpoint + "/"
 
             headers = {'host': domain_name}
-            rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+            
+            rsp = requests.get(req, headers=headers) #, verify=self.verifyCert())
 
             if rsp.status_code == 200:
                 root_json = json.loads(rsp.text)
