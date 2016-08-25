@@ -22,43 +22,34 @@ else:
     
 from common import ut, TestCase
 
-# test point selection
+# test dataset query
 #
-# Not working yet!
 #
         
-class TestPointSelectDataset(TestCase):
-    def test__dset(self):
-        filename = self.getFileName("point_select_dset")
-        print("filename:", filename)
+class TestQueryDataset(TestCase):
+    def test_query_dset(self):
+        filename = self.getFileName("query_dset")
         f = h5py.File(filename, "w")
        
-        primes = [2, 3, 5, 7, 11, 13, 17, 19]
-        num_rows = 5
+        count = 100
+        dt = np.dtype([('a', np.int), ('b', np.int)])
+        dset = f.create_dataset('dset', (count,), dtype=dt)
         
-        dset1 = f.create_dataset('dset1', (len(primes),), dtype='i8')
-        dset2 = f.create_dataset('dset2', (num_rows, len(primes)), dtype='i8')
- 
-        
-        shape = dset2.shape
-        self.assertEqual(shape[0], num_rows)
-        self.assertEqual(shape[1], len(primes))
+        elem = dset[0]
+        for i in range(count):     
+            elem['a'] = i // 10
+            elem['b'] = i % 10
+            dset[i] = elem
+             
          
-        
-        # write primes
-        row = primes[:]
-        
-        dset1[:] = primes
-         
-        for i in range(num_rows):       
-            row = primes[:]
-            for j in range(len(row)):
-                row[j] *= (i+1)
-            dset2[i, :] = row
-  
         # select from dset1
-        points = dset1[[2, 3, 6]]
-        print(points)
+        if not config.get("use_h5py"):
+            count = 0
+            for row in dset.read_where("b>4"):
+                self.assertTrue(row[1] > 4)
+                count += 1
+        
+            self.assertEqual(count, 50)
 
         f.close()
     

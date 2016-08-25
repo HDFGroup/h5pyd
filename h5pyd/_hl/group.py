@@ -692,9 +692,11 @@ class Group(HLObject, MutableMappingHDF5):
                 for link in links:
                     obj = None
                     if link['class'] == 'H5L_TYPE_SOFT':
-                        obj = SoftLink(link['h5path'])
+                        #obj = SoftLink(link['h5path'])
+                        pass  # don't visit soft links'
                     elif link['class'] == 'H5L_TYPE_EXTERNAL':
-                        obj = ExternalLink(link['h5domain'], link['h5path'])
+                        #obj = ExternalLink(link['h5domain'], link['h5path'])
+                        pass # don't visit external links'
                     elif link['class'] ==  'H5L_TYPE_UDLINK':
                         obj = UserDefinedLink()
                     elif link['class'] == 'H5L_TYPE_HARD':

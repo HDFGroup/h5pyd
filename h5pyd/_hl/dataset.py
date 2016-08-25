@@ -661,7 +661,6 @@ class Dataset(HLObject):
         if selection.nselect == 0:
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
 
-
         # Perfom the actual read
         req = "/datasets/" + self.id.uuid + "/value"
         req += "?query=" + condition

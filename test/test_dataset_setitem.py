@@ -22,44 +22,17 @@ else:
     
 from common import ut, TestCase
 
-# test point selection
-#
-# Not working yet!
-#
         
-class TestPointSelectDataset(TestCase):
-    def test__dset(self):
-        filename = self.getFileName("point_select_dset")
+class TestSetItemDataset(TestCase):
+    def test_set_all(self):
+        filename = self.getFileName("dset_set_all")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-       
-        primes = [2, 3, 5, 7, 11, 13, 17, 19]
-        num_rows = 5
         
-        dset1 = f.create_dataset('dset1', (len(primes),), dtype='i8')
-        dset2 = f.create_dataset('dset2', (num_rows, len(primes)), dtype='i8')
- 
-        
-        shape = dset2.shape
-        self.assertEqual(shape[0], num_rows)
-        self.assertEqual(shape[1], len(primes))
-         
-        
-        # write primes
-        row = primes[:]
-        
-        dset1[:] = primes
-         
-        for i in range(num_rows):       
-            row = primes[:]
-            for j in range(len(row)):
-                row[j] *= (i+1)
-            dset2[i, :] = row
-  
-        # select from dset1
-        points = dset1[[2, 3, 6]]
-        print(points)
-
+        extent = 10
+        dset = f.create_dataset('dset', (extent, extent), dtype='f8')
+        arr = np.random.rand(extent, extent)
+        dset[()] = arr
         f.close()
     
     
