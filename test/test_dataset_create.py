@@ -37,14 +37,45 @@ class TestCreateDataset(TestCase):
         
         self.assertEqual(dset.name, "/simple_dset")
         self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 2)
         self.assertEqual(dset.shape[0], 40)
         self.assertEqual(dset.shape[1], 80)
         self.assertEqual(str(dset.dtype), 'float32')
         self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 2)
         self.assertEqual(dset.maxshape[0], 40)
         self.assertEqual(dset.maxshape[1], 80)
          
         dset_ref = f['/simple_dset']
+        self.assertTrue(dset_ref is not None)
+        if not config.get("use_h5py"):
+            # obj ids should be the same with h5pyd (but not h5py)
+            self.assertEqual(dset.id.id, dset_ref.id.id)
+            # Check dataset's last modified time
+            self.assertTrue(isinstance(dset.modified, datetime))
+            self.assertEqual(dset.modified.tzname(), six.u('UTC'))
+
+        f.close()
+
+    def test_create_simple_dset_by_path(self):
+        filename = self.getFileName("create_simple_dset_by_path")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+
+        dims = (40,)
+        dset = f.create_dataset('/mypath/simple_dset', dims, dtype='i8')
+         
+        self.assertEqual(dset.name, "/mypath/simple_dset")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 1)
+        self.assertEqual(dset.shape[0], 40)
+        self.assertEqual(str(dset.dtype), 'int64')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 1)
+        self.assertEqual(dset.maxshape[0], 40)
+        
+        grp = f['/mypath'] 
+        dset_ref = grp['simple_dset']
         self.assertTrue(dset_ref is not None)
         if not config.get("use_h5py"):
             # obj ids should be the same with h5pyd (but not h5py)

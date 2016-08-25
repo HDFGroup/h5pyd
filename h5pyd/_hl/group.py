@@ -137,13 +137,36 @@ class Group(HLObject, MutableMappingHDF5):
             dset = dataset.Dataset(dsid)
 
             if name is not None:
-                #print 'fname:', self._name
-                if self._name:
-                    if self._name[-1] == '/':
-                        dset._name = self._name + name
-                    else:
-                        dset._name = self._name + '/' + name
-                self[name] = dset
+                items = name.split('/')
+                path = []
+                for item in items:
+                    if len(item) > 0:
+                        path.append(item)  # just get non-empty strings
+
+                grp = self
+
+                if len(path) == 0:
+                    # no name, just return anonymous dataset
+                    return dset
+
+                dset_link = path[-1]   
+                dset._name = self._name 
+                if dset._name[-1] != '/':
+                    dset._name += '/'
+                if len(path) > 1:
+                    grp_path = path[:-1]
+                    # create any grps along the path that don't already exist
+                    for item in grp_path:
+                        if item not in grp:
+                            grp = grp.create_group(item)
+                        else:
+                            grp = grp[item]
+                        
+                        dset._name = dset._name + item + '/'
+
+                dset._name += dset_link
+                grp[dset_link] = dset
+                
             return dset
 
     def require_dataset(self, name, shape, dtype, exact=False, **kwds):
