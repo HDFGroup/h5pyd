@@ -12,22 +12,15 @@
 
 from __future__ import absolute_import
 
-import posixpath as pp
-
 import six
 import sys
 import numpy
 import collections
-import json
 
-
-from . import base
-from .base import HLObject, MutableMappingHDF5, Reference, phil, with_phil
-from . import objectid
+from .base import HLObject, MutableMappingHDF5, Reference, phil
 from .objectid import ObjectID, TypeID, GroupID, DatasetID
 from . import dataset
 from .dataset import Dataset
-from . import datatype
 from .datatype import Datatype
 from . import h5type
 
@@ -244,7 +237,7 @@ class Group(HLObject, MutableMappingHDF5):
 
             try:
                 rsp_json = self.GET(req)
-            except IOError as ioe:
+            except IOError:
                 raise KeyError("Unable to open object (Component not found)")
 
             if "link" not in rsp_json:
