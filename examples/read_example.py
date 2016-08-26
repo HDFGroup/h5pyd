@@ -9,23 +9,23 @@
 # distribution tree.  If you do not have access to this file, you may        #
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
- 
+
 import h5pyd as h5py
 
 def visit_item(name):
     print("visit:", name)
     return None
-    
+
 def find_g1_2(name):
     print("visit:", name)
     if name.endswith("g1.2"):
         return True  # stop iteration
-        
-    
+
+
 def visit_item_obj(name, obj):
     print("visit:", name, obj.id.id)
     return None
-    
+
 print("version:", h5py.version.version)
 
 f = h5py.File("tall.data.hdfgroup.org", "r", endpoint="https://data.hdfgroup.org:7258")
@@ -42,7 +42,7 @@ print("g2 num elements:", len(g2))
 print("g2: iter..")
 for x in g2:
     print(x)
-   
+
 print("xyz in g2", ('xyz' in g2))
 print("dset2.1 in g2", ('dset2.1' in g2))
 
@@ -59,7 +59,7 @@ print("dset111 dims:", dset111.shape)
 print("dset111 type:", dset111.dtype)
 print("dset111 len:", len(dset111))
 
- 
+
 attr1 = dset111.attrs['attr1']
 print("attr1:", attr1)
 print("num attrs of dset1.1.1:", len(dset111.attrs))
@@ -76,5 +76,5 @@ f.visititems(visit_item_obj)
 
 print("search g1.2:")
 f.visit(find_g1_2)
-      
-    
+
+

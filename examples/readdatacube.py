@@ -18,17 +18,17 @@ endpoint="http://127.0.0.1:5000"
 cube_side = 64
 if len(sys.argv) > 1:
     cube_side = int(sys.argv[1])
-    
+
 filename = "cube_" + str(cube_side) + "_" + str(cube_side) + "_" + str(cube_side) + ".client_test.hdfgroup.org"
- 
+
 f = h5pyd.File(filename, "r", endpoint=endpoint)
 
 print("filename,", f.filename)
 print("name:", f.name)
 print("uuid:", f.id.uuid)
- 
+
 print("get dataset")
- 
+
 dset = f['dset']
 
 print("name:", dset.name)
@@ -44,7 +44,7 @@ for i in range(cube_side):
     arr = dset[i,:,:]
     stats.append( (i, np.min(arr), np.max(arr), np.mean(arr),
                 np.median(arr), np.std(arr) ) )
-     
+
 print("done!")
 
 print("slice     min  max       mean     medien    stddev")
@@ -52,6 +52,6 @@ print("--------------------------------------------------")
 for item in stats:
     print(item)
 
-f.close() 
+f.close()
 
- 
+

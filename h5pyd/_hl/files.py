@@ -176,7 +176,7 @@ class File(Group):
             req = endpoint + "/"
 
             headers = {'host': domain_name}
-            
+
             rsp = requests.get(req, headers=headers) #, verify=self.verifyCert())
 
             if rsp.status_code == 200:

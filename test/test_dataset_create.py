@@ -34,7 +34,7 @@ class TestCreateDataset(TestCase):
 
         dims = (40, 80)
         dset = f.create_dataset('simple_dset', dims, dtype='f4')
-        
+
         self.assertEqual(dset.name, "/simple_dset")
         self.assertTrue(isinstance(dset.shape, tuple))
         self.assertEqual(len(dset.shape), 2)
@@ -45,7 +45,7 @@ class TestCreateDataset(TestCase):
         self.assertEqual(len(dset.maxshape), 2)
         self.assertEqual(dset.maxshape[0], 40)
         self.assertEqual(dset.maxshape[1], 80)
-         
+
         dset_ref = f['/simple_dset']
         self.assertTrue(dset_ref is not None)
         if not config.get("use_h5py"):
@@ -64,7 +64,7 @@ class TestCreateDataset(TestCase):
 
         dims = (40,)
         dset = f.create_dataset('/mypath/simple_dset', dims, dtype='i8')
-         
+
         self.assertEqual(dset.name, "/mypath/simple_dset")
         self.assertTrue(isinstance(dset.shape, tuple))
         self.assertEqual(len(dset.shape), 1)
@@ -73,8 +73,8 @@ class TestCreateDataset(TestCase):
         self.assertTrue(isinstance(dset.maxshape, tuple))
         self.assertEqual(len(dset.maxshape), 1)
         self.assertEqual(dset.maxshape[0], 40)
-        
-        grp = f['/mypath'] 
+
+        grp = f['/mypath']
         dset_ref = grp['simple_dset']
         self.assertTrue(dset_ref is not None)
         if not config.get("use_h5py"):
@@ -89,17 +89,17 @@ class TestCreateDataset(TestCase):
     def test_create_dset_gzip(self):
         filename = self.getFileName("create_dset_gzip")
         print("filename:", filename)
-        
+
         f = h5py.File(filename, "w")
 
         dims = (40, 80)
 
         # create some test data
         arr = np.random.rand(dims[0], dims[1])
-         
-        dset = f.create_dataset('simple_dset_gzip', data=arr, dtype='f8', 
+
+        dset = f.create_dataset('simple_dset_gzip', data=arr, dtype='f8',
             compression='gzip', compression_opts=9)
-        
+
         self.assertEqual(dset.name, "/simple_dset_gzip")
         self.assertTrue(isinstance(dset.shape, tuple))
         self.assertEqual(len(dset.shape), 2)
@@ -110,7 +110,7 @@ class TestCreateDataset(TestCase):
         self.assertEqual(len(dset.maxshape), 2)
         self.assertEqual(dset.maxshape[0], 40)
         self.assertEqual(dset.maxshape[1], 80)
-       
+
         chunks = dset.chunks  # chunk layout auto-generated
         self.assertTrue(chunks is not None)
         self.assertEqual(len(chunks), 2)
@@ -118,7 +118,7 @@ class TestCreateDataset(TestCase):
         self.assertEqual(chunks[1], 40)
         self.assertEqual(dset.compression, 'gzip')
         self.assertEqual(dset.compression_opts, 9)
-         
+
         dset_ref = f['/simple_dset_gzip']
         self.assertTrue(dset_ref is not None)
         if not config.get("use_h5py"):

@@ -19,40 +19,40 @@ if config.get("use_h5py"):
     import h5py
 else:
     import h5pyd as h5py
-    
+
 from common import ut, TestCase
 
 # test dataset query
 #
 #
-        
+
 class TestQueryDataset(TestCase):
     def test_query_dset(self):
         filename = self.getFileName("query_dset")
         f = h5py.File(filename, "w")
-       
+
         count = 100
         dt = np.dtype([('a', np.int), ('b', np.int)])
         dset = f.create_dataset('dset', (count,), dtype=dt)
-        
+
         elem = dset[0]
-        for i in range(count):     
+        for i in range(count):
             elem['a'] = i // 10
             elem['b'] = i % 10
             dset[i] = elem
-             
-         
+
+
         # select from dset1
         if not config.get("use_h5py"):
             count = 0
             for row in dset.read_where("b>4"):
                 self.assertTrue(row[1] > 4)
                 count += 1
-        
+
             self.assertEqual(count, 50)
 
         f.close()
-    
-    
+
+
 if __name__ == '__main__':
     ut.main()

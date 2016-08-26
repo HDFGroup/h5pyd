@@ -16,35 +16,35 @@ if config.get("use_h5py"):
     import h5py
 else:
     import h5pyd as h5py
-    
+
 from common import ut, TestCase
 
-        
+
 class TestAttribute(TestCase):
-    
-        
+
+
     def test_create(self):
         filename = self.getFileName("create_attribute")
         print("filename:", filename)
-         
+
         f = h5py.File(filename, 'w')
-        
+
         #f.attrs['a1'] = 42  #  to-dofix
 
         g1 = f.create_group('g1')
- 
-        g1.attrs['a1'] = 42 
+
+        g1.attrs['a1'] = 42
         #g1.attrs['a2'] = [b'hello', b'goodbye']
         n = g1.attrs['a1']
         self.assertEqual(n, 42)
         #words = g1.attrs['a2']
         #self.assertEqual(words[0], b'hello')
-        #self.assertEqual(words[1], b'goodbye')     
-         
-        
+        #self.assertEqual(words[1], b'goodbye')
+
+
 if __name__ == '__main__':
     ut.main()
 
 
-     
-    
+
+

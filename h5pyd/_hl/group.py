@@ -149,8 +149,8 @@ class Group(HLObject, MutableMappingHDF5):
                     # no name, just return anonymous dataset
                     return dset
 
-                dset_link = path[-1]   
-                dset._name = self._name 
+                dset_link = path[-1]
+                dset._name = self._name
                 if dset._name[-1] != '/':
                     dset._name += '/'
                 if len(path) > 1:
@@ -161,12 +161,12 @@ class Group(HLObject, MutableMappingHDF5):
                             grp = grp.create_group(item)
                         else:
                             grp = grp[item]
-                        
+
                         dset._name = dset._name + item + '/'
 
                 dset._name += dset_link
                 grp[dset_link] = dset
-                
+
             return dset
 
     def require_dataset(self, name, shape, dtype, exact=False, **kwds):

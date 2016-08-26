@@ -21,13 +21,13 @@ def getShapeText(dset):
             shape_text += str(shape[dim])
         shape_text += "}"
     return shape_text
-    
- 
+
+
 def dump(name, obj):
     class_name = obj.__class__.__name__
     desc = None
     obj_id = None
-    
+
     if class_name == "Dataset":
         desc = getShapeText(obj)
         obj_id = obj.id.id
@@ -45,7 +45,7 @@ def dump(name, obj):
         print("{0:24} {1} {2}".format(name, class_name, desc))
     if verbose and obj_id is not None:
         print("    id: {0}".format(obj_id))
-          
+
 #
 # Get Group based on URL
 #
@@ -56,7 +56,7 @@ def getGroupFromUrl(url):
         return f['/']
     except OSError as err:
         print("OSError: {0}".format(err))
-         
+
         sys.exit()
 
 #
@@ -65,14 +65,14 @@ def getGroupFromUrl(url):
 def printUsage():
     print("usage: python h5ls.py [-r] [-a] [-e endpoint] urls")
     print("example: python h5ls.py -r -e http://data.hdfgroup.org:7253 tall.test.data.hdfgroup.org")
-    sys.exit() 
- 
+    sys.exit()
+
 #
 # Main
-#     
-         
+#
+
 urls = []
-argn = 1 
+argn = 1
 
 while argn < len(sys.argv):
     arg = sys.argv[argn]
@@ -88,15 +88,15 @@ while argn < len(sys.argv):
          endpoint = sys.argv[argn+1]
          argn += 2
     elif arg[0] == '-':
-         printUsage()         
+         printUsage()
     else:
          urls.append(arg)
-         argn += 1 
-            
+         argn += 1
+
 if len(urls) == 0:
     # add a generic url
     urls.append("hdfgroup.org")
-        
+
 for url in urls:
     grp = getGroupFromUrl(url)
     dump('/', grp)
@@ -109,6 +109,6 @@ for url in urls:
                 # follow hardlinks
                 item = grp.get(k)
             dump(k, item)
-    grp.file.close()         
+    grp.file.close()
 
- 
+

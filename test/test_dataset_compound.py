@@ -19,37 +19,37 @@ if config.get("use_h5py"):
     import h5py
 else:
     import h5pyd as h5py
-    
+
 from common import ut, TestCase
 
-        
+
 class TestDatasetCompound(TestCase):
     def test_create_compound_dset(self):
         filename = self.getFileName("create_compound_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-        
+
         #curl -v --header "Host: create_compound_dset.h5pyd_test.hdfgroup.org" http://127.0.0.1:5000
-          
+
 
         count = 10
-  
+
         dt = np.dtype([('real', np.float), ('img', np.float)])
         dset = f.create_dataset('complex', (count,), dtype=dt)
-        
+
         elem = dset[0]
         for i in range(count):
             theta = (4.0 * math.pi)*(float(i)/float(count))
             elem['real'] = math.cos(theta)
             elem['img'] = math.sin(theta)
             dset[i] = elem
-       
+
         f.close()
         val = dset[0]
         self.assertEqual(val['real'], 1.0)
         f.close()
-        
-    
-    
+
+
+
 if __name__ == '__main__':
     ut.main()

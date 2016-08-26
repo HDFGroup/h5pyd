@@ -23,7 +23,7 @@ import six
 from six.moves import xrange    # pylint: disable=redefined-builtin
 
 import numpy as np
- 
+
 
 def select(shape, args, dsid):
     """ High-level routine to generate a selection from arbitrary arguments
@@ -35,7 +35,7 @@ def select(shape, args, dsid):
     args
         Either a single argument or a tuple of arguments.  See below for
         supported classes of argument.
-    
+
     dsid
         A h5py.h5d.DatasetID instance representing the source dataset.
 
@@ -78,7 +78,7 @@ def select(shape, args, dsid):
             sid = h5r.get_region(arg, dsid)
             if shape != sid.shape:
                 raise TypeError("Reference shape does not match dataset shape")
-                
+
             return Selection(shape, spaceid=sid)
         """
 
@@ -90,7 +90,7 @@ def select(shape, args, dsid):
                 sel = FancySelection(shape)
                 sel[args]
                 return sel
-    
+
     sel = SimpleSelection(shape)
     sel[args]
     return sel
@@ -125,7 +125,7 @@ class Selection(object):
         Base class for HDF5 dataspace selections.  Subclasses support the
         "selection protocol", which means they have at least the following
         members:
-        
+
         __init__(shape)   => Create a new selection on "shape"-tuple
         __getitem__(args) => Perform a selection with the range specified.
                              What args are allowed depends on the
@@ -133,7 +133,7 @@ class Selection(object):
 
         id (read-only) =>      h5py.h5s.SpaceID instance
         shape (read-only) =>   The shape of the dataspace.
-        mshape  (read-only) => The shape of the selection region. 
+        mshape  (read-only) => The shape of the selection region.
                                Not guaranteed to fit within "shape", although
                                the total number of points is less than
                                product(shape).
@@ -148,7 +148,7 @@ class Selection(object):
 
     def __init__(self, shape):
         """ Create a selection.  Shape may be None if spaceid is given. """
-        
+
         shape = tuple(shape)
         self._shape = shape
         self._select_type = 'SEL_ALL'
@@ -166,14 +166,14 @@ class Selection(object):
     @property
     def nselect(self):
         """ Number of elements currently selected """
-        
+
         return self.getSelectNpoints()
 
     @property
     def mshape(self):
         """ Shape of selection (always 1-D for this class) """
         return (self.nselect,)
-        
+
     def getSelectNpoints(self):
         npoints = None
         if self._select_type == 'SEL_NONE':
@@ -186,7 +186,7 @@ class Selection(object):
         else:
             raise IOError("Unsupported select type")
         return npoints
-            
+
 
     def broadcast(self, target_shape):
         """ Get an iterable for broadcasting """
@@ -253,15 +253,15 @@ class SimpleSelection(Selection):
     def mshape(self):
         """ Shape of current selection """
         return self._mshape
-        
+
     @property
     def start(self):
         return self._sel[0]
-        
+
     @property
     def count(self):
         return self._sel[1]
-        
+
     @property
     def step(self):
         return self._sel[2]
@@ -277,9 +277,9 @@ class SimpleSelection(Selection):
 
         if not isinstance(args, tuple):
             args = (args,)
-            
+
         #print "__getitem__", args
-  
+
         if self.shape == ():
             if len(args) > 0 and args[0] not in (Ellipsis, ()):
                 raise TypeError("Invalid index for scalar dataset (only ..., () allowed)")
@@ -288,7 +288,7 @@ class SimpleSelection(Selection):
 
         start, count, step, scalar = _handle_simple(self.shape,args)
         #print "__getitem__", start, count, step, scalar
-         
+
         #self._id.select_hyperslab(start, count, step)
 
         self._sel = (start, count, step, scalar)
@@ -297,11 +297,11 @@ class SimpleSelection(Selection):
         self._mshape = tuple(x for x, y in zip(count, scalar) if not y)
 
         return self
-        
+
     def getSelectNpoints(self):
         """Return number of elements in current selection
         """
-         
+
         npoints = None
         if self._select_type == 'SEL_NONE':
             npoints = 0
@@ -316,11 +316,11 @@ class SimpleSelection(Selection):
             npoints = 1
             rank = len(dims)
             for i in range(rank):
-                npoints *= self.count[i]       
+                npoints *= self.count[i]
         else:
             raise IOError("Unsupported select type")
         return npoints
-        
+
     def getQueryParam(self):
         param = ''
         rank = len(self.shape)
@@ -549,8 +549,8 @@ def _translate_slice(exp, length):
     """
     #print "_translate_slice:", exp, "length:", length
     start, stop, step = exp.indices(length)
-        # Now if step > 0, then start and stop are in [0, length]; 
-        # if step < 0, they are in [-1, length - 1] (Python 2.6b2 and later; 
+        # Now if step > 0, then start and stop are in [0, length];
+        # if step < 0, they are in [-1, length - 1] (Python 2.6b2 and later;
         # Python issue 3004).
 
     if step < 1:
@@ -566,7 +566,7 @@ def guess_shape(sid):
     """ Given a dataspace, try to deduce the shape of the selection.
 
     Returns one of:
-        * A tuple with the selection shape, same length as the dataspace 
+        * A tuple with the selection shape, same length as the dataspace
         * A 1D selection shape for point-based and multiple-hyperslab selections
         * None, for unselected scalars and for NULL dataspaces
     """

@@ -17,21 +17,21 @@ if config.get("use_h5py"):
 else:
     import h5pyd as h5py
 
-  
+
 from common import ut, TestCase
 
-        
+
 class TestCommittedType(TestCase):
     def test_createtype(self):
         filename = self.getFileName("committed_type")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-        # create a compound numpy type 
+        # create a compound numpy type
         dt = np.dtype([('real', np.float), ('img', np.float)])
         f['complex_type'] = dt
- 
+
         dset = f.create_dataset('complex_dset', (10,), dtype=f['complex_type'])
-        f.close()  
-        
+        f.close()
+
 if __name__ == '__main__':
     ut.main()

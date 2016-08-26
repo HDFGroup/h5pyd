@@ -18,7 +18,7 @@ import sys
 
 #from ..h5t import TypeID
 from .base import HLObject, phil, with_phil
- 
+
 from .objectid import ObjectID, TypeID
 from .h5type import getTypeItem, createDataType
 
@@ -49,10 +49,10 @@ class Datatype(HLObject):
                 # todo: distinguish type from other hl objects
                 raise ValueError("%s is not a TypeID" % bind)
             HLObject.__init__(self, bind)
-            
+
             self._dtype = createDataType(self.id.type_json)
-             
-            
+
+
     @with_phil
     def __repr__(self):
         if not self.id:

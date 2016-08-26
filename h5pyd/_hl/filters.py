@@ -20,7 +20,7 @@
         decent-to-good ratio, good portability, and don't mind waiting.
 
     "lzf"
-        Custom compression filter for h5py.  This filter is much, much faster 
+        Custom compression filter for h5py.  This filter is much, much faster
         than gzip (roughly 10x in compression vs. gzip level 4, and 3x faster
         in decompressing), but at the cost of a worse compression ratio.  Use
         this if you want cheap compression and portability is not a concern.
@@ -38,7 +38,7 @@
         Tuple of available filter names for decoding
 
     encode
-        Tuple of available filter names for encoding 
+        Tuple of available filter names for encoding
 """
 
 from __future__ import absolute_import, division
@@ -64,12 +64,12 @@ def _gen_filter_tuples():
     for name, code in _COMP_FILTERS.items():
         # TBD: Provide a REST operation to query which filters are available
         #info = h5z.get_filter_info(code)
-        enc.append(name)    
+        enc.append(name)
         dec.append(name)
 
     return tuple(dec), tuple(enc)
 
-    
+
 
 decode, encode = _gen_filter_tuples()
 
@@ -138,15 +138,15 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
     elif compression_opts is not None:
         # Can't specify just compression_opts by itself.
         raise TypeError("Compression method must be specified")
-    
+
     if scaleoffset is not None:
         # scaleoffset must be an integer when it is not None or False,
         # except for integral data, for which scaleoffset == True is
         # permissible (will use SO_INT_MINBITS_DEFAULT)
-        
+
         if scaleoffset < 0:
             raise ValueError('scale factor must be >= 0')
-                
+
         if dtype.kind == 'f':
             if scaleoffset is True:
                 raise ValueError('integer scaleoffset must be provided for '
@@ -157,7 +157,7 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
         else:
             raise TypeError('scale/offset filter only supported for integer '
                             'and floating-point types')
-        
+
         # Scale/offset following fletcher32 in the filter chain will (almost?)
         # always triggera a read error, as most scale/offset settings are
         # lossy. Since fletcher32 must come first (see comment below) we
@@ -168,10 +168,10 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
     # End argument validation
 
     if (chunks is True) or \
-    (chunks is None and any((shuffle, fletcher32, compression, maxshape, 
+    (chunks is None and any((shuffle, fletcher32, compression, maxshape,
                              scaleoffset is not None))):
         chunks = guess_chunk(shape, maxshape, dtype.itemsize)
-        
+
     if maxshape is True:
         maxshape = (None,)*len(shape)
 
@@ -197,7 +197,7 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
         filter_scaleoffset['scaleOffset'] = scaleoffset
         if dtype.kind in ('u', 'i'):
             #plist.set_scaleoffset(h5z.SO_INT, scaleoffset)
-            filter_scaleoffset['scaleType'] = 'H5Z_SO_INT'         
+            filter_scaleoffset['scaleType'] = 'H5Z_SO_INT'
         else: # dtype.kind == 'f'
             #plist.set_scaleoffset(h5z.SO_FLOAT_DSCALE, scaleoffset)
             filter_scaleoffset['scaleType'] = 'H5Z_SO_FLOAT_DSCALE'
@@ -254,17 +254,17 @@ def get_filters(plist):
     Undocumented and subject to change without warning.
     """
 
-    filter_names = {'H5Z_FILTER_DEFLATE': 'gzip', 
+    filter_names = {'H5Z_FILTER_DEFLATE': 'gzip',
                'H5Z_FILTER_SZIP': 'szip',
-               'H5Z_FILTER_SHUFFLE': 'shuffle', 
+               'H5Z_FILTER_SHUFFLE': 'shuffle',
                'H5Z_FILTER_FLETCHER32': 'fletcher32',
-               'H5Z_FILTER_LZF': 'lzf', 
+               'H5Z_FILTER_LZF': 'lzf',
                'H5Z_FILTER_SCALEOFFSET': 'scaleoffset' }
 
     pipeline = {}
     if 'filters' not in plist:
         return pipeline
-        
+
     filters = plist['filters']
 
     for filter in filters:
@@ -310,7 +310,7 @@ def guess_chunk(shape, maxshape, typesize):
     Undocumented and subject to change without warning.
     """
     # pylint: disable=unused-argument
-    
+
     # For unlimited dimensions we have to guess 1024
     shape = tuple((x if x!=0 else 1024) for i, x in enumerate(shape))
 

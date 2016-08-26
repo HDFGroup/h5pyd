@@ -112,7 +112,7 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
             type_json = getTypeItem(dtype)
             #tid = h5t.py_create(dtype, logical=1)
     body['type'] = type_json
-     
+
     # Legacy
     if any((compression, shuffle, fletcher32, maxshape,scaleoffset)) and chunks is False:
         raise ValueError("Chunked format required for given storage options")
@@ -153,9 +153,9 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
 
     #dset_id = h5d.create(parent.id, None, tid, sid, dcpl=dcpl)
     req = "/datasets"
-    
+
     body['shape'] = shape
-        
+
     rsp = parent.POST(req, body=body)
     json_rep = {}
     json_rep['id'] = rsp['id']
@@ -340,8 +340,8 @@ class Dataset(HLObject):
         HLObject.__init__(self, bind)
 
         self._dcpl = self.id.dcpl_json
-        self._filters = filters.get_filters(self._dcpl)  
-        
+        self._filters = filters.get_filters(self._dcpl)
+
         self._local = None #local()
         # make a numpy dtype out of the type json
 

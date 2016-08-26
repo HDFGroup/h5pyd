@@ -20,17 +20,17 @@ cube_side = 256
 
 if len(sys.argv) > 1:
     cube_side = int(sys.argv[1])
-    
+
 filename = "cube_" + str(cube_side) + "_" + str(cube_side) + "_" + str(cube_side)
 filename += ".client_test.hdfgroup.org"
 #filename += ".h5"
- 
+
 f = h5pyd.File(filename, "w", endpoint=endpoint)
 
 print("filename,", f.filename)
- 
+
 print("create dataset")
- 
+
 dset = f.create_dataset('dset', (cube_side, cube_side, cube_side), dtype='f4')
 
 print("name:", dset.name)
@@ -45,6 +45,6 @@ for i in range(cube_side):
     dset[i,:,:] = arr
 print("done!")
 
-f.close() 
+f.close()
 
- 
+
