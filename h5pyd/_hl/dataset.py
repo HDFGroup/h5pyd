@@ -25,7 +25,7 @@ import numpy
 from .base import HLObject, Reference, RegionReference
 from .base import phil, with_phil
 from .objectid import ObjectID, TypeID, DatasetID
-#from . import filters
+from . import filters
 from . import selections as sel
 #from . import selections2 as sel2
 from .datatype import Datatype
@@ -59,6 +59,8 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
     Only creates anonymous datasets.
     """
 
+    # fill in fields for the body of the POST request as we got
+    body = { }
     # Convert data to a C-contiguous ndarray
     if data is not None:
         from . import base
@@ -73,6 +75,7 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
         shape = tuple(shape)
         if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
             raise ValueError("Shape tuple is incompatible with data")
+    body['shape'] = shape
 
     tmp_shape = maxshape if maxshape is not None else shape
     # Validate chunk shape
@@ -108,7 +111,8 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
         else:
             type_json = getTypeItem(dtype)
             #tid = h5t.py_create(dtype, logical=1)
-
+    body['type'] = type_json
+     
     # Legacy
     if any((compression, shuffle, fletcher32, maxshape,scaleoffset)) and chunks is False:
         raise ValueError("Chunked format required for given storage options")
@@ -126,14 +130,14 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
         compression_opts = compression
         compression = 'gzip'
 
-    # todo
-    #dcpl = filters.generate_dcpl(shape, dtype, chunks, compression, compression_opts,
-    #              shuffle, fletcher32, maxshape, scaleoffset)
-    dcpl = None
+    dcpl = filters.generate_dcpl(shape, dtype, chunks, compression, compression_opts,
+                     shuffle, fletcher32, maxshape, scaleoffset)
+
     if fillvalue is not None:
         fillvalue = numpy.array(fillvalue)
         #todo
         #dcpl.set_fill_value(fillvalue)
+    body['creationProperties'] = dcpl
 
     """
     if track_times in (True, False):
@@ -143,17 +147,15 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
     """
     if maxshape is not None:
         maxshape = tuple(m if m is not None else 0 for m in maxshape)
+        body['maxdims'] = maxshape
     #sid = h5s.create_simple(shape, maxshape)
 
 
     #dset_id = h5d.create(parent.id, None, tid, sid, dcpl=dcpl)
     req = "/datasets"
-    body = {'type': type_json }
+    
     body['shape'] = shape
-
-    if maxshape is not None:
-        body['maxdims'] = maxshape
-
+        
     rsp = parent.POST(req, body=body)
     json_rep = {}
     json_rep['id'] = rsp['id']
@@ -338,7 +340,8 @@ class Dataset(HLObject):
         HLObject.__init__(self, bind)
 
         self._dcpl = self.id.dcpl_json
-        self._filters = [] # filters.get_filters(self._dcpl)  # todo
+        self._filters = filters.get_filters(self._dcpl)  
+        
         self._local = None #local()
         # make a numpy dtype out of the type json
 
@@ -436,7 +439,6 @@ class Dataset(HLObject):
 
         * Boolean "mask" array indexing
         """
-        #print "getitem"
         args = args if isinstance(args, tuple) else (args,)
 
         # Sort field indices from the rest of the args.
