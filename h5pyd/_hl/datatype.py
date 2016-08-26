@@ -8,8 +8,7 @@
 #           and contributor agreement.
 
 """
-    Implements high-level access to committed datatypes in the file.
-"""
+    Implements high-level access to committed datatypes in the file. """
 
 from __future__ import absolute_import
 
@@ -31,8 +30,7 @@ class Datatype(HLObject):
 
         >>> MyGroup["name"] = numpy.dtype("f")
         >>> named_type = MyGroup["name"]
-        >>> assert named_type.dtype == numpy.dtype("f")
-    """
+        >>> assert named_type.dtype == numpy.dtype("f")  """
 
     @property
     @with_phil

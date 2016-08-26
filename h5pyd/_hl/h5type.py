@@ -37,8 +37,7 @@ def special_dtype(**kwds):
 
     ref = Reference | RegionReference
         Create a NumPy representation of an HDF5 object or region reference
-        type.
-    """
+        type.    """
 
     if len(kwds) != 1:
         raise TypeError("Exactly one keyword may be provided")
@@ -112,13 +111,12 @@ def check_dtype(**kwds):
         return None
 
 
-
 """
 Convert the given type item  to a predefined type string for
 predefined integer and floating point types ("H5T_STD_I64LE", et. al).
 For compound types, recursively iterate through the typeItem and do same
-conversion for fields of the compound type.
-"""
+conversion for fields of the compound type.  """
+
 def getTypeResponse(typeItem):
 
     response = None
@@ -152,7 +150,7 @@ def getTypeResponse(typeItem):
         response = {}   # otherwise, return full type
         for k in typeItem.keys():
             if k == 'base':
-                if type(typeItem[k]) == dict:
+                if isinstance(typeItem[k], dict):
                     response[k] = getTypeResponse(typeItem[k])  # recursive call
                 else:
                     response[k] = typeItem[k]  # predefined type
@@ -209,7 +207,7 @@ def getTypeItem(dt):
         #
         # check for h5py variable length extension
         vlen_check = check_dtype(vlen=dt.base)
-        if vlen_check is not None and type(vlen_check) != np.dtype:
+        if vlen_check is not None and isinstance(vlen_check, np.dtype):
             vlen_check = np.dtype(vlen_check)
         ref_check = check_dtype(ref=dt.base)
         if vlen_check == six.binary_type:
@@ -222,7 +220,7 @@ def getTypeItem(dt):
             type_info['length'] = 'H5T_VARIABLE'
             type_info['charSet'] = 'H5T_CSET_UTF8'
             type_info['strPad'] = 'H5T_STR_NULLTERM'
-        elif type(vlen_check) == np.dtype:
+        elif isintance(vlen_check, np.dtype):
             # vlen data
             type_info['class'] = 'H5T_VLEN'
             type_info['size'] = 'H5T_VARIABLE'
@@ -261,7 +259,6 @@ def getTypeItem(dt):
         # boolean type - h5py stores as enum
         if dt.base == dt:
             raise TypeError("Expected base type to be different than parent")
-        baseType = getBaseType(dt)
         type_info['class'] = 'H5T_ENUM'
         type_info['mapping'] = {"false": 0, "true": 1}
         type_info['base'] = getTypeItem(dt.base)
@@ -324,7 +321,7 @@ def getTypeItem(dt):
 """
 def getItemSize(typeItem):
     # handle the case where we are passed a primitive type first
-    if type(typeItem) in [six.string_types, six.text_type, six.binary_type]:
+    if isinstance(typeItem, six.string_types) or isinstance(typeItem, six.text_type) or isinstance(typeItem, six.binary_type):
         for type_prefix in ("H5T_STD_I", "H5T_STD_U", "H5T_IEEE_F"):
             if typeItem.startswith(type_prefix):
                 num_bits = typeItem[len(type_prefix):]
@@ -336,14 +333,13 @@ def getItemSize(typeItem):
                     raise TypeError("Invalid Type")
         # none of the expect primative types mathched
         raise TypeError("Invalid Type")
-    if type(typeItem) != dict:
+    if not isinstance(typeItem, dict):
         raise TypeError("invalid type")
 
     item_size = 0
     if 'class' not in typeItem:
         raise KeyError("'class' not provided")
     typeClass = typeItem['class']
-
 
     if typeClass == 'H5T_INTEGER':
         if 'base' not in typeItem:
@@ -385,13 +381,13 @@ def getItemSize(typeItem):
         if 'fields' not in typeItem:
             raise KeyError("'fields' not provided for compound type")
         fields = typeItem['fields']
-        if type(fields) is not list:
+        if not isinstance(fields, list):
             raise TypeError("Type Error: expected list type for 'fields'")
         if not fields:
             raise KeyError("no 'field' elements provided")
         # add up the size of each sub-field
         for field in fields:
-            if type(field) != dict:
+            if not isinstance(field, dict):
                 raise TypeError("Expected dictionary type for field")
             if 'type' not in field:
                 raise KeyError("'type' missing from field")
@@ -405,7 +401,7 @@ def getItemSize(typeItem):
         raise TypeError("Invalid type class")
 
     # calculate array type
-    if 'dims' in typeItem and type(item_size) is int:
+    if 'dims' in typeItem and isintance(item_size, int):
         dims = typeItem['dims']
         for dim in dims:
             item_size *= dim
@@ -457,7 +453,7 @@ def createBaseDataType(typeItem):
         dtRet = np.dtype(dtName)
         return dtRet  # return predefined type
 
-    if type(typeItem) != dict:
+    if not isinstance(typeItem, dict):
         raise TypeError("Type Error: invalid type")
 
     if 'class' not in typeItem:
@@ -467,9 +463,9 @@ def createBaseDataType(typeItem):
     dims = ''
     if 'dims' in typeItem:
         dims = None
-        if type(typeItem['dims']) == int:
+        if isintance(typeItem['dims'], int):
             dims = (typeItem['dims'])  # make into a tuple
-        elif type(typeItem['dims']) not in (list, tuple):
+        elif not isintance(typeItem['dims'], list) and not isinstance(typeItem['dims'], tuple):
             raise TypeError("expected list or integer for dims")
         else:
             dims = typeItem['dims']
@@ -502,7 +498,7 @@ def createBaseDataType(typeItem):
                 raise TypeError("unexpected 'charSet' value")
         else:
             nStrSize = typeItem['length']
-            if type(nStrSize) != int:
+            if not isinstance(nStrSize, int):
                 raise TypeError("expecting integer value for 'length'")
             type_code = None
             if typeItem['charSet'] == 'H5T_CSET_ASCII':
@@ -534,7 +530,7 @@ def createBaseDataType(typeItem):
         if 'base' not in typeItem:
             raise KeyError("'base' not provided")
         arrayBaseType = typeItem['base']
-        if type(arrayBaseType) is dict:
+        if isinstance(arrayBaseType, dict):
             if "class" not in arrayBaseType:
                 raise KeyError("'class' not provided for array base type")
             if arrayBaseType["class"] not in ('H5T_INTEGER', 'H5T_FLOAT', 'H5T_STRING'):
@@ -596,7 +592,7 @@ def createDataType(typeItem):
             if 'type' not in field:
                 raise KeyError("'type' missing from field")
             field_name = field['name']
-            if type(field_name) == unicode:
+            if isinstance(field_name, unicode):
                 # verify the field name is ascii
                 try:
                     ascii_name = field_name.encode('ascii')
