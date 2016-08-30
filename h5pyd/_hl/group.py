@@ -40,6 +40,7 @@ class Group(HLObject, MutableMappingHDF5):
             if not isinstance(bind, GroupID):
                 raise ValueError("%s is not a GroupID" % bind)
             HLObject.__init__(self, bind)
+            self._req_prefix = "/groups/" + self.id.uuid 
 
     def create_group(self, name):
         """ Create and return a new subgroup.
@@ -53,9 +54,11 @@ class Group(HLObject, MutableMappingHDF5):
         if self.__contains__(name):
             raise ValueError("Unable to create link (Name alredy exists)")
 
+
         body = {'link': { 'id': self.id.uuid,
                           'name': name
                } }
+         
         rsp = self.POST('/groups', body=body)
 
         group_json = rsp #json.loads(rsp.text)

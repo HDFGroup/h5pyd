@@ -49,6 +49,7 @@ class Datatype(HLObject):
             HLObject.__init__(self, bind)
 
             self._dtype = createDataType(self.id.type_json)
+            self._req_prefix = "/datatypes/" + self.id.uuid
 
 
     @with_phil

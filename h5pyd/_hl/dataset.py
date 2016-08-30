@@ -353,6 +353,8 @@ class Dataset(HLObject):
         else:
             self._shape = self.id.shape_json['dims']
 
+        self._req_prefix = "/datasets/" + self.id.uuid
+
 
         # self._local.astype = None #todo
 

@@ -12,20 +12,11 @@
 
 from __future__ import absolute_import
 
-# import weakref
-# import sys
-# import os
-# import uuid
-
-# import six
-
-# import requests
-# import json
-
-# from base import HLObject
-# from . import base
+ 
+import os
+ 
 from .base import phil, parse_lastmodified
-# from .. import version
+ 
 
 
 class ObjectID:
@@ -51,6 +42,17 @@ class ObjectID:
     def endpoint(self):
         """service endpoint"""
         return self._endpoint
+
+    @property
+    def username(self):
+        """username for requests"""
+        return self._username
+
+
+    @property
+    def password(self):
+        """user password for requests"""
+        return self._password
 
     @property
     def objtype_code(self):
@@ -82,7 +84,7 @@ class ObjectID:
         return self._modified
 
     def __init__(self, parent, item, objtype_code=None, domain=None,
-                 endpoint=None, mode='r', **kwds):
+                 endpoint=None, username=None, password=None, mode='r', **kwds):
         """Create a new objectId.
         """
         # print "object init:", item
@@ -98,7 +100,11 @@ class ObjectID:
 
         self._obj_json = item
 
-        self._endpoint = None
+        if username is None and "H5SERV_USERNAME" in os.environ:
+            username = os.environ["H5SERV_USERNAME"]
+
+        if password is None and "H5SERV_PASSWORD" in os.environ:
+            password = os.environ["H5SERV_PASSWORD"]
 
         self._objtype_code = objtype_code
 
@@ -107,11 +113,15 @@ class ObjectID:
                 self._domain = parent.id.domain
                 self._endpoint = parent.id.endpoint
                 self._mode = parent.id.mode
+                self._username = parent.id.username
+                self._password = parent.id.password
                 # self._parent = parent
             else:
                 self._domain = domain
                 self._endpoint = endpoint
                 self._mode = mode
+                self._username = username
+                self._password = password
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -137,13 +147,15 @@ class TypeID(ObjectID):
     def type_json(self):
         return self.obj_json['type']
 
-    def __init__(self, parent, item, domain=None, endpoint=None, **kwds):
+    def __init__(self, parent, item, domain=None, endpoint=None, mode=None,
+        username=None, password=None, **kwds):
         """Create a new TypeID.
         """
 
         with phil:
             ObjectID.__init__(self, parent, item, objtype_code='t',
-                              domain=domain, endpoint=endpoint)
+                              domain=domain, endpoint=endpoint, 
+                              username=username, password=password)
 
 
 class DatasetID(ObjectID):
@@ -170,22 +182,26 @@ class DatasetID(ObjectID):
             rank = len(dims)
         return rank
 
-    def __init__(self, parent, item, domain=None, endpoint=None, **kwds):
+    def __init__(self, parent, item, domain=None, endpoint=None, mode=None,
+        username=None, password=None, **kwds):
         """Create a new DatasetID.
         """
 
         with phil:
             ObjectID.__init__(self, parent, item, objtype_code='d',
-                              domain=domain, endpoint=endpoint)
+                              domain=domain, endpoint=endpoint,
+                              username=username, password=password)
 
 
 class GroupID(ObjectID):
 
     def __init__(self, parent, item, domain=None, endpoint=None, mode=None,
+                username=None, password=None,
                  **kwds):
         """Create a new GroupID.
         """
-
+        
         with phil:
             ObjectID.__init__(self, parent, item, objtype_code='g',
-                              domain=domain, mode=mode, endpoint=endpoint)
+                              domain=domain, mode=mode, endpoint=endpoint,
+                              username=username, password=password)

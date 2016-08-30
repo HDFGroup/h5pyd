@@ -16,6 +16,7 @@ import posixpath
 import weakref
 import os
 import json
+import base64
 import requests
 import logging
 import logging.handlers
@@ -86,6 +87,17 @@ def parse_lastmodified(datestr):
     # format: "2016-08-04T06:44:04Z"
     return datetime.strptime(
         datestr, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=pytz.UTC)
+
+def getHeaders(domain, username=None, password=None):
+        headers =  {'host': domain}
+        
+        if username is not None and password is not None:
+            auth_string = username + ':' + password
+            auth_string = auth_string.encode('utf-8')
+            auth_string = base64.b64encode(auth_string)
+            auth_string = b"Basic " + auth_string
+            headers['Authorization'] = auth_string
+        return headers
 
 
 class Reference():
@@ -307,6 +319,53 @@ class _RegionProxy(object):
             return selections.guess_shape(sid)
         """
 
+class ACL(object):
+
+    @property
+    def username(self):
+        return self._username
+
+    @property
+    def create(self):
+        return self._create
+
+    @property
+    def delete(self):
+        return self._delete
+
+    @property
+    def read(self):
+        return self._read
+
+    @property
+    def update(self):
+        return self._update
+
+
+    @property
+    def readACL(self):
+        return self._readACL
+
+    @property
+    def updateACL(self):
+        return self._updateACL
+
+     
+
+    """
+        Proxy object which handles ACLs (access control list)
+
+    """
+
+    def __init__(self):
+        self._username = None
+        self._create = True
+        self._delete = True
+        self._read = True
+        self._update = True
+        self._readACL = True
+        self._updateACL = True
+
 
 class HLObject(CommonStateObject):
 
@@ -392,17 +451,19 @@ class HLObject(CommonStateObject):
             if verify_cert.startswith('F'):
                 return False
         return True
+      
 
     def GET(self, req, format="json"):
         if self.id.endpoint is None:
             raise IOError("object not initialized")
         if self.id.domain is None:
             raise IOError("no domain defined")
-
+        
         # try to do a GET from the domain
         req = self.id.endpoint + req
 
-        headers = {'host': self.id.domain}
+        headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
+         
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
         self.log.info("GET: " + req)
@@ -432,7 +493,7 @@ class HLObject(CommonStateObject):
 
         data = json.dumps(body)
 
-        headers = {'host': self.id.domain}
+        headers = getHeaders(self.id.domain)
         self.log.info("PUT: " + req)
         # self.log.info("BODY: " + str(data))
         rsp = requests.put(req, data=data, headers=headers,
@@ -456,8 +517,10 @@ class HLObject(CommonStateObject):
 
         data = json.dumps(body)
 
-        headers = {'host': self.id.domain}
+        headers = getHeaders(self.id.domain)
+
         self.log.info("PST: " + req)
+         
         rsp = requests.post(req, data=data, headers=headers,
                             verify=self.verifyCert())
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
@@ -476,7 +539,8 @@ class HLObject(CommonStateObject):
         # try to do a DELETE of the resource
         req = self.id.endpoint + req
 
-        headers = {'host': self.id.domain}
+        headers = getHeaders(self.id.domain)
+
         self.log.info("DEL: " + req)
         rsp = requests.delete(req, headers=headers, verify=False)
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
@@ -489,6 +553,7 @@ class HLObject(CommonStateObject):
         """ Setup this object, given its low-level identifier """
         self._id = oid
         self.log = logging.getLogger("h5pyd")
+        self.req_prefix  = None # derived class should set this to the URI of the object
         if not self.log.handlers:
             # setup logging
             log_path = os.getcwd()
@@ -513,6 +578,22 @@ class HLObject(CommonStateObject):
     def __bool__(self):
         with phil:
             return bool(self.id)
+
+    def getACL(self, username):
+        req = self._req_prefix + '/acls'
+        if username is not None:
+            req += '/' + username
+        rsp_json = self.GET(req)
+        acl_json = rsp_json["acl"] 
+        return acl_json
+
+    def getACLs(self):
+        req = self._req_prefix + '/acls'
+        rsp_json = self.GET(req)
+        print("acls:", rsp_json)
+        acls_json = rsp_json["acls"] 
+        return acls_json
+        
     __nonzero__ = __bool__
 
 

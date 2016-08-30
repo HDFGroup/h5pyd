@@ -26,7 +26,7 @@ import json
 from .objectid import GroupID
 # from . import base
 # from .base import HLObject
-from .base import phil, parse_lastmodified
+from .base import phil, parse_lastmodified, getHeaders
 # from . import group
 from .group import Group
 from .. import version
@@ -117,30 +117,19 @@ class File(Group):
         """Last modified time of the domain as a datetime object."""
         return self._modified
 
-    def __init__(self, domain_name, mode=None, endpoint=None, **kwds):
+    def __init__(self, domain_name, mode=None, endpoint=None, 
+        username=None, password=None, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
 
-        name
-            Name of the file on disk.  Note: for files created with the 'core'
-            driver, HDF5 still requires this be non-empty.
-        driver
-            Name of the driver to use.  Legal values are None (default,
-            recommended), 'core', 'sec2', 'stdio', 'mpio'.
-        libver
-            Library version bounds.  Currently only the strings 'earliest'
-            and 'latest' are defined.
-        userblock
-            Desired size of user block.  Only allowed when creating a new
-            file (mode w, w- or x).
-        swmr
-            Open the file in SWMR read mode. Only used when mode = 'r'.
-        Additional keywords
-            Passed on to the selected file driver.
+        domain_name
+            URI of the domain name to access. E.g.: tall.data.hdfgroup.org.
+        mode
+            Access mode: 'r', 'r+', 'w', or 'a'
+        endpoint
+            Server endpoint.   Defaults to "http://localhost:5000"
         """
-
-        self._endpoint = None
 
         with phil:
             """
@@ -174,9 +163,9 @@ class File(Group):
 
             # try to do a GET from the domain
             req = endpoint + "/"
-
-            headers = {'host': domain_name}
-
+             
+            headers = getHeaders(domain=domain_name, username=username, password=password)
+            
             rsp = requests.get(req, headers=headers) #, verify=self.verifyCert())
 
             if rsp.status_code == 200:
@@ -231,7 +220,8 @@ class File(Group):
             group_json = json.loads(rsp.text)
 
             self._id = GroupID(None, group_json, domain=domain_name,
-                               endpoint=endpoint, mode=mode)
+                               endpoint=endpoint, username=username,
+                               password=password, mode=mode)
 
             self._name = '/'
             self._created = root_json['created']
