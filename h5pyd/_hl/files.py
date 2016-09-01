@@ -12,59 +12,19 @@
 
 from __future__ import absolute_import
 
-# import weakref
-# import sys
 import os
-# import uuid
-
 import six
 
 import requests
 import json
 
-# from . import objectid
 from .objectid import GroupID
-# from . import base
-# from .base import HLObject
 from .base import phil, parse_lastmodified, getHeaders
-# from . import group
 from .group import Group
 from .. import version
 
 
 hdf5_version = version.hdf5_version_tuple[0:3]
-
-
-# def make_fapl(driver, libver, **kwds):
-#     """ Set up a file access property list """
-#     plist = h5p.create(h5p.FILE_ACCESS)
-
-#     if libver is not None:
-#         if libver in libver_dict:
-#             low = libver_dict[libver]
-#             high = h5f.LIBVER_LATEST
-#         else:
-#             low, high = (libver_dict[x] for x in libver)
-#         plist.set_libver_bounds(low, high)
-
-#     if driver is None or (driver == 'windows' and sys.platform == 'win32'):
-#         return plist
-
-#     if(driver == 'sec2'):
-#         plist.set_fapl_sec2(**kwds)
-#     elif(driver == 'stdio'):
-#         plist.set_fapl_stdio(**kwds)
-#     elif(driver == 'core'):
-#         plist.set_fapl_core(**kwds)
-#     elif(driver == 'family'):
-#         plist.set_fapl_family(memb_fapl=plist.copy(), **kwds)
-#     elif(driver == 'mpio'):
-#         kwds.setdefault('info', mpi4py.MPI.Info())
-#         plist.set_fapl_mpio(**kwds)
-#     else:
-#         raise ValueError('Unknown driver type "%s"' % driver)
-
-#     return plist
 
 
 class File(Group):
@@ -166,7 +126,7 @@ class File(Group):
              
             headers = getHeaders(domain=domain_name, username=username, password=password)
             
-            rsp = requests.get(req, headers=headers) #, verify=self.verifyCert())
+            rsp = requests.get(req, headers=headers, verify=self.verifyCert())
 
             if rsp.status_code == 200:
                 root_json = json.loads(rsp.text)
@@ -232,6 +192,13 @@ class File(Group):
     def close(self):
         """ Clears reference to remote resource.
         """
+        self._id.close()
+
+    def remove(self):
+        """ Deletes the domain on the server"""
+        if self.id.mode == 'r':
+            raise ValueError("Unable to remove file (No write intent on file)")
+        self.DELETE('/')
         self._id.close()
 
     def flush(self):

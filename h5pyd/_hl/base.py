@@ -493,7 +493,7 @@ class HLObject(CommonStateObject):
 
         data = json.dumps(body)
 
-        headers = getHeaders(self.id.domain)
+        headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
         self.log.info("PUT: " + req)
         # self.log.info("BODY: " + str(data))
         rsp = requests.put(req, data=data, headers=headers,
@@ -517,7 +517,7 @@ class HLObject(CommonStateObject):
 
         data = json.dumps(body)
 
-        headers = getHeaders(self.id.domain)
+        headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
 
         self.log.info("PST: " + req)
          
@@ -539,15 +539,13 @@ class HLObject(CommonStateObject):
         # try to do a DELETE of the resource
         req = self.id.endpoint + req
 
-        headers = getHeaders(self.id.domain)
+        headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
 
         self.log.info("DEL: " + req)
-        rsp = requests.delete(req, headers=headers, verify=False)
+        rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
-        rsp_json = json.loads(rsp.text)
-        return rsp
 
     def __init__(self, oid):
         """ Setup this object, given its low-level identifier """
@@ -580,9 +578,7 @@ class HLObject(CommonStateObject):
             return bool(self.id)
 
     def getACL(self, username):
-        req = self._req_prefix + '/acls'
-        if username is not None:
-            req += '/' + username
+        req = self._req_prefix + '/acls/' + username
         rsp_json = self.GET(req)
         acl_json = rsp_json["acl"] 
         return acl_json
@@ -590,9 +586,20 @@ class HLObject(CommonStateObject):
     def getACLs(self):
         req = self._req_prefix + '/acls'
         rsp_json = self.GET(req)
-        print("acls:", rsp_json)
         acls_json = rsp_json["acls"] 
         return acls_json
+
+    def putACL(self, acl):
+        if "userName" not in acl:
+            raise IOError("ACL has no 'userName' key")
+        perm = {}
+        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
+            perm[k] = acl[k]
+        body = {"perm": perm}
+        req = self._req_prefix + '/acls/' + acl['userName']
+        self.PUT(req, body=body)
+
+        
         
     __nonzero__ = __bool__
 

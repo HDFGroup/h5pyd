@@ -12,6 +12,7 @@
 
 import config
 
+
 if config.get("use_h5py"):
     import h5py
 else:
@@ -19,6 +20,7 @@ else:
 
 from common import ut, TestCase
 from datetime import datetime
+from copy import copy
 import six
 
 
@@ -112,75 +114,148 @@ class TestFile(TestCase):
             self.assertTrue(False) #expect exception
         except IOError:
             pass
-        
-    def test_auth(self):
-        filename = "tallp.hdfgroup.org"
+
+    def test_delete(self):
+        filename = self.getFileName("delete_me")        
         print("filename:", filename)
 
-        docker_endpoint = "http://192.168.1.100:5000"
-        
-        try:
-            f = h5py.File(filename, 'r', endpoint=docker_endpoint) 
-            self.assertTrue(False)    # should be blocked from unauthenticated access
-        except IOError as ioe:
-            self.assertEqual(str(ioe), "Unauthorized")
+        f = h5py.File(filename, 'w')
 
-        f = h5py.File(filename, 'a', endpoint=docker_endpoint, username="test_user1", password="test")
-        root_id = f.id.id
+        for name in ("g1", "g2", "g1/g1.1"):
+            f.create_group(name)
+        f.close()
 
+        f = h5py.File(filename, 'r') 
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
-        self.assertEqual(f.id.username, "test_user1")
-        self.assertEqual(f.id.password, "test")
         self.assertEqual(len(f.keys()), 2)
 
-        file_acl = f.getACL("default")
-        self.assertEqual(file_acl["userName"], "default")        
-        self.assertEqual(file_acl["create"], False)
-        self.assertEqual(file_acl["read"], False)
-        self.assertEqual(file_acl["update"], False)
-        self.assertEqual(file_acl["delete"], False)
-        self.assertEqual(file_acl["readACL"], False)
-        self.assertEqual(file_acl["updateACL"], False)
+        # removing file in read-mode should fail
+        try:
+            f.remove()
+            self.assertTrue(False)  # expected exception
+        except ValueError as ve:
+            self.assertEqual(str(ve), "Unable to remove file (No write intent on file)")
+        
+        f = h5py.File(filename, 'r+')
+        self.assertEqual(f.filename, filename)
+        self.assertEqual(f.name, "/")
+        self.assertTrue(f.id.id is not None)
+        self.assertEqual(len(f.keys()), 2)
+
+        # delete the file
+        f.remove()
+        self.assertEqual(f.id.id, 0)
+
+        # opening in read-mode should fail
+        try:
+            f = h5py.File(filename, 'r') 
+            self.assertTrue(False)  # expected exception
+        except IOError as ioe:
+            self.assertEqual(str(ioe), "Not Found")
+
+    def test_auth(self):
+        filename = self.getFileName("file_auth")        
+        print("filename:", filename)
+
+        f = h5py.File(filename, 'w') 
+       
+        for name in ("g1", "g2", "g1/g1.1"):
+            f.create_group(name)
+         
+        self.assertEqual(f.filename, filename)
+        self.assertEqual(f.name, "/")
+        self.assertTrue(f.id.id is not None)
+        self.assertEqual(len(f.keys()), 2)
+        
+        # no explicit ACLs yet
+        file_acls = f.getACLs()
+        self.assertEqual(len(file_acls), 0)
 
         file_acl = f.getACL("test_user1")
-        self.assertEqual(file_acl["userName"], "test_user1")        
-        self.assertEqual(file_acl["create"], True)
-        self.assertEqual(file_acl["read"], True)
-        self.assertEqual(file_acl["update"], True)
-        self.assertEqual(file_acl["delete"], True)
-        self.assertEqual(file_acl["readACL"], True)
-        self.assertEqual(file_acl["updateACL"], True)
+        # there's no ACL for test_User1 yet, so this should return the default ACL
+        acl_keys = ("create", "read", "update", "delete", "readACL", "updateACL")
+        self.assertEqual(file_acl["userName"], "default")   
+        for k in acl_keys:
+            self.assertEqual(file_acl[k], True)
 
-        file_acl = f.getACL("test_user2")
-        self.assertEqual(file_acl["userName"], "test_user2")        
-        self.assertEqual(file_acl["create"], False)
-        self.assertEqual(file_acl["read"], True)
-        self.assertEqual(file_acl["update"], False)
-        self.assertEqual(file_acl["delete"], False)
-        self.assertEqual(file_acl["readACL"], False)
-        self.assertEqual(file_acl["updateACL"], False)
+        # same as getting "default" for username
+        default_acl = f.getACL("default")
+        # there's no ACL for test_User1 yet, so this should return the default ACL
+        self.assertEqual(default_acl["userName"], "default")  
+        for k in acl_keys:
+            self.assertEqual(default_acl[k], True)      
 
-        try:
-            file_acl = f.getACL("not_a_user")
-            self.assertTrue(False)
-        except IOError as ioe:
-            self.assertEqual(str(ioe), "username does not exist")
+        user1_acl = copy(default_acl)
+        user1_acl["userName"] = "test_user1"
+        f.putACL(user1_acl)
+        user1_acl = f.getACL("test_user1")
+        
+        for k in acl_keys:
+            # no permission for unauthenticated users
+            default_acl[k] = False
 
-        # TBD: get ACLS
-        #file_acls = f.getACLs()
-        #print("acls:", file_acls)
+        # add an acl for test_user2 that has only read access
+        user2_acl = copy(default_acl)
+        user2_acl["userName"] = "test_user2"
+        user2_acl["read"] = True  # allow read access
+        f.putACL(user2_acl)
+
+        f.putACL(default_acl)  # after this call, each request will need authentication
 
         f.close()
-
-        # test_user2 has read, but not write access
+        
+        # opening in read-mode should fail
         try:
-            f = h5py.File(filename, 'w', endpoint=docker_endpoint, username="test_user2", password="test") 
-            self.assertTrue(False)    # should be blocked from unauthenticated access
+            f = h5py.File(filename, 'r') 
+            self.assertTrue(False)  # expected exception
         except IOError as ioe:
-            self.assertEqual(str(ioe), "Forbidden")        
+            self.assertEqual(str(ioe), "Unauthorized")  # need to be authenticated
 
+        # same with write mode
+        try:
+            f = h5py.File(filename, 'w') 
+            self.assertTrue(False)  # expected exception
+        except IOError:
+            pass  # expected
 
+        # test_user2 has read access, but opening in write mode should fail
+        try:
+            f = h5py.File(filename, 'w', username="test_user2", password="test")
+            self.assertEqual(len(f.keys()), 0)
+            self.assertTrue(False)  # expected exception
+        except IOError as ioe:
+            self.assertEqual(str(ioe), "Forbidden")  # user is not authorized
+
+        f = h5py.File(filename, 'r', username="test_user2", password="test") 
+        self.assertEqual(f.filename, filename)
+        self.assertEqual(f.name, "/")
+        self.assertTrue(f.id.id is not None)
+        self.assertEqual(len(f.keys()), 2)
+        # try delete the file (should throw an exception)
+        try:
+            f.remove()
+            self.assertTrue(False)  # expected exception
+        except ValueError as ve:
+            self.assertEqual(str(ve), "Unable to remove file (No write intent on file)")
+        f.close()
+        self.assertEqual(f.id.id, 0)
+        
+        f = h5py.File(filename, 'r+', username="test_user1", password="test") 
+        self.assertEqual(f.filename, filename)
+        self.assertEqual(f.name, "/")
+        self.assertTrue(f.id.id is not None)
+        self.assertEqual(len(f.keys()), 2)
+        # delete the file
+        f.remove()
+        self.assertEqual(f.id.id, 0)
+
+        try:
+            f = h5py.File(filename, 'r+', username="test_user1", password="test") 
+        except IOError as ioe:
+            self.assertEqual(str(ioe), "Not Found")
+            
+              
 if __name__ == '__main__':
     ut.main()
