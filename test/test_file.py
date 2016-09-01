@@ -248,6 +248,12 @@ class TestFile(TestCase):
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 2)
+        try:
+            file_acls = f.getACLs()  # test_user2 doesn't have readACL permissio'
+            self.assertTrue(False) # expected exception
+        except IOError as ioe:
+            self.assertEqual(str(ioe), "Forbidden")
+        
         grp = f['/']
         grp.file.close()  # try closing the file via a group reference
 
@@ -266,6 +272,9 @@ class TestFile(TestCase):
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 2)
+        file_acls = f.getACLs()
+        self.assertEqual(len(file_acls), 3)
+
         # delete the file
         f.remove()
         self.assertEqual(f.id.id, 0)

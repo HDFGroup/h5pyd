@@ -7,6 +7,7 @@ import sys
 #
 recursive = False
 verbose = False
+showacls = False
 endpoint = "http://127.0.0.1:5000"
 username = None
 password = None
@@ -48,6 +49,52 @@ def dump(name, obj):
     if verbose and obj_id is not None:
         print("    id: {0}".format(obj_id))
 
+def dumpACL(acl):
+    perms = ""
+    if acl["create"]:
+        perms += 'c'
+    else:
+        perms += '-'
+    if acl["read"]:
+        perms += 'r'
+    else:
+        perms += '-'
+    if acl["update"]:
+        perms += 'u'
+    else:
+        perms += '-'
+    if acl["delete"]:
+        perms += 'd'
+    else:
+        perms += '-'
+    if acl["readACL"]:
+        perms += 'e'
+    else:
+        perms += '-'
+    if acl["updateACL"]:
+        perms += 'p'
+    else:
+        perms += '-'
+    print("    {0:24} {1}".format(acl["userName"], perms))
+
+def dumpAcls(obj):
+    try:
+        default_acl = obj.getACL("default")
+        print("acls:")
+        dumpACL(default_acl)
+    except OSError:
+        print("read ACLs is not permitted")
+        return
+
+    acls = obj.getACLs()
+     
+    for acl in acls:
+        if acl["userName"] == "default":
+            continue
+        dumpACL(acl)
+            
+
+
 #
 # Get Group based on URL
 #
@@ -64,7 +111,7 @@ def getGroupFromUrl(url):
 # Usage
 #
 def printUsage():
-    print("usage: python h5ls.py [-r] [-a] [-e endpoint] [-u username] [-p password] urls")
+    print("usage: python h5ls.py [-r] [-a] [-showacls] [-e endpoint] [-u username] [-p password] urls")
     print("example: python h5ls.py -r -e http://data.hdfgroup.org:7253 tall.test.data.hdfgroup.org")
     sys.exit()
 
@@ -82,6 +129,9 @@ while argn < len(sys.argv):
          argn += 1
     elif arg in ("-v", "--verbose"):
          verbose = True
+         argn += 1
+    elif arg in ("-showacls", "--showacls"):
+         showacls = True
          argn += 1
     elif arg in ("-h", "--help"):
          printUsage()
@@ -116,6 +166,8 @@ for url in urls:
                 # follow hardlinks
                 item = grp.get(k)
             dump(k, item)
+    if showacls:
+        dumpAcls(grp)
     grp.file.close()
 
 
