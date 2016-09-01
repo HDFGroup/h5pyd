@@ -8,6 +8,8 @@ import sys
 recursive = False
 verbose = False
 endpoint = "http://127.0.0.1:5000"
+username = None
+password = None
 
 def getShapeText(dset):
     shape_text = "Scalar"
@@ -50,9 +52,8 @@ def dump(name, obj):
 # Get Group based on URL
 #
 def getGroupFromUrl(url):
-
     try:
-        f = h5py.File(url, 'r', endpoint=endpoint)
+        f = h5py.File(url, 'r', endpoint=endpoint, username=username, password=password)
         return f['/']
     except OSError as err:
         print("OSError: {0}".format(err))
@@ -63,7 +64,7 @@ def getGroupFromUrl(url):
 # Usage
 #
 def printUsage():
-    print("usage: python h5ls.py [-r] [-a] [-e endpoint] urls")
+    print("usage: python h5ls.py [-r] [-a] [-e endpoint] [-u username] [-p password] urls")
     print("example: python h5ls.py -r -e http://data.hdfgroup.org:7253 tall.test.data.hdfgroup.org")
     sys.exit()
 
@@ -86,6 +87,12 @@ while argn < len(sys.argv):
          printUsage()
     elif arg in ("-e", "--endpoint"):
          endpoint = sys.argv[argn+1]
+         argn += 2
+    elif arg in ("-u", "--username"):
+         username = sys.argv[argn+1]
+         argn += 2
+    elif arg in ("-p", "--password"):
+         password = sys.argv[argn+1]
          argn += 2
     elif arg[0] == '-':
          printUsage()

@@ -220,6 +220,7 @@ class TestFile(TestCase):
 
         f.close()
         
+        
         # opening in read-mode should fail
         try:
             f = h5py.File(filename, 'r') 
@@ -247,6 +248,10 @@ class TestFile(TestCase):
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 2)
+        grp = f['/']
+        grp.file.close()  # try closing the file via a group reference
+
+        f = h5py.File(filename, 'r', username="test_user2", password="test") 
         # try delete the file (should throw an exception)
         try:
             f.remove()

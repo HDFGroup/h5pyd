@@ -385,7 +385,8 @@ class HLObject(CommonStateObject):
         """ Return a File instance associated with this object """
         from . import files
         return files.File(self._id.domain, endpoint=self._id.endpoint,
-                          mode=self._id.mode)
+                          mode=self._id.mode, username=self._id.username,
+                          password=self._id.password)
 
     @property
     def name(self):
