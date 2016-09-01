@@ -44,8 +44,9 @@ class TestScalarDataset(TestCase):
         self.assertEqual(dset.file.filename, filename)
 
         # Check dataset's last modified time
-        self.assertTrue(isinstance(dset.modified, datetime))
-        self.assertEqual(dset.modified.tzname(), six.u('UTC'))
+        if h5py.__name__ == "h5pyd":
+            self.assertTrue(isinstance(dset.modified, datetime))
+            self.assertEqual(dset.modified.tzname(), six.u('UTC'))
 
         f.close()
 

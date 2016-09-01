@@ -134,11 +134,13 @@ class TestGroup(TestCase):
         self.assertEqual(len(r), 4)
 
         # Check group's last modified time
-        self.assertTrue(isinstance(g1.modified, datetime))
-        self.assertEqual(g1.modified.tzname(), six.u('UTC'))
+        if h5py.__name__ == "h5pyd":
+            self.assertTrue(isinstance(g1.modified, datetime))
+            self.assertEqual(g1.modified.tzname(), six.u('UTC'))
 
         f.close()
-        self.assertEqual(f.id.id, 0)
+        if h5py.__name__ == "h5pyd":
+            self.assertEqual(f.id.id, 0)
 
 if __name__ == '__main__':
     ut.main()

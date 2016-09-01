@@ -44,7 +44,6 @@ class TestDatasetCompound(TestCase):
             elem['img'] = math.sin(theta)
             dset[i] = elem
 
-        f.close()
         val = dset[0]
         self.assertEqual(val['real'], 1.0)
         f.close()

@@ -15,6 +15,7 @@ import config
 
 if config.get("use_h5py"):
     import h5py
+    import os
 else:
     import h5pyd as h5py
 
@@ -44,7 +45,8 @@ class TestFile(TestCase):
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 0)
         self.assertEqual(f.mode, 'r+')
-        self.assertTrue(f.id.endpoint.startswith("http"))
+        if h5py.__name__ == "h5pyd":
+            self.assertTrue(f.id.endpoint.startswith("http"))
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
         r = f['/']
@@ -78,8 +80,9 @@ class TestFile(TestCase):
         self.assertEqual(len(f.attrs.keys()), 0)
 
         # Check domain's last modified time
-        self.assertTrue(isinstance(f.modified, datetime))
-        self.assertEqual(f.modified.tzname(), six.u('UTC'))
+        if h5py.__name__ == "h5pyd":
+            self.assertTrue(isinstance(f.modified, datetime))
+            self.assertEqual(f.modified.tzname(), six.u('UTC'))
 
         try:
             f.create_group("another_subgrp")
@@ -132,11 +135,14 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 2)
 
         # removing file in read-mode should fail
-        try:
-            f.remove()
-            self.assertTrue(False)  # expected exception
-        except ValueError as ve:
-            self.assertEqual(str(ve), "Unable to remove file (No write intent on file)")
+        if h5py.__name__ == "h5pyd":
+            try:
+                f.remove()
+                self.assertTrue(False)  # expected exception
+            except ValueError as ve:
+                self.assertEqual(str(ve), "Unable to remove file (No write intent on file)")
+
+        f.close()
         
         f = h5py.File(filename, 'r+')
         self.assertEqual(f.filename, filename)
@@ -145,17 +151,25 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 2)
 
         # delete the file
-        f.remove()
-        self.assertEqual(f.id.id, 0)
+        if h5py.__name__ == "h5py":
+            os.remove(filename)
+        else:
+            f.remove()
+        if h5py.__name__ == "h5pyd":
+            self.assertEqual(f.id.id, 0)
 
         # opening in read-mode should fail
         try:
             f = h5py.File(filename, 'r') 
             self.assertTrue(False)  # expected exception
         except IOError as ioe:
-            self.assertEqual(str(ioe), "Not Found")
+            if h5py.__name__ == "h5pyd":
+                self.assertEqual(str(ioe), "Not Found")
 
     def test_auth(self):
+        if h5py.__name__ == "h5py":
+            return  # ACLs are just for h5pyd
+            
         filename = self.getFileName("file_auth")        
         print("filename:", filename)
 

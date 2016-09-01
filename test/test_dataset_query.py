@@ -43,7 +43,7 @@ class TestQueryDataset(TestCase):
 
 
         # select from dset1
-        if not config.get("use_h5py"):
+        if h5py.__name__ == "h5pyd":
             count = 0
             for row in dset.read_where("b>4"):
                 self.assertTrue(row[1] > 4)

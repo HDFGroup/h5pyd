@@ -30,6 +30,7 @@ class TestCreateDataset(TestCase):
     def test_create_simple_dset(self):
         filename = self.getFileName("create_simple_dset")
         print("filename:", filename)
+        print("h5py:", h5py.__name__)
         f = h5py.File(filename, "w")
 
         dims = (40, 80)
