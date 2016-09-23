@@ -501,7 +501,10 @@ class HLObject(CommonStateObject):
                            verify=self.verifyCert())
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
-            raise IOError(rsp.reason)
+            if rsp.status_code == 409:
+                raise RuntimeError(rsp.reason)
+            else:
+                raise IOError(rsp.reason)
 
         if rsp.text:
             rsp_json = json.loads(rsp.text)

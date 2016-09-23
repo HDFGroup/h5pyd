@@ -34,13 +34,22 @@ class TestAttribute(TestCase):
         g1 = f.create_group('g1')
 
         g1.attrs['a1'] = 42
-        #g1.attrs['a2'] = [b'hello', b'goodbye']
+         
         n = g1.attrs['a1']
         self.assertEqual(n, 42)
-        #words = g1.attrs['a2']
-        #self.assertEqual(words[0], b'hello')
-        #self.assertEqual(words[1], b'goodbye')
 
+        self.assertEqual(len(g1.attrs), 1)
+
+        g1.attrs['b1'] = list(range(10))
+
+        # try replacing 'a1'
+        g1.attrs['a1'] = 24
+
+        self.assertEqual(len(g1.attrs), 2)
+
+
+
+         
 
 if __name__ == '__main__':
     ut.main()

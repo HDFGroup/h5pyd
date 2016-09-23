@@ -83,7 +83,17 @@ class TestGroup(TestCase):
         self.assertEqual(len(g1_1), 0)
 
         # create a hardlink
-        r['g1.1'] = g1_1
+        tmp_grp = r.create_group("tmp")
+        r['g1.1'] = tmp_grp
+
+        # try to replace the link
+        try:
+            r['g1.1'] = g1_1
+            self.assertTrue(False)  # shouldn't get here'
+        except RuntimeError:
+            pass # expected
+        
+        del r['tmp']
         self.assertEqual(len(r), 4)
 
         # create a softlink
@@ -117,7 +127,7 @@ class TestGroup(TestCase):
             linkee_class = r.get('myexternallink', getclass=True)
             if not config.get('use_h5py'):
                 self.assertTrue(True)  # TODO - implement for h5pyd
-        except IOError:
+        except OSError:
             if config.get('use_h5py'):
                 self.assertTrue(False)  # Should work for h5py
 
