@@ -220,7 +220,7 @@ def getTypeItem(dt):
             type_info['length'] = 'H5T_VARIABLE'
             type_info['charSet'] = 'H5T_CSET_UTF8'
             type_info['strPad'] = 'H5T_STR_NULLTERM'
-        elif isintance(vlen_check, np.dtype):
+        elif isinstance(vlen_check, np.dtype):
             # vlen data
             type_info['class'] = 'H5T_VLEN'
             type_info['size'] = 'H5T_VARIABLE'
@@ -401,7 +401,7 @@ def getItemSize(typeItem):
         raise TypeError("Invalid type class")
 
     # calculate array type
-    if 'dims' in typeItem and isintance(item_size, int):
+    if 'dims' in typeItem and isinstance(item_size, int):
         dims = typeItem['dims']
         for dim in dims:
             item_size *= dim
@@ -463,9 +463,9 @@ def createBaseDataType(typeItem):
     dims = ''
     if 'dims' in typeItem:
         dims = None
-        if isintance(typeItem['dims'], int):
+        if isinstance(typeItem['dims'], int):
             dims = (typeItem['dims'])  # make into a tuple
-        elif not isintance(typeItem['dims'], list) and not isinstance(typeItem['dims'], tuple):
+        elif not isinstance(typeItem['dims'], list) and not isinstance(typeItem['dims'], tuple):
             raise TypeError("expected list or integer for dims")
         else:
             dims = typeItem['dims']
