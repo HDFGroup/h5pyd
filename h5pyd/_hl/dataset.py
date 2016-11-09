@@ -23,8 +23,8 @@ import numpy
 
 #from . import base
 from .base import HLObject, Reference, RegionReference
-from .base import phil, with_phil
-from .objectid import ObjectID, TypeID, DatasetID
+from .base import phil
+from .objectid import DatasetID
 from . import filters
 from . import selections as sel
 #from . import selections2 as sel2
@@ -327,14 +327,13 @@ class Dataset(HLObject):
         """Fill value for this dataset (0 by default)"""
         arr = numpy.ndarray((1,), dtype=self.dtype)
         dcpl = self._dcpl.get_fill_value(arr)
-        return arr[0]
+        return dcpl  # TBD: check this
 
 
     def __init__(self, bind):
         """ Create a new Dataset object by binding to a low-level DatasetID.
         """
-        from threading import local
-
+        
         if not isinstance(bind, DatasetID):
             raise ValueError("%s is not a DatasetID" % bind)
         HLObject.__init__(self, bind)
@@ -530,7 +529,7 @@ class Dataset(HLObject):
         #print "start:", selection.start
         #print "count:", selection.count
         #print "setp:", selection.step
-        rank = len(selection.start)
+        #rank = len(selection.start)
 
         if selection.nselect == 0:
             #print "nselect is 0"
@@ -660,7 +659,7 @@ class Dataset(HLObject):
         selection = sel.select(self.shape, selection_arg, dsid=self.id)
         #print "start:", selection.start
         #print "count:", selection.count
-        rank = len(selection.start)
+        #rank = len(selection.start)
 
         if selection.nselect == 0:
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
@@ -727,7 +726,6 @@ class Dataset(HLObject):
             # h5pyd References are just strings
             val = val.tolist()
 
-
         # Sort field indices from the slicing
         names = tuple(x for x in args if isinstance(x, six.string_types))
         args = tuple(x for x in args if not isinstance(x, six.string_types))
@@ -778,9 +776,10 @@ class Dataset(HLObject):
             if cast_compound:
                 val = val.astype(numpy.dtype([(names[0], dtype)]))
 
-
-
         # Check for array dtype compatibility and convert
+        mshape = None
+        """
+        # TBD..
         if self.dtype.subdtype is not None:
             shp = self.dtype.subdtype[1]
             valshp = val.shape[-len(shp):]
@@ -788,6 +787,7 @@ class Dataset(HLObject):
                 raise TypeError("When writing to array types, last N dimensions have to match (got %s, but should be %s)" % (valshp, shp,))
             mtype = h5t.py_create(numpy.dtype((val.dtype, shp)))
             mshape = val.shape[0:len(val.shape)-len(shp)]
+         
 
         # Make a compound memory type if field-name slicing is required
         elif len(names) != 0:
@@ -815,13 +815,13 @@ class Dataset(HLObject):
                 for fieldname in fieldnames:
                     subtype = h5t.py_create(val.dtype.fields[fieldname][0])
                     offset = val.dtype.fields[fieldname][1]
-                    mtype.insert(self._e(fieldname), offset, subtype)
-
+                   mtype.insert(self._e(fieldname), offset, subtype)
+       
         # Use mtype derived from array (let DatasetID.write figure it out)
         else:
             mshape = val.shape
-            mtype = None
-
+            #mtype = None
+        """
         # Perform the dataspace selection
         selection = sel.select(self.shape, args, dsid=self.id)
 
@@ -840,10 +840,13 @@ class Dataset(HLObject):
         # Perform the write, with broadcasting
         # Be careful to pad memory shape with ones to avoid HDF5 chunking
         # glitch, which kicks in for mismatched memory/file selections
+        """ 
+        # TBD: do we need this adjustment?
         if(len(mshape) < len(self.shape)):
             mshape_pad = (1,)*(len(self.shape)-len(mshape)) + mshape
         else:
             mshape_pad = mshape
+        """
         req = "/datasets/" + self.id.uuid + "/value"
 
         body = {}

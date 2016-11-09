@@ -13,12 +13,11 @@
 from __future__ import absolute_import
 
 import six
-import sys
 import numpy
 import collections
 
 from .base import HLObject, MutableMappingHDF5, Reference, phil
-from .objectid import ObjectID, TypeID, GroupID, DatasetID
+from .objectid import TypeID, GroupID, DatasetID
 from . import dataset
 from .dataset import Dataset
 from .datatype import Datatype
@@ -288,9 +287,9 @@ class Group(HLObject, MutableMappingHDF5):
                 return tgt  # ref'd object has not been deleted
             if isinstance(name.id, GroupID):
                 tgt = getObjByUuid('groups', name.id.uuid)
-            elif isintance(name.id, DatasetID):
+            elif isinstance(name.id, DatasetID):
                 tgt = getObjByUuid('datasets', name.id.uuid)
-            elif isintance(name.id, TypeID):
+            elif isinstance(name.id, TypeID):
                 tgt = getObjByUuid('datatypes', name.id.uuid)
             else:
                 raise IOError("Unexpected Error - ObjectID type: " + name.__class__.__name__)
@@ -378,7 +377,7 @@ class Group(HLObject, MutableMappingHDF5):
                     return Group
                 elif obj.id.__class__ is DatasetID:
                     return Dataset
-                elif obj.id.__class__ is DatatypeID:
+                elif obj.id.__class__ is TypeID:
                     return Datatype
                 else:
                     raise TypeError("Unknown object type")
@@ -505,7 +504,7 @@ class Group(HLObject, MutableMappingHDF5):
         try:
             self.get_link_json(name)
             found = True
-        except KeyError as ke:
+        except KeyError:
             pass  # not found
         return found
 

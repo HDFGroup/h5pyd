@@ -24,6 +24,16 @@ from six.moves import xrange    # pylint: disable=redefined-builtin
 
 import numpy as np
 
+H5S_SEL_POINTS = 0
+H5S_SELECT_SET = 1
+H5S_SELECT_APPEND = 2
+H5S_SELECT_PREPEND = 3
+H5S_SELECT_OR = 4
+H5S_SELECT_NONE = 5
+H5S_SELECT_ALL = 6
+H5S_SELECT_HYPERSLABS = 7
+H5S_SELECT_NOTB = 8
+
 
 def select(shape, args, dsid):
     """ High-level routine to generate a selection from arbitrary arguments
@@ -115,8 +125,8 @@ class _RegionProxy(object):
         """ Takes arbitrary selection terms and produces a RegionReference
         object.  Selection must be compatible with the dataset.
         """
-        selection = select(self.id.shape, args, self.id)
-        # todo - regionreference
+        # TBD - regionreference
+        #selection = select(self.id.shape, args, self.id)   
         # return h5r.create(self.id, '.', h5r.DATASET_REGION, selection.id)
 
 class Selection(object):
@@ -211,8 +221,8 @@ class PointSelection(Selection):
         if len(points.shape) == 1:
             points.shape = (1,points.shape[0])
 
-        if self._id.get_select_type() != h5s.SEL_POINTS:
-            op = h5s.SELECT_SET
+        if self._id.get_select_type() != H5S_SEL_POINTS:
+            op = H5S_SELECT_SET
 
         if len(points) == 0:
             self._id.select_none()
@@ -232,15 +242,15 @@ class PointSelection(Selection):
 
     def append(self, points):
         """ Add the sequence of points to the end of the current selection """
-        self._perform_selection(points, h5s.SELECT_APPEND)
+        self._perform_selection(points, H5S_SELECT_APPEND)
 
     def prepend(self, points):
         """ Add the sequence of points to the beginning of the current selection """
-        self._perform_selection(points, h5s.SELECT_PREPEND)
+        self._perform_selection(points, H5S_SELECT_PREPEND)
 
     def set(self, points):
         """ Replace the current selection with the given sequence of points"""
-        self._perform_selection(points, h5s.SELECT_SET)
+        self._perform_selection(points, H5S_SELECT_SET)
 
 
 class SimpleSelection(Selection):
@@ -453,7 +463,7 @@ class FancySelection(Selection):
         self._id.select_none()
         for idx, vector in enumerate(argvector):
             start, count, step, scalar = _handle_simple(self.shape, vector)
-            self._id.select_hyperslab(start, count, step, op=h5s.SELECT_OR)
+            self._id.select_hyperslab(start, count, step, H5S_SELECT_OR)
 
         # Final shape excludes scalars, except where
         # they correspond to sequence entries
@@ -574,16 +584,16 @@ def guess_shape(sid):
     sel_class = sid.get_simple_extent_type()    # Dataspace class
     sel_type = sid.get_select_type()            # Flavor of selection in use
 
-    if sel_class == h5s.NULL:
+    if sel_class == 'H5S_NULL':
         # NULL dataspaces don't support selections
         return None
 
-    elif sel_class == h5s.SCALAR:
+    elif sel_class == 'H5S_SCALAR':
         # NumPy has no way of expressing empty 0-rank selections, so we use None
-        if sel_type == h5s.SEL_NONE: return None
-        if sel_type == h5s.SEL_ALL: return tuple()
+        if sel_type == H5S_SELECT_NONE: return None
+        if sel_type == H5S_SELECT_ALL: return tuple()
 
-    elif sel_class != h5s.SIMPLE:
+    elif sel_class != 'H5S_SIMPLE':
         raise TypeError("Unrecognized dataspace class %s" % sel_class)
 
     # We have a "simple" (rank >= 1) dataspace
@@ -591,18 +601,18 @@ def guess_shape(sid):
     N = sid.get_select_npoints()
     rank = len(sid.shape)
 
-    if sel_type == h5s.SEL_NONE:
+    if sel_type == H5S_SELECT_NONE:
         return (0,)*rank
 
-    elif sel_type == h5s.SEL_ALL:
+    elif sel_type == H5S_SELECT_ALL:
         return sid.shape
 
-    elif sel_type == h5s.SEL_POINTS:
+    elif sel_type == H5S_SEL_POINTS:
         # Like NumPy, point-based selections yield 1D arrays regardless of
         # the dataspace rank
         return (N,)
 
-    elif sel_type != h5s.SEL_HYPERSLABS:
+    elif sel_type != H5S_SELECT_HYPERSLABS:
         raise TypeError("Unrecognized selection method %s" % sel_type)
 
     # We have a hyperslab-based selection
@@ -636,7 +646,7 @@ def guess_shape(sid):
 
         # Throw away all points along this axis
         masked_sid = sid.copy()
-        masked_sid.select_hyperslab(tuple(start), tuple(count), op=h5s.SELECT_NOTB)
+        masked_sid.select_hyperslab(tuple(start), tuple(count), op=H5S_SELECT_NOTB)
 
         N_leftover = masked_sid.get_select_npoints()
 

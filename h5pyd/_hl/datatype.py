@@ -13,13 +13,12 @@
 from __future__ import absolute_import
 
 import posixpath as pp
-import sys
 
 #from ..h5t import TypeID
 from .base import HLObject, phil, with_phil
 
-from .objectid import ObjectID, TypeID
-from .h5type import getTypeItem, createDataType
+from .objectid import  TypeID
+from .h5type import createDataType
 
 class Datatype(HLObject):
 

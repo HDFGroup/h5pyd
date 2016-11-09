@@ -21,7 +21,7 @@ import requests
 import logging
 import logging.handlers
 from collections import (
-    Mapping, MutableMapping, MappingView, KeysView, ValuesView, ItemsView
+    Mapping, MutableMapping, KeysView, ValuesView, ItemsView
 )
 import six
 from datetime import datetime
@@ -99,6 +99,51 @@ def getHeaders(domain, username=None, password=None):
             headers['Authorization'] = auth_string
         return headers
 
+class LinkCreationPropertyList(object):
+    """
+        Represents a LinkCreationPropertyList
+    """
+    @with_phil
+    def __init__(self, char_encoding=None):
+        if char_encoding:
+            if char_encoding not in ("CSET_ASCII", "CSET_UTF8"):
+                raise ValueError("Unknown encoding")
+            self._char_encoding = char_encoding
+        else:
+            self._char_encoding = "CSET_ASCII"
+
+    @with_phil
+    def __repr__(self):
+        return "<HDF5 LinkCreationPropertyList>"
+
+    @property
+    def char_encoding(self):
+        return self._char_encoding
+
+
+
+class LinkAccessPropertyList(object):
+    """
+        Represents a LinkAccessPropertyList
+    """
+
+    @with_phil
+    def __repr__(self):
+        return "<HDF5 LinkAccessPropertyList>"
+
+def default_lcpl():
+    """ Default link creation property list """
+    lcpl = LinkCreationPropertyList()
+    return lcpl
+
+def default_lapl():
+    """ Default link access property list """
+    lapl = LinkAccessPropertyList()
+    return lapl
+
+dlapl = default_lapl()
+dlcpl = default_lcpl()
+
 
 class Reference():
 
@@ -171,6 +216,7 @@ class RegionReference():
         return "<HDF5 region reference>"
 
 
+
 class CommonStateObject(object):
 
     """
@@ -180,6 +226,7 @@ class CommonStateObject(object):
 
         Also implements Unicode operations.
     """
+    
 
     @property
     def _lapl(self):
@@ -212,14 +259,14 @@ class CommonStateObject(object):
             return (None, None) if lcpl else None
 
         if isinstance(name, bytes):
-            coding = h5t.CSET_ASCII
+            coding = "CSET_ASCII"
         else:
             try:
                 name = name.encode('ascii')
-                coding = h5t.CSET_ASCII
+                coding = "CSET_ASCII"
             except UnicodeEncodeError:
                 name = name.encode('utf8')
-                coding = h5t.CSET_UTF8
+                coding = "CSET_UTF8"
 
         if lcpl:
             return name, get_lcpl(coding)

@@ -56,6 +56,7 @@ _COMP_FILTERS = {'gzip': 'H5Z_FILTER_DEFLATE',
 
 DEFAULT_GZIP = 4
 DEFAULT_SZIP = ('nn', 8)
+SO_INT_MINBITS_DEFAULT = 0
 
 def _gen_filter_tuples():
     """ Bootstrap function to figure out what filters are available. """
@@ -153,7 +154,7 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
                                  'floating point types')
         elif dtype.kind in ('u', 'i'):
             if scaleoffset is True:
-                scaleoffset = h5z.SO_INT_MINBITS_DEFAULT
+                scaleoffset = SO_INT_MINBITS_DEFAULT
         else:
             raise TypeError('scale/offset filter only supported for integer '
                             'and floating-point types')
@@ -234,13 +235,18 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
         filters.append(filter_szip)
 
     elif isinstance(compression, int):
+        # TBD - don't have a way to query available filters via REST API
+        # just throw ValueError for now
+        raise ValueError("Unsupported compression filter: {}".format(compression))
+        """
         if not h5z.filter_avail(compression):
             raise ValueError("Unknown compression filter number: %s" % compression)
         filter_ext = { 'id': compression }
         for k in compression_opts:
             filter_ext[k] = compression_opts[k]
         filters.append(filter_ext)
-        #plist.set_filter(compression, h5z.FLAG_OPTIONAL, compression_opts)
+        plist.set_filter(compression, h5z.FLAG_OPTIONAL, compression_opts)
+        """
 
     if len(filters) > 0:
         plist["filters"] = filters
@@ -282,7 +288,7 @@ def get_filters(plist):
                 raise TypeError("Unknown SZIP configuration")
             pixels = filter['bitsPerPixel']
             vals = (mask, pixels)
-        elif code == h5z.FILTER_LZF:
+        elif filter['class'] == 'H5Z_FILTER_LZF':
             vals = None
         else:
             if len(vals) == 0:
