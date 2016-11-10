@@ -24,12 +24,12 @@ install:
     - python setup.py install
     - cd .. 
     - git clone https://github.com/HDFGroup/h5serv.git
-    - cd ..
-    - python setup.py install
+
 
 script:
     - cd h5serv
     - python server/app.py >app.out &
     - sleep 5
     - cd ..
+    = python setup.py install
     - python testall.py
