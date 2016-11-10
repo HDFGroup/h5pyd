@@ -46,7 +46,7 @@ for instructions on installing and running h5serv.
 
  
 Uninstalling
-------------
+-------------
 
 Just remove the install directory and all contents to uninstall.
 
