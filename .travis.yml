@@ -31,5 +31,5 @@ script:
     - python server/app.py >app.out &
     - sleep 5
     - cd ..
-    = python setup.py install
+    - python setup.py install
     - python testall.py
