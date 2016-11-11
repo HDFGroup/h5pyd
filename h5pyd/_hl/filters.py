@@ -267,9 +267,11 @@ def get_filters(plist):
                'H5Z_FILTER_LZF': 'lzf',
                'H5Z_FILTER_SCALEOFFSET': 'scaleoffset' }
 
+    vals = None
     pipeline = {}
     if 'filters' not in plist:
         return pipeline
+
 
     filters = plist['filters']
 
@@ -291,8 +293,8 @@ def get_filters(plist):
         elif filter['class'] == 'H5Z_FILTER_LZF':
             vals = None
         else:
-            if len(vals) == 0:
-                vals = None
+            if vals and len(vals) == 0:
+               vals = None
         filter_name = "Extension"
         if filter['class'] in filter_names:
             filter_name = filter_names[filter['class']]
