@@ -27,6 +27,7 @@ install:
 
 
 script:
+    - cd h5serv
     - python server/app.py >app.out &
     - sleep 5
     - cd ..
