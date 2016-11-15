@@ -27,7 +27,9 @@ install:
 
 
 script:
-    - cd h5serv
+    - cd h5serv/test/integ
+    - python setupdata.py -f
+    - cd ../..
     - python server/app.py >app.out &
     - sleep 5
     - cd ..
