@@ -130,7 +130,6 @@ class File(Group):
 
             if rsp.status_code == 200:
                 root_json = json.loads(rsp.text)
-
             if rsp.status_code != 200 and mode in ('r', 'r+'):
                 # file must exist
                 raise IOError(rsp.reason)

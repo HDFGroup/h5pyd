@@ -29,7 +29,7 @@ class TestAttribute(TestCase):
 
         f = h5py.File(filename, 'w')
 
-        #f.attrs['a1'] = 42  #  to-dofix
+        #f.attrs['a1'] = 42  #  to-do fix
 
         g1 = f.create_group('g1')
 

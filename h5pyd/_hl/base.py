@@ -176,7 +176,7 @@ class Reference():
 
     @with_phil
     def tolist(self):
-        if type(self._id.id) is not str:
+        if type(self._id.id) is not six.text_type:
             raise TypeError("Expected string id")
         if self._id.objtype_code == 'd':
             return [("datasets/" + self._id.id), ]
