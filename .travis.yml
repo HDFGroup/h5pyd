@@ -27,8 +27,10 @@ install:
 
 
 script:
-    - cd h5serv/test/integ
-    - python setupdata.py -f
+    - cd h5serv/util/admin
+    - python makepwd_file.py
+    - python update_pwd.py -a -u test_user1 -p test
+    - python update_pwd.py -a -u test_user2 -p test
     - cd ../..
     - python server/app.py >app.out &
     - sleep 5
