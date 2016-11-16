@@ -1,6 +1,9 @@
 h5pyd
 =====
 
+.. image:: https://travis-ci.org/HDFGroup/h5pyd.svg?branch=develop
+    :target: https://travis-ci.org/HDFGroup/h5pyd
+
 Python client library for HDF5 REST interface
 
 
