@@ -119,13 +119,19 @@ class File(Group):
                 else:
                     endpoint = "http://127.0.0.1:5000"
 
+            if username is None and "H5SERV_USERNAME" in os.environ:
+                username = os.environ["H5SERV_USERNAME"]
+
+            if password is None and "H5SERV_PASSWORD" in os.environ:
+                password = os.environ["H5SERV_PASSWORD"]
+
             root_json = None
 
             # try to do a GET from the domain
             req = endpoint + "/"
              
             headers = getHeaders(domain=domain_name, username=username, password=password)
-            
+                        
             rsp = requests.get(req, headers=headers, verify=self.verifyCert())
 
             if rsp.status_code == 200:

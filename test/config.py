@@ -12,16 +12,13 @@
 import os
 
 cfg = {
-    'server': '127.0.0.1',
-    'home_domain': 'home.hdfgroup.org',
-    'port':   '5000',
+    'hdf_server_endpoint': "http://127.0.0.1:5000",
     'domain':   'h5pyd_test.hdfgroup.org',
-    'hdf5_ext': '.h5',
-    'home_dir': 'home',
     'use_h5py': False
 }
 
 def get(x):
+    print("config.get({})".format(x))
     # see if there is a command-line override
     config_value = None
 
@@ -38,6 +35,7 @@ def get(x):
             config_value = True
         elif config_value.upper() in ('F', 'FALSE'):
             config_value = False
+    print("ret: {}".format(config_value))
     return config_value
 
 

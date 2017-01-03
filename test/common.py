@@ -66,7 +66,7 @@ class TestCase(ut.TestCase):
 
     @property
     def endpoint(self):
-        endpoint = "http://" + config.get('server') + ":" + config.get('port')
+        endpoint = config.get('hdf_server_endpoint')
         return endpoint
 
     @property
