@@ -33,7 +33,7 @@ class TestFile(TestCase):
         n = version.find(".")
         self.assertTrue(n>=1)
         m = version[(n+1):].find('.')
-        self.assertTrue(n>=1)
+        self.assertTrue(m>=1)
 
     def test_create(self):
         filename = self.getFileName("new_file")
