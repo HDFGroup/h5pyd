@@ -36,7 +36,7 @@ class TestFile(TestCase):
         self.assertTrue(m>=1)
 
     def test_create(self):
-        filename = self.getFileName("new_filexyz")
+        filename = self.getFileName("new_file")
         print("filename:", filename)
         
         f = h5py.File(filename, 'w')
