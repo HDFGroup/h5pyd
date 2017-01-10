@@ -54,7 +54,6 @@ class TestCreateDataset(TestCase):
             self.assertEqual(dset.id.id, dset_ref.id.id)
             # Check dataset's last modified time
             self.assertTrue(isinstance(dset.modified, datetime))
-            self.assertEqual(dset.modified.tzname(), six.u('UTC'))
 
         f.close()
 

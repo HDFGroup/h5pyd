@@ -18,7 +18,6 @@ cfg = {
 }
 
 def get(x):
-    print("config.get({})".format(x))
     # see if there is a command-line override
     config_value = None
 
@@ -35,7 +34,6 @@ def get(x):
             config_value = True
         elif config_value.upper() in ('F', 'FALSE'):
             config_value = False
-    print("ret: {}".format(config_value))
     return config_value
 
 

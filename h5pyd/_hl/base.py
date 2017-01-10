@@ -17,6 +17,7 @@ import weakref
 import os
 import json
 import base64
+import time
 import requests
 import logging
 import logging.handlers
@@ -83,10 +84,16 @@ def guess_dtype(data):
 
 def parse_lastmodified(datestr):
     """Turn last modified datetime string into a datetime object."""
-    # format: 2016-06-30T06:17:16.563536Z
-    # format: "2016-08-04T06:44:04Z"
-    return datetime.strptime(
-        datestr, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=pytz.UTC)
+    if isinstance(datestr, str):
+        # format: 2016-06-30T06:17:16.563536Z
+        # format: "2016-08-04T06:44:04Z"
+        dt = datetime.strptime(
+            datestr, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=pytz.UTC)
+    else:
+        # if the time is an int or float, interpet as seconds since epoch
+        dt = datetime.fromtimestamp(time.time())
+
+    return dt
 
 def getHeaders(domain, username=None, password=None):
         headers =  {'host': domain}
