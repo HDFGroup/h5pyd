@@ -15,6 +15,7 @@ from __future__ import absolute_import
 import posixpath as pp
 import sys
 import base64
+import numpy as np
 
 import six
 from six.moves import xrange
@@ -134,9 +135,10 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
                      shuffle, fletcher32, maxshape, scaleoffset)
 
     if fillvalue is not None:
-        fillvalue = numpy.array(fillvalue)
-        #todo
-        #dcpl.set_fill_value(fillvalue)
+        # is it compatible with the array type?
+        fillvalue = numpy.asarray(fillvalue,dtype=dtype)
+        if fillvalue:
+            dcpl["fillValue"] = fillvalue.tolist()
     body['creationProperties'] = dcpl
 
     """
@@ -155,7 +157,6 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
     req = "/datasets"
 
     body['shape'] = shape
-
     rsp = parent.POST(req, body=body)
     json_rep = {}
     json_rep['id'] = rsp['id']
@@ -260,15 +261,8 @@ class Dataset(HLObject):
     @property
     def chunks(self):
         """Dataset chunks (or None)"""
-        dcpl = self._dcpl
-        if 'layout' in dcpl:
-            layout = dcpl['layout']
-            if 'class' in layout:
-                if layout['class'] == 'H5D_CHUNKED':
-                    return layout['dims']
-
-        return None
-
+        return self.id.chunks
+        
     @property
     def compression(self):
         """Compression strategy (or None)"""
@@ -325,9 +319,15 @@ class Dataset(HLObject):
     @property
     def fillvalue(self):
         """Fill value for this dataset (0 by default)"""
-        arr = numpy.ndarray((1,), dtype=self.dtype)
-        dcpl = self._dcpl.get_fill_value(arr)
-        return dcpl  # TBD: check this
+        dcpl = self.id.dcpl_json
+        fill_value = None
+        if "fillValue" in dcpl:
+            fill_value = dcpl["fillValue"]
+        else:
+            arr = np.zeros((), dtype=self._dtype)
+            fill_value = arr.tolist()
+ 
+        return fill_value
 
 
     def __init__(self, bind):
@@ -534,7 +534,6 @@ class Dataset(HLObject):
         if selection.nselect == 0:
             #print "nselect is 0"
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
-
         # Up-converting to (1,) so that numpy.ndarray correctly creates
         # np.void rows in case of multi-field dtype. (issue 135)
         single_element = selection.mshape == ()
@@ -593,13 +592,13 @@ class Dataset(HLObject):
             self.id.read(mspace, fspace, arr, mtype)
             """
 
-            # Patch up the output for NumPy
-            if len(names) == 1:
-                arr = arr[names[0]]     # Single-field recarray convention
-            if arr.shape == ():
-                arr = numpy.asscalar(arr)
-            if single_element:
-                arr = arr[0]
+        # Patch up the output for NumPy
+        if len(names) == 1:
+            arr = arr[names[0]]     # Single-field recarray convention
+        if arr.shape == ():
+            arr = numpy.asscalar(arr)
+        if single_element:
+            arr = arr[0]
         return arr
 
     def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None):

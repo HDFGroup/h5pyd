@@ -182,6 +182,25 @@ class DatasetID(ObjectID):
             rank = len(dims)
         return rank
 
+    @property
+    def chunks(self):
+        chunks = None
+        if "layout" in self._obj_json:
+            layout = self._obj_json['layout']
+            if layout['class'] == 'H5D_CHUNKED':
+                chunks = layout['dims']
+        else:
+            dcpl = self._obj_json['creationProperties']
+            if 'layout' in dcpl:
+                layout = dcpl['layout']
+                if 'class' in layout:
+                    if layout['class'] == 'H5D_CHUNKED':
+                        chunks = layout['dims']
+        return chunks
+
+
+
+
     def __init__(self, parent, item, domain=None, endpoint=None, mode=None,
         username=None, password=None, **kwds):
         """Create a new DatasetID.

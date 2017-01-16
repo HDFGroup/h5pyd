@@ -46,7 +46,6 @@ class TestScalarDataset(TestCase):
         # Check dataset's last modified time
         if h5py.__name__ == "h5pyd":
             self.assertTrue(isinstance(dset.modified, datetime))
-            self.assertEqual(dset.modified.tzname(), six.u('UTC'))
 
         f.close()
 

@@ -582,6 +582,9 @@ class HLObject(CommonStateObject):
         rsp = requests.post(req, data=data, headers=headers,
                             verify=self.verifyCert())
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
+        # raise a ValueError if the link name already existing
+        if rsp.status_code == 409:
+            raise ValueError("name already exists")
         if rsp.status_code not in (200, 201):
             raise IOError(rsp.reason)
 
