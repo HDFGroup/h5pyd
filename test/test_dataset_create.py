@@ -88,6 +88,8 @@ class TestCreateDataset(TestCase):
         dims = (10,)
         dset = f.create_dataset('simple_1d_dset', dims, dtype='uint32')
 
+        print(dset.id.id)
+
         self.assertEqual(dset.name, "/simple_1d_dset")
         self.assertTrue(isinstance(dset.shape, tuple))
         self.assertEqual(len(dset.shape), 1)
@@ -98,6 +100,18 @@ class TestCreateDataset(TestCase):
         self.assertEqual(dset.maxshape[0], 10)
         self.assertEqual(dset.fillvalue, 0)
         self.assertEqual(dset[0], 0)
+
+        dset[:] = np.ones((10,), dtype='uint32')
+        vals = dset[:]  # read back
+        print(vals)
+        for i in range(10):
+            self.assertEqual(vals[i], 1)
+
+        # Write 2's to the first five elements
+        dset[0:5] = [2,] * 5
+        vals = dset[:]
+        print(vals)
+
 
         f.close()
 

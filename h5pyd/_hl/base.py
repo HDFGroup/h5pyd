@@ -95,8 +95,10 @@ def parse_lastmodified(datestr):
 
     return dt
 
-def getHeaders(domain, username=None, password=None):
-        headers =  {'host': domain}
+def getHeaders(domain, username=None, password=None, headers=None):
+        if headers is None:
+            headers = {}
+        headers['host'] = domain
         
         if username is not None and password is not None:
             auth_string = username + ':' + password
@@ -537,22 +539,26 @@ class HLObject(CommonStateObject):
             rsp_json = json.loads(rsp.text)
             return rsp_json
 
-    def PUT(self, req, body=None):
+    def PUT(self, req, body=None, params=None, headers=None):
         if self.id.endpoint is None:
             raise IOError("object not initialized")
         if self.id.domain is None:
             raise IOError("no domain defined")
 
         # try to do a PUT to the domain
-        req = self.id.endpoint + req
+        req = self.id.endpoint + req  
 
-        data = json.dumps(body)
-
-        headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
+        headers = getHeaders(self.id.domain, username=self.id.username, 
+            password=self.id.password, headers=headers) 
         self.log.info("PUT: " + req)
+        if 'Content-Type' in headers and headers['Content-Type'] == "application/octet-stream":
+            # binary write
+            data = body
+        else:
+            data = json.dumps(body)
         # self.log.info("BODY: " + str(data))
         rsp = requests.put(req, data=data, headers=headers,
-                           verify=self.verifyCert())
+                           params=params, verify=self.verifyCert())
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
             if rsp.status_code == 409:

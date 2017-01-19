@@ -51,6 +51,40 @@ def readtime_dtype(basetype, names):
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
     """
 
+
+    """
+    Helper method - set query parameter for given shape + selection
+
+        Query arg should be in the form: [<dim1>, <dim2>, ... , <dimn>]
+            brackets are optional for one dimensional arrays.
+            Each dimension, valid formats are:
+                single integer: n
+                start and end: n:m
+                start, end, and stride: n:m:s
+    """
+def setSliceQueryParam(params, dims, sel):  
+    # pass dimensions, and selection as query params
+    rank = len(dims)
+    start = list(sel.start)
+    count = list(sel.count)
+    step = list(sel.step)
+    if rank > 0:
+        sel_param="["
+        for i in range(rank):
+            extent = dims[i]
+            sel_param += str(start[i])
+            sel_param += ':'
+            sel_param += str(start[i] + count[i])
+            if step[i] > 1:
+                sel_param += ':'
+                sel_param += str(step[i])
+            if i < rank - 1:
+                sel_param += ','
+        sel_param += ']'
+        params["select"] = sel_param
+
+
+
 def make_new_dset(parent, shape=None, dtype=None, data=None,
                  chunks=None, compression=None, shuffle=None,
                     fletcher32=None, maxshape=None, compression_opts=None,
@@ -848,8 +882,16 @@ class Dataset(HLObject):
         """
         req = "/datasets/" + self.id.uuid + "/value"
 
+        #print("type value:", type(val))
+        #print("value dtype:", val.dtype)
+        #print("value kind:", val.dtype.kind)
+        #print("value shape:", val.shape)
+        headers = {}
+        params = {}
         body = {}
-        if selection.start:
+
+        if selection.start and not self.id.uuid.startswith("d-"):
+            #h5serv - set selection in body
             body['start'] = list(selection.start)
             stop = list(selection.start)
             for i in range(len(stop)):
@@ -858,22 +900,28 @@ class Dataset(HLObject):
             if selection.step:
                 body['step'] = list(selection.step)
 
-        #print("type value:", type(val))
-        #print("value dtype:", val.dtype)
-        #print("value kind:", val.dtype.kind)
-        #print("value shape:", val.shape)
         if use_base64:
-            data = val.tostring()
-            data = base64.b64encode(data)
-            data = data.decode("ascii")
-            body['value_base64'] = data
+            
+            if self.id.uuid.startswith("d-"):
+                # server is HSDS, use binary data use param values for selection
+                headers['Content-Type'] = "application/octet-stream"
+                body = val.tobytes()
+=                if selection.start:
+                    setSliceQueryParam(params, self.shape, selection)
+            else:
+                # h5serv, base64 encode, body json for selection
+                # TBD - replace with above once h5serv supports binary req
+                data = val.tostring()
+                data = base64.b64encode(data)
+                data = data.decode("ascii")
+                body['value_base64'] = data
         else:
             if type(val) is not list:
                 val = val.tolist()
             val = self._decode(val)
             body['value'] = val
 
-        self.PUT(req, body=body)
+        self.PUT(req, body=body, headers=headers, params=params)
         """
         mspace = h5s.create_simple(mshape_pad, (h5s.UNLIMITED,)*len(mshape_pad))
         for fspace in selection.broadcast(mshape):

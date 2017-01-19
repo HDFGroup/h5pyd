@@ -44,7 +44,6 @@ class TestGroup(TestCase):
         self.assertTrue(g1.id.id != r.id.id)
         self.assertEqual(g1.name, "/g1")
 
-        print("create g1/g1.1")
         r.create_group("g1/g1.1")
         g1_1 = r["g1/g1.1"]
         self.assertEqual(g1_1.name, "/g1/g1.1")
