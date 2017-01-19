@@ -906,7 +906,7 @@ class Dataset(HLObject):
                 # server is HSDS, use binary data use param values for selection
                 headers['Content-Type'] = "application/octet-stream"
                 body = val.tobytes()
-=                if selection.start:
+                if selection.start:
                     setSliceQueryParam(params, self.shape, selection)
             else:
                 # h5serv, base64 encode, body json for selection

@@ -103,15 +103,12 @@ class TestCreateDataset(TestCase):
 
         dset[:] = np.ones((10,), dtype='uint32')
         vals = dset[:]  # read back
-        print(vals)
         for i in range(10):
             self.assertEqual(vals[i], 1)
 
         # Write 2's to the first five elements
         dset[0:5] = [2,] * 5
         vals = dset[:]
-        print(vals)
-
 
         f.close()
 
