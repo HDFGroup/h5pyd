@@ -24,11 +24,10 @@ from common import ut, TestCase
 
 # test point selection
 #
-# Not working yet!
 #
 
 class TestPointSelectDataset(TestCase):
-    def test__dset(self):
+    def test_boolean_select(self):
         filename = self.getFileName("point_select_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -43,7 +42,43 @@ class TestPointSelectDataset(TestCase):
         for value in pos_vals:
             self.assertTrue(value > 0)
          
+        f.close()
 
+    def test_1d_pointselect(self):
+        filename = self.getFileName("test_1d_pointselect")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+
+        dset1d = f.create_dataset('dset1d', (10,), dtype='i4')
+        vals = list(range(10))
+        vals.reverse()
+        dset1d[...] = vals
+        vals = dset1d[...]
+        pts = dset1d[ [2,4,6,8] ]
+        expected_vals = [7,5,3,1]
+        for i in range(len(expected_vals)):
+            self.assertEqual(pts[i], expected_vals[i])
+
+        f.close()
+
+    def test_2d_pointselect(self):
+        filename = self.getFileName("test_2d_pointselect")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+
+        dset2d = f.create_dataset('dset2d', (10,20), dtype='i4')
+        vals = np.zeros((10,20), dtype='i4')
+        for i in range(10):
+            for j in range(20):
+                vals[i,j] = i*1000 + j
+
+        dset2d[...] = vals
+        vals = dset2d[...]
+        pts = dset2d[ [ (5,5), (5,10), (5,15) ] ] 
+        expected_vals =  [5005,5010,5015]
+        for i in range(len(expected_vals)):
+            self.assertEqual(pts[i],expected_vals[i])
+         
         f.close()
 
 

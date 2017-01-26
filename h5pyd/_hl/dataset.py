@@ -612,14 +612,19 @@ class Dataset(HLObject):
                 arr = numpy.empty(mshape, dtype=mtype)
                 arr[...] = data
         elif isinstance(selection, sel.FancySelection):
-            print("Fancy Selection, mshape", selection.mshape)
+            #print("Fancy Selection, mshape", selection.mshape)
+            hyperslabs = selection.hyperslabs
+             
             raise ValueError("selection type not supported")
         elif isinstance(selection, sel.PointSelection):
-            print("Point Selection, mshape", selection.mshape)
-             
+            #print("Point Selection, mshape", selection.mshape)
+            # TBD - using JSON request since h5serv does not yet support binary
+
             #print(selection.points)
             body= { }
+            #print("selection points:", selection.points)
             body["points"]  = selection.points.tolist()
+            #print("post body:", body)
             rsp = self.POST(req, body=body)
             data = rsp["value"]
              
