@@ -33,32 +33,16 @@ class TestPointSelectDataset(TestCase):
         print("filename:", filename)
         f = h5py.File(filename, "w")
 
-        primes = [2, 3, 5, 7, 11, 13, 17, 19]
-        num_rows = 5
-
-        dset1 = f.create_dataset('dset1', (len(primes),), dtype='i8')
-        dset2 = f.create_dataset('dset2', (num_rows, len(primes)), dtype='i8')
-
-
-        shape = dset2.shape
-        self.assertEqual(shape[0], num_rows)
-        self.assertEqual(shape[1], len(primes))
-
-
-        # write primes
-        row = primes[:]
-
-        dset1[:] = primes
-
-        for i in range(num_rows):
-            row = primes[:]
-            for j in range(len(row)):
-                row[j] *= (i+1)
-            dset2[i, :] = row
-
-        # select from dset1
-        points = dset1[[2, 3, 6]]
-        print(points)
+        data = np.zeros((10,10), dtype='i4')
+        for i in range(10):
+            for j in range(10):
+                data[i,j] = i - j
+        dset = f.create_dataset('dset', data=data)
+        pos_vals = dset[ data > 0 ]
+        self.assertEqual(len(pos_vals), 45)
+        for value in pos_vals:
+            self.assertTrue(value > 0)
+         
 
         f.close()
 

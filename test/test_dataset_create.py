@@ -99,8 +99,9 @@ class TestCreateDataset(TestCase):
         self.assertEqual(len(dset.maxshape), 1)
         self.assertEqual(dset.maxshape[0], 10)
         self.assertEqual(dset.fillvalue, 0)
+        print(dset[0])
         self.assertEqual(dset[0], 0)
-
+        
         dset[:] = np.ones((10,), dtype='uint32')
         vals = dset[:]  # read back
         for i in range(10):

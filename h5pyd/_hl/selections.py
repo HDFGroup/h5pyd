@@ -68,7 +68,7 @@ def select(shape, args, dsid):
     """
     if not isinstance(args, tuple):
         args = (args,)
-
+    #print("select, len(args):", len(args))
     # "Special" indexing objects
     if len(args) == 1:
 
@@ -97,6 +97,7 @@ def select(shape, args, dsid):
             try:
                 int(a)
             except Exception:
+                print("do fancyselection:", shape)
                 sel = FancySelection(shape)
                 sel[args]
                 return sel
@@ -119,6 +120,7 @@ class _RegionProxy(object):
 
     def __init__(self, dsid):
         """ Supply a h5py.h5d.DatasetID instance """
+        #print("RegionProxy, dsid:", dsid)
         self.id = dsid
 
     def __getitem__(self, args):
@@ -161,7 +163,8 @@ class Selection(object):
 
         shape = tuple(shape)
         self._shape = shape
-        self._select_type = 'SEL_ALL'
+        
+        self._select_type = H5S_SELECT_ALL
 
     @property
     def select_type(self):
@@ -186,9 +189,10 @@ class Selection(object):
 
     def getSelectNpoints(self):
         npoints = None
-        if self._select_type == 'SEL_NONE':
+        #print("getSelectNPoints, sel_type:", self._select_type)
+        if self._select_type == H5S_SELECT_NONE:
             npoints = 0
-        elif self._select_type == 'SEL_ALL':
+        elif self._select_type == H5S_SELECT_ALL:
             dims = self._shape
             npoints = 1
             for nextent in dims:
@@ -214,6 +218,33 @@ class PointSelection(Selection):
         points to the three methods append(), prepend() and set(), or a
         single boolean array to __getitem__.
     """
+    def __init__(self, shape,  *args, **kwds):
+        """ Create a Point selection.   """   
+        Selection.__init__(self, shape, *args, **kwds)      
+        self._points = []
+
+    @property
+    def points(self):
+        """ selection points """
+        return self._points
+
+
+    def getSelectNpoints(self):
+        npoints = None
+        #print("PointSelection getSelectNPoints, sel_type:", self._select_type)
+        if self._select_type == H5S_SELECT_NONE:
+            npoints = 0
+        elif self._select_type == H5S_SELECT_ALL:
+            dims = self._shape
+            npoints = 1
+            for nextent in dims:
+                npoints *= nextent
+        elif self._select_type == H5S_SEL_POINTS:
+            return len(self._points)
+        else:
+            raise IOError("Unsupported select type")
+        return npoints
+
 
     def _perform_selection(self, points, op):
         """ Internal method which actually performs the selection """
@@ -221,13 +252,20 @@ class PointSelection(Selection):
         if len(points.shape) == 1:
             points.shape = (1,points.shape[0])
 
-        if self._id.get_select_type() != H5S_SEL_POINTS:
+        if self._select_type != H5S_SEL_POINTS:
             op = H5S_SELECT_SET
+        self._select_type = H5S_SEL_POINTS
 
-        if len(points) == 0:
-            self._id.select_none()
+        if op == H5S_SELECT_SET:
+            self._points = points
+        elif op == H5S_SELECT_APPEND:
+            self._points.extent(points)
+        elif op == H5S_SELECT_PREPEND:
+            tmp = self._points
+            self._points = points
+            self._points.extend(tmp)
         else:
-            self._id.select_elements(points, op)
+            raise ValueError("Unsupported operation")
 
     def __getitem__(self, arg):
         """ Perform point-wise selection from a NumPy boolean array """
@@ -281,7 +319,7 @@ class SimpleSelection(Selection):
         rank = len(self.shape)
         self._sel = ((0,)*rank, self.shape, (1,)*rank, (False,)*rank)
         self._mshape = self.shape
-        self._select_type = 'SEL_ALL'
+        self._select_type = H5S_SELECT_ALL
 
     def __getitem__(self, args):
 
@@ -293,16 +331,15 @@ class SimpleSelection(Selection):
         if self.shape == ():
             if len(args) > 0 and args[0] not in (Ellipsis, ()):
                 raise TypeError("Invalid index for scalar dataset (only ..., () allowed)")
-            self._select_type = 'SEL_ALL'
+            self._select_type = H5S_SELECT_ALL
             return self
 
         start, count, step, scalar = _handle_simple(self.shape,args)
-        #print "__getitem__", start, count, step, scalar
+        #print("simpleselection__getitem__", start, count, step, scalar)
+        self._sel = (start, count, step, scalar)
 
         #self._id.select_hyperslab(start, count, step)
-
-        self._sel = (start, count, step, scalar)
-        self._select_type = 'SEL_HYPERSLABS'
+        self._select_type = H5S_SELECT_HYPERSLABS
 
         self._mshape = tuple(x for x, y in zip(count, scalar) if not y)
 
@@ -311,17 +348,17 @@ class SimpleSelection(Selection):
     def getSelectNpoints(self):
         """Return number of elements in current selection
         """
-
+        #print("SimpleSelection.getSelectNPoints")
         npoints = None
-        if self._select_type == 'SEL_NONE':
+        if self._select_type == H5S_SELECT_NONE:
             npoints = 0
-        elif self._select_type == 'SEL_ALL':
+        elif self._select_type == H5S_SELECT_ALL:
             dims = self._shape
             npoints = 1
             for nextent in dims:
                 npoints *= nextent
-        elif self._select_type == 'SEL_HYPERSLABS':
-            #print "sel hyperslabs, count:", self.count, "step:", self.step
+        elif self._select_type == H5S_SELECT_HYPERSLABS:
+            #print("sel hyperslabs, count:", self.count, "step:", self.step)
             dims = self._shape
             npoints = 1
             rank = len(dims)
@@ -413,9 +450,10 @@ class FancySelection(Selection):
     def __init__(self, shape, *args, **kwds):
         Selection.__init__(self, shape, *args, **kwds)
         self._mshape = self.shape
+        self._hyperslabs = []
 
     def __getitem__(self, args):
-        #print "args:", args
+        #print("args:", args)
 
         if not isinstance(args, tuple):
             args = (args,)
@@ -457,13 +495,15 @@ class FancySelection(Selection):
             for position, seq in six.iteritems(sequenceargs):
                 entry[position] = seq[idx]
             argvector.append(entry)
+            #print("adding to argvector:", entry)
 
         # "OR" all these selection lists together to make the final selection
 
-        self._id.select_none()
+        #self._id.select_none()
         for idx, vector in enumerate(argvector):
             start, count, step, scalar = _handle_simple(self.shape, vector)
-            self._id.select_hyperslab(start, count, step, H5S_SELECT_OR)
+            #print("select_hyperslab:", start, count, step)
+            #self._id.select_hyperslab(start, count, step, H5S_SELECT_OR)
 
         # Final shape excludes scalars, except where
         # they correspond to sequence entries

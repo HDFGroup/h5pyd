@@ -15,6 +15,7 @@ from __future__ import absolute_import
 import posixpath as pp
 import sys
 import base64
+import json
 import numpy as np
 
 import six
@@ -346,7 +347,8 @@ class Dataset(HLObject):
         else:
             dims = shape_json['maxdims']
 
-        return tuple(x if x != 0 else None for x in dims)
+        # HSDS returns H5S_UNLIMITED for ulimitied dims, h5serv, returns 0
+        return tuple(x if (x != 0 and x != 'H5S_UNLIMITED') else None for x in dims)
         #dims = space.get_simple_extent_dims(True)
         #return tuple(x if x != h5s.UNLIMITED else None for x in dims)
 
@@ -559,12 +561,11 @@ class Dataset(HLObject):
 
         # Perform the dataspace selection
         #print "args:", args
+        #print("select, args:", args)
         selection = sel.select(self.shape, args, dsid=self.id)
-        #print "start:", selection.start
-        #print "count:", selection.count
-        #print "setp:", selection.step
-        #rank = len(selection.start)
-
+        #print("selection class:",selection.__class__.__name__)
+        #print("got select.nselect:", selection.nselect)
+         
         if selection.nselect == 0:
             #print "nselect is 0"
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
@@ -582,49 +583,60 @@ class Dataset(HLObject):
 
         # Perfom the actual read
         #print "do select"
+        rsp = None
         req = "/datasets/" + self.id.uuid + "/value"
-        sel_query = selection.getQueryParam()
-        if sel_query:
-            req += "?" + sel_query
+        if isinstance(selection, sel.SimpleSelection):         
+            sel_query = selection.getQueryParam() #TBD - move getQueryParam to this file?
+            if sel_query:
+                req += "?" + sel_query
+            #print("req:", req)
+            # get binary if available
+            #rsp = self.GET(req, format="json")
+            rsp = self.GET(req, format="binary")
+            if type(rsp) is bytes:
+                # got binary response
+                arr1d = numpy.fromstring(rsp, dtype=mtype)
+                arr = numpy.reshape(arr1d, mshape)
+            else:
+                # got JSON response
+                # need some special conversion for compound types --
+                # each element must be a tuple, but the JSON decoder
+                # gives us a list instead.
+                data = rsp['value']
+                if len(mtype) > 1 and type(data) in (list, tuple):
+                    converted_data = []
+                    for i in range(len(data)):
+                        converted_data.append(self.toTuple(data[i]))
+                    data = converted_data
 
-        # get binary if available
-        #rsp = self.GET(req, format="json")
-        rsp = self.GET(req, format="binary")
+                arr = numpy.empty(mshape, dtype=mtype)
+                arr[...] = data
+        elif isinstance(selection, sel.FancySelection):
+            print("Fancy Selection, mshape", selection.mshape)
+            raise ValueError("selection type not supported")
+        elif isinstance(selection, sel.PointSelection):
+            print("Point Selection, mshape", selection.mshape)
+             
+            #print(selection.points)
+            body= { }
+            body["points"]  = selection.points.tolist()
+            rsp = self.POST(req, body=body)
+            data = rsp["value"]
+             
+            if len(data) != selection.mshape[0]:
+                raise IOError("Expected {} elements, but got {}".format(selection.mshape[0], len(data)))
+
+            # print("got rsp:", rsp)
+            arr = np.asarray(data, dtype=mtype, order='C')
+            #print(rsp)
+
+
+        else:
+            raise ValueError("selection type not supported")
 
         #print "value:", rsp['value']
         #print "new_dtype:", new_dtype
-
-        if type(rsp) is bytes:
-            # got binary response
-            arr1d = numpy.fromstring(rsp, dtype=mtype)
-            arr = numpy.reshape(arr1d, mshape)
-        else:
-            # got JSON response
-            # need some special conversion for compound types --
-            # each element must be a tuple, but the JSON decoder
-            # gives us a list instead.
-            data = rsp['value']
-            if len(mtype) > 1 and type(data) in (list, tuple):
-                converted_data = []
-                for i in range(len(data)):
-                    converted_data.append(self.toTuple(data[i]))
-                data = converted_data
-
-            arr = numpy.empty(mshape, dtype=mtype)
-            arr[...] = data
-
-            """
-            if self.id.type_json['class'] == 'H5T_COMPOUND':
-                arr = numpy.empty(mshape, dtype=new_dtype)
-            else:
-                arr = numpy.array(rsp['value'], dtype=new_dtype)
-            """
-            """
-            #todo
-            mspace = h5s.create_simple(mshape)
-            fspace = selection._id
-            self.id.read(mspace, fspace, arr, mtype)
-            """
+        
 
         # Patch up the output for NumPy
         if len(names) == 1:
