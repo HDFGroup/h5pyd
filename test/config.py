@@ -12,12 +12,8 @@
 import os
 
 cfg = {
-    'server': '127.0.0.1',
-    'home_domain': 'home.hdfgroup.org',
-    'port':   '5000',
+    'hdf_server_endpoint': "http://127.0.0.1:5000",
     'domain':   'h5pyd_test.hdfgroup.org',
-    'hdf5_ext': '.h5',
-    'home_dir': 'home',
     'use_h5py': False
 }
 

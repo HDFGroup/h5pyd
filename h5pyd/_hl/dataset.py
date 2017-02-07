@@ -15,6 +15,8 @@ from __future__ import absolute_import
 import posixpath as pp
 import sys
 import base64
+import json
+import numpy as np
 
 import six
 from six.moves import xrange
@@ -49,6 +51,40 @@ def readtime_dtype(basetype, names):
 
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
     """
+
+
+    """
+    Helper method - set query parameter for given shape + selection
+
+        Query arg should be in the form: [<dim1>, <dim2>, ... , <dimn>]
+            brackets are optional for one dimensional arrays.
+            Each dimension, valid formats are:
+                single integer: n
+                start and end: n:m
+                start, end, and stride: n:m:s
+    """
+def setSliceQueryParam(params, dims, sel):  
+    # pass dimensions, and selection as query params
+    rank = len(dims)
+    start = list(sel.start)
+    count = list(sel.count)
+    step = list(sel.step)
+    if rank > 0:
+        sel_param="["
+        for i in range(rank):
+            extent = dims[i]
+            sel_param += str(start[i])
+            sel_param += ':'
+            sel_param += str(start[i] + count[i])
+            if step[i] > 1:
+                sel_param += ':'
+                sel_param += str(step[i])
+            if i < rank - 1:
+                sel_param += ','
+        sel_param += ']'
+        params["select"] = sel_param
+
+
 
 def make_new_dset(parent, shape=None, dtype=None, data=None,
                  chunks=None, compression=None, shuffle=None,
@@ -134,9 +170,10 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
                      shuffle, fletcher32, maxshape, scaleoffset)
 
     if fillvalue is not None:
-        fillvalue = numpy.array(fillvalue)
-        #todo
-        #dcpl.set_fill_value(fillvalue)
+        # is it compatible with the array type?
+        fillvalue = numpy.asarray(fillvalue,dtype=dtype)
+        if fillvalue:
+            dcpl["fillValue"] = fillvalue.tolist()
     body['creationProperties'] = dcpl
 
     """
@@ -155,7 +192,6 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
     req = "/datasets"
 
     body['shape'] = shape
-
     rsp = parent.POST(req, body=body)
     json_rep = {}
     json_rep['id'] = rsp['id']
@@ -260,15 +296,8 @@ class Dataset(HLObject):
     @property
     def chunks(self):
         """Dataset chunks (or None)"""
-        dcpl = self._dcpl
-        if 'layout' in dcpl:
-            layout = dcpl['layout']
-            if 'class' in layout:
-                if layout['class'] == 'H5D_CHUNKED':
-                    return layout['dims']
-
-        return None
-
+        return self.id.chunks
+        
     @property
     def compression(self):
         """Compression strategy (or None)"""
@@ -318,16 +347,23 @@ class Dataset(HLObject):
         else:
             dims = shape_json['maxdims']
 
-        return tuple(x if x != 0 else None for x in dims)
+        # HSDS returns H5S_UNLIMITED for ulimitied dims, h5serv, returns 0
+        return tuple(x if (x != 0 and x != 'H5S_UNLIMITED') else None for x in dims)
         #dims = space.get_simple_extent_dims(True)
         #return tuple(x if x != h5s.UNLIMITED else None for x in dims)
 
     @property
     def fillvalue(self):
         """Fill value for this dataset (0 by default)"""
-        arr = numpy.ndarray((1,), dtype=self.dtype)
-        dcpl = self._dcpl.get_fill_value(arr)
-        return dcpl  # TBD: check this
+        dcpl = self.id.dcpl_json
+        fill_value = None
+        if "fillValue" in dcpl:
+            fill_value = dcpl["fillValue"]
+        else:
+            arr = np.zeros((), dtype=self._dtype)
+            fill_value = arr.tolist()
+ 
+        return fill_value
 
 
     def __init__(self, bind):
@@ -525,16 +561,14 @@ class Dataset(HLObject):
 
         # Perform the dataspace selection
         #print "args:", args
+        #print("select, args:", args)
         selection = sel.select(self.shape, args, dsid=self.id)
-        #print "start:", selection.start
-        #print "count:", selection.count
-        #print "setp:", selection.step
-        #rank = len(selection.start)
-
+        #print("selection class:",selection.__class__.__name__)
+        #print("got select.nselect:", selection.nselect)
+         
         if selection.nselect == 0:
             #print "nselect is 0"
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
-
         # Up-converting to (1,) so that numpy.ndarray correctly creates
         # np.void rows in case of multi-field dtype. (issue 135)
         single_element = selection.mshape == ()
@@ -549,57 +583,73 @@ class Dataset(HLObject):
 
         # Perfom the actual read
         #print "do select"
+        rsp = None
         req = "/datasets/" + self.id.uuid + "/value"
-        sel_query = selection.getQueryParam()
-        if sel_query:
-            req += "?" + sel_query
+        if isinstance(selection, sel.SimpleSelection):         
+            sel_query = selection.getQueryParam() #TBD - move getQueryParam to this file?
+            if sel_query:
+                req += "?" + sel_query
+            #print("req:", req)
+            # get binary if available
+            #rsp = self.GET(req, format="json")
+            rsp = self.GET(req, format="binary")
+            if type(rsp) is bytes:
+                # got binary response
+                arr1d = numpy.fromstring(rsp, dtype=mtype)
+                arr = numpy.reshape(arr1d, mshape)
+            else:
+                # got JSON response
+                # need some special conversion for compound types --
+                # each element must be a tuple, but the JSON decoder
+                # gives us a list instead.
+                data = rsp['value']
+                if len(mtype) > 1 and type(data) in (list, tuple):
+                    converted_data = []
+                    for i in range(len(data)):
+                        converted_data.append(self.toTuple(data[i]))
+                    data = converted_data
 
-        # get binary if available
-        #rsp = self.GET(req, format="json")
-        rsp = self.GET(req, format="binary")
+                arr = numpy.empty(mshape, dtype=mtype)
+                arr[...] = data
+        elif isinstance(selection, sel.FancySelection):
+            #print("Fancy Selection, mshape", selection.mshape)
+            hyperslabs = selection.hyperslabs
+             
+            raise ValueError("selection type not supported")
+        elif isinstance(selection, sel.PointSelection):
+            #print("Point Selection, mshape", selection.mshape)
+            # TBD - using JSON request since h5serv does not yet support binary
+
+            #print(selection.points)
+            body= { }
+            #print("selection points:", selection.points)
+            body["points"]  = selection.points.tolist()
+            #print("post body:", body)
+            rsp = self.POST(req, body=body)
+            data = rsp["value"]
+             
+            if len(data) != selection.mshape[0]:
+                raise IOError("Expected {} elements, but got {}".format(selection.mshape[0], len(data)))
+
+            # print("got rsp:", rsp)
+            arr = np.asarray(data, dtype=mtype, order='C')
+            #print(rsp)
+
+
+        else:
+            raise ValueError("selection type not supported")
 
         #print "value:", rsp['value']
         #print "new_dtype:", new_dtype
+        
 
-        if type(rsp) is bytes:
-            # got binary response
-            arr1d = numpy.fromstring(rsp, dtype=mtype)
-            arr = numpy.reshape(arr1d, mshape)
-        else:
-            # got JSON response
-            # need some special conversion for compound types --
-            # each element must be a tuple, but the JSON decoder
-            # gives us a list instead.
-            data = rsp['value']
-            if len(mtype) > 1 and type(data) in (list, tuple):
-                converted_data = []
-                for i in range(len(data)):
-                    converted_data.append(self.toTuple(data[i]))
-                data = converted_data
-
-            arr = numpy.empty(mshape, dtype=mtype)
-            arr[...] = data
-
-            """
-            if self.id.type_json['class'] == 'H5T_COMPOUND':
-                arr = numpy.empty(mshape, dtype=new_dtype)
-            else:
-                arr = numpy.array(rsp['value'], dtype=new_dtype)
-            """
-            """
-            #todo
-            mspace = h5s.create_simple(mshape)
-            fspace = selection._id
-            self.id.read(mspace, fspace, arr, mtype)
-            """
-
-            # Patch up the output for NumPy
-            if len(names) == 1:
-                arr = arr[names[0]]     # Single-field recarray convention
-            if arr.shape == ():
-                arr = numpy.asscalar(arr)
-            if single_element:
-                arr = arr[0]
+        # Patch up the output for NumPy
+        if len(names) == 1:
+            arr = arr[names[0]]     # Single-field recarray convention
+        if arr.shape == ():
+            arr = numpy.asscalar(arr)
+        if single_element:
+            arr = arr[0]
         return arr
 
     def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None):
@@ -849,8 +899,16 @@ class Dataset(HLObject):
         """
         req = "/datasets/" + self.id.uuid + "/value"
 
+        #print("type value:", type(val))
+        #print("value dtype:", val.dtype)
+        #print("value kind:", val.dtype.kind)
+        #print("value shape:", val.shape)
+        headers = {}
+        params = {}
         body = {}
-        if selection.start:
+
+        if selection.start and not self.id.uuid.startswith("d-"):
+            #h5serv - set selection in body
             body['start'] = list(selection.start)
             stop = list(selection.start)
             for i in range(len(stop)):
@@ -859,22 +917,28 @@ class Dataset(HLObject):
             if selection.step:
                 body['step'] = list(selection.step)
 
-        #print("type value:", type(val))
-        #print("value dtype:", val.dtype)
-        #print("value kind:", val.dtype.kind)
-        #print("value shape:", val.shape)
         if use_base64:
-            data = val.tostring()
-            data = base64.b64encode(data)
-            data = data.decode("ascii")
-            body['value_base64'] = data
+            
+            if self.id.uuid.startswith("d-"):
+                # server is HSDS, use binary data use param values for selection
+                headers['Content-Type'] = "application/octet-stream"
+                body = val.tobytes()
+                if selection.start:
+                    setSliceQueryParam(params, self.shape, selection)
+            else:
+                # h5serv, base64 encode, body json for selection
+                # TBD - replace with above once h5serv supports binary req
+                data = val.tostring()
+                data = base64.b64encode(data)
+                data = data.decode("ascii")
+                body['value_base64'] = data
         else:
             if type(val) is not list:
                 val = val.tolist()
             val = self._decode(val)
             body['value'] = val
 
-        self.PUT(req, body=body)
+        self.PUT(req, body=body, headers=headers, params=params)
         """
         mspace = h5s.create_simple(mshape_pad, (h5s.UNLIMITED,)*len(mshape_pad))
         for fspace in selection.broadcast(mshape):

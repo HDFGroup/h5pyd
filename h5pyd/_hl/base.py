@@ -17,6 +17,7 @@ import weakref
 import os
 import json
 import base64
+import time
 import requests
 import logging
 import logging.handlers
@@ -83,13 +84,21 @@ def guess_dtype(data):
 
 def parse_lastmodified(datestr):
     """Turn last modified datetime string into a datetime object."""
-    # format: 2016-06-30T06:17:16.563536Z
-    # format: "2016-08-04T06:44:04Z"
-    return datetime.strptime(
-        datestr, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=pytz.UTC)
+    if isinstance(datestr, str):
+        # format: 2016-06-30T06:17:16.563536Z
+        # format: "2016-08-04T06:44:04Z"
+        dt = datetime.strptime(
+            datestr, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=pytz.UTC)
+    else:
+        # if the time is an int or float, interpet as seconds since epoch
+        dt = datetime.fromtimestamp(time.time())
 
-def getHeaders(domain, username=None, password=None):
-        headers =  {'host': domain}
+    return dt
+
+def getHeaders(domain, username=None, password=None, headers=None):
+        if headers is None:
+            headers = {}
+        headers['host'] = domain
         
         if username is not None and password is not None:
             auth_string = username + ':' + password
@@ -176,7 +185,7 @@ class Reference():
 
     @with_phil
     def tolist(self):
-        if type(self._id.id) is not str:
+        if type(self._id.id) is not six.text_type:
             raise TypeError("Expected string id")
         if self._id.objtype_code == 'd':
             return [("datasets/" + self._id.id), ]
@@ -530,22 +539,26 @@ class HLObject(CommonStateObject):
             rsp_json = json.loads(rsp.text)
             return rsp_json
 
-    def PUT(self, req, body=None):
+    def PUT(self, req, body=None, params=None, headers=None):
         if self.id.endpoint is None:
             raise IOError("object not initialized")
         if self.id.domain is None:
             raise IOError("no domain defined")
 
         # try to do a PUT to the domain
-        req = self.id.endpoint + req
+        req = self.id.endpoint + req  
 
-        data = json.dumps(body)
-
-        headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
+        headers = getHeaders(self.id.domain, username=self.id.username, 
+            password=self.id.password, headers=headers) 
         self.log.info("PUT: " + req)
+        if 'Content-Type' in headers and headers['Content-Type'] == "application/octet-stream":
+            # binary write
+            data = body
+        else:
+            data = json.dumps(body)
         # self.log.info("BODY: " + str(data))
         rsp = requests.put(req, data=data, headers=headers,
-                           verify=self.verifyCert())
+                           params=params, verify=self.verifyCert())
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code not in (200, 201):
             if rsp.status_code == 409:
@@ -575,6 +588,9 @@ class HLObject(CommonStateObject):
         rsp = requests.post(req, data=data, headers=headers,
                             verify=self.verifyCert())
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
+        # raise a ValueError if the link name already existing
+        if rsp.status_code == 409:
+            raise ValueError("name already exists")
         if rsp.status_code not in (200, 201):
             raise IOError(rsp.reason)
 

@@ -21,13 +21,14 @@ from __future__ import absolute_import
 
 import numpy
 import sys
+import six
 
 from . import base
 from .base import phil, with_phil
 from .dataset import readtime_dtype
 from .datatype import Datatype
 from .objectid import GroupID, DatasetID, TypeID
-from .h5type import getTypeItem, createDataType
+from .h5type import getTypeItem, createDataType, special_dtype
 
 
 class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
@@ -77,6 +78,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             attr_json = self._parent.GET(req)
         except IOError as e:
             raise KeyError
+        
         shape_json = attr_json['shape']
         type_json = attr_json['type']
         #if attr.get_space().get_simple_extent_type() == h5s.NULL:
@@ -166,7 +168,14 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 use_htype = dtype.id
                 dtype = dtype.dtype
             elif dtype is None:
-                dtype = data.dtype
+                if data.dtype.kind == 'U':
+                    # use vlen for unicode strings
+                    if six.PY3:
+                        dtype = special_dtype(vlen=str)
+                    else:
+                        dtype = special_dtype(vlen=unicode)
+                else:
+                    dtype = data.dtype
             else:
                 dtype = numpy.dtype(dtype) # In case a string, e.g. 'i8' is passed
 
@@ -222,7 +231,14 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             body['shape'] = shape
             body['value'] = data.tolist()
 
-            self._parent.PUT(req, body=body)
+            try:
+                self._parent.PUT(req, body=body)
+            except RuntimeError:
+                # Resource already exist, try deleting it
+                self._parent.log.info("Update to existing attribute ({}), deleting it".format(name))
+                self._parent.DELETE(req)
+                # now add again
+                self._parent.PUT(req, body=body)
 
             """
             try:

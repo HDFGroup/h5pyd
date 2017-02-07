@@ -13,6 +13,7 @@
 from __future__ import absolute_import
 
 import six
+import os.path as op
 import numpy
 import collections
 
@@ -50,12 +51,27 @@ class Group(HLObject, MutableMappingHDF5):
         if self.id.mode == 'r':
             raise ValueError("Unable to create group (No write intent on file)")
 
-        if self.__contains__(name):
-            raise ValueError("Unable to create link (Name alredy exists)")
+        #if self.__contains__(name):
+        #    raise ValueError("Unable to create link (Name alredy exists)")
+        if name[-1] == '/':
+            raise ValueError("Invalid path for create_group")
+        
 
+        parent_uuid = self.id.id
+        if name[0] == '/':
+            # absolute path         
+            rsp = self.GET('/')
+            parent_uuid = rsp['root']
 
-        body = {'link': { 'id': self.id.uuid,
-                          'name': name
+        parent_path = op.dirname(name)
+        basename = op.basename(name)
+
+        if parent_path:
+            parent_uuid, link_json = self.get_link_json(parent_path)
+            
+         
+        body = {'link': { 'id': parent_uuid,
+                          'name': basename
                } }
          
         rsp = self.POST('/groups', body=body)
@@ -214,7 +230,6 @@ class Group(HLObject, MutableMappingHDF5):
 
     def get_link_json(self, name):
         """ Return parent_uuid and json description of link for given path """
-
         parent_uuid = self.id.uuid
         tgt_json = None
 
@@ -246,7 +261,6 @@ class Group(HLObject, MutableMappingHDF5):
                 raise IOError("Unexpected Error")
             tgt_json = rsp_json['link']
 
-            #print "link_json", link_json
             if tgt_json['class'] == 'H5L_TYPE_HARD':
                 #print "hard link, collection:", link_json['collection']
                 if tgt_json['collection'] == 'groups':
@@ -258,8 +272,7 @@ class Group(HLObject, MutableMappingHDF5):
 
     def __getitem__(self, name):
         """ Open an object in the file """
-        #print("group.__getitem__:", name)
-        #print("group.__getitem__(type):", type(name))
+         
 
         def getObjByUuid(collection_type, uuid):
             """ Utility method to get an obj based on collection type and uuid """

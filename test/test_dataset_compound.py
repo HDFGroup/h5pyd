@@ -48,6 +48,44 @@ class TestDatasetCompound(TestCase):
         self.assertEqual(val['real'], 1.0)
         f.close()
 
+    def test_query_compound_dset(self):
+        filename = self.getFileName("query_compound_dset")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+
+        #curl -v --header "Host: create_compound_dset.h5pyd_test.hdfgroup.org" http://127.0.0.1:5000
+
+        # write entire array
+        data = [
+            ("EBAY", "20170102", 3023, 3088),
+            ("AAPL", "20170102", 3054, 2933),
+            ("AMZN", "20170102", 2973, 3011),
+            ("EBAY", "20170103", 3042, 3128),
+            ("AAPL", "20170103", 3182, 3034),
+            ("AMZN", "20170103", 3021, 2788),
+            ("EBAY", "20170104", 2798, 2876),
+            ("AAPL", "20170104", 2834, 2867),
+            ("AMZN", "20170104", 2891, 2978),
+            ("EBAY", "20170105", 2973, 2962),
+            ("AAPL", "20170105", 2934, 3010),
+            ("AMZN", "20170105", 3018, 3086)
+        ] 
+         
+        count = len(data)
+        dt = np.dtype([('symbol', 'S4'), ('date', 'S8'), ('open', 'i4'), ('close', 'i4')])
+        dset = f.create_dataset('stock', (count,), dtype=dt)
+        for i in range(count):
+            dset[i] = data[i]
+        if config.get("use_h5py"):
+            print("read_where not availble for h5py")
+        else:    
+            quotes = dset.read_where("symbol == b'AAPL'")
+            self.assertEqual(len(quotes), 4)
+            for i in range(4):
+                quote = quotes[i]
+                self.assertEqual(quote[0], b'AAPL')
+        f.close()
+
 
 
 if __name__ == '__main__':

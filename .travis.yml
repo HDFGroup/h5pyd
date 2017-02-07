@@ -5,7 +5,6 @@ notifications:
 
 python:
   - "2.7"
-  - "3.3"
   - "3.4"
   - "3.5"
 
@@ -14,7 +13,6 @@ install:
     - sudo apt-get install -qq libhdf5-serial-dev
     - pip uninstall numpy -y 
     - pip install numpy>=1.10.4
-    - pip install h5py
     - pip install requests
     - pip install pytz
     - pip install tornado
@@ -27,7 +25,11 @@ install:
 
 
 script:
-    - cd h5serv
+    - cd h5serv/util/admin
+    - python makepwd_file.py
+    - python update_pwd.py -a -u test_user1 -p test
+    - python update_pwd.py -a -u test_user2 -p test
+    - cd ../..
     - python server/app.py >app.out &
     - sleep 5
     - cd ..

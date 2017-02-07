@@ -10,6 +10,8 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 
+import numpy as np
+import six
 import config
 
 if config.get("use_h5py"):
@@ -26,10 +28,9 @@ class TestAttribute(TestCase):
     def test_create(self):
         filename = self.getFileName("create_attribute")
         print("filename:", filename)
-
         f = h5py.File(filename, 'w')
 
-        #f.attrs['a1'] = 42  #  to-dofix
+        #f.attrs['a1'] = 42  #  to-do fix
 
         g1 = f.create_group('g1')
 
@@ -46,6 +47,45 @@ class TestAttribute(TestCase):
         g1.attrs['a1'] = 24
 
         self.assertEqual(len(g1.attrs), 2)
+        
+        # create an attribute with explict UTF type
+        dt = h5py.special_dtype(vlen=str)
+        g1.attrs.create('c1', "Hello HDF", dtype=dt)
+         
+
+        value = g1.attrs['c1']
+
+        self.assertEqual(value, "Hello HDF")
+
+        # create attribute with implicit UTF type
+        g1.attrs.create('d1', "This is a python string")
+
+        attr_names = []
+        for a in g1.attrs:
+            attr_names.append(a)
+        self.assertEqual(len(attr_names), 4)
+        self.assertTrue('a1' in attr_names)
+        self.assertTrue('b1' in attr_names)
+        self.assertTrue('c1' in attr_names)
+        self.assertTrue('d1' in attr_names)
+
+        # create a array attribute
+        g1.attrs["ones"] = np.ones((10,))
+        arr = g1.attrs["ones"]
+        self.assertEqual(arr.shape, (10,))
+        for i in range(10):
+            self.assertEqual(arr[i], 1)
+
+        # array of strings
+        g1.attrs['strings'] = ["Hello", "Good-bye"]
+        arr = g1.attrs['strings']
+        self.assertEqual(arr.shape, (2,))
+        self.assertEqual(arr[0], "Hello")
+        self.assertEqual(arr[1], "Good-bye")
+        if six.PY3:
+            self.assertEqual(arr.dtype, h5py.special_dtype(vlen=str))
+        else:
+            self.assertEqual(arr.dtype, np.dtype("S8"))
 
 
 
