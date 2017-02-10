@@ -19,7 +19,7 @@ import requests
 import json
 
 from .objectid import GroupID
-from .base import phil, parse_lastmodified, getHeaders
+from .base import parse_lastmodified, getHeaders
 from .group import Group
 from .. import version
 
@@ -91,124 +91,122 @@ class File(Group):
             Server endpoint.   Defaults to "http://localhost:5000"
         """
 
-        with phil:
-            """
-            if isinstance(name, _objects.ObjectID):
-                fid = h5i.get_file_id(name)
+       
+        """
+        if isinstance(name, _objects.ObjectID):
+            fid = h5i.get_file_id(name)
+        else:
+            try:
+                # If the byte string doesn't match the default
+                # encoding, just pass it on as-is.  Note Unicode
+                # objects can always be encoded.
+                name = name.encode(sys.getfilesystemencoding())
+            except (UnicodeError, LookupError):
+                pass
+
+            fapl = make_fapl(driver, libver, **kwds)
+        """
+        if mode and mode not in ('r', 'r+', 'w', 'w-', 'x', 'a'):
+            raise ValueError(
+                "Invalid mode; must be one of r, r+, w, w-, x, a")
+
+        if mode is None:
+            mode = 'a'
+
+        if endpoint is None:
+            if "H5SERV_ENDPOINT" in os.environ:
+                endpoint = os.environ["H5SERV_ENDPOINT"]
             else:
-                try:
-                    # If the byte string doesn't match the default
-                    # encoding, just pass it on as-is.  Note Unicode
-                    # objects can always be encoded.
-                    name = name.encode(sys.getfilesystemencoding())
-                except (UnicodeError, LookupError):
-                    pass
+                endpoint = "http://127.0.0.1:5000"
 
-                fapl = make_fapl(driver, libver, **kwds)
-            """
-            if mode and mode not in ('r', 'r+', 'w', 'w-', 'x', 'a'):
-                raise ValueError(
-                    "Invalid mode; must be one of r, r+, w, w-, x, a")
+        if username is None and "H5SERV_USERNAME" in os.environ:
+            username = os.environ["H5SERV_USERNAME"]
 
-            if mode is None:
-                mode = 'a'
+        if password is None and "H5SERV_PASSWORD" in os.environ:
+            password = os.environ["H5SERV_PASSWORD"]
 
-            if endpoint is None:
-                if "H5SERV_ENDPOINT" in os.environ:
-                    endpoint = os.environ["H5SERV_ENDPOINT"]
-                else:
-                    endpoint = "http://127.0.0.1:5000"
+        root_json = None
 
-            if username is None and "H5SERV_USERNAME" in os.environ:
-                username = os.environ["H5SERV_USERNAME"]
-
-            if password is None and "H5SERV_PASSWORD" in os.environ:
-                password = os.environ["H5SERV_PASSWORD"]
-
-            root_json = None
-
-            # try to do a GET from the domain
-            req = endpoint + "/"
+        # try to do a GET from the domain
+        req = endpoint + "/"
              
-            headers = getHeaders(domain=domain_name, username=username, password=password)
+        headers = getHeaders(domain=domain_name, username=username, password=password)
                         
-            rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+        rsp = requests.get(req, headers=headers, verify=self.verifyCert())
 
-            if rsp.status_code == 200:
-                root_json = json.loads(rsp.text)
-            if rsp.status_code != 200 and mode in ('r', 'r+'):
-                # file must exist
-                raise IOError(rsp.reason)
-            if rsp.status_code == 200 and mode in ('w-', 'x'):
-                # Fail if exists
-                raise IOError("domain already exists")
-            if rsp.status_code == 200 and mode == 'w':
-                # delete existing domain
-                rsp = requests.delete(req, headers=headers,
-                                      verify=self.verifyCert())
-                if rsp.status_code != 200:
-                    # failed to delete
-                    raise IOError(rsp.reason)
-                root_json = None
-            if root_json is None:
-                # create the domain
-                if mode not in ('w', 'a'):
-                    raise IOError("File not found")
-                rsp = requests.put(req, headers=headers,
-                                   verify=self.verifyCert())
-                if rsp.status_code != 201:
-                    raise IOError(rsp.reason)
-                root_json = json.loads(rsp.text)
-
-            if 'root' not in root_json:
-                raise IOError("Unexpected error")
-            if 'created' not in root_json:
-                raise IOError("Unexpected error")
-            if 'lastModified' not in root_json:
-                raise IOError("Unexpected error")
-
-            if mode == 'a':
-                # for append, verify we have 'update' permission on the domain
-                # try first with getting the acl for the current user, then as default
-                for name in (username, "default"):
-                    if not username:
-                        continue
-                    req = endpoint + "/acls/" + name
-                    rsp = requests.get(req, headers=headers, verify=self.verifyCert())
-                    if rsp.status_code == 200:
-                        rspJson = json.loads(rsp.text)
-                        domain_acl = rspJson["acl"]
-                        if not domain_acl["update"]:
-                            raise IOError("Forbidden")
-                        else:
-                            break  # don't check with "default" user in this case
-
-            if mode in ('w', 'w-', 'x', 'a'):
-                mode = 'r+'
-
-            # print "root_json:", root_json
-            root_uuid = root_json['root']
-
-            # get the group json for the root group
-            req = endpoint + "/groups/" + root_uuid
-
-            rsp = requests.get(req, headers=headers, verify=self.verifyCert())
-
-            # print "req:", req
-
+        if rsp.status_code == 200:
+            root_json = json.loads(rsp.text)
+        if rsp.status_code != 200 and mode in ('r', 'r+'):
+            # file must exist
+            raise IOError(rsp.reason)
+        if rsp.status_code == 200 and mode in ('w-', 'x'):
+            # Fail if exists
+            raise IOError("domain already exists")
+        if rsp.status_code == 200 and mode == 'w':
+            # delete existing domain
+            rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
             if rsp.status_code != 200:
-                raise IOError("Unexpected Error")
-            group_json = json.loads(rsp.text)
+                # failed to delete
+                raise IOError(rsp.reason)
+            root_json = None
+        if root_json is None:
+            # create the domain
+            if mode not in ('w', 'a'):
+                raise IOError("File not found")
+            rsp = requests.put(req, headers=headers, verify=self.verifyCert())
+            if rsp.status_code != 201:
+                raise IOError(rsp.reason)
+            root_json = json.loads(rsp.text)
 
-            self._id = GroupID(None, group_json, domain=domain_name,
+        if 'root' not in root_json:
+            raise IOError("Unexpected error")
+        if 'created' not in root_json:
+            raise IOError("Unexpected error")
+        if 'lastModified' not in root_json:
+            raise IOError("Unexpected error")
+
+        if mode == 'a':
+            # for append, verify we have 'update' permission on the domain
+            # try first with getting the acl for the current user, then as default
+            for name in (username, "default"):
+                if not username:
+                    continue
+                req = endpoint + "/acls/" + name
+                rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+                if rsp.status_code == 200:
+                    rspJson = json.loads(rsp.text)
+                    domain_acl = rspJson["acl"]
+                    if not domain_acl["update"]:
+                        raise IOError("Forbidden")
+                    else:
+                        break  # don't check with "default" user in this case
+
+        if mode in ('w', 'w-', 'x', 'a'):
+            mode = 'r+'
+
+        # print "root_json:", root_json
+        root_uuid = root_json['root']
+
+        # get the group json for the root group
+        req = endpoint + "/groups/" + root_uuid
+
+        rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+
+        # print "req:", req
+
+        if rsp.status_code != 200:
+            raise IOError("Unexpected Error")
+        group_json = json.loads(rsp.text)
+
+        self._id = GroupID(None, group_json, domain=domain_name,
                                endpoint=endpoint, username=username,
                                password=password, mode=mode)
 
-            self._name = '/'
-            self._created = root_json['created']
-            self._modified = parse_lastmodified(root_json['lastModified'])
+        self._name = '/'
+        self._created = root_json['created']
+        self._modified = parse_lastmodified(root_json['lastModified'])
 
-            Group.__init__(self, self._id)
+        Group.__init__(self, self._id)
 
     # override base implemention of ACL methods to use the domain rather than update root group
     def getACL(self, username):

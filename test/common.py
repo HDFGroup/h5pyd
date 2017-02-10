@@ -182,9 +182,29 @@ class TestCase(ut.TestCase):
                 dset[s]
 
     def getFileName(self, basename):
+        """
+        Get filepath for a test case given a testname
+        """
         if config.get("use_h5py"):
             if not op.isdir("out"):
                 os.mkdir("out")
             return "out/" + basename + ".h5"
         else:
             return basename + "." + config.get("domain")
+
+    
+    def getPathFromDomain(domain):
+        """
+        Convert DNS-style domain name to filepath
+        E.g. "mytest.h5pyd_test.hdfgroup.org" to
+             "/org/hdfgroup/h5pyd_test/mytest
+        """
+        names = domain.split('.')
+        names.reverse()
+        path = '/'
+        for name in names:
+            if name:
+                 path += name
+                 path += '/'
+        path = path[:-1]  # strip trailing slash
+        return path
