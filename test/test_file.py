@@ -170,7 +170,7 @@ class TestFile(TestCase):
         if h5py.__name__ == "h5py":
             return  # ACLs are just for h5pyd
             
-        filename = self.getFileName("file_auth7")        
+        filename = self.getFileName("file_auth")        
         print("filename:", filename)
 
         f = h5py.File(filename, 'w') 
