@@ -167,6 +167,22 @@ class File(Group):
             if 'lastModified' not in root_json:
                 raise IOError("Unexpected error")
 
+            if mode == 'a':
+                # for append, verify we have 'update' permission on the domain
+                # try first with getting the acl for the current user, then as default
+                for name in (username, "default"):
+                    if not username:
+                        continue
+                    req = endpoint + "/acls/" + name
+                    rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+                    if rsp.status_code == 200:
+                        rspJson = json.loads(rsp.text)
+                        domain_acl = rspJson["acl"]
+                        if not domain_acl["update"]:
+                            raise IOError("Forbidden")
+                        else:
+                            break  # don't check with "default" user in this case
+
             if mode in ('w', 'w-', 'x', 'a'):
                 mode = 'r+'
 
@@ -193,6 +209,30 @@ class File(Group):
             self._modified = parse_lastmodified(root_json['lastModified'])
 
             Group.__init__(self, self._id)
+
+    # override base implemention of ACL methods to use the domain rather than update root group
+    def getACL(self, username):
+        req = '/acls/' + username
+        rsp_json = self.GET(req)
+        acl_json = rsp_json["acl"]
+        return acl_json
+
+    def getACLs(self):
+        req = '/acls'
+        rsp_json = self.GET(req)
+        acls_json = rsp_json["acls"] 
+        return acls_json
+
+    def putACL(self, acl):
+        if "userName" not in acl:
+            raise IOError("ACL has no 'userName' key")
+        perm = {}
+        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
+            perm[k] = acl[k]
+         
+        req = '/acls/' + acl['userName']
+        self.PUT(req, body=perm)
+
 
     def close(self):
         """ Clears reference to remote resource.

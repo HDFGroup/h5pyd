@@ -529,7 +529,6 @@ class HLObject(CommonStateObject):
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
-        # print "rsp text", rsp.text
         if rsp.headers['Content-Type'] == "application/octet-stream":
             self.log.info("returning binary content, length: " +
                           rsp.headers['Content-Length'])
@@ -647,7 +646,7 @@ class HLObject(CommonStateObject):
     def getACL(self, username):
         req = self._req_prefix + '/acls/' + username
         rsp_json = self.GET(req)
-        acl_json = rsp_json["acl"] 
+        acl_json = rsp_json["acl"]
         return acl_json
 
     def getACLs(self):
@@ -662,11 +661,10 @@ class HLObject(CommonStateObject):
         perm = {}
         for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
             perm[k] = acl[k]
-        body = {"perm": perm}
+         
         req = self._req_prefix + '/acls/' + acl['userName']
-        self.PUT(req, body=body)
-
-        
+        self.PUT(req, body=perm)
+   
         
     __nonzero__ = __bool__
 
