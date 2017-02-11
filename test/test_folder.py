@@ -26,7 +26,7 @@ from copy import copy
 import six
 
 
-class TestFile(TestCase):
+class TestFolders(TestCase):
 
      
     def test_create(self):
