@@ -193,7 +193,7 @@ class TestCase(ut.TestCase):
             return basename + "." + config.get("domain")
 
     
-    def getPathFromDomain(domain):
+    def getPathFromDomain(self, domain):
         """
         Convert DNS-style domain name to filepath
         E.g. "mytest.h5pyd_test.hdfgroup.org" to
