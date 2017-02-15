@@ -32,6 +32,9 @@ class TestFolders(TestCase):
     def test_create(self):
         test_domain = self.getFileName("folder_test")  
         f = h5py.File(test_domain, 'w')  # create a new domain
+        if not f.id.id.startswith("g-"):
+            # Folders aren't implemented yet for h5serv, so skip
+            return
         filepath = self.getPathFromDomain(test_domain)
 
         folder_name = op.dirname(filepath)  + '/' 
@@ -44,7 +47,7 @@ class TestFolders(TestCase):
         self.assertEqual(dir.parent[:-1], op.dirname(folder_name[:-1]))
 
         # get ACL for dir
-        dir_acl = dir.getACL("test_user1")
+        dir_acl = dir.getACL(self.test_user1["name"])
         self.assertEqual(len(dir_acl.keys()), 6)
         for k in dir_acl.keys():
             self.assertTrue(dir_acl[k])
@@ -63,7 +66,7 @@ class TestFolders(TestCase):
             self.assertTrue("lastModified" in item)
             self.assertTrue("created" in item)
             self.assertTrue("owner" in item)
-            self.assertEqual(item["owner"], "test_user1")
+            self.assertEqual(item["owner"], self.test_user1["name"])
         self.assertTrue(test_domain_found)
             
             

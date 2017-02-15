@@ -15,7 +15,6 @@ from __future__ import absolute_import
 import sys
 import os
 import os.path as op
-import shutil
 import tempfile
 import time
 import config
@@ -66,12 +65,50 @@ class TestCase(ut.TestCase):
 
     @property
     def endpoint(self):
-        endpoint = config.get('hdf_server_endpoint')
+        if "H5SERV_ENDPOINT" in os.environ:
+            endpoint = os.environ["H5SERV_ENDPOINT"]
+        else:
+            endpoint = "http://127.0.0.1:5000"
         return endpoint
 
+   
     @property
-    def base_domain(self):
-        return  self.test_dir + ".h5pyd_test.hdfgroup.org"
+    def test_user1(self):
+        # H5SERV_USERNAME is the username h5pyd will look up if
+        #   if not provided in the File constructor
+        user1 = {}
+        if  "H5SERV_USERNAME" in os.environ:
+            user1["name"] = os.environ["H5SERV_USERNAME"]
+        else:
+            user1["name"] = "test_user1"
+        if "H5SERV_PASSWORD" in os.environ:
+            user1["password"] = os.environ["H5SERV_PASSWORD"]
+        else:
+            # only use "test_user1/test" for desktop testing
+            user1["password"] = "test"
+        return user1
+
+    @property
+    def test_user2(self):
+        user2 = {}
+        if  "TEST12_USERNAME" in os.environ:
+            user2["name"] = os.environ["TEST2_USERNAME"]
+        else:
+            user2["name"] = "test_user2"
+        if "TEST2_PASSWORD" in os.environ:
+            user2["password"] = os.environ["TEST2_PASSWORD"]
+        else:
+            # only use "test_user1/test" for desktop testing
+            user2["password"] = "test"
+        return user2
+
+    @classmethod
+    def use_h5py():
+        """ Use the standard H5PY package rather than h5pyd"""
+        if "USE_H5PY" in os.environ and os.environ["USE_H5PY"]:
+            return True
+        else:
+            return False
 
     @classmethod
     def setUpClass(cls):
@@ -190,7 +227,11 @@ class TestCase(ut.TestCase):
                 os.mkdir("out")
             return "out/" + basename + ".h5"
         else:
-            return basename + "." + config.get("domain")
+            if "DOMAIN" in os.environ:
+                domain = os.environ["DOMAIN"]
+            else:
+                domain = "h5pyd_test.hdfgroup.org"
+            return basename + "." + domain
 
     
     def getPathFromDomain(self, domain):

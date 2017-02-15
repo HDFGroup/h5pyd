@@ -77,6 +77,16 @@ class File(Group):
         """Last modified time of the domain as a datetime object."""
         return self._modified
 
+    @property
+    def created(self):
+        """Creation time of the domain"""
+        return self._created
+
+    @property
+    def owner(self):
+        """Username of the owner of the domain"""
+        return self._owner
+
     def __init__(self, domain_name, mode=None, endpoint=None, 
         username=None, password=None, **kwds):
         """Create a new file object.
@@ -204,7 +214,12 @@ class File(Group):
 
         self._name = '/'
         self._created = root_json['created']
-        self._modified = parse_lastmodified(root_json['lastModified'])
+        self._modified = root_json['lastModified']
+        if 'owner' in root_json:
+            # currently this is only available for HSDS 
+            self._owner = root_json['owner']
+        else:
+            self._owner = None
 
         Group.__init__(self, self._id)
 

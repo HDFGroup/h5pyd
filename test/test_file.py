@@ -23,6 +23,7 @@ from common import ut, TestCase
 from datetime import datetime
 from copy import copy
 import six
+import time
 
 
 class TestFile(TestCase):
@@ -38,17 +39,40 @@ class TestFile(TestCase):
     def test_create(self):
         filename = self.getFileName("new_file")
         print("filename:", filename)
-        
+        now = time.time()
         f = h5py.File(filename, 'w')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 0)
         self.assertEqual(f.mode, 'r+')
+        is_hsds = False
+        if f.id.id.startswith("g-"):
+            is_hsds = True  # HSDS has different permission defaults
         if h5py.__name__ == "h5pyd":
             self.assertTrue(f.id.endpoint.startswith("http"))
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
+        # Check domain's timestamps
+        if h5py.__name__ == "h5pyd" and is_hsds:
+            # TBD: remove is_hsds when h5serv timestamp changed to float
+            print("modified:", datetime.fromtimestamp(f.modified), f.modified)
+            print("created: ", datetime.fromtimestamp(f.created), f.created)
+            print("now:     ", datetime.fromtimestamp(now), now)
+            # verify the timestamps make sense
+            # we add a 30-sec margin to account for possible time skew
+            # between client and server
+            self.assertTrue(f.created - 30.0 < now)
+            self.assertTrue(f.created + 30.0 > now)
+            self.assertTrue(f.modified - 30.0 < now)
+            self.assertTrue(f.modified + 30.0 > now)
+            self.assertEqual(f.modified, f.created)
+        if f.id.id.startswith("g-"):
+            # owner prop is just for HSDS
+            print("owner")
+            self.assertEqual(f.owner, self.test_user1["name"])
+         
+         
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
@@ -77,12 +101,6 @@ class TestFile(TestCase):
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
-       
-
-        # Check domain's last modified time
-        if h5py.__name__ == "h5pyd":
-            self.assertTrue(isinstance(f.modified, datetime))
-            #self.assertEqual(f.modified.tzname(), six.u('UTC'))
 
         try:
             f.create_group("another_subgrp")
@@ -195,7 +213,7 @@ class TestFile(TestCase):
         else:
             self.assertEqual(len(file_acls), 0)
 
-        file_acl = f.getACL("test_user1")
+        file_acl = f.getACL(self.test_user1["name"])
         # there's no ACL for test_User1 yet, so this should return the default ACL
         acl_keys = ("create", "read", "update", "delete", "readACL", "updateACL")
         #self.assertEqual(file_acl["userName"], "default")   
@@ -211,13 +229,13 @@ class TestFile(TestCase):
                 self.assertEqual(default_acl[k], False)
        
         user1_acl = copy(default_acl)
-        user1_acl["userName"] = "test_user1"
+        user1_acl["userName"] = self.test_user1["name"]
         f.close()
 
 
         # test_user2 has read access, but opening in write mode should fail
         try:
-            f = h5py.File(filename, 'w', username="test_user2", password="test")
+            f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
             self.assertFalse(is_hsds)  # expect exception for hsds
         except IOError as ioe:
             self.assertTrue(is_hsds)
@@ -225,7 +243,7 @@ class TestFile(TestCase):
 
         # append mode w/ test_user2
         try:
-            f = h5py.File(filename, 'a', username="test_user2", password="test")
+            f = h5py.File(filename, 'a', username=self.test_user2["name"], password=self.test_user2["password"])
             self.assertFalse(is_hsds)  # expected exception
         except IOError as ioe:
             self.assertTrue(is_hsds)
@@ -234,7 +252,7 @@ class TestFile(TestCase):
         f = h5py.File(filename, 'a')  # open for append with original username
         # add an acl for test_user2 that has only read/update access
         user2_acl = copy(default_acl)
-        user2_acl["userName"] = "test_user2"
+        user2_acl["userName"] = self.test_user2["name"]
         user2_acl["read"] = True  # allow read access
         user2_acl["update"] = True
         f.putACL(user2_acl)
@@ -243,7 +261,7 @@ class TestFile(TestCase):
 
         # test_user2  opening in write mode should still fail
         try:
-            f = h5py.File(filename, 'w', username="test_user2", password="test")
+            f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
             self.assertFalse(is_hsds)  # expected exception
         except IOError as ioe:
             self.assertTrue(is_hsds)
@@ -251,7 +269,7 @@ class TestFile(TestCase):
 
         # append mode w/ test_user2
         try:
-            f = h5py.File(filename, 'a', username="test_user2", password="test")
+            f = h5py.File(filename, 'a', username=self.test_user2["name"], password=self.test_user2["password"])
         except IOError as ioe:
             self.assertTrue(False)  # shouldn't get here
 

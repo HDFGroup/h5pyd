@@ -157,11 +157,6 @@ class Folder():
     """
 
     @property
-    def mode(self):
-        """ Python mode used to open file """
-        return self.id._mode
-
-    @property
     def domain(self):
         return self._domain + '/'
 
@@ -272,13 +267,11 @@ class Folder():
 
     def remove(self):
         """ Deletes the domain on the server"""
-        if self.id.mode == 'r':
-            raise ValueError("Unable to remove file (No write intent on file)")
+         
         rsp = self._http.DELETE('/')
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
 
-        self._id.close()
 
     def flush(self):
         """ For h5py compatibility, doesn't currently do anything in h5pyd.
@@ -289,14 +282,11 @@ class Folder():
         return self
 
     def __exit__(self, *args):
-        if self.id:
-            self.close()
+        pass
 
     def __repr__(self):
-        if not self.id:
-            r = six.u('<Closed Folder>')
-        else:
-            r = six.u(self._domain + '/')
+        
+        r = six.u(self._domain + '/')
              
         if six.PY3:
             return r
