@@ -29,8 +29,9 @@ import six
 class TestFolders(TestCase):
 
      
-    def test_create(self):
+    def test_list(self):
         test_domain = self.getFileName("folder_test")  
+        print("test_domain:", test_domain)
         f = h5py.File(test_domain, 'w')  # create a new domain
         if not f.id.id.startswith("g-"):
             # Folders aren't implemented yet for h5serv, so skip
@@ -42,7 +43,9 @@ class TestFolders(TestCase):
         dir = h5py.Folder(folder_name)  # get folder object
         self.assertEqual(dir.domain, folder_name)
         self.assertTrue(dir.modified)
-        self.assertTrue(dir.created)
+        self.assertTrue(dir.created) 
+        self.assertEqual(str(dir), folder_name)
+        self.assertEqual(dir.owner, self.test_user1["name"])
         dir_parent = dir.parent
         self.assertEqual(dir.parent[:-1], op.dirname(folder_name[:-1]))
 
@@ -55,19 +58,25 @@ class TestFolders(TestCase):
         dir_acls = dir.getACLs()
         self.assertTrue(isinstance(dir_acls, list))
 
-        subdomains = dir.getSubdomains()
-        self.assertTrue(len(subdomains) > 1)
+        count = len(dir)
+        self.assertTrue(count > 1)
+           
         test_domain_found = False
-        for item in subdomains:
-            self.assertTrue("name" in item)
-            if item["name"] == "folder_test":
+        
+        i = 0
+        for name in dir:
+            if name == "folder_test":
                 self.assertFalse(test_domain_found)
                 test_domain_found = True
+            item = dir[name]
             self.assertTrue("lastModified" in item)
             self.assertTrue("created" in item)
             self.assertTrue("owner" in item)
             self.assertEqual(item["owner"], self.test_user1["name"])
+            i += 1
         self.assertTrue(test_domain_found)
+        self.assertEqual(i, count)
+
             
             
          

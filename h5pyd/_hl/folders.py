@@ -79,7 +79,7 @@ class HttpUtil:
                 return False
         return True
 
-    def GET(self, req, format="json"):
+    def GET(self, req, format="json", headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
@@ -87,7 +87,8 @@ class HttpUtil:
         
         req = self._endpoint + req
 
-        headers = self.getHeaders() 
+        if not headers:
+            headers = self.getHeaders() 
          
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
@@ -104,8 +105,10 @@ class HttpUtil:
 
         # try to do a PUT to the domain
         req = self._endpoint + req  
+        
+        if not headers:
+            headers = self.getHeaders() 
 
-        headers = self.getHeaders() 
         self.log.info("PUT: " + req)
         if 'Content-Type' in headers and headers['Content-Type'] == "application/octet-stream":
             # binary write
@@ -117,7 +120,7 @@ class HttpUtil:
                            params=params, verify=self.verifyCert())
         return rsp
 
-    def POST(self, req, body=None):
+    def POST(self, req, body=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
@@ -128,14 +131,15 @@ class HttpUtil:
 
         data = json.dumps(body)
 
-        headers = self.getHeaders() 
+        if not headers:
+            headers = self.getHeaders() 
 
         self.log.info("PST: " + req)
          
         rsp = requests.post(req, data=data, headers=headers, verify=self.verifyCert())
         return rsp
 
-    def DELETE(self, req):
+    def DELETE(self, req, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
@@ -144,7 +148,8 @@ class HttpUtil:
         # try to do a DELETE of the resource
         req = self._endpoint + req
 
-        headers = self.getHeaders() 
+        if not headers:
+            headers = self.getHeaders() 
 
         self.log.info("DEL: " + req)
         rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
@@ -177,6 +182,11 @@ class Folder():
     def created(self):
         """creation time of the domain as a datetime object."""
         return self._created
+
+    @property
+    def owner(self):
+        """Username of the owner of the folder """
+        return self._owner
 
     def __init__(self, domain_name, mode=None, endpoint=None, 
         username=None, password=None, **kwds):
@@ -213,7 +223,11 @@ class Folder():
          
         self._name = domain_name
         self._created = domain_json['created']
-        self._modified = parse_lastmodified(domain_json['lastModified'])
+        self._modified = domain_json['lastModified']
+        if "owner" in domain_json:
+            self._owner = domain_json["owner"]
+        else:
+            self._owner = None
 
 
     def getACL(self, username):
@@ -246,8 +260,8 @@ class Folder():
         if rsp.status_code != 201:
             raise IOError(rsp.reason)
 
-    # TBD: make this a proper iter class
-    def getSubdomains(self):
+    # TBD: Replace with implementation that can handle large collections
+    def _getSubdomains(self):
         req = '/domains'
         rsp = self._http.GET(req)
         if rsp.status_code != 200:
@@ -259,24 +273,50 @@ class Folder():
         return domains
 
 
-
     def close(self):
         """ Clears reference to remote resource.
         """
         self._domain = None
 
-    def remove(self):
-        """ Deletes the domain on the server"""
+    def __getitem__(self, name):
+        """ Get a domain  """
+        domains = self._getSubdomains()
+        for domain in domains:
+            if domain["name"] == name:
+                return domain
+        return None
+
+    def __delitem__(self, name):
+        """ Delete domain. """
+        domain = self._domain + '/' + name
+        headers = self._http.getHeaders(domain=domain)
+        req = '/'
+        self.DELETE('/', headers=headers)
+        #self.id.unlink(self._e(name))
+
+    def __len__(self):
+        """ Number of subdomains of this folder """
+        domains = self._getSubdomains()
+        return len(domains)
          
-        rsp = self._http.DELETE('/')
-        if rsp.status_code != 200:
-            raise IOError(rsp.reason)
 
+    def __iter__(self):
+        """ Iterate over subdomain names """
+        domains = self._getSubdomains()
+        for domain in domains:
+            yield domain['name']
+         
 
-    def flush(self):
-        """ For h5py compatibility, doesn't currently do anything in h5pyd.
-        """
-        pass
+    def __contains__(self, name):
+        """ Test if a member name exists """
+        domains = self._getSubdomains()
+        found = False
+        for domain in domains:
+            if domain['name'] == name:
+                found = True
+                break
+        
+        return found
 
     def __enter__(self):
         return self
