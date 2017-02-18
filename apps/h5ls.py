@@ -1,6 +1,8 @@
 import h5pyd as h5py
 import numpy as np
 import sys
+import os.path as op
+import os
 
 #
 # Print objects in a domain in the style of the h5ls utilitiy
@@ -8,7 +10,7 @@ import sys
 recursive = False
 verbose = False
 showacls = False
-endpoint = "http://127.0.0.1:5000"
+endpoint = None
 username = None
 password = None
 
@@ -25,11 +27,26 @@ def getShapeText(dset):
         shape_text += "}"
     return shape_text
 
+def visititems(name, grp, visited):
+    for k in grp:
+        item = grp.get(k, getlink=True)
+        if item.__class__.__name__ == "HardLink":
+            # follow hardlinks
+            item = grp.get(k)
+            item_name = op.join(name, k)
+            dump(item_name, item, visited=visited)
 
-def dump(name, obj):
+
+def dump(name, obj, visited=None):
     class_name = obj.__class__.__name__
     desc = None
     obj_id = None
+    if class_name in ("Dataset", "Group", "Datatype"):
+        obj_id = obj.id.id
+        if visited and obj_id in visited:
+            same_as = visited[obj_id]
+            print("{0:24} {1}, same as {}".format(name, class_name, same_as))
+            return
 
     if class_name == "Dataset":
         desc = getShapeText(obj)
@@ -48,6 +65,10 @@ def dump(name, obj):
         print("{0:24} {1} {2}".format(name, class_name, desc))
     if verbose and obj_id is not None:
         print("    id: {0}".format(obj_id))
+    if visited is not None and obj_id is not None:
+        visited[obj_id] = name 
+    if class_name == "Group" and visited is not None:
+        visititems(name, obj, visited)
 
 def dumpACL(acl):
     perms = ""
@@ -93,8 +114,6 @@ def dumpAcls(obj):
             continue
         dumpACL(acl)
             
-
-
 #
 # Get Group based on URL
 #
@@ -150,6 +169,19 @@ while argn < len(sys.argv):
          urls.append(arg)
          argn += 1
 
+if endpoint is None:
+    if "H5SERV_ENDPOINT" in os.environ:
+        endpoint = os.environ["H5SERV_ENDPOINT"]
+    else:
+        endpoint = "http://127.0.0.1:5000"
+
+if username is None and "H5SERV_USERNAME" in os.environ:
+    username = os.environ["H5SERV_USERNAME"]
+
+if password is None and "H5SERV_PASSWORD" in os.environ:
+    password = os.environ["H5SERV_PASSWORD"]
+    
+
 if len(urls) == 0:
     # add a generic url
     urls.append("hdfgroup.org")
@@ -157,8 +189,11 @@ if len(urls) == 0:
 for url in urls:
     grp = getGroupFromUrl(url)
     dump('/', grp)
+    
     if recursive:
-        grp.visititems(dump)
+        visited = {} # dict of id to h5path
+        visited[grp.id.id] = '/'
+        visititems('/', grp, visited)
     else:
         for k in grp:
             item = grp.get(k, getlink=True)

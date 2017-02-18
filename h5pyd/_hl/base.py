@@ -518,12 +518,11 @@ class HLObject(CommonStateObject):
         
         # try to do a GET from the domain
         req = self.id.endpoint + req
-
+        self.log.info("GET: {} [{}]".format(req, self.id.domain))
         headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
          
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
-        self.log.info("GET: " + req)
 
         rsp = requests.get(req, headers=headers, verify=self.verifyCert())
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
@@ -549,7 +548,7 @@ class HLObject(CommonStateObject):
 
         headers = getHeaders(self.id.domain, username=self.id.username, 
             password=self.id.password, headers=headers) 
-        self.log.info("PUT: " + req)
+        self.log.info("PUT: {} [{}]".format(req, self.id.domain))
         if 'Content-Type' in headers and headers['Content-Type'] == "application/octet-stream":
             # binary write
             data = body
@@ -582,7 +581,7 @@ class HLObject(CommonStateObject):
 
         headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
 
-        self.log.info("PST: " + req)
+        self.log.info("PST: {} [{}]".format(req, self.id.domain))
          
         rsp = requests.post(req, data=data, headers=headers,
                             verify=self.verifyCert())
@@ -607,7 +606,7 @@ class HLObject(CommonStateObject):
 
         headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
 
-        self.log.info("DEL: " + req)
+        self.log.info("DEL: {} [{}]".format(req, self.id.domain))
         rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
@@ -627,6 +626,8 @@ class HLObject(CommonStateObject):
             self.log.setLevel(logging.INFO)
             fh = logging.FileHandler(log_file)
             self.log.addHandler(fh)
+        else:
+            pass
 
     def __hash__(self):
         return hash(self.id)
