@@ -3,11 +3,12 @@ import numpy as np
 import sys
 import os.path as op
 import os
+from datetime import datetime
 
 #
 # Print objects in a domain in the style of the h5ls utilitiy
 #
-recursive = False
+
 verbose = False
 showacls = False
 endpoint = None
@@ -113,6 +114,47 @@ def dumpAcls(obj):
         if acl["userName"] == "default":
             continue
         dumpACL(acl)
+
+def visitDomains(url, recursive=False):
+    #print("recursive:", recursive)
+    #print("url:", url)
+    
+    if url.endswith('/'):
+        got_folder = False
+        try:
+            dir = h5py.Folder(url)
+            if len(dir) > 0:
+                got_folder = True
+                owner = dir.owner
+                timestamp = datetime.fromtimestamp(int(dir.modified))
+                print("{:24} {} {}".format(owner, timestamp, url))
+                if not recursive:
+                    # if not recusive, print the number of sub-domains
+                    print("{} items".format(len(dir)))
+                else:
+                    for name in dir:
+                        # recurse for items in folder
+                        visitDomains(url + name, recursive=True)
+        except OSError:
+            pass # not a valid folder either!
+    else:
+        got_domain = False
+        # see if this is a domain
+        try:
+            f = h5py.File(url, 'r', endpoint=endpoint, username=username, password=password)
+            owner = f.owner
+            timestamp = datetime.fromtimestamp(int(f.modified))
+            print("{:24} {} {}".format(owner, timestamp, url))
+            f.close()
+            got_domain = True
+        except OSError:
+            pass  # ignore if the url doesn't point to a valid domain
+        
+        if not got_domain or recursive:
+            # see if this is a folder url
+            visitDomains(url+'/', recursive=recursive)
+       
+
             
 #
 # Get Group based on URL
@@ -140,6 +182,7 @@ def printUsage():
 
 urls = []
 argn = 1
+recursive = False
 
 while argn < len(sys.argv):
     arg = sys.argv[argn]
@@ -187,22 +230,27 @@ if len(urls) == 0:
     urls.append("hdfgroup.org")
 
 for url in urls:
-    grp = getGroupFromUrl(url)
-    dump('/', grp)
-    
-    if recursive:
-        visited = {} # dict of id to h5path
-        visited[grp.id.id] = '/'
-        visititems('/', grp, visited)
+    if url.endswith('/'):
+        # given a folder path
+        visitDomains(url, recursive=recursive)
     else:
-        for k in grp:
-            item = grp.get(k, getlink=True)
-            if item.__class__.__name__ == "HardLink":
-                # follow hardlinks
-                item = grp.get(k)
-            dump(k, item)
-    if showacls:
-        dumpAcls(grp)
-    grp.file.close()
+         
+        grp = getGroupFromUrl(url)
+        dump('/', grp)
+    
+        if recursive:
+            visited = {} # dict of id to h5path
+            visited[grp.id.id] = '/'
+            visititems('/', grp, visited)
+        else:
+            for k in grp:
+                item = grp.get(k, getlink=True)
+                if item.__class__.__name__ == "HardLink":
+                    # follow hardlinks
+                    item = grp.get(k)
+                dump(k, item)
+        if showacls:
+            dumpAcls(grp)
+        grp.file.close()
 
 
