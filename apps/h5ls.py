@@ -119,6 +119,7 @@ def visitDomains(url, recursive=False):
     #print("recursive:", recursive)
     #print("url:", url)
     
+    count = 0
     if url.endswith('/'):
         got_folder = False
         try:
@@ -128,13 +129,12 @@ def visitDomains(url, recursive=False):
                 owner = dir.owner
                 timestamp = datetime.fromtimestamp(int(dir.modified))
                 print("{:24} {} {}".format(owner, timestamp, url))
-                if not recursive:
-                    # if not recusive, print the number of sub-domains
-                    print("{} items".format(len(dir)))
-                else:
-                    for name in dir:
-                        # recurse for items in folder
-                        visitDomains(url + name, recursive=True)
+                for name in dir:
+                    # recurse for items in folder
+                    n = visitDomains(url + name, recursive=recursive)
+                    count += n
+ 
+                    
         except OSError:
             pass # not a valid folder either!
     else:
@@ -147,12 +147,15 @@ def visitDomains(url, recursive=False):
             print("{:24} {} {}".format(owner, timestamp, url))
             f.close()
             got_domain = True
+            count = 1
         except OSError:
             pass  # ignore if the url doesn't point to a valid domain
         
         if not got_domain or recursive:
             # see if this is a folder url
-            visitDomains(url+'/', recursive=recursive)
+            count += visitDomains(url+'/', recursive=recursive)
+
+    return count
        
 
             
@@ -232,7 +235,8 @@ if len(urls) == 0:
 for url in urls:
     if url.endswith('/'):
         # given a folder path
-        visitDomains(url, recursive=recursive)
+        count = visitDomains(url, recursive=recursive)
+        print("{} items".format(count))
     else:
          
         grp = getGroupFromUrl(url)
