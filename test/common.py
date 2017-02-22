@@ -222,6 +222,7 @@ class TestCase(ut.TestCase):
         """
         Get filepath for a test case given a testname
         """
+        
         if config.get("use_h5py"):
             if not op.isdir("out"):
                 os.mkdir("out")
@@ -230,7 +231,7 @@ class TestCase(ut.TestCase):
             if "DOMAIN" in os.environ:
                 domain = os.environ["DOMAIN"]
             else:
-                domain = "h5pyd_test.hdfgroup.org"
+                domain = "h5pyd_test." + self.test_user1["name"] + ".home" 
             return basename + "." + domain
 
     

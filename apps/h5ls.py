@@ -160,30 +160,28 @@ def visitDomains(url, recursive=False):
 
             
 #
-# Get Group based on URL
+# Get Group based on domain path
 #
-def getGroupFromUrl(url):
+def getGroupFromDomain(domain):
     try:
-        f = h5py.File(url, 'r', endpoint=endpoint, username=username, password=password)
+        f = h5py.File(domain, 'r', endpoint=endpoint, username=username, password=password)
         return f['/']
     except OSError as err:
-        print("OSError: {0}".format(err))
-
-        sys.exit()
+        return None
 
 #
 # Usage
 #
 def printUsage():
-    print("usage: python h5ls.py [-r] [-a] [-showacls] [-e endpoint] [-u username] [-p password] urls")
-    print("example: python h5ls.py -r -e http://data.hdfgroup.org:7253 tall.test.data.hdfgroup.org")
+    print("usage: python h5ls.py [-r] [-a] [-showacls] [-e endpoint] [-u username] [-p password] domains")
+    print("example: python h5ls.py -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5")
     sys.exit()
 
 #
 # Main
 #
 
-urls = []
+domains = []
 argn = 1
 recursive = False
 
@@ -212,7 +210,7 @@ while argn < len(sys.argv):
     elif arg[0] == '-':
          printUsage()
     else:
-         urls.append(arg)
+         domains.append(arg)
          argn += 1
 
 if endpoint is None:
@@ -228,18 +226,21 @@ if password is None and "H5SERV_PASSWORD" in os.environ:
     password = os.environ["H5SERV_PASSWORD"]
     
 
-if len(urls) == 0:
+if len(domains) == 0:
     # add a generic url
-    urls.append("hdfgroup.org")
+    domains.append("hdfgroup.org")
 
-for url in urls:
-    if url.endswith('/'):
+for domain in domains:
+    if domain.endswith('/'):
         # given a folder path
-        count = visitDomains(url, recursive=recursive)
+        count = visitDomains(domain, recursive=recursive)
         print("{} items".format(count))
     else:
          
-        grp = getGroupFromUrl(url)
+        grp = getGroupFromDomain(domain)
+        if grp is None:
+            print("No group associated with this domain")
+            continue
         dump('/', grp)
     
         if recursive:
