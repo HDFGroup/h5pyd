@@ -108,12 +108,17 @@ def dumpAcls(obj):
         print("read ACLs is not permitted")
         return
 
-    acls = obj.getACLs()
+    try:
+        acls = obj.getACLs()
      
-    for acl in acls:
-        if acl["userName"] == "default":
-            continue
-        dumpACL(acl)
+        for acl in acls:
+            if acl["userName"] == "default":
+                continue
+            dumpACL(acl)
+    except OSError:
+        # if requesting user does not permission to read non-default acl,
+        # just ignore
+        pass 
 
 def visitDomains(url, recursive=False):
     #print("recursive:", recursive)
@@ -123,7 +128,7 @@ def visitDomains(url, recursive=False):
     if url.endswith('/'):
         got_folder = False
         try:
-            dir = h5py.Folder(url)
+            dir = h5py.Folder(url, endpoint=endpoint)
             if len(dir) > 0:
                 got_folder = True
                 owner = dir.owner
@@ -218,6 +223,10 @@ if endpoint is None:
         endpoint = os.environ["H5SERV_ENDPOINT"]
     else:
         endpoint = "http://127.0.0.1:5000"
+elif not endpoint.startswith("http"):
+    # add the http if user just gave IP and port
+    endpoint = "http://" + endpoint
+
 
 if username is None and "H5SERV_USERNAME" in os.environ:
     username = os.environ["H5SERV_USERNAME"]
@@ -225,7 +234,7 @@ if username is None and "H5SERV_USERNAME" in os.environ:
 if password is None and "H5SERV_PASSWORD" in os.environ:
     password = os.environ["H5SERV_PASSWORD"]
     
-
+print("endpoint:", endpoint)
 if len(domains) == 0:
     # add a generic url
     domains.append("hdfgroup.org")

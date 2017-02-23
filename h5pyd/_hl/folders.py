@@ -37,7 +37,7 @@ class HttpUtil:
             else:
                 self._endpoint = "http://127.0.0.1:5000"
         else:
-            self._endpoint = None
+            self._endpoint = endpoint
 
         if username is None and "H5SERV_USERNAME" in os.environ:
             self._username = os.environ["H5SERV_USERNAME"]
@@ -92,7 +92,7 @@ class HttpUtil:
          
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
-        self.log.info("GET: " + req)
+        self.log.info("GET: {} [{}]".format(req, headers["host"]))
  
         rsp = requests.get(req, headers=headers, verify=self.verifyCert())
         return rsp
