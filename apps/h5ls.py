@@ -97,12 +97,11 @@ def dumpACL(acl):
         perms += 'p'
     else:
         perms += '-'
-    print("    {0:24} {1}".format(acl["userName"], perms))
+    print("    acl: {0:24} {1}".format(acl["userName"], perms))
 
 def dumpAcls(obj):
     try:
         default_acl = obj.getACL("default")
-        print("acls:")
         dumpACL(default_acl)
     except OSError:
         print("read ACLs is not permitted")
@@ -120,23 +119,25 @@ def dumpAcls(obj):
         # just ignore
         pass 
 
-def visitDomains(url, recursive=False):
+def visitDomains(domain, recursive=False):
     #print("recursive:", recursive)
-    #print("url:", url)
-    
+    #print("domain:", domain)
     count = 0
-    if url.endswith('/'):
+    if domain.endswith('/'):
         got_folder = False
         try:
-            dir = h5py.Folder(url, endpoint=endpoint)
+            dir = h5py.Folder(domain, endpoint=endpoint)
             if len(dir) > 0:
                 got_folder = True
                 owner = dir.owner
                 timestamp = datetime.fromtimestamp(int(dir.modified))
-                print("{:24} {} {}".format(owner, timestamp, url))
+                print("{:24} {} {}".format(owner, timestamp, domain))
+                count += 1
+                if showacls:
+                    dumpAcls(dir)
                 for name in dir:
                     # recurse for items in folder
-                    n = visitDomains(url + name, recursive=recursive)
+                    n = visitDomains(domain + name, recursive=recursive)
                     count += n
  
                     
@@ -146,19 +147,19 @@ def visitDomains(url, recursive=False):
         got_domain = False
         # see if this is a domain
         try:
-            f = h5py.File(url, 'r', endpoint=endpoint, username=username, password=password)
+            f = h5py.File(domain, 'r', endpoint=endpoint, username=username, password=password)
             owner = f.owner
             timestamp = datetime.fromtimestamp(int(f.modified))
-            print("{:24} {} {}".format(owner, timestamp, url))
+            print("{:24} {} {}".format(owner, timestamp, domain))
             f.close()
             got_domain = True
             count = 1
         except OSError:
-            pass  # ignore if the url doesn't point to a valid domain
+            pass  # ignore if the domain is not valid 
         
         if not got_domain or recursive:
-            # see if this is a folder url
-            count += visitDomains(url+'/', recursive=recursive)
+            # see if this is a folder 
+            count += visitDomains(domain+'/', recursive=recursive)
 
     return count
        
@@ -234,7 +235,6 @@ if username is None and "H5SERV_USERNAME" in os.environ:
 if password is None and "H5SERV_PASSWORD" in os.environ:
     password = os.environ["H5SERV_PASSWORD"]
     
-print("endpoint:", endpoint)
 if len(domains) == 0:
     # add a generic url
     domains.append("hdfgroup.org")
