@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 #
-# Print objects in a domain in the style of the h5ls utilitiy
+# Print objects in a domain in the style of the hsls utilitiy
 #
 
 verbose = False
@@ -179,8 +179,8 @@ def getGroupFromDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: python h5ls.py [-r] [-a] [-showacls] [-e endpoint] [-u username] [-p password] domains")
-    print("example: python h5ls.py -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5")
+    print("usage: python hsls.py [-r] [-a] [-showacls] [-e endpoint] [-u username] [-p password] domains")
+    print("example: python hsls.py -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5")
     sys.exit()
 
 #
