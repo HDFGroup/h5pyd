@@ -133,8 +133,10 @@ def getFile(domain):
     fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username, password=password)
     return fh
 
-def visitDomains(domain, recursive=False):
-    #print("recursive:", recursive)
+def visitDomains(domain, depth=1):
+    if depth == 0:
+        return 0
+    #print("recursive:", depth)
     #print("domain:", domain)
     count = 0
     if domain.endswith('/'):
@@ -151,7 +153,7 @@ def visitDomains(domain, recursive=False):
                     dumpAcls(dir)
                 for name in dir:
                     # recurse for items in folder
-                    n = visitDomains(domain + name, recursive=recursive)
+                    n = visitDomains(domain + name, depth=(depth-1))
                     count += n
                     
         except OSError as oe:
@@ -172,9 +174,9 @@ def visitDomains(domain, recursive=False):
         except OSError:
             pass  # ignore if the domain is not valid 
         
-        if not got_domain or recursive:
+        if not got_domain or depth > 0:
             # see if this is a folder 
-            count += visitDomains(domain+'/', recursive=recursive)
+            count += visitDomains(domain+'/', depth=depth)
 
     return count
             
@@ -202,12 +204,12 @@ def printUsage():
 
 domains = []
 argn = 1
-recursive = False
+depth = 2
 
 while argn < len(sys.argv):
     arg = sys.argv[argn]
     if arg in ("-r", "--recursive"):
-        recursive = True
+        depth = -1
         argn += 1
     elif arg in ("-v", "--verbose"):
         verbose = True
@@ -239,7 +241,7 @@ if len(domains) == 0:
 for domain in domains:
     if domain.endswith('/'):
         # given a folder path
-        count = visitDomains(domain, recursive=recursive)
+        count = visitDomains(domain, depth=depth)
         print("{} items".format(count))
     else:
          
@@ -249,7 +251,8 @@ for domain in domains:
             continue
         dump('/', grp)
     
-        if recursive:
+        if depth < 0:
+            # recursive
             visited = {} # dict of id to h5path
             visited[grp.id.id] = '/'
             visititems('/', grp, visited)
