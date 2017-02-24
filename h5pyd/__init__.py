@@ -31,6 +31,7 @@ from ._hl.dataset import Dataset
 from ._hl.datatype import Datatype
 from ._hl.attrs import AttributeManager
 from ._hl.base import Reference, RegionReference
+#from ._hl.httputil import HttpUtil
 
 
 #from .h5 import get_config

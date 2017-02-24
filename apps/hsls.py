@@ -4,6 +4,7 @@ import sys
 import os.path as op
 import os
 from datetime import datetime
+from config import Config
 
 #
 # Print objects in a domain in the style of the hsls utilitiy
@@ -11,9 +12,8 @@ from datetime import datetime
 
 verbose = False
 showacls = False
-endpoint = None
-username = None
-password = None
+ 
+cfg = Config()
 
 def getShapeText(dset):
     shape_text = "Scalar"
@@ -119,6 +119,20 @@ def dumpAcls(obj):
         # just ignore
         pass 
 
+def getFolder(domain):
+    username = cfg["hs_username"]
+    password = cfg["hs_password"]
+    endpoint = cfg["hs_endpoint"]
+    dir = h5py.Folder(domain, endpoint=endpoint, username=username, password=password)
+    return dir
+
+def getFile(domain):
+    username = cfg["hs_username"]
+    password = cfg["hs_password"]
+    endpoint = cfg["hs_endpoint"]
+    fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username, password=password)
+    return fh
+
 def visitDomains(domain, recursive=False):
     #print("recursive:", recursive)
     #print("domain:", domain)
@@ -126,7 +140,7 @@ def visitDomains(domain, recursive=False):
     if domain.endswith('/'):
         got_folder = False
         try:
-            dir = h5py.Folder(domain, endpoint=endpoint)
+            dir = getFolder(domain)
             if len(dir) > 0:
                 got_folder = True
                 owner = dir.owner
@@ -139,15 +153,16 @@ def visitDomains(domain, recursive=False):
                     # recurse for items in folder
                     n = visitDomains(domain + name, recursive=recursive)
                     count += n
- 
                     
-        except OSError:
-            pass # not a valid folder either!
+        except OSError as oe:
+            sys.exit(str(oe))
+             
+         
     else:
         got_domain = False
         # see if this is a domain
         try:
-            f = h5py.File(domain, 'r', endpoint=endpoint, username=username, password=password)
+            f = getFile(domain) 
             owner = f.owner
             timestamp = datetime.fromtimestamp(int(f.modified))
             print("{:24} {} {}".format(owner, timestamp, domain))
@@ -162,15 +177,13 @@ def visitDomains(domain, recursive=False):
             count += visitDomains(domain+'/', recursive=recursive)
 
     return count
-       
-
             
 #
 # Get Group based on domain path
 #
 def getGroupFromDomain(domain):
     try:
-        f = h5py.File(domain, 'r', endpoint=endpoint, username=username, password=password)
+        f = getFile(domain)
         return f['/']
     except OSError as err:
         return None
@@ -194,47 +207,31 @@ recursive = False
 while argn < len(sys.argv):
     arg = sys.argv[argn]
     if arg in ("-r", "--recursive"):
-         recursive = True
-         argn += 1
+        recursive = True
+        argn += 1
     elif arg in ("-v", "--verbose"):
-         verbose = True
-         argn += 1
+        verbose = True
+        argn += 1
     elif arg in ("-showacls", "--showacls"):
-         showacls = True
-         argn += 1
+        showacls = True
+        argn += 1
     elif arg in ("-h", "--help"):
-         printUsage()
+        printUsage()
     elif arg in ("-e", "--endpoint"):
-         endpoint = sys.argv[argn+1]
-         argn += 2
+        cfg["hs_endpoint"] = sys.argv[argn+1]
+        argn += 2
     elif arg in ("-u", "--username"):
-         username = sys.argv[argn+1]
-         argn += 2
+        cfg["hs_username"] = sys.argv[argn+1]
+        argn += 2
     elif arg in ("-p", "--password"):
-         password = sys.argv[argn+1]
+         cfg["hs_password"] = sys.argv[argn+1]
          argn += 2
     elif arg[0] == '-':
          printUsage()
     else:
          domains.append(arg)
          argn += 1
-
-if endpoint is None:
-    if "H5SERV_ENDPOINT" in os.environ:
-        endpoint = os.environ["H5SERV_ENDPOINT"]
-    else:
-        endpoint = "http://127.0.0.1:5000"
-elif not endpoint.startswith("http"):
-    # add the http if user just gave IP and port
-    endpoint = "http://" + endpoint
-
-
-if username is None and "H5SERV_USERNAME" in os.environ:
-    username = os.environ["H5SERV_USERNAME"]
-
-if password is None and "H5SERV_PASSWORD" in os.environ:
-    password = os.environ["H5SERV_PASSWORD"]
-    
+ 
 if len(domains) == 0:
     # add a generic url
     domains.append("hdfgroup.org")

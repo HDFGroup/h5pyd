@@ -15,13 +15,12 @@ from __future__ import absolute_import
 import os
 import six
 
-import requests
 import json
 
 from .objectid import GroupID
-from .base import parse_lastmodified, getHeaders
 from .group import Group
 from .. import version
+from .httputil import HttpUtil
 
 
 hdf5_version = version.hdf5_version_tuple[0:3]
@@ -135,14 +134,13 @@ class File(Group):
         if password is None and "H5SERV_PASSWORD" in os.environ:
             password = os.environ["H5SERV_PASSWORD"]
 
+        self._http = HttpUtil(domain_name, endpoint=endpoint, username=username, password=password)
         root_json = None
 
         # try to do a GET from the domain
-        req = endpoint + "/"
-             
-        headers = getHeaders(domain=domain_name, username=username, password=password)
+        req = "/"      
                         
-        rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+        rsp = self._http.GET(req)  
 
         if rsp.status_code == 200:
             root_json = json.loads(rsp.text)
@@ -154,7 +152,7 @@ class File(Group):
             raise IOError("domain already exists")
         if rsp.status_code == 200 and mode == 'w':
             # delete existing domain
-            rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
+            rsp = self._http.DELETE(req)
             if rsp.status_code != 200:
                 # failed to delete
                 raise IOError(rsp.reason)
@@ -163,7 +161,7 @@ class File(Group):
             # create the domain
             if mode not in ('w', 'a'):
                 raise IOError("File not found")
-            rsp = requests.put(req, headers=headers, verify=self.verifyCert())
+            rsp = self._http.PUT(req)  
             if rsp.status_code != 201:
                 raise IOError(rsp.reason)
             root_json = json.loads(rsp.text)
@@ -181,8 +179,8 @@ class File(Group):
             for name in (username, "default"):
                 if not username:
                     continue
-                req = endpoint + "/acls/" + name
-                rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+                req = "/acls/" + name
+                rsp = self._http.GET(req)  
                 if rsp.status_code == 200:
                     rspJson = json.loads(rsp.text)
                     domain_acl = rspJson["acl"]
@@ -198,9 +196,9 @@ class File(Group):
         root_uuid = root_json['root']
 
         # get the group json for the root group
-        req = endpoint + "/groups/" + root_uuid
+        req = "/groups/" + root_uuid
 
-        rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+        rsp = self._http.GET(req)
 
         # print "req:", req
 

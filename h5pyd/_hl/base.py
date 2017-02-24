@@ -18,7 +18,6 @@ import os
 import json
 import base64
 import time
-import requests
 import logging
 import logging.handlers
 from collections import (
@@ -27,6 +26,7 @@ from collections import (
 import six
 from datetime import datetime
 import pytz
+from .httputil import HttpUtil
 
 
 class FakeLock():
@@ -107,6 +107,8 @@ def getHeaders(domain, username=None, password=None, headers=None):
             auth_string = b"Basic " + auth_string
             headers['Authorization'] = auth_string
         return headers
+
+
 
 class LinkCreationPropertyList(object):
     """
@@ -515,17 +517,9 @@ class HLObject(CommonStateObject):
             raise IOError("object not initialized")
         if self.id.domain is None:
             raise IOError("no domain defined")
-        
-        # try to do a GET from the domain
-        req = self.id.endpoint + req
-        self.log.info("GET: {} [{}]".format(req, self.id.domain))
-        headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
          
-        if format == "binary":
-            headers['accept'] = 'application/octet-stream'
-
-        rsp = requests.get(req, headers=headers, verify=self.verifyCert())
-        # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
+        rsp = self._http_util.GET(req, format=format)
+         
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
         if rsp.headers['Content-Type'] == "application/octet-stream":
@@ -537,27 +531,15 @@ class HLObject(CommonStateObject):
             rsp_json = json.loads(rsp.text)
             return rsp_json
 
-    def PUT(self, req, body=None, params=None, headers=None):
+    def PUT(self, req, body=None, params=None, format="json"):
         if self.id.endpoint is None:
             raise IOError("object not initialized")
         if self.id.domain is None:
             raise IOError("no domain defined")
 
         # try to do a PUT to the domain
-        req = self.id.endpoint + req  
-
-        headers = getHeaders(self.id.domain, username=self.id.username, 
-            password=self.id.password, headers=headers) 
-        self.log.info("PUT: {} [{}]".format(req, self.id.domain))
-        if 'Content-Type' in headers and headers['Content-Type'] == "application/octet-stream":
-            # binary write
-            data = body
-        else:
-            data = json.dumps(body)
-        # self.log.info("BODY: " + str(data))
-        rsp = requests.put(req, data=data, headers=headers,
-                           params=params, verify=self.verifyCert())
-        # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
+        rsp = self._http_util.PUT(req, body=body, params=params, format=format)
+         
         if rsp.status_code not in (200, 201):
             if rsp.status_code == 409:
                 raise RuntimeError(rsp.reason)
@@ -575,18 +557,12 @@ class HLObject(CommonStateObject):
             raise IOError("no domain defined")
 
         # try to do a POST to the domain
-        req = self.id.endpoint + req
-
-        data = json.dumps(body)
-
-        headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
-
+         
+         
         self.log.info("PST: {} [{}]".format(req, self.id.domain))
          
-        rsp = requests.post(req, data=data, headers=headers,
-                            verify=self.verifyCert())
-        # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
-        # raise a ValueError if the link name already existing
+        rsp = self._http_util.POST(req, body=body)
+         
         if rsp.status_code == 409:
             raise ValueError("name already exists")
         if rsp.status_code not in (200, 201):
@@ -602,12 +578,9 @@ class HLObject(CommonStateObject):
             raise IOError("no domain defined")
 
         # try to do a DELETE of the resource
-        req = self.id.endpoint + req
-
-        headers = getHeaders(self.id.domain, username=self.id.username, password=self.id.password) 
-
+        
         self.log.info("DEL: {} [{}]".format(req, self.id.domain))
-        rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
+        rsp = self._http_util.DELETE(req)  
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
@@ -617,6 +590,8 @@ class HLObject(CommonStateObject):
         self._id = oid
         self.log = logging.getLogger("h5pyd")
         self.req_prefix  = None # derived class should set this to the URI of the object
+        self._http_util = HttpUtil(self.id.domain, endpoint=self.id.endpoint, 
+                    username=self.id.username, password=self.id.password)
         if not self.log.handlers:
             # setup logging
             log_path = os.getcwd()

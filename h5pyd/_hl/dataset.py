@@ -15,7 +15,6 @@ from __future__ import absolute_import
 import posixpath as pp
 import sys
 import base64
-import json
 import numpy as np
 
 import six
@@ -72,7 +71,6 @@ def setSliceQueryParam(params, dims, sel):
     if rank > 0:
         sel_param="["
         for i in range(rank):
-            extent = dims[i]
             sel_param += str(start[i])
             sel_param += ':'
             sel_param += str(start[i] + count[i])
@@ -613,7 +611,7 @@ class Dataset(HLObject):
                 arr[...] = data
         elif isinstance(selection, sel.FancySelection):
             #print("Fancy Selection, mshape", selection.mshape)
-            hyperslabs = selection.hyperslabs
+            #hyperslabs = selection.hyperslabs
              
             raise ValueError("selection type not supported")
         elif isinstance(selection, sel.PointSelection):
@@ -903,7 +901,6 @@ class Dataset(HLObject):
         #print("value dtype:", val.dtype)
         #print("value kind:", val.dtype.kind)
         #print("value shape:", val.shape)
-        headers = {}
         params = {}
         body = {}
 
@@ -917,11 +914,12 @@ class Dataset(HLObject):
             if selection.step:
                 body['step'] = list(selection.step)
 
+        format = "json"
         if use_base64:
             
             if self.id.uuid.startswith("d-"):
                 # server is HSDS, use binary data use param values for selection
-                headers['Content-Type'] = "application/octet-stream"
+                format = "binary"
                 body = val.tobytes()
                 if selection.start:
                     setSliceQueryParam(params, self.shape, selection)
@@ -938,7 +936,7 @@ class Dataset(HLObject):
             val = self._decode(val)
             body['value'] = val
 
-        self.PUT(req, body=body, headers=headers, params=params)
+        self.PUT(req, body=body, format=format, params=params)
         """
         mspace = h5s.create_simple(mshape_pad, (h5s.UNLIMITED,)*len(mshape_pad))
         for fspace in selection.broadcast(mshape):
