@@ -231,7 +231,7 @@ class TestCase(ut.TestCase):
             if "DOMAIN" in os.environ:
                 domain = os.environ["DOMAIN"]
             else:
-                domain = "h5pyd_test." + self.test_user1["name"] + ".home" 
+                domain = "h5pyd_test.hdfgroup.org"  #+ self.test_user1["name"] + ".home" 
             return basename + "." + domain
 
     
