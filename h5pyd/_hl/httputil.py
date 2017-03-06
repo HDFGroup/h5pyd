@@ -88,6 +88,7 @@ class HttpUtil:
 
         if not headers:
             headers = self.getHeaders() 
+        #print("GET", req, "headers:", headers)
          
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
@@ -110,10 +111,12 @@ class HttpUtil:
             raise IOError("no domain defined")
 
         req = self._endpoint + req
+        
         # try to do a PUT to the domain
          
         if not headers:
             headers = self.getHeaders() 
+        #print("PUT", req, "headers:", headers)
 
         self.log.info("PUT: " + req)
         if format=="binary":
@@ -146,7 +149,7 @@ class HttpUtil:
         try: 
             rsp = requests.post(req, data=data, headers=headers, verify=self.verifyCert())
         except ConnectionError as ce:
-            print("connection error: ", ce)
+            self.log.warn("connection error: ", ce)
             raise IOError(str(ce))
 
         return rsp

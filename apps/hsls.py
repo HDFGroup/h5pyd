@@ -157,7 +157,13 @@ def visitDomains(domain, depth=1):
                     count += n
                     
         except OSError as oe:
-            sys.exit(str(oe))
+            if oe.errno == 404:
+                # TBD: recently creating domains may not be immediately visible to the service
+                # Once the flush operation is implemented, this should be an issue for h5pyd apps
+                pass
+            else:
+                print("error getting domain:", domain)
+                sys.exit(str(oe))
              
          
     else:

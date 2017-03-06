@@ -84,13 +84,12 @@ class Folder():
         rsp = self._http.GET(req)
 
         if rsp.status_code != 200:
-            print("bad status:", rsp.status_code)
             # file must exist
             if rsp.status_code < 500:
                 self.log.warn("status_code: {}".format(rsp.status_code))
             else:
                 self.log.error("status_code: {}".format(rsp.status_code))
-            raise IOError(rsp.reason)
+            raise IOError(rsp.status_code, rsp.reason)
         domain_json = json.loads(rsp.text)
          
         self._name = domain_name
@@ -100,7 +99,6 @@ class Folder():
             self._owner = domain_json["owner"]
         else:
             self._owner = None
-
 
     def getACL(self, username):
         req = '/acls/' + username
@@ -115,14 +113,14 @@ class Folder():
         req = '/acls'
         rsp = self._http.GET(req)
         if rsp.status_code != 200:
-            raise IOError(rsp.reason)
+            raise IOError(rsp.status_code, rsp.reason)
         rsp_json = json.loads(rsp.text)
         acls_json = rsp_json["acls"] 
         return acls_json
 
     def putACL(self, acl):
         if "userName" not in acl:
-            raise IOError("ACL has no 'userName' key")
+            raise IOError(404, "ACL has no 'userName' key")
         perm = {}
         for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
             perm[k] = acl[k]
@@ -130,17 +128,17 @@ class Folder():
         req = '/acls/' + acl['userName']
         rsp = self._http.PUT(req, body=perm)
         if rsp.status_code != 201:
-            raise IOError(rsp.reason)
+            raise IOError(rsp.status_code, rsp.reason)
 
     # TBD: Replace with implementation that can handle large collections
     def _getSubdomains(self):
         req = '/domains'
         rsp = self._http.GET(req)
         if rsp.status_code != 200:
-            raise IOError(rsp.reason)
+            raise IOError(rsp.status_code, rsp.reason)
         rsp_json = json.loads(rsp.text)
         if "domains" not in rsp_json:
-            raise IOError("Unexpected Error")
+            raise IOError(500, "Unexpected Error")
         domains = rsp_json["domains"]
         return domains
 
@@ -163,7 +161,7 @@ class Folder():
         domain = self._domain + '/' + name
         headers = self._http.getHeaders(domain=domain)
         req = '/'
-        self.DELETE(req, headers=headers)
+        self._http.DELETE(req, headers=headers)
         #self.id.unlink(self._e(name))
 
     def __len__(self):

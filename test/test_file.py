@@ -182,7 +182,7 @@ class TestFile(TestCase):
             self.assertTrue(False)  # expected exception
         except IOError as ioe:
             if h5py.__name__ == "h5pyd":
-                self.assertTrue(str(ioe) in ("Gone", "Not Found"))
+                self.assertTrue(ioe.errno in (404, 410))  # Not Found or Gone
 
     def test_auth(self):
         if h5py.__name__ == "h5py":
@@ -239,7 +239,7 @@ class TestFile(TestCase):
             self.assertFalse(is_hsds)  # expect exception for hsds
         except IOError as ioe:
             self.assertTrue(is_hsds)
-            self.assertEqual(str(ioe), "Forbidden")  # user is not authorized
+            self.assertEqual(ioe.errno, 403)  # user is not authorized
 
         # append mode w/ test_user2
         try:
@@ -247,7 +247,7 @@ class TestFile(TestCase):
             self.assertFalse(is_hsds)  # expected exception
         except IOError as ioe:
             self.assertTrue(is_hsds)
-            self.assertEqual(str(ioe), "Forbidden")  # user is not authorized
+            self.assertEqual(ioe.errno, 403)  # user is not authorized
         
         f = h5py.File(filename, 'a')  # open for append with original username
         # add an acl for test_user2 that has only read/update access
@@ -265,7 +265,7 @@ class TestFile(TestCase):
             self.assertFalse(is_hsds)  # expected exception
         except IOError as ioe:
             self.assertTrue(is_hsds)
-            self.assertEqual(str(ioe), "Forbidden")  # user is not authorized
+            self.assertEqual(ioe.errno, 403)  # user is not authorized
 
         # append mode w/ test_user2
         try:
@@ -285,7 +285,7 @@ class TestFile(TestCase):
         try:
             f = h5py.File(filename, 'r+') 
         except IOError as ioe:
-            self.assertTrue(str(ioe) in ("Gone", "Not Found"))
+            self.assertTrue(ioe.errno in (404, 410))  # Not Found or Gone
            
               
 if __name__ == '__main__':

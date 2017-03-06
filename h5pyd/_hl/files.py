@@ -146,32 +146,33 @@ class File(Group):
             root_json = json.loads(rsp.text)
         if rsp.status_code != 200 and mode in ('r', 'r+'):
             # file must exist
-            raise IOError(rsp.reason)
+            raise IOError(rsp.status_code, rsp.reason)
         if rsp.status_code == 200 and mode in ('w-', 'x'):
             # Fail if exists
-            raise IOError("domain already exists")
+            print("x mode, file exist")
+            raise IOError(409, "domain already exists")
         if rsp.status_code == 200 and mode == 'w':
             # delete existing domain
             rsp = self._http.DELETE(req)
             if rsp.status_code != 200:
                 # failed to delete
-                raise IOError(rsp.reason)
+                raise IOError(rsp.status_code, rsp.reason)
             root_json = None
         if root_json is None:
             # create the domain
-            if mode not in ('w', 'a'):
-                raise IOError("File not found")
+            if mode not in ('w', 'a', 'x'):
+                raise IOError(404, "File not found")
             rsp = self._http.PUT(req)  
             if rsp.status_code != 201:
-                raise IOError(rsp.reason)
+                raise IOError(rsp.status_code, rsp.reason)
             root_json = json.loads(rsp.text)
 
         if 'root' not in root_json:
-            raise IOError("Unexpected error")
+            raise IOError(500, "Unexpected error")
         if 'created' not in root_json:
-            raise IOError("Unexpected error")
+            raise IOError(500, "Unexpected error")
         if 'lastModified' not in root_json:
-            raise IOError("Unexpected error")
+            raise IOError(500, "Unexpected error")
 
         if mode == 'a':
             # for append, verify we have 'update' permission on the domain
@@ -185,7 +186,7 @@ class File(Group):
                     rspJson = json.loads(rsp.text)
                     domain_acl = rspJson["acl"]
                     if not domain_acl["update"]:
-                        raise IOError("Forbidden")
+                        raise IOError(403, "Forbidden")
                     else:
                         break  # don't check with "default" user in this case
 
@@ -203,7 +204,7 @@ class File(Group):
         # print "req:", req
 
         if rsp.status_code != 200:
-            raise IOError("Unexpected Error")
+            raise IOError(rsp.status_code, "Unexpected Error")
         group_json = json.loads(rsp.text)
 
         self._id = GroupID(None, group_json, domain=domain_name,
@@ -236,7 +237,7 @@ class File(Group):
 
     def putACL(self, acl):
         if "userName" not in acl:
-            raise IOError("ACL has no 'userName' key")
+            raise IOError(404, "ACL has no 'userName' key")
         perm = {}
         for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
             perm[k] = acl[k]
