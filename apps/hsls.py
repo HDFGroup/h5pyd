@@ -157,7 +157,7 @@ def visitDomains(domain, depth=1):
                     count += n
                     
         except OSError as oe:
-            if oe.errno == 404:
+            if oe.errno in (404, 410):
                 # TBD: recently creating domains may not be immediately visible to the service
                 # Once the flush operation is implemented, this should be an issue for h5pyd apps
                 pass
@@ -253,7 +253,7 @@ for domain in domains:
          
         grp = getGroupFromDomain(domain)
         if grp is None:
-            print("No group associated with this domain")
+            print("{}: No such domain".format(domain))
             continue
         dump('/', grp)
     

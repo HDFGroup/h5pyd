@@ -56,7 +56,7 @@ def touchDomain(domain):
         hparent = getFolder(parent_domain)
     except OSError as oe:
         #print("errno:", oe.errno)
-        if oe.errno == 404:   # Not Found
+        if oe.errno in (404, 410):   # Not Found
             sys.exit("Parent domain: {} not found".format(parent_domain))
         elif oe.errno == 401:  # Unauthorized
             sys.exit("Authorization failure")
@@ -70,7 +70,7 @@ def touchDomain(domain):
         hdomain = getFile(domain)
     except OSError as oe:
         #print("errno:", oe.errno)
-        if oe.errno == 404:   # Not Found
+        if oe.errno in (404, 410):   # Not Found
             pass  # domain not found
         else:
             sys.exit("Unexpected error: {}".format(oe))
