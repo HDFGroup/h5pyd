@@ -12,6 +12,7 @@ from config import Config
 
 verbose = False
 showacls = False
+showattrs = False
  
 cfg = Config()
 
@@ -46,7 +47,7 @@ def dump(name, obj, visited=None):
         obj_id = obj.id.id
         if visited and obj_id in visited:
             same_as = visited[obj_id]
-            print("{0:24} {1}, same as {}".format(name, class_name, same_as))
+            print("{0:24} {1}, same as {2}".format(name, class_name, same_as))
             return
 
     if class_name == "Dataset":
@@ -66,6 +67,23 @@ def dump(name, obj, visited=None):
         print("{0:24} {1} {2}".format(name, class_name, desc))
     if verbose and obj_id is not None:
         print("    id: {0}".format(obj_id))
+
+    if showattrs and class_name in ("Dataset", "Group", "Datatype"):
+        # dump attributes for the object
+        for attr_name in obj.attrs:
+            attr = obj.attrs[attr_name]
+            el = "..."  # show this if the attribute is too large
+            rank = len(attr.shape)
+            if rank > 1:
+                val = "["*rank + "..." + "]"*rank
+                print("   attr: {0:24} {1}".format(attr_name, val))
+            elif rank == 1 and attr.shape[0] > 1:
+                val = "[{},...]".format(attr[0])
+                print("   attr: {0:24} {1}".format(attr_name, val))
+            else:
+                print("   attr: {0:24} {1}".format(attr_name, attr))
+
+
     if visited is not None and obj_id is not None:
         visited[obj_id] = name 
     if class_name == "Group" and visited is not None:
@@ -200,7 +218,7 @@ def getGroupFromDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: python hsls.py [-r] [-a] [-showacls] [-e endpoint] [-u username] [-p password] domains")
+    print("usage: python hsls.py [-r] [-a] [--showacls] [--showattrs] [-e endpoint] [-u username] [-p password] domains")
     print("example: python hsls.py -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5")
     sys.exit()
 
@@ -211,9 +229,11 @@ def printUsage():
 domains = []
 argn = 1
 depth = 2
-
 while argn < len(sys.argv):
     arg = sys.argv[argn]
+    val = None
+    if len(sys.argv) > argn + 1:
+        val = sys.argv[argn+1]
     if arg in ("-r", "--recursive"):
         depth = -1
         argn += 1
@@ -223,16 +243,19 @@ while argn < len(sys.argv):
     elif arg in ("-showacls", "--showacls"):
         showacls = True
         argn += 1
+    elif arg in ("-showattrs", "--showattrs"):
+        showattrs = True
+        argn += 1
     elif arg in ("-h", "--help"):
         printUsage()
     elif arg in ("-e", "--endpoint"):
-        cfg["hs_endpoint"] = sys.argv[argn+1]
+        cfg["hs_endpoint"] = val
         argn += 2
     elif arg in ("-u", "--username"):
-        cfg["hs_username"] = sys.argv[argn+1]
+        cfg["hs_username"] = val
         argn += 2
     elif arg in ("-p", "--password"):
-         cfg["hs_password"] = sys.argv[argn+1]
+         cfg["hs_password"] = val
          argn += 2
     elif arg[0] == '-':
          printUsage()
