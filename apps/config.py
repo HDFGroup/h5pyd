@@ -52,8 +52,12 @@ class Config:
             self._cfg[k] = kwargs[k]
 
     def __getitem__(self, name):
-        """ Get a domain  """
+        """ Get a config item  """
         return self._cfg[name]
+
+    def __setitem__(self, name, obj):
+        """ set config item """
+        self._cfg[name] = obj
 
     def __delitem__(self, name):
         """ Delete option. """
