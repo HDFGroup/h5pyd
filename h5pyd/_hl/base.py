@@ -642,9 +642,6 @@ class HLObject(CommonStateObject):
         req = self._req_prefix + '/acls/' + acl['userName']
         self.PUT(req, body=perm)
    
-        
-    __nonzero__ = __bool__
-
 
 # --- Dictionary-style interface ----------------------------------------------
 
