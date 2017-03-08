@@ -56,9 +56,9 @@ class TestFile(TestCase):
         # Check domain's timestamps
         if h5py.__name__ == "h5pyd" and is_hsds:
             # TBD: remove is_hsds when h5serv timestamp changed to float
-            print("modified:", datetime.fromtimestamp(f.modified), f.modified)
-            print("created: ", datetime.fromtimestamp(f.created), f.created)
-            print("now:     ", datetime.fromtimestamp(now), now)
+            #print("modified:", datetime.fromtimestamp(f.modified), f.modified)
+            #print("created: ", datetime.fromtimestamp(f.created), f.created)
+            #print("now:     ", datetime.fromtimestamp(now), now)
             # verify the timestamps make sense
             # we add a 30-sec margin to account for possible time skew
             # between client and server
@@ -69,9 +69,7 @@ class TestFile(TestCase):
             self.assertEqual(f.modified, f.created)
         if f.id.id.startswith("g-"):
             # owner prop is just for HSDS
-            print("owner")
-            self.assertEqual(f.owner, self.test_user1["name"])
-         
+            self.assertEqual(f.owner, self.test_user1["name"]) 
          
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
@@ -286,6 +284,14 @@ class TestFile(TestCase):
             f = h5py.File(filename, 'r+') 
         except IOError as ioe:
             self.assertTrue(ioe.errno in (404, 410))  # Not Found or Gone
+
+    def test_close(self):
+        filename = self.getFileName("close_file")
+        print("filename:", filename)
+        f = h5py.File(filename, 'w')
+        self.assertTrue(f)
+        f.close()
+        self.assertFalse(f)
            
               
 if __name__ == '__main__':

@@ -140,6 +140,9 @@ class ObjectID:
         self._obj_json = None
         self._endpoint = None
 
+    def __bool__(self):
+        return bool(self._uuid)
+
 
 class TypeID(ObjectID):
 
