@@ -88,12 +88,13 @@ class HttpUtil:
 
         if not headers:
             headers = self.getHeaders() 
-        #print("GET", req, "headers:", headers)
          
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
         
         self.log.info("GET: {} [{}]".format(req, headers["host"]))
+
+        #print("GET: {} [{}]".format(req, headers["host"]))
         try:
             rsp = requests.get(req, headers=headers, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
@@ -116,7 +117,7 @@ class HttpUtil:
          
         if not headers:
             headers = self.getHeaders() 
-        #print("PUT", req, "headers:", headers)
+        #print("PUT", req, "body:", body, "headers:", headers["host"])
 
         self.log.info("PUT: " + req)
         if format=="binary":
@@ -145,6 +146,7 @@ class HttpUtil:
             headers = self.getHeaders() 
 
         self.log.info("PST: " + req)
+        #print("POST", req, "body:", body, "headers:", headers["host"])
 
         try: 
             rsp = requests.post(req, data=data, headers=headers, verify=self.verifyCert())
@@ -167,6 +169,7 @@ class HttpUtil:
             headers = self.getHeaders() 
 
         self.log.info("DEL: " + req)
+        #print("DELETE:", req, headers["host"])
         rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
         return rsp
 

@@ -41,8 +41,9 @@ class Group(HLObject, MutableMappingHDF5):
                 raise ValueError("%s is not a GroupID" % bind)
             HLObject.__init__(self, bind)
             self._req_prefix = "/groups/" + self.id.uuid 
+            self._link_db = {}  # cache for links
 
-    def create_group(self, name):
+    def create_group(self, h5path):
         """ Create and return a new subgroup.
 
         Name may be absolute or relative.  Fails if the target name already
@@ -53,38 +54,41 @@ class Group(HLObject, MutableMappingHDF5):
 
         #if self.__contains__(name):
         #    raise ValueError("Unable to create link (Name alredy exists)")
-        if name[-1] == '/':
+        if h5path[-1] == '/':
             raise ValueError("Invalid path for create_group")
         
 
         parent_uuid = self.id.id
-        if name[0] == '/':
+        if h5path[0] == '/':
             # absolute path         
-            rsp = self.GET('/')
-            parent_uuid = rsp['root']
+            parent_uuid = self.file.id.id   # uuid of root group
 
-        parent_path = op.dirname(name)
-        basename = op.basename(name)
+        parent_path = op.dirname(h5path)
+        title = op.basename(h5path)
 
         if parent_path:
             parent_uuid, link_json = self.get_link_json(parent_path)
-            
+            if link_json["class"] != 'H5L_TYPE_HARD':
+                # TBD: get the referenced object for softlink?
+                raise IOError("cannot create subgroup of softlink")
+            parent_uuid = link_json["id"]
+
          
         body = {'link': { 'id': parent_uuid,
-                          'name': basename
+                          'name': title
                } }
          
         rsp = self.POST('/groups', body=body)
 
-        group_json = rsp #json.loads(rsp.text)
+        group_json = rsp 
         groupId = GroupID(self, group_json)
 
         subGroup = Group(groupId)
         if self._name:
             if self._name[-1] == '/':
-                subGroup._name = self._name + name
+                subGroup._name = self._name + title
             else:
-                subGroup._name = self._name + '/' + name
+                subGroup._name = self._name + '/' + title
         return subGroup
 
     def create_dataset(self, name, shape=None, dtype=None, data=None, **kwds):
@@ -228,27 +232,42 @@ class Group(HLObject, MutableMappingHDF5):
                 raise TypeError("Incompatible object (%s) already exists" % grp.__class__.__name__)
             return grp
 
-    def get_link_json(self, name):
+    def get_link_json(self, h5path):
         """ Return parent_uuid and json description of link for given path """
         parent_uuid = self.id.uuid
         tgt_json = None
+        if h5path.find('/') == -1:
+            in_group = True   # link owned by this group
+        else:
+            in_group = False  # may belong to some other group
 
-        if name[0] == '/':
+
+        if h5path[0] == '/':
             #abs path, start with root
             # get root_uuid
-            rsp = self.GET('/')
-            parent_uuid = rsp['root']
+            parent_uuid = self.file.id.id  
             # make a fake tgt_json to represent 'link' to root group
             tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid }
+            if h5path == '/':
+                # asking for the root, just return the root link
+                return parent_uuid, tgt_json
+        else:
+            if in_group and h5path in self._link_db:
+                # link belonging to this group, see if it's in the cache
+                tgt_json = self._link_db[h5path]
+                parent_uuid = self.id.id
+                 
+                return parent_uuid, tgt_json
+                
 
-        path = name.split('/')
+        path = h5path.split('/')
 
         for name in path:
             if not name:
                 continue
 
             if not parent_uuid:
-                raise KeyError("Unable to open object (Component not found)")
+                raise KeyError("Unable to open object (Component not found)") 
 
             req = "/groups/" + parent_uuid + "/links/" + name
 
@@ -261,8 +280,11 @@ class Group(HLObject, MutableMappingHDF5):
                 raise IOError("Unexpected Error")
             tgt_json = rsp_json['link']
 
+            if in_group:
+                # add to db to speed up future requests
+                self._link_db[name] = tgt_json
+
             if tgt_json['class'] == 'H5L_TYPE_HARD':
-                #print "hard link, collection:", link_json['collection']
                 if tgt_json['collection'] == 'groups':
                     parent_uuid = tgt_json['id']
                 else:
@@ -490,6 +512,9 @@ class Group(HLObject, MutableMappingHDF5):
         """ Delete (unlink) an item from this group. """
         req = "/groups/" + self.id.uuid + "/links/" + name
         self.DELETE(req)
+        if name.find('/') == -1 and name in self._link_db:
+            # remove from link cache
+            del self._link_db[name]
         #self.id.unlink(self._e(name))
 
     def __len__(self):
@@ -504,6 +529,13 @@ class Group(HLObject, MutableMappingHDF5):
         req = "/groups/" + self.id.uuid + "/links"
         rsp_json = self.GET(req)
         links = rsp_json['links']
+
+        # reset the link cache
+        self._link_db = {}
+        for link in links:
+            name = link["title"]
+            self._link_db[name] = link
+
         for x in links:
             yield x['title']
         """

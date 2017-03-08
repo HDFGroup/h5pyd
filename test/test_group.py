@@ -22,6 +22,8 @@ import six
 
 class TestGroup(TestCase):
 
+    
+
     def test_create(self):
         # create main test file
         filename = self.getFileName("create_group")
@@ -107,7 +109,6 @@ class TestGroup(TestCase):
         self.assertEqual(len(g1), 1)
         self.assertEqual(len(g1_1), 0)
 
-        #print r.get_link_json("/mysoftlink")
         slink = r['mysoftlink']
         self.assertEqual(slink.id, g1_1.id)
 
@@ -119,7 +120,6 @@ class TestGroup(TestCase):
 
         # create a external hardlink
         r['myexternallink'] = h5py.ExternalLink(link_target_filename, "somepath")
-        #print("link_target_filename:", link_target_filename)
         # test getclass
         g1_class = r.get('g1', getclass=True)
         self.assertEqual(g1_class, h5py.Group)
@@ -128,7 +128,6 @@ class TestGroup(TestCase):
         link_class = r.get('mysoftlink', getclass=True, getlink=True)
         self.assertEqual(link_class, h5py.SoftLink)
         softlink = r.get('mysoftlink', getlink=True)
-        #print("softlink class:", softlink.__class__.__name__)
         self.assertEqual(softlink.path, '/g1/g1.1')
 
         try:
