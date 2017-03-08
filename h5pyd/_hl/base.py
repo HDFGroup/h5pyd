@@ -618,6 +618,7 @@ class HLObject(CommonStateObject):
     def __bool__(self):
         with phil:
             return bool(self.id)
+    __nonzero__ = __bool__  # Python 2.7 compat
 
     def getACL(self, username):
         req = self._req_prefix + '/acls/' + username

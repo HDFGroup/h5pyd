@@ -143,6 +143,8 @@ class ObjectID:
     def __bool__(self):
         return bool(self._uuid)
 
+    __nonzero__ = __bool__  # Python 2.7 compat
+
 
 class TypeID(ObjectID):
 
