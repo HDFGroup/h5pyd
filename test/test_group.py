@@ -22,7 +22,6 @@ import six
 
 class TestGroup(TestCase):
 
-    
 
     def test_create(self):
         # create main test file
@@ -130,19 +129,23 @@ class TestGroup(TestCase):
         softlink = r.get('mysoftlink', getlink=True)
         self.assertEqual(softlink.path, '/g1/g1.1')
 
-        try:
-            linkee_class = r.get('myexternallink', getclass=True)
-            if not config.get('use_h5py'):
-                self.assertTrue(True)  # TODO - implement for h5pyd
-        except OSError:
-            if config.get('use_h5py'):
-                self.assertTrue(False)  # Should work for h5py
-
-
+        
+        linkee_class = r.get('myexternallink', getclass=True)
+        if not config.get('use_h5py'):
+            self.assertTrue(True)  # TODO - implement for h5pyd
+         
         link_class = r.get('myexternallink', getclass=True, getlink=True)
         self.assertEqual(link_class, h5py.ExternalLink)
         external_link = r.get('myexternallink', getlink=True)
         self.assertEqual(external_link.path, 'somepath')
+        external_link_filename = external_link.filename
+        if config.get('use_h5py'):
+            # h5py external link should be a posix path
+            self.assertTrue(external_link_filename.find('/') > 0)
+        else:
+            # HDF Server should be a DNS style name
+            self.assertEqual(external_link_filename.find('/'), -1)
+
 
         del r['mysoftlink']
         self.assertEqual(len(r), 5)
