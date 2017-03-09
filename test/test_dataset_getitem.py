@@ -422,13 +422,32 @@ class Test2DZeroFloat(TestCase):
         filename = self.getFileName("dataset_test2dzerofloat")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
+        print("root:", self.f.id.id)
         self.data = np.ones((0,3), dtype='f')
         self.dset = self.f.create_dataset('x', data=self.data)
 
     @ut.expectedFailure
     def test_indexlist(self):
         """ see issue #473 """
+        print(self.data)
         self.assertNumpyBehavior(self.dset, self.data, np.s_[:,[0,1,2]])
+
+class Test3DFloat(TestCase):
+
+    def setUp(self):
+        TestCase.setUp(self)
+        filename = self.getFileName("dataset_test3dfloat")
+        print("filename:", filename)
+        self.f = h5py.File(filename, 'w')
+        print("root:", self.f.id.id)
+        self.data = np.ones((4,6,8), dtype='f')
+        self.dset = self.f.create_dataset('x', data=self.data)
+
+    def test_index_simple(self):
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[1,2:4,3:6])
+
+     
+ 
 
 
 

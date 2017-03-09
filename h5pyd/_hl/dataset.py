@@ -591,6 +591,7 @@ class Dataset(HLObject):
             # get binary if available
             #rsp = self.GET(req, format="json")
             rsp = self.GET(req, format="binary")
+            print("make req:", req)
             if type(rsp) is bytes:
                 # got binary response
                 arr1d = numpy.fromstring(rsp, dtype=mtype)
@@ -633,7 +634,6 @@ class Dataset(HLObject):
             arr = np.asarray(data, dtype=mtype, order='C')
             #print(rsp)
 
-
         else:
             raise ValueError("selection type not supported")
 
@@ -648,6 +648,8 @@ class Dataset(HLObject):
             arr = numpy.asscalar(arr)
         if single_element:
             arr = arr[0]
+        if len(arr.shape) > 1:
+            arr = np.squeeze(arr)  # reduce dimension if there are single dimension entries
         return arr
 
     def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None):
