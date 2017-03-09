@@ -28,7 +28,6 @@ class TestGroup(TestCase):
         filename = self.getFileName("create_group")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
-        self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
         r = f['/'] 
         self.assertEqual(len(r), 0)
@@ -131,9 +130,7 @@ class TestGroup(TestCase):
 
         
         linkee_class = r.get('myexternallink', getclass=True)
-        if not config.get('use_h5py'):
-            self.assertTrue(True)  # TODO - implement for h5pyd
-         
+            
         link_class = r.get('myexternallink', getclass=True, getlink=True)
         self.assertEqual(link_class, h5py.ExternalLink)
         external_link = r.get('myexternallink', getlink=True)
@@ -146,6 +143,18 @@ class TestGroup(TestCase):
             # HDF Server should be a DNS style name
             self.assertEqual(external_link_filename.find('/'), -1)
 
+        links = r.items()
+        got_external_link = False
+        for link in links:
+            title = link[0]
+            obj = link[1]
+            if title == 'myexternallink':
+                self.assertTrue(obj is not None)            
+                self.assertEqual(len(obj), 0)
+                self.assertTrue(obj.file.filename != filename)
+                got_external_link = True
+
+        self.assertTrue(got_external_link)
 
         del r['mysoftlink']
         self.assertEqual(len(r), 5)
@@ -157,10 +166,9 @@ class TestGroup(TestCase):
         if h5py.__name__ == "h5pyd":
             self.assertTrue(isinstance(g1.modified, datetime))
             #self.assertEqual(g1.modified.tzname(), six.u('UTC'))
-
+         
         f.close()
-        if h5py.__name__ == "h5pyd":
-            self.assertEqual(f.id.id, 0)
+        
 
 if __name__ == '__main__':
     ut.main()
