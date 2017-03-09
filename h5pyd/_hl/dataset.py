@@ -591,7 +591,6 @@ class Dataset(HLObject):
             # get binary if available
             #rsp = self.GET(req, format="json")
             rsp = self.GET(req, format="binary")
-            print("make req:", req)
             if type(rsp) is bytes:
                 # got binary response
                 arr1d = numpy.fromstring(rsp, dtype=mtype)
