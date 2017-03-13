@@ -94,7 +94,6 @@ class HttpUtil:
         
         self.log.info("GET: {} [{}]".format(req, headers["host"]))
 
-        #print("GET: {} [{}]".format(req, headers["host"]))
         try:
             rsp = requests.get(req, headers=headers, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
@@ -117,7 +116,6 @@ class HttpUtil:
          
         if not headers:
             headers = self.getHeaders() 
-        #print("PUT", req, "body:", body, "headers:", headers["host"])
 
         self.log.info("PUT: " + req)
         if format=="binary":

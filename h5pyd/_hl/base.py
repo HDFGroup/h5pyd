@@ -349,33 +349,18 @@ class _RegionProxy(object):
 
     def __getitem__(self, args):
         pass
-        """
-        if not isinstance(self.id, h5d.DatasetID):
-            raise TypeError("Region references can only be made to datasets")
-        from . import selections
-        selection = selections.select(self.id.shape, args, dsid=self.id)
-        return h5r.create(self.id, b'.', h5r.DATASET_REGION, selection._id)
-        """
+        # bases classes will override
+         
 
     def shape(self, ref):
         pass
-        """ Get the shape of the target dataspace referred to by *ref*. """
-        """
-        with phil:
-            sid = h5r.get_region(ref, self.id)
-            return sid.shape
-        """
+        
 
     def selection(self, ref):
         """ Get the shape of the target dataspace selection referred to by *ref*
         """
         pass
-        """
-        with phil:
-            from . import selections
-            sid = h5r.get_region(ref, self.id)
-            return selections.guess_shape(sid)
-        """
+         
 
 class ACL(object):
 
@@ -562,7 +547,6 @@ class HLObject(CommonStateObject):
         self.log.info("PST: {} [{}]".format(req, self.id.domain))
          
         rsp = self._http_util.POST(req, body=body)
-         
         if rsp.status_code == 409:
             raise ValueError("name already exists")
         if rsp.status_code not in (200, 201):

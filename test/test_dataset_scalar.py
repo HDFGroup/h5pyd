@@ -37,9 +37,14 @@ class TestScalarDataset(TestCase):
         self.assertEqual(val, 42)
         self.assertEqual(dset.shape, ())
 
-        dset[()] = 24
+        dset[...] = 24
         val = dset[()]
         self.assertEqual(val, 24)
+
+        # try setting value using tuple
+        dset[()] = 99
+        val = dset[()]
+        self.assertEqual(val, 99)
 
         self.assertEqual(dset.file.filename, filename)
 

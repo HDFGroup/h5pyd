@@ -35,19 +35,16 @@ H5S_SELECT_HYPERSLABS = 7
 H5S_SELECT_NOTB = 8
 
 
-def select(shape, args, dsid):
+def select(obj, args):
     """ High-level routine to generate a selection from arbitrary arguments
     to __getitem__.  The arguments should be the following:
 
-    shape
-        Shape of the "source" dataspace.
+    obj
+        Datatset object
 
     args
         Either a single argument or a tuple of arguments.  See below for
         supported classes of argument.
-
-    dsid
-        A h5py.h5d.DatasetID instance representing the source dataset.
 
     Argument classes:
 
@@ -66,8 +63,18 @@ def select(shape, args, dsid):
     Indices, slices, ellipses, lists or boolean index arrays
         Returns a FancySelection instance.
     """
+     
     if not isinstance(args, tuple):
         args = (args,)
+    
+    # TBD - handle NULL Space object
+
+    if obj.shape == ():
+        # scalar object
+        sel = ScalarSelection(obj.shape, args)
+        return sel
+
+    
     #print("select, len(args):", len(args))
     # "Special" indexing objects
     if len(args) == 1:
@@ -75,12 +82,12 @@ def select(shape, args, dsid):
         arg = args[0]
         
         if isinstance(arg, Selection):
-            if arg.shape != shape:
+            if arg.shape != obj.shape:
                 raise TypeError("Mismatched selection shape")
             return arg
 
         elif isinstance(arg, np.ndarray) or isinstance(arg, list):
-            sel = PointSelection(shape)
+            sel = PointSelection(obj.shape)
             sel[arg]
             return sel
         """
@@ -98,39 +105,16 @@ def select(shape, args, dsid):
             try:
                 int(a)
             except Exception:
-                #print("do fancyselection:", shape)
-                sel = FancySelection(shape)
+                sel = FancySelection(obj.shape)
                 sel[args]
                 return sel
-
-    sel = SimpleSelection(shape)
+   
+    sel = SimpleSelection(obj.shape)
     sel[args]
     return sel
 
-class _RegionProxy(object):
 
-    """
-        Thin proxy object which takes __getitem__-style index arguments and
-        produces RegionReference objects.  Example:
-
-        >>> dset = myfile['dataset']
-        >>> myref = dset.regionref[0:100,20:30]
-        >>> data = dset[myref]
-
-    """
-
-    def __init__(self, dsid):
-        """ Supply a h5py.h5d.DatasetID instance """
-        #print("RegionProxy, dsid:", dsid)
-        self.id = dsid
-
-    def __getitem__(self, args):
-        """ Takes arbitrary selection terms and produces a RegionReference
-        object.  Selection must be compatible with the dataset.
-        """
-        # TBD - regionreference
-        #selection = select(self.id.shape, args, self.id)   
-        # return h5r.create(self.id, '.', h5r.DATASET_REGION, selection.id)
+ 
 
 class Selection(object):
 
@@ -159,7 +143,7 @@ class Selection(object):
         The base class represents "unshaped" selections (1-D).
     """
 
-    def __init__(self, shape):
+    def __init__(self, shape, *args, **kwds):
         """ Create a selection.  Shape may be None if spaceid is given. """
 
         shape = tuple(shape)
@@ -190,7 +174,6 @@ class Selection(object):
 
     def getSelectNpoints(self):
         npoints = None
-        #print("getSelectNPoints, sel_type:", self._select_type)
         if self._select_type == H5S_SELECT_NONE:
             npoints = 0
         elif self._select_type == H5S_SELECT_ALL:
@@ -232,7 +215,6 @@ class PointSelection(Selection):
 
     def getSelectNpoints(self):
         npoints = None
-        #print("PointSelection getSelectNPoints, sel_type:", self._select_type)
         if self._select_type == H5S_SELECT_NONE:
             npoints = 0
         elif self._select_type == H5S_SELECT_ALL:
@@ -251,7 +233,6 @@ class PointSelection(Selection):
         """ Internal method which actually performs the selection """
         if isinstance(points, np.ndarray) or True:
             points = np.asarray(points, order='C', dtype='u8')
-            #print("points:", points)
             if len(points.shape) == 1:
                 #points.shape = (1,points.shape[0])
                 pass
@@ -263,9 +244,7 @@ class PointSelection(Selection):
 
         if op == H5S_SELECT_SET:
             self._points = points
-            #print("op set", self._points)
         elif op == H5S_SELECT_APPEND:
-            #print("op append")
             self._points.extent(points)
         elif op == H5S_SELECT_PREPEND:
             tmp = self._points
@@ -273,7 +252,6 @@ class PointSelection(Selection):
             self._points.extend(tmp)
         else:
             raise ValueError("Unsupported operation")
-        #print("per_selection:", self._points)
 
     #def _perform_list_selection(points, H5S_SELECT_SET):
 
@@ -285,12 +263,11 @@ class PointSelection(Selection):
         else:
             if not (isinstance(arg, np.ndarray) and arg.dtype.kind == 'b'):
                 raise TypeError("PointSelection __getitem__ only works with bool arrays")
-            if not arg.shape == self.shape:
+            if not arg.shape == self._shape:
                 raise TypeError("Boolean indexing array has incompatible shape")
 
             points = np.transpose(arg.nonzero())
         self.set(points)
-        #print("getitem, points:", points)
         return self
 
     def append(self, points):
@@ -306,7 +283,6 @@ class PointSelection(Selection):
         """
         if isinstance(points, list):
             # selection with list of points
-            print("set with list of points")
             self._perform_list_selection(points, H5S_SELECT_SET)
             
         else:
@@ -340,9 +316,9 @@ class SimpleSelection(Selection):
 
     def __init__(self, shape, *args, **kwds):
         Selection.__init__(self, shape, *args, **kwds)
-        rank = len(self.shape)
-        self._sel = ((0,)*rank, self.shape, (1,)*rank, (False,)*rank)
-        self._mshape = self.shape
+        rank = len(self._shape)
+        self._sel = ((0,)*rank, self._shape, (1,)*rank, (False,)*rank)
+        self._mshape = self._shape
         self._select_type = H5S_SELECT_ALL
 
     def __getitem__(self, args):
@@ -352,14 +328,13 @@ class SimpleSelection(Selection):
 
         #print "__getitem__", args
 
-        if self.shape == ():
+        if self._shape == ():
             if len(args) > 0 and args[0] not in (Ellipsis, ()):
                 raise TypeError("Invalid index for scalar dataset (only ..., () allowed)")
             self._select_type = H5S_SELECT_ALL
             return self
 
-        start, count, step, scalar = _handle_simple(self.shape,args)
-        #print("simpleselection__getitem__", start, count, step, scalar)
+        start, count, step, scalar = _handle_simple(self._shape,args)
         self._sel = (start, count, step, scalar)
 
         #self._id.select_hyperslab(start, count, step)
@@ -394,7 +369,7 @@ class SimpleSelection(Selection):
 
     def getQueryParam(self):
         param = ''
-        rank = len(self.shape)
+        rank = len(self._shape)
         if rank > 0:
             param += "select=["
             for i in range(rank):
@@ -414,9 +389,9 @@ class SimpleSelection(Selection):
         """ Return an iterator over target dataspaces for broadcasting.
 
         Follows the standard NumPy broadcasting rules against the current
-        selection shape (self.mshape).
+        selection shape (self._mshape).
         """
-        if self.shape == ():
+        if self._shape == ():
             if np.product(target_shape) != 1:
                 raise TypeError("Can't broadcast %s to scalar" % target_shape)
             self._id.select_all()
@@ -478,7 +453,7 @@ class FancySelection(Selection):
 
     def __init__(self, shape, *args, **kwds):
         Selection.__init__(self, shape, *args, **kwds)
-        self._mshape = self.shape
+        self._mshape = self._shape
         self._hyperslabs = []
 
     def __getitem__(self, args):
@@ -487,7 +462,7 @@ class FancySelection(Selection):
         if not isinstance(args, tuple):
             args = (args,)
 
-        args = _expand_ellipsis(args, len(self.shape))
+        args = _expand_ellipsis(args, len(self._shape))
 
         # First build up a dictionary of (position:sequence) pairs
 
@@ -530,8 +505,9 @@ class FancySelection(Selection):
 
         #self._id.select_none()
         self._hyperslabs = []
+        count = ()
         for idx, vector in enumerate(argvector):
-            start, count, step, scalar = _handle_simple(self.shape, vector)
+            start, count, step, scalar = _handle_simple(self._shape, vector)
             #print("select_hyperslab:", start, count, step)
             #self._id.select_hyperslab(start, count, step, H5S_SELECT_OR)
             self._hyperslabs.append( {"start": start, "count": count, "step": step} )
@@ -549,7 +525,7 @@ class FancySelection(Selection):
         self._mshape = tuple(x for x in mshape if x != 0)
 
     def broadcast(self, target_shape):
-        if not target_shape == self.mshape:
+        if not target_shape == self._mshape:
             raise TypeError("Broadcasting is not supported for complex selections")
         yield self._id
 
@@ -628,7 +604,6 @@ def _translate_slice(exp, length):
         (start, count, step)
         for use with the hyperslab selection routines
     """
-    #print "_translate_slice:", exp, "length:", length
     start, stop, step = exp.indices(length)
         # Now if step > 0, then start and stop are in [0, length];
         # if step < 0, they are in [-1, length - 1] (Python 2.6b2 and later;
@@ -732,6 +707,38 @@ def guess_shape(sid):
         return (N,)
 
     return shape
+
+
+
+ 
+class ScalarSelection(Selection):
+
+    """
+        Implements slicing for scalar datasets.
+    """
+
+    @property
+    def mshape(self):
+        return self._mshape
+
+    
+    def __init__(self, shape,  *args, **kwds):
+        Selection.__init__(self, shape, *args, **kwds) 
+        arg = None
+        if len(args) > 0:
+            arg = args[0]
+        if arg == ():
+            self._mshape = None
+            self._select_type = H5S_SELECT_ALL
+        elif arg == (Ellipsis,):
+            self._mshape = ()
+            self._select_type = H5S_SELECT_ALL
+        else:
+            raise ValueError("Illegal slicing argument for scalar dataspace")
+
+                
+
+ 
 
 
 
