@@ -297,7 +297,7 @@ class Test1DZeroFloat(TestCase):
         filename = self.getFileName("dataset_test1dzerofloat")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        self.data = np.ones((0,), dtype='f')
+        self.data = np.ones((0,), maxshape=(None,), dtype='f')
         # TBD data in initializer not working
         #self.dset = self.f.create_dataset('x', data=self.data)
         self.dset = self.f.create_dataset('x', (0,), dtype='f')
@@ -461,7 +461,7 @@ class Test2DZeroFloat(TestCase):
         filename = self.getFileName("dataset_test2dzerofloat")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        self.data = np.ones((0,3), dtype='f')
+        self.data = np.ones((0,3), maxshape=(None,3), dtype='f')
         # TBD data in initializer not working
         self.dset = self.f.create_dataset('x', (0,3), dtype='f')
         self.dset[...] = self.data
