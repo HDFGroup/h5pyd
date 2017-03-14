@@ -937,18 +937,7 @@ class Dataset(HLObject):
         params = {}
         body = {}
 
-        if selection.select_type != sel.H5S_SELECT_ALL:
-            # set the start/stopstep params
-            if selection.start and not self.id.uuid.startswith("d-"):
-                #h5serv - set selection in body
-                body['start'] = list(selection.start)
-                stop = list(selection.start)
-                for i in range(len(stop)):
-                    stop[i] += selection.count[i]
-                body['stop'] = stop
-                if selection.step:
-                    body['step'] = list(selection.step)
-
+        
         format = "json"
          
         if use_base64:
@@ -956,9 +945,7 @@ class Dataset(HLObject):
             if self.id.uuid.startswith("d-"):
                 # server is HSDS, use binary data use param values for selection
                 format = "binary"
-                body = val.tobytes()
-                if selection.start:
-                    setSliceQueryParam(params, self.shape, selection)
+                body = val.tobytes()     
             else:
                 # h5serv, base64 encode, body json for selection
                 # TBD - replace with above once h5serv supports binary req
@@ -971,6 +958,20 @@ class Dataset(HLObject):
                 val = val.tolist()
             val = self._decode(val)
             body['value'] = val
+
+        if selection.select_type != sel.H5S_SELECT_ALL:
+            if format == "binary":
+                # set selection using query parameters
+                setSliceQueryParam(params, self.shape, selection)
+            else:
+                # set selection as body keys
+                body['start'] = list(selection.start)
+                stop = list(selection.start)
+                for i in range(len(stop)):
+                    stop[i] += selection.count[i]
+                body['stop'] = stop
+                if selection.step:
+                    body['step'] = list(selection.step)
 
         self.PUT(req, body=body, format=format, params=params)
         """
