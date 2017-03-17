@@ -1,9 +1,11 @@
-import h5pyd as h5py
-import numpy as np
+
 import sys
 import os.path as op
 import os
+import logging
 from datetime import datetime
+import h5pyd as h5py
+import numpy as np
 from config import Config
 
 #
@@ -218,7 +220,7 @@ def getGroupFromDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: python hsls.py [-r] [-a] [--showacls] [--showattrs] [-e endpoint] [-u username] [-p password] domains")
+    print("usage: python hsls.py [-r] [-a] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains")
     print("example: python hsls.py -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5")
     sys.exit()
 
@@ -229,6 +231,9 @@ def printUsage():
 domains = []
 argn = 1
 depth = 2
+loglevel = logging.INFO
+logfname=None
+
 while argn < len(sys.argv):
     arg = sys.argv[argn]
     val = None
@@ -240,6 +245,21 @@ while argn < len(sys.argv):
     elif arg in ("-v", "--verbose"):
         verbose = True
         argn += 1
+    elif arg == "--loglevel":
+        if val == "debug":
+            loglevel = logging.DEBUG
+        elif val == "info":
+            loglevel = logging.INFO
+        elif val == "warning":
+            loglevel = logging.WARNING
+        elif val == "error":
+            loglevel = logging.ERROR
+        else:
+            printUsage()  
+        argn += 2
+    elif arg == '--logfile':
+        logfname = val
+        argn += 2
     elif arg in ("-showacls", "--showacls"):
         showacls = True
         argn += 1
@@ -262,6 +282,8 @@ while argn < len(sys.argv):
     else:
          domains.append(arg)
          argn += 1
+# setup logging
+logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
  
 if len(domains) == 0:
     # add a generic url

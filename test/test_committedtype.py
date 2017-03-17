@@ -17,7 +17,6 @@ if config.get("use_h5py"):
 else:
     import h5pyd as h5py
 
-
 from common import ut, TestCase
 
 
@@ -29,7 +28,10 @@ class TestCommittedType(TestCase):
         # create a compound numpy type
         dt = np.dtype([('real', np.float), ('img', np.float)])
         f['complex_type'] = dt
-
+        ctype = f['complex_type']
+        self.assertEqual(ctype.dtype.name, dt.name)
+        self.assertEqual(len(ctype.dtype), len(dt))
+        ctype.attrs["attr1"] = "this is a named datatype"
         dset = f.create_dataset('complex_dset', (10,), dtype=f['complex_type'])
         f.close()
 
