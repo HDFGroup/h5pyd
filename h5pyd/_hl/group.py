@@ -508,7 +508,6 @@ class Group(HLObject, MutableMappingHDF5):
             body['lastModified'] = rsp['lastModified']
 
             type_id = TypeID(self, body)
-            print("put datatype:", name)
             req = "/groups/" + self.id.uuid + "/links/" + name
             body = {'id': type_id.uuid }
             self.PUT(req, body=body)
