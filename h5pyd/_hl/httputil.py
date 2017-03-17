@@ -101,7 +101,6 @@ class HttpUtil:
             self.log.error("connection error: {}".format(ce))
             raise IOError("Connection Error")
          
-        
         return rsp
 
     def PUT(self, req, body=None, format="json", params=None, headers=None):
@@ -116,7 +115,6 @@ class HttpUtil:
          
         if not headers:
             headers = self.getHeaders() 
-
         self.log.info("PUT: " + req)
         if format=="binary":
             headers['Content-Type'] = "application/octet-stream"

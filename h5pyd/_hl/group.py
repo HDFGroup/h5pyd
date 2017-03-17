@@ -462,8 +462,20 @@ class Group(HLObject, MutableMappingHDF5):
         """
 
         #name, lcpl = self._e(name, lcpl=True)
-
-        if isinstance(obj, HLObject):
+        if name.find('/') != -1:
+            parent_path = op.dirname(name)
+            basename = op.basename(name)
+            if not basename:
+                raise KeyError("Group path can not end with '/'")
+            parent_uuid, link_json = self.get_link_json(parent_path)
+            if parent_uuid is None:
+                raise KeyError("group path: {} not found".format(parent_path))
+            req = "/groups/" + parent_uuid
+            group_json = self.GET(req)
+            tgt = Group(GroupID(self, group_json)) 
+            tgt[basename] = obj   
+             
+        elif isinstance(obj, HLObject):
             body = {'id': obj.id.uuid }
             req = "/groups/" + self.id.uuid + "/links/" + name
             self.PUT(req, body=body)
@@ -496,6 +508,7 @@ class Group(HLObject, MutableMappingHDF5):
             body['lastModified'] = rsp['lastModified']
 
             type_id = TypeID(self, body)
+            print("put datatype:", name)
             req = "/groups/" + self.id.uuid + "/links/" + name
             body = {'id': type_id.uuid }
             self.PUT(req, body=body)

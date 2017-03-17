@@ -162,10 +162,16 @@ class TestGroup(TestCase):
         del r['myexternallink']
         self.assertEqual(len(r), 4)
 
+        # create group using nested path
+        g2 = r['g2']
+        r['g1/g1.3'] = g2
+
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":
             self.assertTrue(isinstance(g1.modified, datetime))
             #self.assertEqual(g1.modified.tzname(), six.u('UTC'))
+
+
          
         f.close()
         
