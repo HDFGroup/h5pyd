@@ -87,6 +87,9 @@ class TestAttribute(TestCase):
         else:
             self.assertEqual(arr.dtype, np.dtype("S8"))
 
+        # byte values
+        g1.attrs['e1'] = b"Hello"
+
 
 
          

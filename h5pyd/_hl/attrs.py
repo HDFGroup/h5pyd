@@ -20,15 +20,15 @@
 from __future__ import absolute_import
 
 import numpy
-import sys
 import six
 
 from . import base
 from .base import phil, with_phil
-from .dataset import readtime_dtype
 from .datatype import Datatype
 from .objectid import GroupID, DatasetID, TypeID
 from .h5type import getTypeItem, createDataType, special_dtype
+
+
 
 
 class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
@@ -67,6 +67,46 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             # "unknown id"
             self._req_prefix = "<unknown>"
 
+    
+    def _bytesArrayToList(self, data):
+        """
+        Convert list that may contain bytes type elements to list of string elements  
+        """
+        if six.PY2:
+            text_types = (bytes, str, unicode)
+        else:
+            text_types = (bytes, str)
+        if isinstance(data, text_types):
+            is_list = False
+        elif isinstance(data, (numpy.ndarray, numpy.generic)):
+            if len(data.shape) == 0:
+                is_list = False
+                data = data.tolist()  # tolist will return a scalar in this case
+                if type(data) in (list, tuple):
+                    is_list = True
+                else:
+                    is_list = False
+            else:
+                is_list = True        
+        elif type(data) in (list, tuple):
+            is_list = True
+        else:
+            is_list = False
+                
+        if is_list:
+            out = []
+            for item in data:
+                out.append(self._bytesArrayToList(item)) # recursive call  
+        elif type(data) is bytes:
+            if six.PY3:
+                out = data.decode("utf-8")
+            else:
+                out = data
+        else:
+            out = data
+                   
+        return out
+
 
     @with_phil
     def __getitem__(self, name):
@@ -76,7 +116,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         req = self._req_prefix + name
         try:
             attr_json = self._parent.GET(req)
-        except IOError as e:
+        except IOError:
             raise KeyError
         
         shape_json = attr_json['shape']
@@ -105,7 +145,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         # attr.shape == (5,) and attr.dtype == '(3,)f'. Then:
         if dtype.subdtype is not None:
             subdtype, subshape = dtype.subdtype
-            shape = attr.shape + subshape   # (5, 3)
+            shape = shape + subshape   # (5, 3)
             dtype = subdtype                # 'f'
 
         #arr = numpy.ndarray(shape, dtype=dtype, order='C')
@@ -179,7 +219,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             else:
                 dtype = numpy.dtype(dtype) # In case a string, e.g. 'i8' is passed
 
-            original_dtype = dtype  # We'll need this for top-level array types
+            #original_dtype = dtype  # We'll need this for top-level array types
 
             # Where a top-level array type is requested, we have to do some
             # fiddling around to present the data as a smaller array of
@@ -212,14 +252,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             # Make HDF5 datatype and dataspace for the H5A calls
             if use_htype is None:
                 type_json = getTypeItem(dtype)
-                #htype = h5t.py_create(original_dtype, logical=True)
-                #htype2 = h5t.py_create(original_dtype)  # Must be bit-for-bit representation rather than logical
-            else:
-                htype = use_htype
-                htype2 = None
-
-            #space = h5s.create_simple(shape)
-
+               
+ 
             # This mess exists because you can't overwrite attributes in HDF5.
             # So we write to a temporary attribute first, and then rename.
 
@@ -229,7 +263,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             body = {}
             body['type'] = type_json
             body['shape'] = shape
-            body['value'] = data.tolist()
+            body['value'] = self._bytesArrayToList(data) 
 
             try:
                 self._parent.PUT(req, body=body)
@@ -273,6 +307,9 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         If the attribute doesn't exist, it will be automatically created.
         """
+        pass
+        # TBD
+        """
         with phil:
             if not name in self:
                 self[name] = value
@@ -289,6 +326,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                    (numpy.product(value.shape) == 1 and numpy.product(attr.shape) == 1):
                     raise TypeError("Shape of data is incompatible with existing attribute")
                 attr.write(value)
+        """
 
     @with_phil
     def __len__(self):
