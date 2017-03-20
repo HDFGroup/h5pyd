@@ -283,7 +283,16 @@ while argn < len(sys.argv):
          domains.append(arg)
          argn += 1
 # setup logging
+print("loglevel:", loglevel)
 logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
+print("debug log...")
+logging.debug("this is debug")
+print("info log...")
+logging.info("this is info")
+print("warn log...")
+logging.info("this is warn...")
+print("error log...")
+logging.info("this is error")
  
 if len(domains) == 0:
     # add a generic url

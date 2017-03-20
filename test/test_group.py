@@ -23,6 +23,26 @@ import six
 class TestGroup(TestCase):
 
 
+    def test_simple(self):
+        # create main test file
+        filename = self.getFileName("create_group")
+        print("filename:", filename)
+        f = h5py.File(filename, 'w')
+        self.assertTrue('/' in f)
+        r = f['/'] 
+        self.assertEqual(len(r), 0)
+        self.assertTrue(isinstance(r, h5py.Group))
+        self.assertTrue(r.name, '/')
+        self.assertEqual(len(r.attrs.keys()), 0)
+        self.assertFalse('g1' in r)
+        print("domain:", r.id.http_conn.domain)
+        print("root_uuid:", r.id.http_conn.root_uuid)
+        g1 = r.create_group('g1')
+        self.assertEqual(len(r), 1)
+        file = g1.file
+        print("domain:", file.filename)
+        f.close()
+
     def test_create(self):
         # create main test file
         filename = self.getFileName("create_group")
@@ -165,13 +185,16 @@ class TestGroup(TestCase):
         # create group using nested path
         g2 = r['g2']
         r['g1/g1.3'] = g2
+        self.assertEqual(len(r), 5)
 
+        # try creating a link with a space in the name
+        r["a space"] = g2
+        self.assertEqual(len(r), 6)
+         
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":
             self.assertTrue(isinstance(g1.modified, datetime))
             #self.assertEqual(g1.modified.tzname(), six.u('UTC'))
-
-
          
         f.close()
         

@@ -26,8 +26,6 @@ from chunkiter import ChunkIterator
 __version__ = '0.0.1'
 
 UTILNAME = 'hsload'
-PUTBLK = 2**20 * 4  # 4 MB
-
  
 #get_sizes
 
@@ -39,15 +37,13 @@ def copy_attribute(obj, name, attrobj):
       
 #----------------------------------------------------------------------------------
 def create_dataset(fd, dobj):
-    global PUTBLK 
+    print("createdataet:", dobj.name, type(dobj.name))
     logging.info("creating dataset %s" % (dobj.name))
     # We defer loading the actual data at this point, just create the object and try 
     # to make it as close to the original as possible for the basic copy/load.
     # This routine returns the dataset object (which will be loaded later, most likely)
     try:
-        # If this dataset isn't already chunked we force a rechunk (if possible), for now.
-        # TODO: add a better guess on these chunk sizes here using the PUTBLK value
-         
+           
         logging.info("setting %s chunk size to %s, data shape %s" % (dobj.name, str(dobj.chunks), str(dobj.shape)))
       
         fillvalue = None
@@ -64,6 +60,7 @@ def create_dataset(fd, dobj):
                                scaleoffset=dobj.scaleoffset)
 
         for da in dobj.attrs:
+            print("createdataet/attribute:", da, type(da), dobj.attrs[da])
             copy_attribute(dset, da, dobj.attrs[da])
 
         it = ChunkIterator(dset)

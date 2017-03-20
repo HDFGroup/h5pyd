@@ -39,6 +39,7 @@ class TestFolders(TestCase):
         filepath = self.getPathFromDomain(test_domain)
 
         folder_name = op.dirname(filepath)  + '/' 
+        print("folder_name:", folder_name)
          
         dir = h5py.Folder(folder_name)  # get folder object
         self.assertEqual(dir.domain, folder_name)
@@ -51,7 +52,8 @@ class TestFolders(TestCase):
 
         # get ACL for dir
         dir_acl = dir.getACL(self.test_user1["name"])
-        self.assertEqual(len(dir_acl.keys()), 6)
+        print("dir_acls", list(dir_acl.keys()))
+        self.assertEqual(len(dir_acl.keys()), 7)
         for k in dir_acl.keys():
             self.assertTrue(dir_acl[k])
 

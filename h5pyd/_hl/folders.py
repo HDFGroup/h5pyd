@@ -17,7 +17,7 @@ import six
 #from requests import ConnectionError
 import json
 import logging
-from .httputil import HttpUtil
+from .httpconn import HttpConn
  
  
 class Folder():
@@ -74,19 +74,19 @@ class Folder():
             raise ValueError("Folder name must end with '/'")
 
         self._domain = domain_name[:-1]
-        self._http = HttpUtil(self._domain, endpoint=endpoint, username=username, password=password)
+        self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, password=password, mode='r')
 
         domain_json = None
 
         # try to do a GET from the domain
         req = "/"
                         
-        rsp = self._http.GET(req)
+        rsp = self._http_conn.GET(req)
 
         if rsp.status_code != 200:
             # file must exist
             if rsp.status_code < 500:
-                self.log.warn("status_code: {}".format(rsp.status_code))
+                self.log.warning("status_code: {}".format(rsp.status_code))
             else:
                 self.log.error("status_code: {}".format(rsp.status_code))
             raise IOError(rsp.status_code, rsp.reason)
@@ -102,7 +102,7 @@ class Folder():
 
     def getACL(self, username):
         req = '/acls/' + username
-        rsp = self._http.GET(req)
+        rsp = self._http_conn.GET(req)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
         rsp_json = json.loads(rsp.text)
@@ -111,7 +111,7 @@ class Folder():
 
     def getACLs(self):
         req = '/acls'
-        rsp = self._http.GET(req)
+        rsp = self._http_conn.GET(req)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
         rsp_json = json.loads(rsp.text)
@@ -126,14 +126,14 @@ class Folder():
             perm[k] = acl[k]
          
         req = '/acls/' + acl['userName']
-        rsp = self._http.PUT(req, body=perm)
+        rsp = self._http_conn.PUT(req, body=perm)
         if rsp.status_code != 201:
             raise IOError(rsp.status_code, rsp.reason)
 
     # TBD: Replace with implementation that can handle large collections
     def _getSubdomains(self):
         req = '/domains'
-        rsp = self._http.GET(req)
+        rsp = self._http_conn.GET(req)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
         rsp_json = json.loads(rsp.text)
@@ -159,9 +159,9 @@ class Folder():
     def __delitem__(self, name):
         """ Delete domain. """
         domain = self._domain + '/' + name
-        headers = self._http.getHeaders(domain=domain)
+        headers = self._http_conn.getHeaders(domain=domain)
         req = '/'
-        self._http.DELETE(req, headers=headers)
+        self._http_conn.DELETE(req, headers=headers)
         #self.id.unlink(self._e(name))
 
     def __len__(self):

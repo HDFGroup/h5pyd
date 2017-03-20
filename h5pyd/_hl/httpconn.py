@@ -20,14 +20,16 @@ import json
 import logging
 
  
-class HttpUtil:
+class HttpConn:
     """
     Some utility methods based on equivalents in base class.
     TBD: Should refactor these to a common base class
     """
     def __init__(self, domain_name, endpoint=None, 
-        username=None, password=None, **kwds):
+        username=None, password=None, mode='a', **kwds):
         self._domain = domain_name
+        self._mode = mode
+        self._domain_json = None
         self.log = logging.getLogger("h5pyd")
         if endpoint is None:
             if "H5SERV_ENDPOINT" in os.environ:
@@ -45,6 +47,7 @@ class HttpUtil:
             self._password = os.environ["H5SERV_PASSWORD"]
         else:
             self._password = password
+
 
     def getHeaders(self, domain=None, username=None, password=None, headers=None):
         if headers is None:
@@ -142,7 +145,6 @@ class HttpUtil:
             headers = self.getHeaders() 
 
         self.log.info("PST: " + req)
-        #print("POST", req, "body:", body, "headers:", headers["host"])
 
         try: 
             rsp = requests.post(req, data=data, headers=headers, verify=self.verifyCert())
@@ -165,7 +167,71 @@ class HttpUtil:
             headers = self.getHeaders() 
 
         self.log.info("DEL: " + req)
-        #print("DELETE:", req, headers["host"])
         rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
         return rsp
 
+    @property
+    def domain(self):
+        return self._domain
+
+    @property
+    def username(self):
+        return self._username
+
+    @property
+    def endpoint(self):
+        return self._endpoint
+
+    @property
+    def password(self):
+        return self._password
+
+    @property
+    def mode(self):
+        return self._mode
+
+    @property
+    def domain_json(self):
+        if self._domain_json is None:
+            rsp = self.GET('/')
+            if rsp.status_code != 200:
+                raise IOError(rsp.reason)
+            # assume JSON
+            self._domain_json = json.loads(rsp.text)
+        return self._domain_json
+
+    @property
+    def root_uuid(self):
+        domain_json = self.domain_json
+        if "root" not in domain_json:
+            raise IOError("Unexpected response")
+        root_uuid = domain_json["root"] 
+        return root_uuid
+
+    @property
+    def modified(self):
+        """Last modified time of the domain as a datetime object."""
+        domain_json = self.domain_json
+        if "lastModified" not in domain_json:
+            raise IOError("Unexpected response")
+        last_modified = domain_json["lastModified"]
+        return last_modified
+
+    @property
+    def created(self):
+        """Creation time of the domain"""
+        domain_json = self.domain_json
+        if "created" not in domain_json:
+            raise IOError("Unexpected response")
+        created = domain_json["created"]
+        return created
+
+    @property
+    def owner(self):
+        """ username of creator of domain"""
+        domain_json = self.domain_json
+        username = None
+        if 'owner' in domain_json:
+            # currently this is only available for HSDS 
+            username = domain_json["owner"]
+        return username

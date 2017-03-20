@@ -47,10 +47,10 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 0)
         self.assertEqual(f.mode, 'r+')
         is_hsds = False
-        if f.id.id.startswith("g-"):
+        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
             is_hsds = True  # HSDS has different permission defaults
         if h5py.__name__ == "h5pyd":
-            self.assertTrue(f.id.endpoint.startswith("http"))
+            self.assertTrue(f.id.http_conn.endpoint.startswith("http"))
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
         # Check domain's timestamps
@@ -67,7 +67,7 @@ class TestFile(TestCase):
             self.assertTrue(f.modified - 30.0 < now)
             self.assertTrue(f.modified + 30.0 > now)
             self.assertEqual(f.modified, f.created)
-        if f.id.id.startswith("g-"):
+        if is_hsds:
             # owner prop is just for HSDS
             self.assertEqual(f.owner, self.test_user1["name"]) 
          

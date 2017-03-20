@@ -17,7 +17,7 @@ import os.path as op
 import numpy
 import collections
 
-from .base import HLObject, MutableMappingHDF5, Reference, phil
+from .base import HLObject, MutableMappingHDF5, phil
 from .objectid import TypeID, GroupID, DatasetID
 from . import dataset
 from .dataset import Dataset
@@ -30,7 +30,7 @@ class Group(HLObject, MutableMappingHDF5):
     """ Represents an HDF5 group.
     """
 
-    def __init__(self, bind):
+    def __init__(self, bind, **kwargs):
         #print "group init, bind:", bind
 
         """ Create a new Group object by binding to a low-level GroupID.
@@ -39,7 +39,7 @@ class Group(HLObject, MutableMappingHDF5):
         with phil:
             if not isinstance(bind, GroupID):
                 raise ValueError("%s is not a GroupID" % bind)
-            HLObject.__init__(self, bind)
+            HLObject.__init__(self, bind, **kwargs)
             self._req_prefix = "/groups/" + self.id.uuid 
             self._link_db = {}  # cache for links
 
@@ -49,7 +49,7 @@ class Group(HLObject, MutableMappingHDF5):
         Name may be absolute or relative.  Fails if the target name already
         exists.
         """
-        if self.id.mode == 'r':
+        if self.id.http_conn.mode == 'r':
             raise ValueError("Unable to create group (No write intent on file)")
 
         #if self.__contains__(name):
@@ -57,7 +57,6 @@ class Group(HLObject, MutableMappingHDF5):
         if h5path[-1] == '/':
             raise ValueError("Invalid path for create_group")
         
-
         parent_uuid = self.id.id
         if h5path[0] == '/':
             # absolute path         
@@ -144,7 +143,7 @@ class Group(HLObject, MutableMappingHDF5):
             (T/F) Enable dataset creation timestamps.
         """
 
-        if self.id.mode == 'r':
+        if self.id.http_conn.mode == 'r':
             raise ValueError("Unable to create dataset (No write intent on file)")
 
         with phil:
@@ -245,7 +244,7 @@ class Group(HLObject, MutableMappingHDF5):
         if h5path[0] == '/':
             #abs path, start with root
             # get root_uuid
-            parent_uuid = self.file.id.id  
+            parent_uuid = self.id.http_conn.root_uuid   
             # make a fake tgt_json to represent 'link' to root group
             tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid }
             if h5path == '/':
@@ -316,7 +315,7 @@ class Group(HLObject, MutableMappingHDF5):
 
         tgt = None
 
-        if isinstance(name, Reference):
+        if isinstance(name, h5type.Reference):
             tgt = name.objref()  # weak reference to ref object
             if tgt is not None:
                 return tgt  # ref'd object has not been deleted
@@ -345,7 +344,7 @@ class Group(HLObject, MutableMappingHDF5):
             # try to get a handle to the file and return the linked object...
             from .files import File
             try:
-                f = File(link_json['h5domain'], endpoint=self.id.endpoint, mode='r')
+                f = File(link_json['h5domain'], endpoint=self.id.http_conn.endpoint, mode='r')
             except IOError:
                 # unable to find external link
                 raise KeyError("Unable to open file: " + link_json['h5domain'])

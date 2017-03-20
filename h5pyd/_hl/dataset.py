@@ -23,7 +23,8 @@ from six.moves import xrange
 import numpy
 
 #from . import base
-from .base import HLObject, Reference, RegionReference
+from .base import HLObject
+from .h5type import Reference, RegionReference
 from .base import phil
 from .objectid import DatasetID
 from . import filters

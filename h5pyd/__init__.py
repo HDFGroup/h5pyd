@@ -23,14 +23,13 @@ from __future__ import absolute_import
 #from .highlevel import *
 
 from . import version
-from ._hl.h5type import special_dtype, check_dtype
+from ._hl.h5type import special_dtype, check_dtype, Reference, RegionReference
 from ._hl.files import File
 from ._hl.folders import Folder
 from ._hl.group import Group, SoftLink, ExternalLink, UserDefinedLink, HardLink
 from ._hl.dataset import Dataset
 from ._hl.datatype import Datatype
 from ._hl.attrs import AttributeManager
-from ._hl.base import Reference, RegionReference
 #from ._hl.httputil import HttpUtil
 
 

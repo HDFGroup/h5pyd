@@ -13,12 +13,87 @@
 from __future__ import absolute_import
 
 import numpy as np
-from .base import Reference, RegionReference
+# trying to import these results in circule references, so just use is_reference, is_regionreference helpers to identify
+#from .base import Reference, RegionReference
 import six
+import weakref
 
 if six.PY3:
     unicode = str
+"""
+def is_reference(obj):
+    if isinstance(val, object) and val.__class__.__name__ == "Reference":
+        return True 
+    else:
+        return False
 
+def is_regionreference(obj):
+    if isinstance(val, object) and val.__class__.__name__ == "RegionReference":
+        return True 
+    else:
+        return False
+"""
+
+
+class Reference():
+
+    """
+        Represents an HDF5 object reference
+    """
+    @property
+    def id(self):
+        """ Low-level identifier appropriate for this object """
+        return self._id
+
+    @property
+    def objref(self):
+        """ Weak reference to object """
+        return self._objref  # return weak ref to ref'd object
+
+    def __init__(self, bind):
+        """ Create a new reference by binding to a group/dataset/committed type
+        """
+        self._id = bind._id
+        self._objref = weakref.ref(bind)
+
+    def __repr__(self):
+        return "<HDF5 object reference>"
+
+    def tolist(self):
+        if type(self._id.id) is not six.text_type:
+            raise TypeError("Expected string id")
+        if self._id.objtype_code == 'd':
+            return [("datasets/" + self._id.id), ]
+        elif self._id.objtype_code == 'g':
+            return [("groups/" + self._id.id), ]
+        elif self._id.objtype_code == 't':
+            return [("datatypes/" + self._id.id), ]
+        else:
+            raise TypeError("Unexpected id type")
+
+class RegionReference():
+
+    """
+        Represents an HDF5 region reference
+    """
+    @property
+    def id(self):
+        """ Low-level identifier appropriate for this object """
+        return self._id
+
+    @property
+    def objref(self):
+        """ Weak reference to object """
+        return self._objref  # return weak ref to ref'd object
+
+    def __init__(self, bind):
+        """ Create a new reference by binding to a group/dataset/committed type
+        """
+        self._id = bind._id
+        self._objref = weakref.ref(bind)
+
+    def __repr__(self):
+        return "<HDF5 region reference>"
 
 def special_dtype(**kwds):
     """ Create a new h5py "special" type.  Only one keyword may be given.
@@ -65,9 +140,9 @@ def special_dtype(**kwds):
 
         dt = None
         if val is Reference:
-            dt = np.dtype('S48', metadata={'ref': Reference})
+            dt = np.dtype('S48', metadata={'ref': val.__class__})
         elif val is RegionReference:
-            dt = np.dtype('S48', metadata={'ref': RegionReference})
+            dt = np.dtype('S48', metadata={'ref': val.__class__})
         else:
             raise ValueError("Ref class must be Reference or RegionReference")
 
@@ -232,9 +307,9 @@ def getTypeItem(dt):
             # a reference type
             type_info['class'] = 'H5T_REFERENCE'
 
-            if ref_check is Reference:
+            if ref_check is Reference:  
                 type_info['base'] = 'H5T_STD_REF_OBJ'  # objref
-            elif ref_check is RegionReference:
+            elif ref_check is RegionReference:  
                 type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
             else:
                 raise TypeError("unexpected reference type")

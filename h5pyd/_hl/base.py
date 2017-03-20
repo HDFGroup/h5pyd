@@ -13,20 +13,17 @@
 from __future__ import absolute_import
 
 import posixpath
-import weakref
 import os
 import json
 import base64
-import time
 import logging
 import logging.handlers
 from collections import (
     Mapping, MutableMapping, KeysView, ValuesView, ItemsView
 )
 import six
-from datetime import datetime
-import pytz
-from .httputil import HttpUtil
+from .objectid import GroupID
+from .h5type import Reference
 
 
 class FakeLock():
@@ -81,19 +78,6 @@ def guess_dtype(data):
     # print("guess_dtype")
     return None
 
-
-def parse_lastmodified(datestr):
-    """Turn last modified datetime string into a datetime object."""
-    if isinstance(datestr, str):
-        # format: 2016-06-30T06:17:16.563536Z
-        # format: "2016-08-04T06:44:04Z"
-        dt = datetime.strptime(
-            datestr, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=pytz.UTC)
-    else:
-        # if the time is an int or float, interpet as seconds since epoch
-        dt = datetime.fromtimestamp(time.time())
-
-    return dt
 
 def getHeaders(domain, username=None, password=None, headers=None):
         if headers is None:
@@ -154,77 +138,6 @@ def default_lapl():
 
 dlapl = default_lapl()
 dlcpl = default_lcpl()
-
-
-class Reference():
-
-    """
-        Represents an HDF5 object reference
-
-
-    """
-    @property
-    def id(self):
-        """ Low-level identifier appropriate for this object """
-        return self._id
-
-    @property
-    def objref(self):
-        """ Weak reference to object """
-        return self._objref  # return weak ref to ref'd object
-
-    @with_phil
-    def __init__(self, bind):
-        """ Create a new reference by binding to a group/dataset/committed type
-        """
-        with phil:
-            self._id = bind._id
-            self._objref = weakref.ref(bind)
-
-    @with_phil
-    def __repr__(self):
-        return "<HDF5 object reference>"
-
-    @with_phil
-    def tolist(self):
-        if type(self._id.id) is not six.text_type:
-            raise TypeError("Expected string id")
-        if self._id.objtype_code == 'd':
-            return [("datasets/" + self._id.id), ]
-        elif self._id.objtype_code == 'g':
-            return [("groups/" + self._id.id), ]
-        elif self._id.objtype_code == 't':
-            return [("datatypes/" + self._id.id), ]
-        else:
-            raise TypeError("Unexpected id type")
-
-
-class RegionReference():
-
-    """
-        Represents an HDF5 region reference
-    """
-    @property
-    def id(self):
-        """ Low-level identifier appropriate for this object """
-        return self._id
-
-    @property
-    def objref(self):
-        """ Weak reference to object """
-        return self._objref  # return weak ref to ref'd object
-
-    @with_phil
-    def __init__(self, bind):
-        """ Create a new reference by binding to a group/dataset/committed type
-        """
-        with phil:
-            self._id = bind._id
-            self._objref = weakref.ref(bind)
-
-    @with_phil
-    def __repr__(self):
-        return "<HDF5 region reference>"
 
 
 
@@ -426,10 +339,20 @@ class HLObject(CommonStateObject):
     @property
     def file(self):
         """ Return a File instance associated with this object """
-        from . import files
-        return files.File(self._id.domain, endpoint=self._id.endpoint,
-                          mode=self._id.mode, username=self._id.username,
-                          password=self._id.password)
+        from .files import File
+        http_conn = self._id.http_conn
+        root_uuid = http_conn.root_uuid
+        # construct a group json, so we don't need to do a request
+        group_json = {}
+        group_json["root"] = root_uuid
+        group_json["id"] = root_uuid
+        group_json["domain"] = http_conn.domain
+        group_json["created"] = http_conn.created
+        group_json["lastModified"] = http_conn.modified
+    
+        groupid = GroupID(None, group_json, http_conn=http_conn)
+
+        return File(groupid)
 
     @property
     def name(self):
@@ -498,12 +421,10 @@ class HLObject(CommonStateObject):
       
 
     def GET(self, req, format="json"):
-        if self.id.endpoint is None:
+        if self.id.http_conn is None:
             raise IOError("object not initialized")
-        if self.id.domain is None:
-            raise IOError("no domain defined")
          
-        rsp = self._http_util.GET(req, format=format)
+        rsp = self.id._http_conn.GET(req, format=format)
          
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
@@ -517,13 +438,11 @@ class HLObject(CommonStateObject):
             return rsp_json
 
     def PUT(self, req, body=None, params=None, format="json"):
-        if self.id.endpoint is None:
+        if self.id.http_conn is None:
             raise IOError("object not initialized")
-        if self.id.domain is None:
-            raise IOError("no domain defined")
-
+        
         # try to do a PUT to the domain
-        rsp = self._http_util.PUT(req, body=body, params=params, format=format)
+        rsp = self._id._http_conn.PUT(req, body=body, params=params, format=format)
          
         if rsp.status_code not in (200, 201):
             if rsp.status_code == 409:
@@ -536,17 +455,14 @@ class HLObject(CommonStateObject):
             return rsp_json
 
     def POST(self, req, body=None):
-        if self.id.endpoint is None:
+        if self.id.http_conn is None:
             raise IOError("object not initialized")
-        if self.id.domain is None:
-            raise IOError("no domain defined")
-
-        # try to do a POST to the domain
          
+        # try to do a POST to the domain
          
         self.log.info("PST: {} [{}]".format(req, self.id.domain))
          
-        rsp = self._http_util.POST(req, body=body)
+        rsp = self.id._http_conn.POST(req, body=body)
         if rsp.status_code == 409:
             raise ValueError("name already exists")
         if rsp.status_code not in (200, 201):
@@ -556,26 +472,24 @@ class HLObject(CommonStateObject):
         return rsp_json
 
     def DELETE(self, req):
-        if self.id.endpoint is None:
+        if self.id.http_conn is None:
             raise IOError("object not initialized")
-        if self.id.domain is None:
-            raise IOError("no domain defined")
-
+         
         # try to do a DELETE of the resource
         
         self.log.info("DEL: {} [{}]".format(req, self.id.domain))
-        rsp = self._http_util.DELETE(req)  
+        rsp = self.id._http_conn.DELETE(req)  
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
 
-    def __init__(self, oid):
+    def __init__(self, oid, file=None):
         """ Setup this object, given its low-level identifier """
         self._id = oid
         self.log = logging.getLogger("h5pyd")
         self.req_prefix  = None # derived class should set this to the URI of the object
-        self._http_util = HttpUtil(self.id.domain, endpoint=self.id.endpoint, 
-                    username=self.id.username, password=self.id.password)
+        self._file = file
+        
         if not self.log.handlers:
             # setup logging
             log_path = os.getcwd()
