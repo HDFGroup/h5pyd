@@ -26,10 +26,11 @@ class HttpConn:
     TBD: Should refactor these to a common base class
     """
     def __init__(self, domain_name, endpoint=None, 
-        username=None, password=None, mode='a', **kwds):
+        username=None, password=None, mode='a', use_session=True, **kwds):
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
+        self._use_session = use_session
         self.log = logging.getLogger("h5pyd")
         if endpoint is None:
             if "H5SERV_ENDPOINT" in os.environ:
@@ -179,9 +180,12 @@ class HttpConn:
     def session(self):
         # create a session object to re-use http connection when possible
         # TBD: Add retry here - see: https://laike9m.com/blog/requests-secret-pool_connections-and-pool_maxsize,89/
-        if self._s is None:
-            self._s = requests.Session()
-        return self._s
+        s = requests
+        if self._use_session:
+            if self._s is None:
+                self._s = requests.Session()
+            s = self._s
+        return s
 
     def close(self):
         if self._s:

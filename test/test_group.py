@@ -35,12 +35,10 @@ class TestGroup(TestCase):
         self.assertTrue(r.name, '/')
         self.assertEqual(len(r.attrs.keys()), 0)
         self.assertFalse('g1' in r)
-        print("domain:", r.id.http_conn.domain)
-        print("root_uuid:", r.id.http_conn.root_uuid)
+         
         g1 = r.create_group('g1')
         self.assertEqual(len(r), 1)
         file = g1.file
-        print("domain:", file.filename)
         f.close()
 
     def test_create(self):
@@ -148,9 +146,7 @@ class TestGroup(TestCase):
         softlink = r.get('mysoftlink', getlink=True)
         self.assertEqual(softlink.path, '/g1/g1.1')
 
-        print("get class")
         linkee_class = r.get('myexternallink', getclass=True)
-        print("get link")    
         link_class = r.get('myexternallink', getclass=True, getlink=True)
         self.assertEqual(link_class, h5py.ExternalLink)
         external_link = r.get('myexternallink', getlink=True)

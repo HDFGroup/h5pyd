@@ -87,7 +87,7 @@ class File(Group):
         return self.id.http_conn.owner
 
     def __init__(self, domain, mode=None, endpoint=None, 
-        username=None, password=None, **kwds):
+        username=None, password=None, use_session=True, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -143,7 +143,7 @@ class File(Group):
                 password = os.environ["H5SERV_PASSWORD"]
          
             http_conn =  HttpConn(domain, endpoint=endpoint, 
-                    username=username, password=password, mode=mode)
+                    username=username, password=password, mode=mode, use_session=use_session)
 
         
             root_json = None

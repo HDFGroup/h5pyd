@@ -341,9 +341,11 @@ class Group(HLObject, MutableMappingHDF5):
 
         elif link_class == 'H5L_TYPE_EXTERNAL':
             # try to get a handle to the file and return the linked object...
+            # Note: set use_session to false since file.close won't be called
+            #  (and hince the httpconn socket won't be closed)
             from .files import File
             try:
-                f = File(link_json['h5domain'], endpoint=self.id.http_conn.endpoint, mode='r')
+                f = File(link_json['h5domain'], endpoint=self.id.http_conn.endpoint, mode='r', use_session=False)
             except IOError:
                 # unable to find external link
                 raise KeyError("Unable to open file: " + link_json['h5domain'])
