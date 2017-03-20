@@ -47,7 +47,8 @@ class HttpConn:
             self._password = os.environ["H5SERV_PASSWORD"]
         else:
             self._password = password
-
+        self._s = None  # Sessions 
+        
 
     def getHeaders(self, domain=None, username=None, password=None, headers=None):
         if headers is None:
@@ -98,7 +99,8 @@ class HttpConn:
         self.log.info("GET: {} [{}]".format(req, headers["host"]))
 
         try:
-            rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+            s = self.session
+            rsp = s.get(req, headers=headers, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))
@@ -126,7 +128,8 @@ class HttpConn:
         else:
             data = json.dumps(body)
         # self.log.info("BODY: " + str(data))
-        rsp = requests.put(req, data=data, headers=headers,
+        s = self.session
+        rsp = s.put(req, data=data, headers=headers,
                            params=params, verify=self.verifyCert())
         return rsp
 
@@ -147,7 +150,8 @@ class HttpConn:
         self.log.info("PST: " + req)
 
         try: 
-            rsp = requests.post(req, data=data, headers=headers, verify=self.verifyCert())
+            s = self.session
+            rsp = s.post(req, data=data, headers=headers, verify=self.verifyCert())
         except ConnectionError as ce:
             self.log.warn("connection error: ", ce)
             raise IOError(str(ce))
@@ -167,8 +171,22 @@ class HttpConn:
             headers = self.getHeaders() 
 
         self.log.info("DEL: " + req)
-        rsp = requests.delete(req, headers=headers, verify=self.verifyCert())
+        s = self.session
+        rsp = s.delete(req, headers=headers, verify=self.verifyCert())
         return rsp
+    
+    @property
+    def session(self):
+        # create a session object to re-use http connection when possible
+        # TBD: Add retry here - see: https://laike9m.com/blog/requests-secret-pool_connections-and-pool_maxsize,89/
+        if self._s is None:
+            self._s = requests.Session()
+        return self._s
+
+    def close(self):
+        if self._s:
+            self._s.close()
+            self._s = None
 
     @property
     def domain(self):

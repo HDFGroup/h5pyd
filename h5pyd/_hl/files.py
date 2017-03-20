@@ -244,6 +244,8 @@ class File(Group):
     def close(self):
         """ Clears reference to remote resource.
         """
+        # this will close the socket of the http_conn singleton
+        self._id._http_conn.close()   
         self._id.close()
 
     def remove(self):

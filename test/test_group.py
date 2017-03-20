@@ -148,9 +148,9 @@ class TestGroup(TestCase):
         softlink = r.get('mysoftlink', getlink=True)
         self.assertEqual(softlink.path, '/g1/g1.1')
 
-        
+        print("get class")
         linkee_class = r.get('myexternallink', getclass=True)
-            
+        print("get link")    
         link_class = r.get('myexternallink', getclass=True, getlink=True)
         self.assertEqual(link_class, h5py.ExternalLink)
         external_link = r.get('myexternallink', getlink=True)

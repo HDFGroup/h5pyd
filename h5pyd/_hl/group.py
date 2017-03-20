@@ -333,7 +333,6 @@ class Group(HLObject, MutableMappingHDF5):
         link_class = link_json['class']
 
         if link_class == 'H5L_TYPE_HARD':
-            #print "hard link, collection:", link_json['collection']
             tgt = getObjByUuid(link_json['collection'], link_json['id'])
         elif link_class == 'H5L_TYPE_SOFT':
             h5path = link_json['h5path']
@@ -498,7 +497,6 @@ class Group(HLObject, MutableMappingHDF5):
             # print "create named type"
 
             type_json = h5type.getTypeItem(obj)
-            #print "type_json:", type_json
             req = "/datatypes"
 
             body = {'type': type_json }
