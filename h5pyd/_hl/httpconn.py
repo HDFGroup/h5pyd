@@ -50,7 +50,7 @@ class HttpConn:
     TBD: Should refactor these to a common base class
     """
     def __init__(self, domain_name, endpoint=None, username=None, password=None, 
-            mode='a', use_session=True, use_cache=True, **kwds):
+            mode='a', use_session=True, use_cache=False, **kwds):
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
