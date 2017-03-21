@@ -19,18 +19,46 @@ from requests import ConnectionError
 import json
 import logging
 
+
+class CacheResponse(object):
+    """ Wrap a json response in a Requests.Response looking class.
+        Note: we don't want to keep a proper requests obj in the cache since it 
+        would contain refernces to other objects
+    """
+    def __init__(self, rsp):
+        # just save off what we need
+        self._text = rsp.text
+        self._status_code = rsp.status_code
+        self._headers = rsp.headers
+
+    @property
+    def text(self):
+        return self._text
+
+    @property
+    def status_code(self):
+        return self._status_code
+
+    @property
+    def headers(self):
+        return self._headers
+
  
 class HttpConn:
     """
     Some utility methods based on equivalents in base class.
     TBD: Should refactor these to a common base class
     """
-    def __init__(self, domain_name, endpoint=None, 
-        username=None, password=None, mode='a', use_session=True, **kwds):
+    def __init__(self, domain_name, endpoint=None, username=None, password=None, 
+            mode='a', use_session=True, use_cache=True, **kwds):
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
         self._use_session = use_session
+        if use_cache:
+            self._cache = {}
+        else:
+            self._cache = None
         self.log = logging.getLogger("h5pyd")
         if endpoint is None:
             if "H5SERV_ENDPOINT" in os.environ:
@@ -87,8 +115,7 @@ class HttpConn:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
-        
-        req = self._endpoint + req
+                
         rsp = None
 
         if not headers:
@@ -96,17 +123,34 @@ class HttpConn:
          
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
+
+        if self._cache is not None and format == "json" and headers["host"] == self._domain:
+            if req in self._cache:
+                rsp = self._cache[req]
+                return rsp
         
-        self.log.info("GET: {} [{}]".format(req, headers["host"]))
+        self.log.info("GET: {} [{}]".format(self._endpoint + req, headers["host"]))
 
         try:
             s = self.session
-            rsp = s.get(req, headers=headers, verify=self.verifyCert())
+            rsp = s.get(self._endpoint + req, headers=headers, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))
             raise IOError("Connection Error")
-         
+        if rsp.status_code == 200 and self._cache is not None:
+            rsp_headers = rsp.headers
+            content_length = 0
+            try:
+                content_length = int(rsp_headers['Content-Length'])
+            except ValueError:
+                content_length = 9999999
+
+            if rsp_headers['Content-Type'] == 'application/json' and content_length < 10000:
+            
+                # add to our _cache
+                cache_rsp = CacheResponse(rsp)
+                self._cache[req] = cache_rsp
         return rsp
 
     def PUT(self, req, body=None, format="json", params=None, headers=None):
@@ -114,6 +158,9 @@ class HttpConn:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
+        if self._cache is not None:   
+            # domain deletin, invalidate everything in cache
+            self._cache = {}  
 
         req = self._endpoint + req
         
@@ -139,7 +186,9 @@ class HttpConn:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
-
+        if self._cache is not None:  
+            self._cache = {}
+            
         # try to do a POST to the domain
         req = self._endpoint + req
 
@@ -164,7 +213,9 @@ class HttpConn:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
-
+        if self._cache is not None:
+            self._cache = {}
+             
         # try to do a DELETE of the resource
         req = self._endpoint + req
 

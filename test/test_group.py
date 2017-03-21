@@ -23,11 +23,11 @@ import six
 class TestGroup(TestCase):
 
 
-    def test_simple(self):
+    def test_cache(self):
         # create main test file
-        filename = self.getFileName("create_group")
+        filename = self.getFileName("create_group_cache")
         print("filename:", filename)
-        f = h5py.File(filename, 'w')
+        f = h5py.File(filename, 'w', use_cache=True)
         self.assertTrue('/' in f)
         r = f['/'] 
         self.assertEqual(len(r), 0)
