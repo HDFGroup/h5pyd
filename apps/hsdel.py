@@ -1,6 +1,7 @@
-import h5pyd as h5py
 import sys
 import os.path as op
+import logging
+import h5pyd as h5py
 from config import Config
 
 #
@@ -56,7 +57,7 @@ def deleteDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: python hsdel.py [-e endpoint] [-u username] [-p password] domains")
+    print("usage: python hsdel.py [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains")
     print("example: python hsdel.py -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/deleteme.h5")
     sys.exit()
 
@@ -66,21 +67,45 @@ def printUsage():
 
 domains = []
 argn = 1
+loglevel = logging.ERROR
+logfname=None
 
 while argn < len(sys.argv):
     arg = sys.argv[argn]
+    val = None
+    if len(sys.argv) > argn + 1:
+        val = sys.argv[argn+1]
     
     if arg in ("-h", "--help"):
         printUsage()
     elif arg in ("-e", "--endpoint"):
-        cfg["hs_endpoint"] = sys.argv[argn+1]
+        cfg["hs_endpoint"] = val
         argn += 2
     elif arg in ("-u", "--username"):
-        cfg["hs_username"] = sys.argv[argn+1]
+        cfg["hs_username"] = val
         argn += 2
     elif arg in ("-p", "--password"):
-         cfg["hs_password"] = sys.argv[argn+1]
+         cfg["hs_password"] = val
          argn += 2
+    elif arg in ("-v", "--verbose"):
+        verbose = True
+        argn += 1
+    elif arg == "--loglevel":
+        val = val.upper()
+        if val == "DEBUG":
+            loglevel = logging.DEBUG
+        elif val == "INFO":
+            loglevel = logging.INFO
+        elif val in ("WARN", "WARNING"):
+            loglevel = logging.WARNING
+        elif val == "ERROR":
+            loglevel = logging.ERROR
+        else:
+            printUsage()  
+        argn += 2
+    elif arg == '--logfile':
+        logfname = val
+        argn += 2
     elif arg[0] == '-':
          printUsage()
     else:
@@ -91,6 +116,10 @@ if len(domains) == 0:
     # need a domain
     printUsage()
 
+
+logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
+logging.debug("set log_level to {}".format(loglevel))
+
 for domain in domains:
     if not domain.startswith('/'):
         sys.exit("domain: {} must start with a slash".format(domain))
@@ -98,9 +127,5 @@ for domain in domains:
         sys.exit("domain: {} can not end with slash".format(domain))
     
     deleteDomain(domain)
-
-    
-    
-     
 
 

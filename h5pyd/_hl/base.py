@@ -486,7 +486,7 @@ class HLObject(CommonStateObject):
     def __init__(self, oid, file=None):
         """ Setup this object, given its low-level identifier """
         self._id = oid
-        self.log = logging.getLogger("h5pyd")
+        self.log = self._id.http_conn.logging
         self.req_prefix  = None # derived class should set this to the URI of the object
         self._file = file
         

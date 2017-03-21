@@ -54,7 +54,7 @@ class Folder():
         return self._owner
 
     def __init__(self, domain_name, mode=None, endpoint=None, 
-        username=None, password=None, **kwds):
+        username=None, password=None, logger=None, **kwds):
         """Create a new Folders object.
 
 
@@ -74,7 +74,8 @@ class Folder():
             raise ValueError("Folder name must end with '/'")
 
         self._domain = domain_name[:-1]
-        self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, password=password, mode='r')
+        self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, password=password, mode='r', logger=logger)
+        self.log = self._http_conn.logging
 
         domain_json = None
 

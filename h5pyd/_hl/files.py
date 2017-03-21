@@ -86,8 +86,8 @@ class File(Group):
         """Username of the owner of the domain"""
         return self.id.http_conn.owner
 
-    def __init__(self, domain, mode=None, endpoint=None, 
-        username=None, password=None, use_session=True, use_cache=False, **kwds):
+    def __init__(self, domain, mode=None, endpoint=None, username=None, password=None, 
+        use_session=True, use_cache=False, logger=None, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -144,7 +144,7 @@ class File(Group):
          
             http_conn =  HttpConn(domain, endpoint=endpoint, 
                     username=username, password=password, mode=mode, 
-                    use_session=use_session, use_cache=use_cache)
+                    use_session=use_session, use_cache=use_cache, logger=logger)
         
             root_json = None
 

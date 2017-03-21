@@ -1,9 +1,10 @@
-import h5pyd as h5py
 import numpy as np
 import sys
 import os.path as op
 import os
+import logging
 from datetime import datetime
+import h5pyd as h5py
 from config import Config
 
 #
@@ -15,7 +16,6 @@ showacls = False
  
 cfg = Config()
 
- 
 def getFolder(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -96,7 +96,7 @@ def touchDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: python hstouch.py [-e endpoint] [-u username] [-p password] domains")
+    print("usage: python hstouch.py [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains")
     print("example: python hstouch.py -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/emptydomain.h5")
     sys.exit()
 
@@ -107,12 +107,33 @@ def printUsage():
 domains = []
 argn = 1
 depth = 2
+loglevel = logging.ERROR
+logfname=None
 
 while argn < len(sys.argv):
     arg = sys.argv[argn]
+    val = None
+    if len(sys.argv) > argn + 1:
+        val = sys.argv[argn+1]
     
     if arg in ("-h", "--help"):
         printUsage()
+    elif arg in ("-v", "--verbose"):
+        verbose = True
+        argn += 1
+    elif arg == "--loglevel":
+        val = val.upper()
+        if val == "DEBUG":
+            loglevel = logging.DEBUG
+        elif val == "INFO":
+            loglevel = logging.INFO
+        elif val in ("WARN", "WARNING"):
+            loglevel = logging.WARNING
+        elif val == "ERROR":
+            loglevel = logging.ERROR
+        else:
+            printUsage()  
+        argn += 2
     elif arg in ("-e", "--endpoint"):
         cfg["hs_endpoint"] = sys.argv[argn+1]
         argn += 2
@@ -131,6 +152,10 @@ while argn < len(sys.argv):
 if len(domains) == 0:
     # need a domain
     printUsage()
+
+# setup logging
+logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
+logging.debug("set log_level to {}".format(loglevel))
 
 for domain in domains:
     if not domain.startswith('/'):

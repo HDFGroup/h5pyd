@@ -37,7 +37,6 @@ def copy_attribute(obj, name, attrobj):
       
 #----------------------------------------------------------------------------------
 def create_dataset(fd, dobj):
-    print("createdataet:", dobj.name, type(dobj.name))
     logging.info("creating dataset %s" % (dobj.name))
     # We defer loading the actual data at this point, just create the object and try 
     # to make it as close to the original as possible for the basic copy/load.
@@ -60,7 +59,6 @@ def create_dataset(fd, dobj):
                                scaleoffset=dobj.scaleoffset)
 
         for da in dobj.attrs:
-            print("createdataet/attribute:", da, type(da), dobj.attrs[da])
             copy_attribute(dset, da, dobj.attrs[da])
 
         it = ChunkIterator(dset)
@@ -169,7 +167,7 @@ def print_config_example():
 #----------------------------------------------------------------------------------
 if __name__ == "__main__":
      
-    loglevel = logging.INFO
+    loglevel = logging.ERROR
     cfg = Config()  #  config object
     endpoint=cfg["hs_endpoint"]
     username=cfg["hs_username"]
@@ -184,6 +182,7 @@ if __name__ == "__main__":
          
         if arg[0] == '-' and len(src_files) > 0:
             # options must be placed before filenames
+            print("options must preceed source files")
             usage()
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
@@ -198,6 +197,7 @@ if __name__ == "__main__":
             elif val == "error":
                 loglevel = logging.ERROR
             else:
+                print("unknown loglevel")
                 printUsage()  
                 sys.exit(-1)
             argn += 2
@@ -225,11 +225,16 @@ if __name__ == "__main__":
         else:
             src_files.append(arg)
             argn += 1
-    # end arg parsing
-    logging.info("username:", username)
-    logging.info("password:", password)
-    logging.info("endpoint:", endpoint)
 
+    # setup logging
+    logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
+    logging.debug("set log_level to {}".format(loglevel))
+    
+    # end arg parsing
+    logging.info("username: {}".format(username))
+    logging.info("password: {}".format(password))
+    logging.info("endpoint: {}".format(endpoint))
+    
     if len(src_files) < 2:
         # need at least a src and destination
         usage()
@@ -240,11 +245,10 @@ if __name__ == "__main__":
     logging.info("source files: {}".format(src_files))
     logging.info("target domain: {}".format(domain))
     if len(src_files) > 1 and (domain[0] != '/' or domain[-1] != '/'):
+        print("target must be a folder if multiple source files are provided")
         usage()
         sys.exit(-1)
-     
-    logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
-   
+        
     if endpoint is None:
         logging.error('No endpoint given, try -h for help\n')
         sys.exit(1)

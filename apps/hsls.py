@@ -220,7 +220,7 @@ def getGroupFromDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: python hsls.py [-r] [-a] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains")
+    print("usage: python hsls.py [-r] [-a] [-v] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains")
     print("example: python hsls.py -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5")
     sys.exit()
 
@@ -231,7 +231,7 @@ def printUsage():
 domains = []
 argn = 1
 depth = 2
-loglevel = logging.INFO
+loglevel = logging.ERROR
 logfname=None
 
 while argn < len(sys.argv):
@@ -246,13 +246,14 @@ while argn < len(sys.argv):
         verbose = True
         argn += 1
     elif arg == "--loglevel":
-        if val == "debug":
+        val = val.upper()
+        if val == "DEBUG":
             loglevel = logging.DEBUG
-        elif val == "info":
+        elif val == "INFO":
             loglevel = logging.INFO
-        elif val == "warning":
+        elif val in ("WARN", "WARNING"):
             loglevel = logging.WARNING
-        elif val == "error":
+        elif val == "ERROR":
             loglevel = logging.ERROR
         else:
             printUsage()  
@@ -282,19 +283,11 @@ while argn < len(sys.argv):
     else:
          domains.append(arg)
          argn += 1
+         
 # setup logging
-"""
-print("loglevel:", loglevel)
 logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
-print("debug log...")
-logging.debug("this is debug")
-print("info log...")
-logging.info("this is info")
-print("warn log...")
-logging.info("this is warn...")
-print("error log...")
-logging.info("this is error")
-"""
+logging.debug("set log_level to {}".format(loglevel))
+ 
  
 if len(domains) == 0:
     # add a generic url

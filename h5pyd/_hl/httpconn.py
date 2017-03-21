@@ -51,7 +51,7 @@ class HttpConn:
     TBD: Should refactor these to a common base class
     """
     def __init__(self, domain_name, endpoint=None, username=None, password=None, 
-            mode='a', use_session=True, use_cache=False, **kwds):
+            mode='a', use_session=True, use_cache=False, logger=None, **kwds):
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
@@ -60,7 +60,12 @@ class HttpConn:
             self._cache = {}
         else:
             self._cache = None
-        self.log = logging.getLogger("h5pyd")
+        self._logger = logger
+        if logger is None:
+            self.log = logging
+        else:
+            self.log = logging.getLogger(logger)
+        self.log = logging
         if endpoint is None:
             if "H5SERV_ENDPOINT" in os.environ:
                 self._endpoint = os.environ["H5SERV_ENDPOINT"]
@@ -309,3 +314,8 @@ class HttpConn:
             # currently this is only available for HSDS 
             username = domain_json["owner"]
         return username
+
+    @property
+    def logging(self):
+        """ return name of logging handler"""
+        return self.log
