@@ -19,6 +19,7 @@ from requests import ConnectionError
 import json
 import logging
 
+MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
 
 class CacheResponse(object):
     """ Wrap a json response in a Requests.Response looking class.
@@ -146,7 +147,7 @@ class HttpConn:
             except ValueError:
                 content_length = 9999999
 
-            if rsp_headers['Content-Type'] == 'application/json' and content_length < 10000:
+            if rsp_headers['Content-Type'] == 'application/json' and content_length < MAX_CACHE_ITEM_SIZE:
             
                 # add to our _cache
                 cache_rsp = CacheResponse(rsp)
