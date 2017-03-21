@@ -34,11 +34,21 @@ def getShapeText(dset):
 def visititems(name, grp, visited):
     for k in grp:
         item = grp.get(k, getlink=True)
-        if item.__class__.__name__ == "HardLink":
+        class_name = item.__class__.__name__
+        if class_name == "HardLink":
             # follow hardlinks
             item = grp.get(k)
             item_name = op.join(name, k)
             dump(item_name, item, visited=visited)
+        elif class_name == "SoftLink":
+            desc = '{' + item.path + '}'
+            print("{0:24} {1} {2}".format(name, class_name, desc))
+        elif class_name == "ExternalLink":
+            desc = '{' + item.path + '//' + item.filename + '}'
+            print("{0:24} {1} {2}".format(name, class_name, desc))
+        else:
+            desc = '{Unknown Link Type}'
+            print("{0:24} {1} {2}".format(name, class_name, desc))
 
 
 def dump(name, obj, visited=None):
@@ -84,7 +94,6 @@ def dump(name, obj, visited=None):
                 print("   attr: {0:24} {1}".format(attr_name, val))
             else:
                 print("   attr: {0:24} {1}".format(attr_name, attr))
-
 
     if visited is not None and obj_id is not None:
         visited[obj_id] = name 
@@ -283,7 +292,7 @@ while argn < len(sys.argv):
     else:
          domains.append(arg)
          argn += 1
-         
+
 # setup logging
 logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
 logging.debug("set log_level to {}".format(loglevel))

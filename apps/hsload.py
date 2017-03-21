@@ -26,18 +26,25 @@ from chunkiter import ChunkIterator
 __version__ = '0.0.1'
 
 UTILNAME = 'hsload'
+verbose = False
  
 #get_sizes
 
 #----------------------------------------------------------------------------------
 def copy_attribute(obj, name, attrobj):
-    logging.debug("creating attribute %s in %s" % (name, obj.name))
+    msg = "creating attribute {} in {}".format(name, obj.name)
+    logging.debug(msg)
+    if verbose:
+        print(msg)
     obj.attrs.create(name, attrobj)
 # copy_attribute
       
 #----------------------------------------------------------------------------------
 def create_dataset(fd, dobj):
-    logging.info("creating dataset %s" % (dobj.name))
+    msg = "creating dataset {}".format(dobj.name)
+    logging.info(msg)
+    if verbose:
+        print(msg)
     # We defer loading the actual data at this point, just create the object and try 
     # to make it as close to the original as possible for the basic copy/load.
     # This routine returns the dataset object (which will be loaded later, most likely)
@@ -57,7 +64,7 @@ def create_dataset(fd, dobj):
                                fletcher32=dobj.fletcher32, maxshape=dobj.maxshape, \
                                compression_opts=dobj.compression_opts, fillvalue=fillvalue, \
                                scaleoffset=dobj.scaleoffset)
-
+        # create attributes
         for da in dobj.attrs:
             copy_attribute(dset, da, dobj.attrs[da])
 
@@ -76,29 +83,63 @@ def create_dataset(fd, dobj):
 
 #----------------------------------------------------------------------------------
 def create_group(fd, gobj):
-    logging.debug("creating group %s" % (gobj.name))
+    msg = "creating group {}".format(gobj.name)
+    logging.info(msg)
+    if verbose:
+        print(msg)
     grp = fd.create_group(gobj.name)
+
+    # create attributes
     for ga in gobj.attrs:
         copy_attribute(grp, ga, gobj.attrs[ga])
+
+    # create any soft/external links
+    for title in gobj:
+        lnk = gobj.get(title, getlink=True)
+        if isinstance(lnk, h5py.HardLink):
+            logging.debug("Got hardlink: {}".format(title))
+            # TBD: handle the case where multiple hardlinks point to same object
+        elif isinstance(lnk, h5py.SoftLink):
+            msg = "creating SoftLink({}) with title: {}".format(lnk.path, title)
+            if verbose:
+                print(msg)
+            logging.info(msg)
+            soft_link = h5pyd.SoftLink(lnk.path)
+            grp[title] = soft_link
+        elif isinstance(lnk, h5py.ExternalLink):
+            msg = "creating ExteernalLink({}, {}) with title: {}".format(lnk.path, lnk.filename, title)
+            if verbose:
+                print(msg)
+            logging.info(msg)
+            ext_link = h5pyd.ExternalLink(lnk.path, lnk.filename)
+            grp[title] = ext_link
+        else:
+            msg = "Unexpected link type: {}".format(lnk.__class__.__name__)
+            logging.warning(msg)
+            if verbose:
+                print(msg)
+            
+
 # create_group
 
 # create_datatype
 
 #----------------------------------------------------------------------------------
 def create_datatype(fd, obj):
-    logging.debug("creating datatype %s" % (obj.name))
+    msg = "creating datatype {}".format(obj.name)
+    logging.info(msg)
+    if verbose:
+        print(msg)
     fd[obj.name] = obj.dtype
     ctype = fd[obj.name]
+    # create attributes
     for ga in obj.attrs:
         copy_attribute(ctype, ga, obj.attrs[ga])
 # create_group
       
 #----------------------------------------------------------------------------------
 def load_file(filename, domain, endpoint=None, username=None, password=None):
-     
-
     try:
-       
         logging.info("input file: {}".format(filename))   
         finfd = h5py.File(filename, "r")
         logging.info("output domain: {}".format(domain))
@@ -143,6 +184,7 @@ def usage():
     print("       FOLDER: HDF Server folder (Unix style ending in '/')")
     print("")
     print("Options:")
+    print("     -v | --verbose :: verbose output")
     print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://example.com:8080")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
@@ -182,12 +224,15 @@ if __name__ == "__main__":
          
         if arg[0] == '-' and len(src_files) > 0:
             # options must be placed before filenames
-            print("options must preceed source files")
+            print("options must precead source files")
             usage()
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1] 
-        if arg == "--loglevel":
+        if arg in ("-v", "--verbose"):
+            verbose = True
+            argn += 1
+        elif arg == "--loglevel":
             if val == "debug":
                 loglevel = logging.DEBUG
             elif val == "info":
@@ -220,8 +265,8 @@ if __name__ == "__main__":
             print_config_example()
             sys.exit(0)
         elif arg[0] == '-':
-             usage()
-             sys.exit(-1)
+            usage()
+            sys.exit(-1)
         else:
             src_files.append(arg)
             argn += 1
