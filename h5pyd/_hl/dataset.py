@@ -255,11 +255,17 @@ class Dataset(HLObject):
     @property
     def shape(self):
         """Numpy-style shape tuple giving dataset dimensions"""
+        # just return the cached shape value 
+        # (although potentially it could have changed on server)
+        return self._shape 
+
+    def get_shape(self, check_server=False):
+        # this version will 
         shape_json = self.id.shape_json
         if shape_json['class'] in ('H5S_NULL', 'H5S_SCALAR'):
             return ()  # return empty
 
-        if 'maxdims' not in shape_json:
+        if 'maxdims' not in shape_json or not check_server:
             # not resizable, just return dims
             dims = shape_json['dims']
         else:
@@ -278,7 +284,9 @@ class Dataset(HLObject):
     @property
     def size(self):
         """Numpy-style attribute giving the total dataset size"""
-        return numpy.prod(self.shape)
+        if self._shape is None:
+            return 0
+        return numpy.prod(self._shape)
 
     @property
     def dtype(self):
@@ -382,11 +390,8 @@ class Dataset(HLObject):
         self._dtype = createDataType(self.id.type_json)
         self._item_size = getItemSize(self.id.type_json)
 
-        if self.id.shape_json['class'] == 'H5S_SCALAR':
-            self._shape = []
-        else:
-            self._shape = self.id.shape_json['dims']
-
+        self._shape = self.get_shape()
+         
         self._req_prefix = "/datasets/" + self.id.uuid
 
 
@@ -418,7 +423,7 @@ class Dataset(HLObject):
             except TypeError:
                 raise TypeError("Argument must be a single int if axis is specified")
 
-            size = list(self.shape)
+            size = list(self._shape)
             size[axis] = newlen
 
         size = tuple(size)
@@ -429,6 +434,7 @@ class Dataset(HLObject):
         self.PUT(req, body=body)
         #self.id.set_extent(size)
         #h5f.flush(self.id)  # THG recommends
+        self._shape = size  # save the new shape
 
     def __len__(self):
         """ The size of the first axis.  TypeError if scalar.
@@ -447,8 +453,8 @@ class Dataset(HLObject):
         len() cannot handle values greater then 2**32 on 32-bit systems.
         """
         with phil:
-            shape = self.shape
-            if len(shape) == 0:
+            shape = self._shape
+            if shape is None or len(shape) == 0:
                 raise TypeError("Attempt to take len() of scalar dataset")
             return shape[0]
 
@@ -457,7 +463,7 @@ class Dataset(HLObject):
 
         BEWARE: Modifications to the yielded data are *NOT* written to file.
         """
-        shape = self.shape
+        shape = self._shape
         if len(shape) == 0:
             raise TypeError("Can't iterate over a scalar dataset")
         for i in xrange(shape[0]):
@@ -497,6 +503,7 @@ class Dataset(HLObject):
         # mtype = h5t.py_create(new_dtype)
         mtype = new_dtype
 
+
         # === Special-case region references ====
         """
         TODO
@@ -520,15 +527,14 @@ class Dataset(HLObject):
         """
 
         # === Check for zero-sized datasets =====
-
-        if numpy.product(self.shape) == 0:
+        if self._shape is None or numpy.product(self._shape) == 0:
             # These are the only access methods NumPy allows for such objects
             if args == (Ellipsis,) or args == tuple():
-                return numpy.empty(self.shape, dtype=new_dtype)
+                return numpy.empty(self._shape, dtype=new_dtype)
 
         # === Scalar dataspaces =================
 
-        if self.shape == ():
+        if self._shape == ():
             #fspace = self.id.get_space()
             #selection = sel2.select_read(fspace, args)
             selection = sel.select(self, args)
@@ -569,9 +575,6 @@ class Dataset(HLObject):
             return arr
             """
 
-             
-
-
         # === Everything else ===================
 
         # Perform the dataspace selection
@@ -587,9 +590,9 @@ class Dataset(HLObject):
 
         # HDF5 has a bug where if the memory shape has a different rank
         # than the dataset, the read is very slow
-        if len(mshape) < len(self.shape):
+        if len(mshape) < len(self._shape):
             # pad with ones
-            mshape = (1,)*(len(self.shape)-len(mshape)) + mshape
+            mshape = (1,)*(len(self._shape)-len(mshape)) + mshape
 
         # Perfom the actual read
         rsp = None
@@ -725,9 +728,9 @@ class Dataset(HLObject):
 
         # === Check for zero-sized datasets =====
 
-        if numpy.product(self.shape) == 0 or self.shape == ():
+        if self._shape is None or numpy.product(self._shape) == 0 or self._shape == ():
             raise TypeError("Scalar datasets can not be used with where method")
-        if len(self.shape) > 1:
+        if len(self._shape) > 1:
             raise TypeError("Multi-dimensional datasets can not be used with where method")
 
 
@@ -738,10 +741,10 @@ class Dataset(HLObject):
             if not start:
                 start = 0
             if not stop:
-                stop = self.shape[0]
+                stop = self._shape[0]
         else:
             start = 0
-            stop = self.shape[0]
+            stop = self._shape[0]
 
         selection_arg = slice(start, stop)
         selection = sel.select(self, selection_arg)
@@ -789,11 +792,12 @@ class Dataset(HLObject):
         (slices and integers).  For advanced indexing, the shapes must
         match.
         """
-        
+        self.log.info("Dataset __setitem__, args: {}".format(args))
         if self._item_size != "H5T_VARIABLE":
             use_base64 = True   # may need to set this to false below for some types
         else:
             use_base64 = False  # never use for variable length types
+            self.log.debug("Using JSON since type is variable length")
 
         args = args if isinstance(args, tuple) else (args,)
 
@@ -859,6 +863,7 @@ class Dataset(HLObject):
                 # val = val.reshape(val.shape[:len(val.shape) - len(dtype.shape)])
         elif isinstance(val, numpy.ndarray):
             # TBD - convert array if needed
+            print("got numpy array")
             pass
         else:
             val = numpy.asarray(val, order='C', dtype=self.dtype)
@@ -928,8 +933,8 @@ class Dataset(HLObject):
         # glitch, which kicks in for mismatched memory/file selections
         """ 
         # TBD: do we need this adjustment?
-        if(len(mshape) < len(self.shape)):
-            mshape_pad = (1,)*(len(self.shape)-len(mshape)) + mshape
+        if(len(mshape) < len(self._shape)):
+            mshape_pad = (1,)*(len(self._shape)-len(mshape)) + mshape
         else:
             mshape_pad = mshape
         """
@@ -944,9 +949,10 @@ class Dataset(HLObject):
         if use_base64:
             
             if self.id.uuid.startswith("d-"):
-                # server is HSDS, use binary data use param values for selection
+                # server is HSDS, use binary data, use param values for selection
                 format = "binary"
                 body = val.tobytes()     
+                self.log
             else:
                 # h5serv, base64 encode, body json for selection
                 # TBD - replace with above once h5serv supports binary req
@@ -963,7 +969,7 @@ class Dataset(HLObject):
         if selection.select_type != sel.H5S_SELECT_ALL:
             if format == "binary":
                 # set selection using query parameters
-                setSliceQueryParam(params, self.shape, selection)
+                setSliceQueryParam(params, self._shape, selection)
             else:
                 # set selection as body keys
                 body['start'] = list(selection.start)
@@ -995,9 +1001,9 @@ class Dataset(HLObject):
         #todo
         with phil:
             if source_sel is None:
-                source_sel = sel.SimpleSelection(self.shape)
+                source_sel = sel.SimpleSelection(self._shape)
             else:
-                source_sel = sel.select(self.shape, source_sel, self.id)  # for numpy.s_
+                source_sel = sel.select(self._shape, source_sel, self.id)  # for numpy.s_
             fspace = source_sel._id
 
             if dest_sel is None:
@@ -1028,9 +1034,9 @@ class Dataset(HLObject):
             mspace = source_sel._id
 
             if dest_sel is None:
-                dest_sel = sel.SimpleSelection(self.shape)
+                dest_sel = sel.SimpleSelection(self._shape)
             else:
-                dest_sel = sel.select(self.shape, dest_sel, self.id)
+                dest_sel = sel.select(self._shape, dest_sel, self.id)
 
             for fspace in dest_sel.broadcast(source_sel.mshape):
                 self.id.write(mspace, fspace, source)
@@ -1041,10 +1047,10 @@ class Dataset(HLObject):
         THIS MEANS DATASETS ARE INTERCHANGABLE WITH ARRAYS.  For one thing,
         you have to read the whole dataset everytime this method is called.
         """
-        arr = numpy.empty(self.shape, dtype=self.dtype if dtype is None else dtype)
+        arr = numpy.empty(self._shape, dtype=self.dtype if dtype is None else dtype)
 
         # Special case for (0,)*-shape datasets
-        if numpy.product(self.shape) == 0:
+        if self._shape is None or numpy.product(self._shape) == 0:
             return arr
 
         # todo
@@ -1062,7 +1068,7 @@ class Dataset(HLObject):
                 namestr = six.u('"%s"') % (
                     name if name != six.u('') else six.u('/'))
             r = six.u('<HDF5 dataset %s: shape %s, type "%s">') % \
-                (namestr, self.shape, self.dtype.str)
+                (namestr, self._shape, self.dtype.str)
         if six.PY3:
             return r
         return r.encode('utf8')
