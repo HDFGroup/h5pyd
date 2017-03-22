@@ -260,7 +260,8 @@ class Dataset(HLObject):
         return self._shape 
 
     def get_shape(self, check_server=False):
-        # this version will 
+        # this version will optionally refetch the shape from the server
+        # (if the dataset is resiable)
         shape_json = self.id.shape_json
         if shape_json['class'] in ('H5S_NULL', 'H5S_SCALAR'):
             return ()  # return empty
@@ -274,8 +275,8 @@ class Dataset(HLObject):
             rsp = self.GET(req)
             shape_json = rsp['shape']
             dims = shape_json['dims']
-
-        return tuple(dims)
+        self._shape = tuple(dims)
+        return self._shape
 
     @shape.setter
     def shape(self, shape):
