@@ -41,7 +41,7 @@ def copy_attribute(obj, name, attrobj):
       
 #----------------------------------------------------------------------------------
 def create_dataset(fd, dobj):
-    msg = "creating dataset {}".format(dobj.name)
+    msg = "creating dataset {} {}".format(dobj.name, '{' + str(dobj.shape) + '}')
     logging.info(msg)
     if verbose:
         print(msg)
@@ -49,7 +49,7 @@ def create_dataset(fd, dobj):
     # to make it as close to the original as possible for the basic copy/load.
     # This routine returns the dataset object (which will be loaded later, most likely)
     try:
-           
+        logging.info("create_dataset for source obj: {}".format(dobj.name))   
         logging.info("setting %s chunk size to %s, data shape %s" % (dobj.name, str(dobj.chunks), str(dobj.shape)))
       
         fillvalue = None
@@ -64,20 +64,28 @@ def create_dataset(fd, dobj):
                                fletcher32=dobj.fletcher32, maxshape=dobj.maxshape, \
                                compression_opts=dobj.compression_opts, fillvalue=fillvalue, \
                                scaleoffset=dobj.scaleoffset)
+        msg = "dataset created, uuid: {}".format(dset.id.id)
+        logging.info(msg)
+        if verbose:
+            print(msg)
         # create attributes
         for da in dobj.attrs:
             copy_attribute(dset, da, dobj.attrs[da])
 
         it = ChunkIterator(dset)
-
+        logging.debug("src dtype: {}".format(dobj.dtype))
+        logging.debug("des dtype: {}".format(dset.dtype))
+        
         for s in it:
-            logging.info("writing dataset data for slice: {}".format(s))
+            msg = "writing dataset data for slice: {}".format(s)
+            logging.info(msg)
+            if verbose:
+                print(msg)
             arr = dobj[s]
             dset[s] = arr
-         
-   
+            
     except Exception as e:
-        logging.error("ERROR : failed to creating dataset in create_dataset : "+str(e))
+        logging.error("ERROR : failed to create dataset in create_dataset : "+str(e))
      
 # create_dataset
 
@@ -107,7 +115,7 @@ def create_group(fd, gobj):
             soft_link = h5pyd.SoftLink(lnk.path)
             grp[title] = soft_link
         elif isinstance(lnk, h5py.ExternalLink):
-            msg = "creating ExteernalLink({}, {}) with title: {}".format(lnk.path, lnk.filename, title)
+            msg = "creating ExternalLink({}, {}) with title: {}".format(lnk.path, lnk.filename, title)
             if verbose:
                 print(msg)
             logging.info(msg)
@@ -164,6 +172,10 @@ def load_file(filename, domain, endpoint=None, username=None, password=None):
       
         # close up the source file, see reason(s) for this below
         finfd.close() 
+        msg = "File {} uploaded to domain: {}".format(filename, domain)
+        logging.info(msg)
+        if verbose:
+            print(msg)
 
         return 0
     except IOError as e: 

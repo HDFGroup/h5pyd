@@ -174,14 +174,15 @@ class HttpConn:
          
         if not headers:
             headers = self.getHeaders() 
-        self.log.info("PUT: " + req)
+        
         if format=="binary":
             headers['Content-Type'] = "application/octet-stream"
             # binary write
             data = body
+            
         else:
             data = json.dumps(body)
-        # self.log.info("BODY: " + str(data))
+        self.log.info("PUT: {} format: {} [{} bytes]".format(req, format, len(data)))
         s = self.session
         rsp = s.put(req, data=data, headers=headers,
                            params=params, verify=self.verifyCert())

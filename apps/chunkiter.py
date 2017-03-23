@@ -27,6 +27,13 @@ class ChunkIterator:
         return self
 
     def __next__(self):
+
+        def get_ret(item):
+            if len(item) == 1:
+                return item[0]
+            else:
+                return tuple(item)
+
         if self._chunk_index[0] * self._layout[0] >= self._shape[0]:
             # ran past the last chunk, end iteration
             raise StopIteration()
@@ -48,11 +55,11 @@ class ChunkIterator:
             chunk_end = self._chunk_index[dim] * c
             if chunk_end < self._shape[dim]:
                 # we still have room to extend along this dimensions
-                return slices
+                return get_ret(slices)
              
             if dim > 0:
                 # reset to the start and continue iterating with higher dimension
                 self._chunk_index[dim] = s.start // c 
             dim -= 1
-        return tuple(slices)
+        return get_ret(slices)
 

@@ -483,6 +483,7 @@ class Dataset(HLObject):
         * Boolean "mask" array indexing
         """
         args = args if isinstance(args, tuple) else (args,)
+        log.debug("dataset.__getitem__({})".format(args))
 
         # Sort field indices from the rest of the args.
         names = tuple(x for x in args if isinstance(x, six.string_types))
@@ -864,7 +865,7 @@ class Dataset(HLObject):
                 # val = val.reshape(val.shape[:len(val.shape) - len(dtype.shape)])
         elif isinstance(val, numpy.ndarray):
             # TBD - convert array if needed
-            print("got numpy array")
+            self.log.debug("got numpy array")
             pass
         else:
             val = numpy.asarray(val, order='C', dtype=self.dtype)
@@ -953,7 +954,7 @@ class Dataset(HLObject):
                 # server is HSDS, use binary data, use param values for selection
                 format = "binary"
                 body = val.tobytes()     
-                self.log
+                self.log.debug("writing binary data, {} bytes".format(len(body)))
             else:
                 # h5serv, base64 encode, body json for selection
                 # TBD - replace with above once h5serv supports binary req
@@ -961,10 +962,12 @@ class Dataset(HLObject):
                 data = base64.b64encode(data)
                 data = data.decode("ascii")
                 body['value_base64'] = data
+                self.log.debug("writing base64 data, {} bytes".format(len(data)))
         else:
             if type(val) is not list:
                 val = val.tolist()
             val = self._decode(val)
+            self.log.debug("writing json data, {} bytes".format(len(val)))
             body['value'] = val
 
         if selection.select_type != sel.H5S_SELECT_ALL:
