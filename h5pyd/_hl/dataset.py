@@ -483,7 +483,7 @@ class Dataset(HLObject):
         * Boolean "mask" array indexing
         """
         args = args if isinstance(args, tuple) else (args,)
-        log.debug("dataset.__getitem__({})".format(args))
+        self.log.debug("dataset.__getitem__({})".format(args))
 
         # Sort field indices from the rest of the args.
         names = tuple(x for x in args if isinstance(x, six.string_types))
