@@ -754,19 +754,49 @@ class Dataset(HLObject):
         if selection.nselect == 0:
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
 
-        # Perfom the actual read
-        req = "/datasets/" + self.id.uuid + "/value"
-        req += "?query=" + condition
-        start_stop = selection.getQueryParam()
-        if start_stop:
-            req += "&" + start_stop
-
-        rsp = self.GET(req)
+        # setup for pagination in case we can't read everthing in one go
+        data = []
+        cursor = start
+        page_size = stop - start
+        
+        while True:
+            # Perfom the actual read
+            req = "/datasets/" + self.id.uuid + "/value"
+            req += "?query=" + condition
+            self.log.info("req - cursor: {} page_size: {}".format(cursor, page_size))
+            end_row = cursor+page_size
+            if end_row > stop:
+                end_row = stop
+            selection_arg = slice(cursor, end_row)
+            selection = sel.select(self, selection_arg)
+            sel_param = selection.getQueryParam()
+            if sel_param:
+                req += "&" + sel_param
+            try:
+                rsp = self.GET(req)
+                count = len(rsp["value"])
+                self.log.info("got {} rows".format(count))
+                if count > 0:
+                    data.extend(rsp['value'])
+                # advance to next page
+                cursor += page_size
+            except IOError as ioe:
+                if ioe.errno == 413 and page_size > 1024:
+                    # too large a query target, try reducing the page size
+                    # if it is not already relatively small (1024)         
+                    page_size //= 2
+                    self.log.info("Got 413, reducing page_size to: {}".format(page_size))
+                else:
+                    # otherwise, just raise the exception
+                    self.log.info("Unexpected exception: {} {}".format(ioe.errno, ioe.reason))
+                    raise ioe
+            if cursor >= stop:
+                self.log.info("completed iteration, returning: {} rows".format(len(data)))
+                break
 
         # need some special conversion for compound types --
         # each element must be a tuple, but the JSON decoder
         # gives us a list instead.
-        data = rsp['value']
 
         mshape = (len(data),)
         if len(mtype) > 1 and type(data) in (list, tuple):
