@@ -785,6 +785,7 @@ class Dataset(HLObject):
                     # too large a query target, try reducing the page size
                     # if it is not already relatively small (1024)         
                     page_size //= 2
+                    page_size += 1  # bump up to avoid tiny pages in the last iteration
                     self.log.info("Got 413, reducing page_size to: {}".format(page_size))
                 else:
                     # otherwise, just raise the exception
