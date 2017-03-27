@@ -65,6 +65,8 @@ def dump(name, obj, visited=None):
     if class_name == "Dataset":
         desc = getShapeText(obj)
         obj_id = obj.id.id
+        
+
     elif class_name == "Group":
         obj_id = obj.id.id
     elif class_name == "Datatype":
@@ -78,7 +80,10 @@ def dump(name, obj, visited=None):
     else:
         print("{0:24} {1} {2}".format(name, class_name, desc))
     if verbose and obj_id is not None:
-        print("    id: {0}".format(obj_id))
+        print("    {0:>12}: {1}".format("UUID", obj_id))
+    if verbose and class_name == "Dataset":
+        print("    {0:>12}: {1}".format("Chunks", obj.chunks))
+        
 
     if showattrs and class_name in ("Dataset", "Group", "Datatype"):
         # dump attributes for the object
@@ -159,7 +164,7 @@ def getFile(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
-    fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username, password=password)
+    fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username, password=password, use_cache=True)
     return fh
 
 def visitDomains(domain, depth=1):

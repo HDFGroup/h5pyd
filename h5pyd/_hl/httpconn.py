@@ -150,7 +150,7 @@ class HttpConn:
             try:
                 content_length = int(rsp_headers['Content-Length'])
             except ValueError:
-                content_length = 9999999
+                content_length = MAX_CACHE_ITEM_SIZE + 1
 
             if rsp_headers['Content-Type'] == 'application/json' and content_length < MAX_CACHE_ITEM_SIZE:
             

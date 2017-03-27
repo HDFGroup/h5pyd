@@ -48,44 +48,44 @@ def create_dataset(fd, dobj):
     # We defer loading the actual data at this point, just create the object and try 
     # to make it as close to the original as possible for the basic copy/load.
     # This routine returns the dataset object (which will be loaded later, most likely)
-    try:
-        logging.info("create_dataset for source obj: {}".format(dobj.name))   
-        logging.info("setting %s chunk size to %s, data shape %s" % (dobj.name, str(dobj.chunks), str(dobj.shape)))
+    
+    logging.info("create_dataset for source obj: {}".format(dobj.name))   
+    logging.info("setting %s chunk size to %s, data shape %s" % (dobj.name, str(dobj.chunks), str(dobj.shape)))
       
-        fillvalue = None
-        try:    
-            # can trigger a runtime error if fillvalue is undefined
-            fillvalue = dobj.fillvalue
-        except RuntimeError:
-            pass  # ignore
+    fillvalue = None
+    try:    
+        # can trigger a runtime error if fillvalue is undefined
+        fillvalue = dobj.fillvalue
+    except RuntimeError:
+        pass  # ignore
 
-        dset = fd.create_dataset( dobj.name, shape=dobj.shape, dtype=dobj.dtype, chunks=dobj.chunks, \
-                               compression=dobj.compression, shuffle=dobj.shuffle, \
-                               fletcher32=dobj.fletcher32, maxshape=dobj.maxshape, \
-                               compression_opts=dobj.compression_opts, fillvalue=fillvalue, \
-                               scaleoffset=dobj.scaleoffset)
-        msg = "dataset created, uuid: {}".format(dset.id.id)
+    dset = fd.create_dataset( dobj.name, shape=dobj.shape, dtype=dobj.dtype, chunks=dobj.chunks, \
+                compression=dobj.compression, shuffle=dobj.shuffle, \
+                fletcher32=dobj.fletcher32, maxshape=dobj.maxshape, \
+                compression_opts=dobj.compression_opts, fillvalue=fillvalue, \
+                scaleoffset=dobj.scaleoffset)
+    msg = "dataset created, uuid: {}".format(dset.id.id)
+    logging.info(msg)
+    if verbose:
+        print(msg)
+    # create attributes
+    for da in dobj.attrs:
+        copy_attribute(dset, da, dobj.attrs[da])
+    
+    it = ChunkIterator(dset)
+    logging.debug("src dtype: {}".format(dobj.dtype))
+    logging.debug("des dtype: {}".format(dset.dtype))
+        
+    for s in it:
+        msg = "writing dataset data for slice: {}".format(s)
         logging.info(msg)
         if verbose:
             print(msg)
-        # create attributes
-        for da in dobj.attrs:
-            copy_attribute(dset, da, dobj.attrs[da])
-
-        it = ChunkIterator(dset)
-        logging.debug("src dtype: {}".format(dobj.dtype))
-        logging.debug("des dtype: {}".format(dset.dtype))
-        
-        for s in it:
-            msg = "writing dataset data for slice: {}".format(s)
-            logging.info(msg)
-            if verbose:
-                print(msg)
-            arr = dobj[s]
-            dset[s] = arr
+        arr = dobj[s]
+        dset[s] = arr
+    
             
-    except Exception as e:
-        logging.error("ERROR : failed to create dataset in create_dataset : "+str(e))
+    
      
 # create_dataset
 
@@ -147,40 +147,37 @@ def create_datatype(fd, obj):
       
 #----------------------------------------------------------------------------------
 def load_file(filename, domain, endpoint=None, username=None, password=None):
-    try:
-        logging.info("input file: {}".format(filename))   
-        finfd = h5py.File(filename, "r")
-        logging.info("output domain: {}".format(domain))
-        foutfd = h5pyd.File(domain, "w", endpoint=endpoint, username=username, password=password)
+    logging.info("input file: {}".format(filename))   
+    finfd = h5py.File(filename, "r")
+    logging.info("output domain: {}".format(domain))
+    foutfd = h5pyd.File(domain, "w", endpoint=endpoint, username=username, password=password)
 
-        def object_create_helper(name, obj):
-            if isinstance(obj, h5py.Dataset):
-                create_dataset(foutfd, obj)
-            elif isinstance(obj, h5py.Group):
-                create_group(foutfd, obj)
-            elif isinstance(obj, h5py.Datatype):
-                create_datatype(foutfd, obj)
-            else:
-                logging.error("no handler for object class: {}".format(type(obj)))
+    def object_create_helper(name, obj):
+        if isinstance(obj, h5py.Dataset):
+            create_dataset(foutfd, obj)
+        elif isinstance(obj, h5py.Group):
+            create_group(foutfd, obj)
+        elif isinstance(obj, h5py.Datatype):
+            create_datatype(foutfd, obj)
+        else:
+            logging.error("no handler for object class: {}".format(type(obj)))
 
-        # build a rough map of the file using the internal function above
-        finfd.visititems(object_create_helper)
+    # build a rough map of the file using the internal function above
+    finfd.visititems(object_create_helper)
         
-        # Fully flush the h5pyd handle. The core of the source hdf5 file 
-        # has been created on the hsds service up to now.
-        foutfd.close() 
+    # Fully flush the h5pyd handle. The core of the source hdf5 file 
+    # has been created on the hsds service up to now.
+    foutfd.close() 
       
-        # close up the source file, see reason(s) for this below
-        finfd.close() 
-        msg = "File {} uploaded to domain: {}".format(filename, domain)
-        logging.info(msg)
-        if verbose:
-            print(msg)
+    # close up the source file, see reason(s) for this below
+    finfd.close() 
+    msg = "File {} uploaded to domain: {}".format(filename, domain)
+    logging.info(msg)
+    if verbose:
+        print(msg)
 
-        return 0
-    except IOError as e: 
-        logging.error(str(e))
-        return 1
+    return 0
+    
 # hsds_basic_load
 
 #----------------------------------------------------------------------------------

@@ -180,9 +180,12 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
     elif track_times is not None:
         raise TypeError("track_times must be either True or False")
     """
-    if maxshape is not None:
-        maxshape = tuple(m if m is not None else 0 for m in maxshape)
-        body['maxdims'] = maxshape
+    if maxshape is not None and len(maxshape) > 0:
+        if shape is not None:
+            maxshape = tuple(m if m is not None else 0 for m in maxshape)
+            body['maxdims'] = maxshape
+        else:
+            self.log.warning("maxshape provided but no shape")
     #sid = h5s.create_simple(shape, maxshape)
 
 
