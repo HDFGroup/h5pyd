@@ -36,54 +36,70 @@ def copy_attribute(obj, name, attrobj):
     logging.debug(msg)
     if verbose:
         print(msg)
-    obj.attrs.create(name, attrobj)
+    try:
+        obj.attrs.create(name, attrobj)
+    except IOError as ioe:
+        msg = "ERROR: failed to create attribute {} of dataset {} -- {}".format(name, obj.name, str(ioe))
+        logging.error(msg)
+        print(msg)
 # copy_attribute
       
 #----------------------------------------------------------------------------------
 def create_dataset(fd, dobj):
-    msg = "creating dataset {} {}".format(dobj.name, '{' + str(dobj.shape) + '}')
+    msg = "creating dataset {}, shape: {}, type: {}".format(dobj.name, dobj.shape, dobj.dtype)
     logging.info(msg)
     if verbose:
-        print(msg)
+        print(msg) 
     # We defer loading the actual data at this point, just create the object and try 
     # to make it as close to the original as possible for the basic copy/load.
     # This routine returns the dataset object (which will be loaded later, most likely)
     
     logging.info("create_dataset for source obj: {}".format(dobj.name))   
     logging.info("setting %s chunk size to %s, data shape %s" % (dobj.name, str(dobj.chunks), str(dobj.shape)))
-      
+    
     fillvalue = None
     try:    
         # can trigger a runtime error if fillvalue is undefined
         fillvalue = dobj.fillvalue
     except RuntimeError:
         pass  # ignore
-
-    dset = fd.create_dataset( dobj.name, shape=dobj.shape, dtype=dobj.dtype, chunks=dobj.chunks, \
+    
+    try:
+        dset = fd.create_dataset( dobj.name, shape=dobj.shape, dtype=dobj.dtype, chunks=dobj.chunks, \
                 compression=dobj.compression, shuffle=dobj.shuffle, \
                 fletcher32=dobj.fletcher32, maxshape=dobj.maxshape, \
                 compression_opts=dobj.compression_opts, fillvalue=fillvalue, \
                 scaleoffset=dobj.scaleoffset)
-    msg = "dataset created, uuid: {}".format(dset.id.id)
-    logging.info(msg)
-    if verbose:
+        msg = "dataset created, uuid: {}".format(dset.id.id)
+        logging.info(msg)
+        if verbose:
+            print(msg)
+    except IOError as ioe:
+        msg = "ERROR: failed to create dataset: {}".format(str(ioe))
+        logging.error(msg)
         print(msg)
     # create attributes
     for da in dobj.attrs:
         copy_attribute(dset, da, dobj.attrs[da])
-    
-    it = ChunkIterator(dset)
-    logging.debug("src dtype: {}".format(dobj.dtype))
-    logging.debug("des dtype: {}".format(dset.dtype))
+    msg = "iterating over chunks for {}".format(dobj.name)
+    try:
+        it = ChunkIterator(dset)
+        logging.debug("src dtype: {}".format(dobj.dtype))
+        logging.debug("des dtype: {}".format(dset.dtype))
         
-    for s in it:
-        msg = "writing dataset data for slice: {}".format(s)
-        logging.info(msg)
-        if verbose:
-            print(msg)
-        arr = dobj[s]
-        dset[s] = arr
-    
+        for s in it:
+            msg = "writing dataset data for slice: {}".format(s)
+            logging.info(msg)
+            if verbose:
+                print(msg)
+            arr = dobj[s]
+            dset[s] = arr
+    except IOError as ioe:
+        msg = "ERROR : failed to copy dataset data : {}".format(str(ioe))
+        logging.error(msg)
+        print(msg)
+
+
             
     
      
@@ -252,7 +268,7 @@ if __name__ == "__main__":
                 loglevel = logging.ERROR
             else:
                 print("unknown loglevel")
-                printUsage()  
+                usage()  
                 sys.exit(-1)
             argn += 2
         elif arg == '--logfile':
