@@ -24,10 +24,13 @@ def getShapeText(dset):
     if shape is not None:
         shape_text = "{"
         rank = len(shape)
-        for dim in range(rank):
-            if dim != 0:
-                shape_text += ", "
-            shape_text += str(shape[dim])
+        if rank == 0:
+            shape_text += "SCALAR"
+        else:
+            for dim in range(rank):
+                if dim != 0:
+                    shape_text += ", "
+                shape_text += str(shape[dim])
         shape_text += "}"
     return shape_text
 
