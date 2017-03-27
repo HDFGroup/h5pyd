@@ -21,7 +21,10 @@ class ChunkIterator:
         else:
             self._layout = dset.chunks
         self._rank = len(dset.shape)
-        self._chunk_index = [0,] * self._rank
+        if self._rank == 0:
+            self._chunk_index = [0,]
+        else:
+            self._chunk_index = [0,] * self._rank
          
     def __iter__(self):
         return self
@@ -33,11 +36,18 @@ class ChunkIterator:
                 return item[0]
             else:
                 return tuple(item)
-
+        if self._layout is ():
+            # special case for scalar datasets
+            if self._chunk_index[0] > 0:
+                raise StopIteration()
+            self._chunk_index[0] += 1
+            return ()
+        
+        slices = []
         if self._chunk_index[0] * self._layout[0] >= self._shape[0]:
             # ran past the last chunk, end iteration
             raise StopIteration()
-        slices = []
+        
         for dim in range(self._rank):
             start = self._chunk_index[dim] * self._layout[dim]
             stop = start + self._layout[dim]
