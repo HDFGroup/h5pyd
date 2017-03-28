@@ -128,11 +128,11 @@ def create_group(fd, gobj):
             soft_link = h5pyd.SoftLink(lnk.path)
             grp[title] = soft_link
         elif isinstance(lnk, h5py.ExternalLink):
-            msg = "creating ExternalLink({}, {}) with title: {}".format(lnk.path, lnk.filename, title)
+            msg = "creating ExternalLink({}, {}) with title: {}".format(lnk.filename, lnk.path, title)
             if verbose:
                 print(msg)
             logging.info(msg)
-            ext_link = h5pyd.ExternalLink(lnk.path, lnk.filename)
+            ext_link = h5pyd.ExternalLink(lnk.filename, lnk.path)
             grp[title] = ext_link
         else:
             msg = "Unexpected link type: {}".format(lnk.__class__.__name__)
