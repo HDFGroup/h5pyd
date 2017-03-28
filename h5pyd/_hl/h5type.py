@@ -312,7 +312,7 @@ def getTypeItem(dt):
             elif ref_check is RegionReference:  
                 type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
             else:
-                raise TypeError("unexpected reference type")
+                raise TypeError("unexpected reference type: {}".format(type(ref_check)))
         else:
             raise TypeError("unknown object type")
     elif dt.kind == 'V':

@@ -38,8 +38,8 @@ def copy_attribute(obj, name, attrobj):
         print(msg)
     try:
         obj.attrs.create(name, attrobj)
-    except IOError as ioe:
-        msg = "ERROR: failed to create attribute {} of dataset {} -- {}".format(name, obj.name, str(ioe))
+    except (IOError, TypeError) as e:
+        msg = "ERROR: failed to create attribute {} of dataset {} -- {}".format(name, obj.name, str(e))
         logging.error(msg)
         print(msg)
 # copy_attribute
@@ -98,9 +98,6 @@ def create_dataset(fd, dobj):
         msg = "ERROR : failed to copy dataset data : {}".format(str(ioe))
         logging.error(msg)
         print(msg)
-
-
-            
     
      
 # create_dataset
