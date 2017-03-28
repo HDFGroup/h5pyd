@@ -165,6 +165,10 @@ def load_file(filename, domain, endpoint=None, username=None, password=None):
     logging.info("output domain: {}".format(domain))
     foutfd = h5pyd.File(domain, "w", endpoint=endpoint, username=username, password=password)
 
+    # create any root attributes
+    for ga in finfd.attrs:
+        copy_attribute(foutfd, ga, finfd.attrs[ga])
+
     def object_create_helper(name, obj):
         if isinstance(obj, h5py.Dataset):
             create_dataset(foutfd, obj)
