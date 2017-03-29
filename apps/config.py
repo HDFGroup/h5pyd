@@ -20,8 +20,10 @@ class Config:
         self._cfg = {}
         if config_file:
             self._config_file = config_file
-        else:
+        elif os.path.isfile(".hscfg"):
             self._config_file = ".hscfg"
+        else:
+            self._config_file = os.path.expanduser("~/.hscfg")
         # process config file if found
         if os.path.isfile(self._config_file):
             line_number = 0
