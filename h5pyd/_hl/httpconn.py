@@ -139,7 +139,7 @@ class HttpConn:
 
         try:
             s = self.session
-            rsp = s.get(self._endpoint + req, headers=headers, verify=self.verifyCert())
+            rsp = s.get(self._endpoint + req, headers=headers, auth=(self._username, self._password), verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))
@@ -185,7 +185,7 @@ class HttpConn:
         self.log.info("PUT: {} format: {} [{} bytes]".format(req, format, len(data)))
         s = self.session
         rsp = s.put(req, data=data, headers=headers,
-                           params=params, verify=self.verifyCert())
+                params=params, auth=(self._username, self._password), verify=self.verifyCert())
         return rsp
 
     def POST(self, req, body=None, headers=None):
@@ -208,7 +208,7 @@ class HttpConn:
 
         try: 
             s = self.session
-            rsp = s.post(req, data=data, headers=headers, verify=self.verifyCert())
+            rsp = s.post(req, data=data, headers=headers, auth=(self._username, self._password), verify=self.verifyCert())
         except ConnectionError as ce:
             self.log.warn("connection error: ", ce)
             raise IOError(str(ce))
@@ -231,7 +231,7 @@ class HttpConn:
 
         self.log.info("DEL: " + req)
         s = self.session
-        rsp = s.delete(req, headers=headers, verify=self.verifyCert())
+        rsp = s.delete(req, headers=headers, auth=(self._username, self._password), verify=self.verifyCert())
         return rsp
     
     @property
