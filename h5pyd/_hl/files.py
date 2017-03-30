@@ -157,28 +157,34 @@ class File(Group):
                 root_json = json.loads(rsp.text)
             if rsp.status_code != 200 and mode in ('r', 'r+'):
                 # file must exist
+                http_conn.close() 
                 raise IOError(rsp.status_code, rsp.reason)
             if rsp.status_code == 200 and mode in ('w-', 'x'):
                 # Fail if exists
+                http_conn.close() 
                 raise IOError(409, "domain already exists")
             if rsp.status_code == 200 and mode == 'w':
                 # delete existing domain
                 rsp = http_conn.DELETE(req)
                 if rsp.status_code != 200:
                     # failed to delete
+                    http_conn.close() 
                     raise IOError(rsp.status_code, rsp.reason)
                 root_json = None
             if root_json is None:
                 # create the domain
                 if mode not in ('w', 'a', 'x'):
+                    http_conn.close() 
                     raise IOError(404, "File not found")
                 rsp = http_conn.PUT(req)  
                 if rsp.status_code != 201:
+                    http_conn.close() 
                     raise IOError(rsp.status_code, rsp.reason)
                  
                 root_json = json.loads(rsp.text)
 
             if 'root' not in root_json:
+                http_conn.close() 
                 raise IOError(500, "Unexpected error")
             root_uuid = root_json['root']
 
@@ -194,6 +200,7 @@ class File(Group):
                         rspJson = json.loads(rsp.text)
                         domain_acl = rspJson["acl"]
                         if not domain_acl["update"]:
+                            http_conn.close() 
                             raise IOError(403, "Forbidden")
                         else:
                             break  # don't check with "default" user in this case
@@ -207,6 +214,7 @@ class File(Group):
             rsp = http_conn.GET(req)
 
             if rsp.status_code != 200:
+                http_conn.close() 
                 raise IOError(rsp.status_code, "Unexpected Error")
             group_json = json.loads(rsp.text)
 
@@ -246,13 +254,6 @@ class File(Group):
         """
         # this will close the socket of the http_conn singleton
         self._id._http_conn.close()   
-        self._id.close()
-
-    def remove(self):
-        """ Deletes the domain on the server"""
-        if self.id.http_conn.mode == 'r':
-            raise ValueError("Unable to remove file (No write intent on file)")
-        self.DELETE('/')
         self._id.close()
 
     def flush(self):

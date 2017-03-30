@@ -95,7 +95,6 @@ class HttpConn:
         if password is None:
             password = self._password
         headers['host'] = domain
-        
         if username is not None and password is not None:
             auth_string = username + ':' + password
             auth_string = auth_string.encode('utf-8')
@@ -136,10 +135,13 @@ class HttpConn:
                 return rsp
         
         self.log.info("GET: {} [{}]".format(self._endpoint + req, headers["host"]))
-
+        if self._username and self._password:
+            auth = (self._username, self._password)
+        else:
+            auth = None
         try:
             s = self.session
-            rsp = s.get(self._endpoint + req, headers=headers, auth=(self._username, self._password), verify=self.verifyCert())
+            rsp = s.get(self._endpoint + req, headers=headers, auth=auth, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))
@@ -178,14 +180,22 @@ class HttpConn:
         if format=="binary":
             headers['Content-Type'] = "application/octet-stream"
             # binary write
-            data = body
-            
+            data = body    
         else:
             data = json.dumps(body)
         self.log.info("PUT: {} format: {} [{} bytes]".format(req, format, len(data)))
-        s = self.session
-        rsp = s.put(req, data=data, headers=headers,
-                params=params, auth=(self._username, self._password), verify=self.verifyCert())
+        if self._username and self._password:
+            auth = (self._username, self._password)
+        else:
+            auth = None
+        try:
+            s = self.session
+            rsp = s.put(req, data=data, headers=headers, auth=auth, verify=self.verifyCert())
+            self.log.info("status: {}".format(rsp.status_code))
+        except ConnectionError as ce:
+            self.log.error("connection error: {}".format(ce))
+            raise IOError("Connection Error")
+ 
         return rsp
 
     def POST(self, req, body=None, headers=None):
@@ -206,9 +216,13 @@ class HttpConn:
 
         self.log.info("PST: " + req)
 
+        if self._username and self._password:
+            auth = (self._username, self._password)
+        else:
+            auth = None
         try: 
             s = self.session
-            rsp = s.post(req, data=data, headers=headers, auth=(self._username, self._password), verify=self.verifyCert())
+            rsp = s.post(req, data=data, headers=headers, auth=auth, verify=self.verifyCert())
         except ConnectionError as ce:
             self.log.warn("connection error: ", ce)
             raise IOError(str(ce))
@@ -230,8 +244,18 @@ class HttpConn:
             headers = self.getHeaders() 
 
         self.log.info("DEL: " + req)
-        s = self.session
-        rsp = s.delete(req, headers=headers, auth=(self._username, self._password), verify=self.verifyCert())
+        if self._username and self._password:
+            auth = (self._username, self._password)
+        else:
+            auth = None
+        try:
+            s = self.session
+            rsp = s.delete(req, headers=headers, auth=auth, verify=self.verifyCert())
+            self.log.info("status: {}".format(rsp.status_code))
+        except ConnectionError as ce:
+            self.log.error("connection error: {}".format(ce))
+            raise IOError("Connection Error")
+ 
         return rsp
     
     @property

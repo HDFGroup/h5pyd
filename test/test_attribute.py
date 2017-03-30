@@ -90,6 +90,9 @@ class TestAttribute(TestCase):
         # byte values
         g1.attrs['e1'] = b"Hello"
 
+        # close file
+        f.close()
+
 
 
 

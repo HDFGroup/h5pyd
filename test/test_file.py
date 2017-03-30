@@ -125,7 +125,11 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
+        
+
+    def test_open_notfound(self):
         # verify open of non-existent file throws exception
+   
         try:
             filename = self.getFileName("no_file_here")
             print("filename:", filename)
@@ -133,54 +137,7 @@ class TestFile(TestCase):
             self.assertTrue(False) #expect exception
         except IOError:
             pass
-
-    def test_delete(self):
-        filename = self.getFileName("delete_me")        
-        print("filename:", filename)
-
-        f = h5py.File(filename, 'w')
-
-        for name in ("g1", "g2", "g1/g1.1"):
-            f.create_group(name)
-        f.close()
-
-        f = h5py.File(filename, 'r') 
-        self.assertEqual(f.filename, filename)
-        self.assertEqual(f.name, "/")
-        self.assertTrue(f.id.id is not None)
-        self.assertEqual(len(f.keys()), 2)
-
-        # removing file in read-mode should fail
-        if h5py.__name__ == "h5pyd":
-            try:
-                f.remove()
-                self.assertTrue(False)  # expected exception
-            except ValueError as ve:
-                self.assertEqual(str(ve), "Unable to remove file (No write intent on file)")
-
-        f.close()
         
-        f = h5py.File(filename, 'r+')
-        self.assertEqual(f.filename, filename)
-        self.assertEqual(f.name, "/")
-        self.assertTrue(f.id.id is not None)
-        self.assertEqual(len(f.keys()), 2)
-
-        # delete the file
-        if h5py.__name__ == "h5py":
-            os.remove(filename)
-        else:
-            f.remove()
-        if h5py.__name__ == "h5pyd":
-            self.assertEqual(f.id.id, 0)
-
-        # opening in read-mode should fail
-        try:
-            f = h5py.File(filename, 'r') 
-            self.assertTrue(False)  # expected exception
-        except IOError as ioe:
-            if h5py.__name__ == "h5pyd":
-                self.assertTrue(ioe.errno in (404, 410))  # Not Found or Gone
 
     def test_auth(self):
         if h5py.__name__ == "h5py":
@@ -274,16 +231,8 @@ class TestFile(TestCase):
         grp = f['/']
         grp.file.close()  # try closing the file via a group reference
         
-        f = h5py.File(filename, 'r+') 
- 
-        # delete the file
-        f.remove()
-        self.assertEqual(f.id.id, 0)
-
-        try:
-            f = h5py.File(filename, 'r+') 
-        except IOError as ioe:
-            self.assertTrue(ioe.errno in (404, 410))  # Not Found or Gone
+        
+         
 
     def test_close(self):
         filename = self.getFileName("close_file")
