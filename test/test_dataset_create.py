@@ -9,7 +9,7 @@
 # distribution tree.  If you do not have access to this file, you may        #
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
-
+import logging
 import numpy as np
 import math
 
@@ -228,4 +228,6 @@ class TestCreateDataset(TestCase):
 
 
 if __name__ == '__main__':
+    loglevel = logging.DEBUG
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

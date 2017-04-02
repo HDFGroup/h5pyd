@@ -207,6 +207,8 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
         json_rep['creationProperties'] = rsp['creationProperties']
     else:
         json_rep['creationProperties'] = {}
+    if "layout" in rsp:
+        json_rep['layout'] = rsp['layout']
 
     dset_id = DatasetID(parent, json_rep)
 

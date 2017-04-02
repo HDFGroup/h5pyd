@@ -169,6 +169,8 @@ class HttpConn:
         if self._cache is not None:   
             # domain deletin, invalidate everything in cache
             self._cache = {}  
+        if params:
+            self.log.info("PUT params: {}".format(params))
 
         req = self._endpoint + req
         
@@ -190,7 +192,7 @@ class HttpConn:
             auth = None
         try:
             s = self.session
-            rsp = s.put(req, data=data, headers=headers, auth=auth, verify=self.verifyCert())
+            rsp = s.put(req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))

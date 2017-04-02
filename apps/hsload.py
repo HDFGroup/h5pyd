@@ -46,17 +46,14 @@ def copy_attribute(obj, name, attrobj):
       
 #----------------------------------------------------------------------------------
 def create_dataset(fd, dobj):
+    """ create a dataset using the properties of the passed in h5py dataset.
+        If successful, proceed to copy attributes and data.
+    """
     msg = "creating dataset {}, shape: {}, type: {}".format(dobj.name, dobj.shape, dobj.dtype)
     logging.info(msg)
     if verbose:
         print(msg) 
-    # We defer loading the actual data at this point, just create the object and try 
-    # to make it as close to the original as possible for the basic copy/load.
-    # This routine returns the dataset object (which will be loaded later, most likely)
-    
-    logging.info("create_dataset for source obj: {}".format(dobj.name))   
-    logging.info("setting %s chunk size to %s, data shape %s" % (dobj.name, str(dobj.chunks), str(dobj.shape)))
-    
+       
     fillvalue = None
     try:    
         # can trigger a runtime error if fillvalue is undefined
@@ -70,7 +67,7 @@ def create_dataset(fd, dobj):
                 fletcher32=dobj.fletcher32, maxshape=dobj.maxshape, \
                 compression_opts=dobj.compression_opts, fillvalue=fillvalue, \
                 scaleoffset=dobj.scaleoffset)
-        msg = "dataset created, uuid: {}".format(dset.id.id)
+        msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))  
         logging.info(msg)
         if verbose:
             print(msg)
@@ -78,10 +75,14 @@ def create_dataset(fd, dobj):
         msg = "ERROR: failed to create dataset: {}".format(str(ioe))
         logging.error(msg)
         print(msg)
+        return
     # create attributes
     for da in dobj.attrs:
         copy_attribute(dset, da, dobj.attrs[da])
     msg = "iterating over chunks for {}".format(dobj.name)
+    logging.info(msg)
+    if verbose:
+        print(msg)
     try:
         it = ChunkIterator(dset)
         logging.debug("src dtype: {}".format(dobj.dtype))
