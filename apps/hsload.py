@@ -27,6 +27,7 @@ __version__ = '0.0.1'
 
 UTILNAME = 'hsload'
 verbose = False
+nodata = False
  
 #get_sizes
 
@@ -71,14 +72,22 @@ def create_dataset(fd, dobj):
         logging.info(msg)
         if verbose:
             print(msg)
-    except IOError as ioe:
-        msg = "ERROR: failed to create dataset: {}".format(str(ioe))
+    except (IOError, TypeError) as e:
+        msg = "ERROR: failed to create dataset: {}".format(str(e))
         logging.error(msg)
         print(msg)
         return
     # create attributes
     for da in dobj.attrs:
         copy_attribute(dset, da, dobj.attrs[da])
+
+    if nodata:
+        msg = "skipping data load"
+        logging.info(msg)
+        if verbose:
+            print(msg)
+        return
+
     msg = "iterating over chunks for {}".format(dobj.name)
     logging.info(msg)
     if verbose:
@@ -95,9 +104,13 @@ def create_dataset(fd, dobj):
                 print(msg)
             arr = dobj[s]
             dset[s] = arr
-    except IOError as ioe:
-        msg = "ERROR : failed to copy dataset data : {}".format(str(ioe))
+    except (IOError, TypeError) as e:
+        msg = "ERROR : failed to copy dataset data : {}".format(str(e))
         logging.error(msg)
+        print(msg)
+    msg = "done with dataload for {}".format(dobj.name)
+    logging.info(msg)
+    if verbose:
         print(msg)
     
      
@@ -219,6 +232,7 @@ def usage():
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
+    print("     --nodata :: Do not upload dataset data")
     print("     -h | --help    :: This message.")
     print("")
     print(("%s version %s\n" % (UTILNAME, __version__)))
@@ -258,6 +272,9 @@ if __name__ == "__main__":
             val = sys.argv[argn+1] 
         if arg in ("-v", "--verbose"):
             verbose = True
+            argn += 1
+        elif arg == "--nodata":
+            nodata = True
             argn += 1
         elif arg == "--loglevel":
             if val == "debug":
