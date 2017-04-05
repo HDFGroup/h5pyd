@@ -11,7 +11,7 @@
 ##############################################################################
 
 import config
-
+import logging
 
 if config.get("use_h5py"):
     import h5py
@@ -31,11 +31,7 @@ class TestFolders(TestCase):
      
     def test_list(self):
         test_domain = self.getFileName("folder_test")  
-        print("test_domain:", test_domain)
-        f = h5py.File(test_domain, 'w')  # create a new domain
-        if not f.id.id.startswith("g-"):
-            # Folders aren't implemented yet for h5serv, so skip
-            return
+         
         filepath = self.getPathFromDomain(test_domain)
 
         folder_name = op.dirname(filepath)  + '/' 
@@ -78,7 +74,24 @@ class TestFolders(TestCase):
             i += 1
         self.assertTrue(test_domain_found)
         self.assertEqual(i, count)
+        dir.close()
+         
 
+    def test_create_folder(self):
+        loglevel = logging.DEBUG
+        logging.basicConfig( format='%(asctime)s %(message)s', level=loglevel)
+        folder_test = self.getFileName("create_folder_test")  
+        folder_path = self.getPathFromDomain(folder_test) + '/'
+
+        print("folder_path", folder_path)
+        dir = h5py.Folder(folder_path, mode='w')  # create a new folder
+        print(dir.owner)
+        dir.close()
+        # re-open
+        dir = h5py.Folder(folder_path)
+        self.assertTrue(dir.is_folder)
+        dir.close()
+         
             
             
          

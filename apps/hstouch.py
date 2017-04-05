@@ -24,6 +24,14 @@ def getFolder(domain):
     dir = h5py.Folder(domain, endpoint=endpoint, username=username, password=password)
     return dir
 
+def createFolder(domain):
+    username = cfg["hs_username"]
+    password = cfg["hs_password"]
+    endpoint = cfg["hs_endpoint"]
+    #print("getFolder", domain)
+    dir = h5py.Folder(domain, mode='x', endpoint=endpoint, username=username, password=password)
+    return dir
+
 def getFile(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -43,6 +51,11 @@ def createFile(domain):
 
    
 def touchDomain(domain):
+
+    make_folder = False
+    if domain[-1] == '/':
+        make_folder = True
+        domain = domain[:-1]
 
     # get handle to parent folder
     parent_domain = op.dirname(domain) 
@@ -76,20 +89,31 @@ def touchDomain(domain):
             sys.exit("Unexpected error: {}".format(oe))
 
     if hdomain:
-        try:
-            r = hdomain['/']
-            # create/update attribute to update lastModified timestamp of domain
-            r.attrs["hstouch"] = 1
-            hdomain.close()
-        except OSError as oe:
-            sys.exit("Got error updating domain: {}".format(oe))
+        if not make_folder:
+            try:
+                r = hdomain['/']
+                # create/update attribute to update lastModified timestamp of domain
+                r.attrs["hstouch"] = 1
+                hdomain.close()
+            except OSError as oe:
+                sys.exit("Got error updating domain: {}".format(oe))
+        else:
+            sys.exit("Can not update timestamp of folder object")
+        hdomain.close()
     else:
         # create domain
-        try:
-            fh = createFile(domain)
-            #print("domain created", fh.id.id)
-        except OSError as oe:
-            sys.exit("Got error updating domain: {}".format(oe))
+        if not make_folder:
+            try:
+                fh = createFile(domain)
+                #print("domain created", fh.id.id)
+                fh.close()
+            except OSError as oe:
+                sys.exit("Got error updating domain: {}".format(oe))
+        else:
+            # make folder
+            fh = createFolder(domain + '/')
+            print("folder: ", domain + '/', "created")
+            fh.close()
 
 
 #
@@ -160,9 +184,7 @@ logging.debug("set log_level to {}".format(loglevel))
 for domain in domains:
     if not domain.startswith('/'):
         sys.exit("domain: {} must start with a slash".format(domain))
-    if domain.endswith('/'):
-        sys.exit("domain: {} can not end with slash".format(domain))
-    
+       
     touchDomain(domain)
 
     

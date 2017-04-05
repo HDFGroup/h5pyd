@@ -174,52 +174,42 @@ def visitDomains(domain, depth=1):
     if depth == 0:
         return 0
     #print("recursive:", depth)
-    #print("domain:", domain)
     count = 0
-    if domain.endswith('/'):
-        got_folder = False
-        try:
-            dir = getFolder(domain)
-            if len(dir) > 0:
-                got_folder = True
-                owner = dir.owner
-                timestamp = datetime.fromtimestamp(int(dir.modified))
-                print("{:24} {} {}".format(owner, timestamp, domain))
-                count += 1
-                if showacls:
-                    dumpAcls(dir)
-                for name in dir:
-                    # recurse for items in folder
-                    n = visitDomains(domain + name, depth=(depth-1))
-                    count += n
-                    
-        except OSError as oe:
-            if oe.errno in (404, 410):
-                # TBD: recently creating domains may not be immediately visible to the service
-                # Once the flush operation is implemented, this should be an issue for h5pyd apps
-                pass
-            else:
-                print("error getting domain:", domain)
-                sys.exit(str(oe))
-             
-         
-    else:
-        got_domain = False
-        # see if this is a domain
-        try:
-            f = getFile(domain) 
-            owner = f.owner
-            timestamp = datetime.fromtimestamp(int(f.modified))
-            print("{:24} {} {}".format(owner, timestamp, domain))
-            f.close()
-            got_domain = True
-            count = 1
-        except OSError:
-            pass  # ignore if the domain is not valid 
+    if domain[-1] == '/':
+        domain = domain[:-1]  # strip off trailing slash
+    
+    got_folder = False
+    try:
+        dir = getFolder(domain + '/')
+        dir_class = "domain"
+        display_name = domain
+        if dir.is_folder:
+            dir_class = "folder"
+            display_name += '/'
         
-        if not got_domain or depth > 0:
-            # see if this is a folder 
-            count += visitDomains(domain+'/', depth=depth)
+        owner = dir.owner
+        timestamp = datetime.fromtimestamp(int(dir.modified))
+                
+        print("{:24} {:8} {} {}".format(owner, dir_class, timestamp, display_name))
+        count += 1
+        if showacls:
+            dumpAcls(dir)
+        if dir.is_folder:
+            for name in dir:
+                # recurse for items in folder
+                #print("got name:", name)
+                n = visitDomains(domain + '/' + name, depth=(depth-1))
+                count += n
+                    
+    except OSError as oe:
+        if oe.errno in (404, 410):
+            # TBD: recently creating domains may not be immediately visible to the service
+            # Once the flush operation is implemented, this should be an issue for h5pyd apps
+            pass
+        else:
+            print("error getting domain:", domain)
+            sys.exit(str(oe))
+             
 
     return count
             
