@@ -59,7 +59,6 @@ class ChunkIterator:
         # bump up the last index and carry forward if we run outside the selection
         dim = self._rank - 1
         while dim >= 0:
-            s = slices[dim]
             c = self._layout[dim]
             self._chunk_index[dim] += 1
             
