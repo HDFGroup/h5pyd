@@ -59,6 +59,7 @@ class ChunkIterator:
         # bump up the last index and carry forward if we run outside the selection
         dim = self._rank - 1
         while dim >= 0:
+            s = slices[dim]
             c = self._layout[dim]
             self._chunk_index[dim] += 1
             
@@ -69,7 +70,7 @@ class ChunkIterator:
              
             if dim > 0:
                 # reset to the start and continue iterating with higher dimension
-                self._chunk_index[dim] = s.start // c 
+                self._chunk_index[dim] = 0
             dim -= 1
         return get_ret(slices)
 
