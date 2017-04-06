@@ -204,7 +204,7 @@ class PointSelection(Selection):
     """
     def __init__(self, shape,  *args, **kwds):
         """ Create a Point selection.   """   
-        Selection.__init__(self, shape, *args, **kwds)      
+        Selection.__init__(self, shape, *args, **kwds)  
         self._points = []
 
     @property
@@ -223,7 +223,12 @@ class PointSelection(Selection):
             for nextent in dims:
                 npoints *= nextent
         elif self._select_type == H5S_SEL_POINTS:
-            return len(self._points)
+            dims = self._shape
+            rank = len(dims)
+            if len(self._points) == rank and not type(self._points[0]) in (list, tuple, np.ndarray):
+                npoints = 1
+            else:
+                npoints = len(self._points)
         else:
             raise IOError("Unsupported select type")
         return npoints

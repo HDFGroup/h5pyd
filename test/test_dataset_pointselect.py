@@ -78,6 +78,9 @@ class TestPointSelectDataset(TestCase):
         expected_vals =  [5005,5010,5015]
         for i in range(len(expected_vals)):
             self.assertEqual(pts[i],expected_vals[i])
+
+        val = dset2d[[1,2]]
+        self.assertEqual(val, 1002)
          
         f.close()
 

@@ -641,29 +641,34 @@ class Dataset(HLObject):
             # verify the points are in range and strictly monotonic (for the 1d case)
             last_point = -1
             delistify = False
-            for point in points:
-                if isinstance(point, (list, tuple)):
-                    if not isinstance(point, (list, tuple)):
-                        raise ValueError("invalid point argument")
-                    if len(point) != rank:
-                        raise ValueError("invalid point argument")
-                    for i in range(rank):
-                        if point[i]<0 or point[i]>=self._shape[i]:
-                            raise ValueError("point out of range")
-                    if rank == 1:
-                        delistify = True
-                        if point[0] <= last_point:
-                            raise TypeError("index points must be strictly increasing")
-                        last_point = point[0]
+            if len(points) == rank and isinstance(points[0], int):
+                # Single point selection
+                self.log.info("single point selection")
+                points = [ points, ]
+            else:
+                for point in points:
+                    if isinstance(point, (list, tuple)):
+                        if not isinstance(point, (list, tuple)):
+                            raise ValueError("invalid point argument")
+                        if len(point) != rank:
+                            raise ValueError("invalid point argument")
+                        for i in range(rank):
+                            if point[i]<0 or point[i]>=self._shape[i]:
+                                raise ValueError("point out of range")
+                        if rank == 1:
+                            delistify = True
+                            if point[0] <= last_point:
+                                raise TypeError("index points must be strictly increasing")
+                            last_point = point[0]
 
-                elif rank == 1 and isinstance(point, six.integer_types):
-                    if point < 0 or point>self._shape[0]:
-                        raise ValueError("point out of range")
-                    if point <= last_point:
-                        raise TypeError("index points must be strictly increasing")
-                    last_point = point
-                else:
-                    raise ValueError("invalid point argument")
+                    elif rank == 1 and isinstance(point, six.integer_types):
+                        if point < 0 or point>self._shape[0]:
+                            raise ValueError("point out of range")
+                        if point <= last_point:
+                            raise TypeError("index points must be strictly increasing")
+                        last_point = point
+                    else:
+                        raise ValueError("invalid point argument")
 
             if delistify:
                 # convert to int if needed
@@ -676,7 +681,6 @@ class Dataset(HLObject):
             else:
                 # can just assign
                 body["points"] = points
-
             rsp = self.POST(req, body=body)
             data = rsp["value"]
              
