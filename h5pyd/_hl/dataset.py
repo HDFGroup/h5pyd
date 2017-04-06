@@ -641,8 +641,9 @@ class Dataset(HLObject):
             # verify the points are in range and strictly monotonic (for the 1d case)
             last_point = -1
             delistify = False
-            if len(points) == rank and isinstance(points[0], int):
-                # Single point selection
+             
+            if len(points) == rank and isinstance(points[0], int) and rank > 1:
+                # Single point selection - need to wrap this in an array
                 self.log.info("single point selection")
                 points = [ points, ]
             else:
