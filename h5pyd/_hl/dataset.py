@@ -642,7 +642,7 @@ class Dataset(HLObject):
             last_point = -1
             delistify = False
              
-            if len(points) == rank and isinstance(points[0], int) and rank > 1:
+            if len(points) == rank and isinstance(points[0], six.integer_types) and rank > 1:
                 # Single point selection - need to wrap this in an array
                 self.log.info("single point selection")
                 points = [ points, ]
