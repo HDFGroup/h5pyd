@@ -21,6 +21,7 @@ from .objectid import GroupID
 from .group import Group
 from .. import version
 from .httpconn import HttpConn
+from .config import Config
 
 
 hdf5_version = version.hdf5_version_tuple[0:3]
@@ -100,21 +101,7 @@ class File(Group):
             Server endpoint.   Defaults to "http://localhost:5000"
         """
 
-       
-        """
-        if isinstance(name, _objects.ObjectID):
-            fid = h5i.get_file_id(name)
-        else:
-            try:
-                # If the byte string doesn't match the default
-                # encoding, just pass it on as-is.  Note Unicode
-                # objects can always be encoded.
-                name = name.encode(sys.getfilesystemencoding())
-            except (UnicodeError, LookupError):
-                pass
-
-            fapl = make_fapl(driver, libver, **kwds)
-        """
+        
         groupid = None
         # if we're passed a GroupId as domain, jsut initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
@@ -130,18 +117,32 @@ class File(Group):
             if mode is None:
                 mode = 'a'
 
+            cfg = None
+            if endpoint is None or username is None or password is None:
+                # unless we'r given all the connect info, create a config object that
+                # pulls in state from a .hscfg file (if found).
+                cfg = Config()
+ 
             if endpoint is None:
                 if "H5SERV_ENDPOINT" in os.environ:
                     endpoint = os.environ["H5SERV_ENDPOINT"]
+                elif "hs_endpoint" in cfg:
+                    endpoint = cfg["hs_endpoint"]
                 else:
                     endpoint = "http://127.0.0.1:5000"
 
-            if username is None and "H5SERV_USERNAME" in os.environ:
-                username = os.environ["H5SERV_USERNAME"]
-
-            if password is None and "H5SERV_PASSWORD" in os.environ:
-                password = os.environ["H5SERV_PASSWORD"]
-         
+            if username is None:
+                if "H5SERV_USERNAME" in os.environ:
+                    username = os.environ["H5SERV_USERNAME"]
+                elif "hs_username" in cfg:
+                    username = cfg["hs_username"]
+                
+            if password is None:
+                if "H5SERV_PASSWORD" in os.environ:
+                    password = os.environ["H5SERV_PASSWORD"]
+                elif "hs_password" in cfg:
+                    password = cfg["hs_password"]
+  
             http_conn =  HttpConn(domain, endpoint=endpoint, 
                     username=username, password=password, mode=mode, 
                     use_session=use_session, use_cache=use_cache, logger=logger)

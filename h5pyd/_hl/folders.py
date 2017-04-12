@@ -18,6 +18,7 @@ import six
 import json
 import logging
 from .httpconn import HttpConn
+from .config import Config
  
  
 class Folder():
@@ -89,6 +90,21 @@ class Folder():
         if mode is None:
             mode = 'r'
 
+        cfg = None
+        if endpoint is None or username is None or password is None:
+            # unless we'r given all the connect info, create a config object that
+            # pulls in state from a .hscfg file (if found).
+            cfg = Config()
+ 
+        if endpoint is None and "hs_endpoint" in cfg:
+            endpoint = cfg["hs_endpoint"]
+
+        if username is None and "hs_username" in cfg:
+            username = cfg["hs_username"]
+              
+        if password is None and "hs_password" in cfg:
+            password = cfg["hs_password"]
+                 
         self._domain = domain_name[:-1]
         self._subdomains = None
         self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, password=password, mode=mode, logger=logger)
