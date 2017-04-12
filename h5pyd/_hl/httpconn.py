@@ -115,7 +115,7 @@ class HttpConn:
                 return False
         return True
 
-    def GET(self, req, format="json", headers=None):
+    def GET(self, req, format="json", params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
@@ -141,7 +141,7 @@ class HttpConn:
             auth = None
         try:
             s = self.session
-            rsp = s.get(self._endpoint + req, headers=headers, auth=auth, verify=self.verifyCert())
+            rsp = s.get(self._endpoint + req, params=params, headers=headers, auth=auth, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))

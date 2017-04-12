@@ -90,6 +90,7 @@ class Folder():
             mode = 'r'
 
         self._domain = domain_name[:-1]
+        self._subdomains = None
         self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, password=password, mode=mode, logger=logger)
         self.log = self._http_conn.logging
 
@@ -169,12 +170,13 @@ class Folder():
         if rsp.status_code != 201:
             raise IOError(rsp.status_code, rsp.reason)
 
-    # TBD: Replace with implementation that can handle large collections
+
     def _getSubdomains(self):
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         req = '/domains'
-        rsp = self._http_conn.GET(req)
+        params = {"domain": self._domain + '/'}
+        rsp = self._http_conn.GET(req, params=params)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
         rsp_json = json.loads(rsp.text)
@@ -195,9 +197,11 @@ class Folder():
         """ Get a domain  """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
-        domains = self._getSubdomains()
+        if self._subdomains is None:
+            self._subdomains = self._getSubdomains()
+        domains = self._subdomains
         for domain in domains:
-            if domain["name"] == name:
+            if op.basename(domain["name"]) == name:
                 return domain
         return None
 
@@ -211,6 +215,7 @@ class Folder():
         headers = self._http_conn.getHeaders(domain=domain)
         req = '/'
         self._http_conn.DELETE(req, headers=headers)
+        self._subdomains = None # reset the cache list
         #self.id.unlink(self._e(name))
 
     def __len__(self):
@@ -227,7 +232,7 @@ class Folder():
             raise IOError(400, "folder is not open")
         domains = self._getSubdomains()
         for domain in domains:
-            yield domain['name']
+            yield op.basename(domain['name'])
          
 
     def __contains__(self, name):
@@ -237,7 +242,7 @@ class Folder():
         domains = self._getSubdomains()
         found = False
         for domain in domains:
-            if domain['name'] == name:
+            if op.basename(domain['name']) == name:
                 found = True
                 break
         
