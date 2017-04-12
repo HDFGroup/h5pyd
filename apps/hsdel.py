@@ -14,11 +14,11 @@ showacls = False
 cfg = Config()
  
 
-def getFolder(domain):
+def getFolder(domain, mode='r'):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
-    dir = h5py.Folder(domain, endpoint=endpoint, username=username, password=password)
+    dir = h5py.Folder(domain, mode=mode, endpoint=endpoint, username=username, password=password)
     return dir
  
    
@@ -34,7 +34,7 @@ def deleteDomain(domain):
     if not parent_domain.endswith('/'):
         parent_domain += '/'
     try:
-        hparent = getFolder(parent_domain)
+        hparent = getFolder(parent_domain, mode='a')
     except OSError as oe:
         if oe.errno == 404:   # Not Found
             sys.exit("Parent domain: {} not found".format(parent_domain))
