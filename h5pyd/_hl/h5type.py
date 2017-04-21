@@ -13,12 +13,87 @@
 from __future__ import absolute_import
 
 import numpy as np
-from .base import Reference, RegionReference
+# trying to import these results in circule references, so just use is_reference, is_regionreference helpers to identify
+#from .base import Reference, RegionReference
 import six
+import weakref
 
 if six.PY3:
     unicode = str
+"""
+def is_reference(obj):
+    if isinstance(val, object) and val.__class__.__name__ == "Reference":
+        return True 
+    else:
+        return False
 
+def is_regionreference(obj):
+    if isinstance(val, object) and val.__class__.__name__ == "RegionReference":
+        return True 
+    else:
+        return False
+"""
+
+
+class Reference():
+
+    """
+        Represents an HDF5 object reference
+    """
+    @property
+    def id(self):
+        """ Low-level identifier appropriate for this object """
+        return self._id
+
+    @property
+    def objref(self):
+        """ Weak reference to object """
+        return self._objref  # return weak ref to ref'd object
+
+    def __init__(self, bind):
+        """ Create a new reference by binding to a group/dataset/committed type
+        """
+        self._id = bind._id
+        self._objref = weakref.ref(bind)
+
+    def __repr__(self):
+        return "<HDF5 object reference>"
+
+    def tolist(self):
+        if type(self._id.id) is not six.text_type:
+            raise TypeError("Expected string id")
+        if self._id.objtype_code == 'd':
+            return [("datasets/" + self._id.id), ]
+        elif self._id.objtype_code == 'g':
+            return [("groups/" + self._id.id), ]
+        elif self._id.objtype_code == 't':
+            return [("datatypes/" + self._id.id), ]
+        else:
+            raise TypeError("Unexpected id type")
+
+class RegionReference():
+
+    """
+        Represents an HDF5 region reference
+    """
+    @property
+    def id(self):
+        """ Low-level identifier appropriate for this object """
+        return self._id
+
+    @property
+    def objref(self):
+        """ Weak reference to object """
+        return self._objref  # return weak ref to ref'd object
+
+    def __init__(self, bind):
+        """ Create a new reference by binding to a group/dataset/committed type
+        """
+        self._id = bind._id
+        self._objref = weakref.ref(bind)
+
+    def __repr__(self):
+        return "<HDF5 region reference>"
 
 def special_dtype(**kwds):
     """ Create a new h5py "special" type.  Only one keyword may be given.
@@ -65,9 +140,9 @@ def special_dtype(**kwds):
 
         dt = None
         if val is Reference:
-            dt = np.dtype('S48', metadata={'ref': Reference})
+            dt = np.dtype('S48', metadata={'ref': val.__class__})
         elif val is RegionReference:
-            dt = np.dtype('S48', metadata={'ref': RegionReference})
+            dt = np.dtype('S48', metadata={'ref': val.__class__})
         else:
             raise ValueError("Ref class must be Reference or RegionReference")
 
@@ -232,12 +307,12 @@ def getTypeItem(dt):
             # a reference type
             type_info['class'] = 'H5T_REFERENCE'
 
-            if ref_check is Reference:
+            if ref_check is Reference:  
                 type_info['base'] = 'H5T_STD_REF_OBJ'  # objref
-            elif ref_check is RegionReference:
+            elif ref_check is RegionReference:  
                 type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
             else:
-                raise TypeError("unexpected reference type")
+                raise TypeError("unexpected reference type: {}".format(type(ref_check)))
         else:
             raise TypeError("unknown object type")
     elif dt.kind == 'V':
@@ -257,11 +332,20 @@ def getTypeItem(dt):
 
     elif dt.kind == 'b':
         # boolean type - h5py stores as enum
-        if dt.base == dt:
-            raise TypeError("Expected base type to be different than parent")
+        # assume LE unless the numpy byteorder is '>'
+        byteorder = 'LE'
+        if dt.base.byteorder == '>':
+            byteorder = 'BE'
+        # this mapping is an h5py convention for boolean support
+        mapping =  {
+            "FALSE": 0,
+            "TRUE": 1
+        }      
         type_info['class'] = 'H5T_ENUM'
-        type_info['mapping'] = {"false": 0, "true": 1}
-        type_info['base'] = getTypeItem(dt.base)
+        type_info['mapping'] = mapping
+        base_info = { "class": "H5T_INTEGER" }
+        base_info['base'] = "H5T_STD_I8" + byteorder
+        type_info["base"] = base_info
     elif dt.kind == 'f':
         # floating point type
         type_info['class'] = 'H5T_FLOAT'
@@ -310,9 +394,6 @@ def getTypeItem(dt):
 
 
     return type_info
-
-
-
 
 """
     Get size of an item in bytes.
@@ -548,6 +629,26 @@ def createBaseDataType(typeItem):
         	dtRet = special_dtype(ref=RegionReference)
         else:
             raise TypeError("Invalid base type for reference type")
+    elif typeClass == 'H5T_ENUM':
+        if 'base' not in typeItem:
+            raise KeyError("Expected 'base' to be provided for enum type")
+        base_json = typeItem["base"]
+        if 'class' not in base_json:
+            raise KeyError("Expected class field in base type")
+        if base_json['class'] != 'H5T_INTEGER':
+            raise TypeError("Only integer base types can be used with enum type")
+        if 'mapping' not in typeItem:
+            raise KeyError("'mapping' not provided for enum type")
+        mapping = typeItem["mapping"]
+        if len(mapping) == 0:
+            raise KeyError("empty enum map")
+        dt = createBaseDataType(base_json)
+        if dt.kind == 'i' and dt.name=='int8' and len(mapping) == 2 and 'TRUE' in mapping and 'FALSE' in mapping:
+            # convert to numpy boolean type
+            dtRet = np.dtype("bool")
+        else:
+            # not a boolean enum, use h5py special dtype 
+            dtRet = special_dtype(enum=(dt, mapping))
 
     else:
         raise TypeError("Invalid type class")

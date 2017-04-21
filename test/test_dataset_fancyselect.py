@@ -9,8 +9,11 @@
 # distribution tree.  If you do not have access to this file, you may        #
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
-import config
+
 import numpy as np
+import math
+
+import config
 
 if config.get("use_h5py"):
     import h5py
@@ -19,21 +22,31 @@ else:
 
 from common import ut, TestCase
 
+# test fancy selection
+#
+#
 
-class TestCommittedType(TestCase):
-    def test_createtype(self):
-        filename = self.getFileName("committed_type")
+class TestFancySelectDataset(TestCase):
+    def test_dset(self):
+        filename = self.getFileName("fancy_select_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-        # create a compound numpy type
-        dt = np.dtype([('real', np.float), ('img', np.float)])
-        f['complex_type'] = dt
-        ctype = f['complex_type']
-        self.assertEqual(ctype.dtype.name, dt.name)
-        self.assertEqual(len(ctype.dtype), len(dt))
-        ctype.attrs["attr1"] = "this is a named datatype"
-        dset = f.create_dataset('complex_dset', (10,), dtype=f['complex_type'])
+
+        dset2d = f.create_dataset('dset2d', (10,10), dtype='i4')
+        vals = np.zeros((10,10), dtype='i4')
+        for i in range(10):
+            vals[i,i] = 1
+        dset2d[...] = vals
+        
+        rows = dset2d[ 5:7, : ]
+        self.assertEqual(len(rows), 2)
+        row1 = rows[0]
+        row2 = rows[1]
+        self.assertEqual(row1[5], 1)
+        self.assertEqual(row2[6], 1)
+         
         f.close()
+
 
 if __name__ == '__main__':
     ut.main()

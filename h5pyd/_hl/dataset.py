@@ -15,7 +15,6 @@ from __future__ import absolute_import
 import posixpath as pp
 import sys
 import base64
-import json
 import numpy as np
 
 import six
@@ -24,7 +23,8 @@ from six.moves import xrange
 import numpy
 
 #from . import base
-from .base import HLObject, Reference, RegionReference
+from .base import HLObject
+from .h5type import Reference, RegionReference
 from .base import phil
 from .objectid import DatasetID
 from . import filters
@@ -37,8 +37,7 @@ _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
 
 def readtime_dtype(basetype, names):
     """ Make a NumPy dtype appropriate for reading """
-    pass
-    """
+  
     if len(names) == 0:  # Not compound, or we want all fields
         return basetype
 
@@ -50,7 +49,7 @@ def readtime_dtype(basetype, names):
             raise ValueError("Field %s does not appear in this type." % name)
 
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
-    """
+    
 
 
     """
@@ -72,7 +71,6 @@ def setSliceQueryParam(params, dims, sel):
     if rank > 0:
         sel_param="["
         for i in range(rank):
-            extent = dims[i]
             sel_param += str(start[i])
             sel_param += ':'
             sel_param += str(start[i] + count[i])
@@ -182,9 +180,12 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
     elif track_times is not None:
         raise TypeError("track_times must be either True or False")
     """
-    if maxshape is not None:
-        maxshape = tuple(m if m is not None else 0 for m in maxshape)
-        body['maxdims'] = maxshape
+    if maxshape is not None and len(maxshape) > 0:
+        if shape is not None:
+            maxshape = tuple(m if m is not None else 0 for m in maxshape)
+            body['maxdims'] = maxshape
+        else:
+            self.log.warning("maxshape provided but no shape")
     #sid = h5s.create_simple(shape, maxshape)
 
 
@@ -206,12 +207,15 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
         json_rep['creationProperties'] = rsp['creationProperties']
     else:
         json_rep['creationProperties'] = {}
+    if "layout" in rsp:
+        json_rep['layout'] = rsp['layout']
 
     dset_id = DatasetID(parent, json_rep)
 
     if data is not None:
         req = "/datasets/" + dset_id.uuid + "/value"
         body = {}
+        # TBD - this will be inefficient if data is already a numpy array
         body['value'] = data.tolist()
         parent.PUT(req, body=body)
 
@@ -256,11 +260,18 @@ class Dataset(HLObject):
     @property
     def shape(self):
         """Numpy-style shape tuple giving dataset dimensions"""
+        # just return the cached shape value 
+        # (although potentially it could have changed on server)
+        return self._shape 
+
+    def get_shape(self, check_server=False):
+        # this version will optionally refetch the shape from the server
+        # (if the dataset is resiable)
         shape_json = self.id.shape_json
         if shape_json['class'] in ('H5S_NULL', 'H5S_SCALAR'):
             return ()  # return empty
 
-        if 'maxdims' not in shape_json:
+        if 'maxdims' not in shape_json or not check_server:
             # not resizable, just return dims
             dims = shape_json['dims']
         else:
@@ -269,8 +280,8 @@ class Dataset(HLObject):
             rsp = self.GET(req)
             shape_json = rsp['shape']
             dims = shape_json['dims']
-
-        return tuple(dims)
+        self._shape = tuple(dims)
+        return self._shape
 
     @shape.setter
     def shape(self, shape):
@@ -279,7 +290,9 @@ class Dataset(HLObject):
     @property
     def size(self):
         """Numpy-style attribute giving the total dataset size"""
-        return numpy.prod(self.shape)
+        if self._shape is None:
+            return 0
+        return numpy.prod(self._shape)
 
     @property
     def dtype(self):
@@ -383,11 +396,8 @@ class Dataset(HLObject):
         self._dtype = createDataType(self.id.type_json)
         self._item_size = getItemSize(self.id.type_json)
 
-        if self.id.shape_json['class'] == 'H5S_SCALAR':
-            self._shape = []
-        else:
-            self._shape = self.id.shape_json['dims']
-
+        self._shape = self.get_shape()
+         
         self._req_prefix = "/datasets/" + self.id.uuid
 
 
@@ -419,7 +429,7 @@ class Dataset(HLObject):
             except TypeError:
                 raise TypeError("Argument must be a single int if axis is specified")
 
-            size = list(self.shape)
+            size = list(self._shape)
             size[axis] = newlen
 
         size = tuple(size)
@@ -430,6 +440,7 @@ class Dataset(HLObject):
         self.PUT(req, body=body)
         #self.id.set_extent(size)
         #h5f.flush(self.id)  # THG recommends
+        self._shape = size  # save the new shape
 
     def __len__(self):
         """ The size of the first axis.  TypeError if scalar.
@@ -448,8 +459,8 @@ class Dataset(HLObject):
         len() cannot handle values greater then 2**32 on 32-bit systems.
         """
         with phil:
-            shape = self.shape
-            if len(shape) == 0:
+            shape = self._shape
+            if shape is None or len(shape) == 0:
                 raise TypeError("Attempt to take len() of scalar dataset")
             return shape[0]
 
@@ -458,7 +469,7 @@ class Dataset(HLObject):
 
         BEWARE: Modifications to the yielded data are *NOT* written to file.
         """
-        shape = self.shape
+        shape = self._shape
         if len(shape) == 0:
             raise TypeError("Can't iterate over a scalar dataset")
         for i in xrange(shape[0]):
@@ -477,27 +488,13 @@ class Dataset(HLObject):
         * Boolean "mask" array indexing
         """
         args = args if isinstance(args, tuple) else (args,)
+        self.log.debug("dataset.__getitem__({})".format(args))
 
         # Sort field indices from the rest of the args.
         names = tuple(x for x in args if isinstance(x, six.string_types))
         args = tuple(x for x in args if not isinstance(x, six.string_types))
         if not six.PY3:
             names = tuple(x.encode('utf-8') if isinstance(x, six.text_type) else x for x in names)
-
-        def readtime_dtype(basetype, names):
-            """ Make a NumPy dtype appropriate for reading """
-
-            if len(names) == 0:  # Not compound, or we want all fields
-                return basetype
-
-            if basetype.names is None:  # Names provided, but not compound
-                raise ValueError("Field names only allowed for compound types")
-
-            for name in names:  # Check all names are legal
-                if not name in basetype.names:
-                    raise ValueError("Field %s does not appear in this type." % name)
-
-            return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
 
         new_dtype = getattr(self._local, 'astype', None)
         if new_dtype is not None:
@@ -512,6 +509,7 @@ class Dataset(HLObject):
         # todo - will need the following once we have binary transfers
         # mtype = h5t.py_create(new_dtype)
         mtype = new_dtype
+
 
         # === Special-case region references ====
         """
@@ -536,38 +534,60 @@ class Dataset(HLObject):
         """
 
         # === Check for zero-sized datasets =====
-
-        if numpy.product(self.shape) == 0:
+        if self._shape is None or numpy.product(self._shape) == 0:
             # These are the only access methods NumPy allows for such objects
             if args == (Ellipsis,) or args == tuple():
-                return numpy.empty(self.shape, dtype=new_dtype)
+                return numpy.empty(self._shape, dtype=new_dtype)
 
         # === Scalar dataspaces =================
 
-        if self.shape == ():
+        if self._shape == ():
             #fspace = self.id.get_space()
             #selection = sel2.select_read(fspace, args)
-
-            arr = numpy.ndarray((), dtype=new_dtype)
+            selection = sel.select(self, args)
+     
+            # TBD - refactor the following with the code for the non-scalar case
             req = "/datasets/" + self.id.uuid + "/value"
-            rsp = self.GET(req)
-            data = rsp['value']
-            arr[()] = data
+            rsp = self.GET(req, format="binary")
+            if type(rsp) is bytes:
+                # got binary response
+                arr = numpy.fromstring(rsp, dtype=new_dtype)
+            else:
+                # got JSON response
+                # need some special conversion for compound types --
+                # each element must be a tuple, but the JSON decoder
+                # gives us a list instead.
+                data = rsp['value']
+                if len(mtype) > 1 and type(data) in (list, tuple):
+                    converted_data = []
+                    for i in range(len(data)):
+                        converted_data.append(self.toTuple(data[i]))
+                    data = tuple(converted_data)
+
+                arr = numpy.empty((), dtype=new_dtype)
+                arr[()] = data
+            if selection.mshape is None:
+                return arr[()]
 
             return arr
 
+            """
+            data = rsp['value']
+            arr = numpy.ndarray((), dtype=new_dtype)
+            arr[()] = data
+            if len(names) == 1:
+                arr = arr[names[0]]
+            if selection.mshape is None:
+                return arr[()]
+            return arr
+            """
 
         # === Everything else ===================
 
         # Perform the dataspace selection
-        #print "args:", args
-        #print("select, args:", args)
-        selection = sel.select(self.shape, args, dsid=self.id)
-        #print("selection class:",selection.__class__.__name__)
-        #print("got select.nselect:", selection.nselect)
+        selection = sel.select(self, args)
          
         if selection.nselect == 0:
-            #print "nselect is 0"
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
         # Up-converting to (1,) so that numpy.ndarray correctly creates
         # np.void rows in case of multi-field dtype. (issue 135)
@@ -577,19 +597,17 @@ class Dataset(HLObject):
 
         # HDF5 has a bug where if the memory shape has a different rank
         # than the dataset, the read is very slow
-        if len(mshape) < len(self.shape):
+        if len(mshape) < len(self._shape):
             # pad with ones
-            mshape = (1,)*(len(self.shape)-len(mshape)) + mshape
+            mshape = (1,)*(len(self._shape)-len(mshape)) + mshape
 
         # Perfom the actual read
-        #print "do select"
         rsp = None
         req = "/datasets/" + self.id.uuid + "/value"
         if isinstance(selection, sel.SimpleSelection):         
             sel_query = selection.getQueryParam() #TBD - move getQueryParam to this file?
             if sel_query:
                 req += "?" + sel_query
-            #print("req:", req)
             # get binary if available
             #rsp = self.GET(req, format="json")
             rsp = self.GET(req, format="binary")
@@ -612,35 +630,69 @@ class Dataset(HLObject):
                 arr = numpy.empty(mshape, dtype=mtype)
                 arr[...] = data
         elif isinstance(selection, sel.FancySelection):
-            #print("Fancy Selection, mshape", selection.mshape)
-            hyperslabs = selection.hyperslabs
-             
             raise ValueError("selection type not supported")
         elif isinstance(selection, sel.PointSelection):
-            #print("Point Selection, mshape", selection.mshape)
             # TBD - using JSON request since h5serv does not yet support binary
 
-            #print(selection.points)
             body= { }
-            #print("selection points:", selection.points)
-            body["points"]  = selection.points.tolist()
-            #print("post body:", body)
+
+            points = selection.points.tolist()
+            rank = len(self._shape)
+            # verify the points are in range and strictly monotonic (for the 1d case)
+            last_point = -1
+            delistify = False
+             
+            if len(points) == rank and isinstance(points[0], six.integer_types) and rank > 1:
+                # Single point selection - need to wrap this in an array
+                self.log.info("single point selection")
+                points = [ points, ]
+            else:
+                for point in points:
+                    if isinstance(point, (list, tuple)):
+                        if not isinstance(point, (list, tuple)):
+                            raise ValueError("invalid point argument")
+                        if len(point) != rank:
+                            raise ValueError("invalid point argument")
+                        for i in range(rank):
+                            if point[i]<0 or point[i]>=self._shape[i]:
+                                raise ValueError("point out of range")
+                        if rank == 1:
+                            delistify = True
+                            if point[0] <= last_point:
+                                raise TypeError("index points must be strictly increasing")
+                            last_point = point[0]
+
+                    elif rank == 1 and isinstance(point, six.integer_types):
+                        if point < 0 or point>self._shape[0]:
+                            raise ValueError("point out of range")
+                        if point <= last_point:
+                            raise TypeError("index points must be strictly increasing")
+                        last_point = point
+                    else:
+                        raise ValueError("invalid point argument")
+
+            if delistify:
+                # convert to int if needed
+                body["points"] = []
+                for point in points:
+                    if isinstance(point, (list, tuple)):
+                        body["points"].append(point[0])
+                    else:
+                        body["points"] = point
+            else:
+                # can just assign
+                body["points"] = points
             rsp = self.POST(req, body=body)
             data = rsp["value"]
              
             if len(data) != selection.mshape[0]:
                 raise IOError("Expected {} elements, but got {}".format(selection.mshape[0], len(data)))
 
-            # print("got rsp:", rsp)
             arr = np.asarray(data, dtype=mtype, order='C')
-            #print(rsp)
-
 
         else:
             raise ValueError("selection type not supported")
 
-        #print "value:", rsp['value']
-        #print "new_dtype:", new_dtype
         
 
         # Patch up the output for NumPy
@@ -650,6 +702,8 @@ class Dataset(HLObject):
             arr = numpy.asscalar(arr)
         if single_element:
             arr = arr[0]
+        if len(arr.shape) > 1:
+            arr = np.squeeze(arr)  # reduce dimension if there are single dimension entries
         return arr
 
     def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None):
@@ -686,49 +740,74 @@ class Dataset(HLObject):
 
         # === Check for zero-sized datasets =====
 
-        if numpy.product(self.shape) == 0 or self.shape == ():
+        if self._shape is None or numpy.product(self._shape) == 0 or self._shape == ():
             raise TypeError("Scalar datasets can not be used with where method")
-        if len(self.shape) > 1:
+        if len(self._shape) > 1:
             raise TypeError("Multi-dimensional datasets can not be used with where method")
 
 
         # === Everything else ===================
 
         # Perform the dataspace selection
-        #print "args:", args
         if start or stop:
             if not start:
                 start = 0
             if not stop:
-                stop = self.shape[0]
+                stop = self._shape[0]
         else:
             start = 0
-            stop = self.shape[0]
+            stop = self._shape[0]
 
         selection_arg = slice(start, stop)
-        selection = sel.select(self.shape, selection_arg, dsid=self.id)
-        #print "start:", selection.start
-        #print "count:", selection.count
-        #rank = len(selection.start)
+        selection = sel.select(self, selection_arg)
 
         if selection.nselect == 0:
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
 
-        # Perfom the actual read
-        req = "/datasets/" + self.id.uuid + "/value"
-        req += "?query=" + condition
-        start_stop = selection.getQueryParam()
-        if start_stop:
-            req += "&" + start_stop
-
-        rsp = self.GET(req)
-        #print "value:", rsp['value']
-        #print "new_dtype:", new_dtype
+        # setup for pagination in case we can't read everthing in one go
+        data = []
+        cursor = start
+        page_size = stop - start
+        
+        while True:
+            # Perfom the actual read
+            req = "/datasets/" + self.id.uuid + "/value"
+            req += "?query=" + condition
+            self.log.info("req - cursor: {} page_size: {}".format(cursor, page_size))
+            end_row = cursor+page_size
+            if end_row > stop:
+                end_row = stop
+            selection_arg = slice(cursor, end_row)
+            selection = sel.select(self, selection_arg)
+            sel_param = selection.getQueryParam()
+            if sel_param:
+                req += "&" + sel_param
+            try:
+                rsp = self.GET(req)
+                count = len(rsp["value"])
+                self.log.info("got {} rows".format(count))
+                if count > 0:
+                    data.extend(rsp['value'])
+                # advance to next page
+                cursor += page_size
+            except IOError as ioe:
+                if ioe.errno == 413 and page_size > 1024:
+                    # too large a query target, try reducing the page size
+                    # if it is not already relatively small (1024)         
+                    page_size //= 2
+                    page_size += 1  # bump up to avoid tiny pages in the last iteration
+                    self.log.info("Got 413, reducing page_size to: {}".format(page_size))
+                else:
+                    # otherwise, just raise the exception
+                    self.log.info("Unexpected exception: {} {}".format(ioe.errno, ioe.reason))
+                    raise ioe
+            if cursor >= stop:
+                self.log.info("completed iteration, returning: {} rows".format(len(data)))
+                break
 
         # need some special conversion for compound types --
         # each element must be a tuple, but the JSON decoder
         # gives us a list instead.
-        data = rsp['value']
 
         mshape = (len(data),)
         if len(mtype) > 1 and type(data) in (list, tuple):
@@ -756,11 +835,12 @@ class Dataset(HLObject):
         (slices and integers).  For advanced indexing, the shapes must
         match.
         """
-
+        self.log.info("Dataset __setitem__, args: {}".format(args))
         if self._item_size != "H5T_VARIABLE":
             use_base64 = True   # may need to set this to false below for some types
         else:
             use_base64 = False  # never use for variable length types
+            self.log.debug("Using JSON since type is variable length")
 
         args = args if isinstance(args, tuple) else (args,)
 
@@ -772,7 +852,6 @@ class Dataset(HLObject):
             pass # not a numpy object, just leave dtype as None
 
         if isinstance(val, Reference):
-            #print("convert reference")
             # h5pyd References are just strings
             val = val.tolist()
 
@@ -784,7 +863,6 @@ class Dataset(HLObject):
 
         # Generally we try to avoid converting the arrays on the Python
         # side.  However, for compound literals this is unavoidable.
-        #print("__setitem__, dkind:", self.dtype.kind)
         # For h5pyd, do extra check and convert type on client side for efficiency
         vlen = check_dtype(vlen=self.dtype)
         if vlen is not None and vlen not in (bytes, six.text_type):
@@ -806,13 +884,13 @@ class Dataset(HLObject):
                     tmp[0] = val
                 val = tmp
 
-        elif val_dtype is None or \
-          self.dtype.kind == "O" or \
+        elif self.dtype.kind == "O" or \
           (self.dtype.kind == 'V' and \
-          (not isinstance(val, numpy.ndarray) or \
-          val.dtype.kind != 'V') and \
-          (self.dtype.subdtype == None)) or \
-          (self.dtype.str != val.dtype.str):
+          (not isinstance(val, numpy.ndarray) or val.dtype.kind != 'V') and \
+          (self.dtype.subdtype == None)):
+          # TBD: Do we need something like the following in the above if condition:
+          # (self.dtype.str != val.dtype.str)
+          # for cases where the val is a numpy array but different type than self?
             if len(names) == 1 and self.dtype.fields is not None:
                 # Single field selected for write, from a non-array source
                 if not names[0] in self.dtype.fields:
@@ -825,19 +903,26 @@ class Dataset(HLObject):
             val = numpy.asarray(val, dtype=dtype, order='C')
             if cast_compound:
                 val = val.astype(numpy.dtype([(names[0], dtype)]))
+                # val = val.reshape(val.shape[:len(val.shape) - len(dtype.shape)])
+        elif isinstance(val, numpy.ndarray):
+            # TBD - convert array if needed
+            self.log.debug("got numpy array")
+            pass
+        else:
+            val = numpy.asarray(val, order='C', dtype=self.dtype)
 
         # Check for array dtype compatibility and convert
         mshape = None
         """
         # TBD..
         if self.dtype.subdtype is not None:
-            shp = self.dtype.subdtype[1]
+            shp = self.dtype.subdtype[1]   # type shape
             valshp = val.shape[-len(shp):]
             if valshp != shp:  # Last dimension has to match
                 raise TypeError("When writing to array types, last N dimensions have to match (got %s, but should be %s)" % (valshp, shp,))
             mtype = h5t.py_create(numpy.dtype((val.dtype, shp)))
             mshape = val.shape[0:len(val.shape)-len(shp)]
-         
+        
 
         # Make a compound memory type if field-name slicing is required
         elif len(names) != 0:
@@ -873,11 +958,10 @@ class Dataset(HLObject):
             #mtype = None
         """
         # Perform the dataspace selection
-        selection = sel.select(self.shape, args, dsid=self.id)
-
+        selection = sel.select(self, args)
         if selection.nselect == 0:
             return
-
+        
         # Broadcast scalars if necessary.
         if (mshape == () and selection.mshape != ()):
             if self.dtype.subdtype is not None:
@@ -892,53 +976,56 @@ class Dataset(HLObject):
         # glitch, which kicks in for mismatched memory/file selections
         """ 
         # TBD: do we need this adjustment?
-        if(len(mshape) < len(self.shape)):
-            mshape_pad = (1,)*(len(self.shape)-len(mshape)) + mshape
+        if(len(mshape) < len(self._shape)):
+            mshape_pad = (1,)*(len(self._shape)-len(mshape)) + mshape
         else:
             mshape_pad = mshape
         """
         req = "/datasets/" + self.id.uuid + "/value"
 
-        #print("type value:", type(val))
-        #print("value dtype:", val.dtype)
-        #print("value kind:", val.dtype.kind)
-        #print("value shape:", val.shape)
-        headers = {}
         params = {}
         body = {}
 
-        if selection.start and not self.id.uuid.startswith("d-"):
-            #h5serv - set selection in body
-            body['start'] = list(selection.start)
-            stop = list(selection.start)
-            for i in range(len(stop)):
-                stop[i] += selection.count[i]
-            body['stop'] = stop
-            if selection.step:
-                body['step'] = list(selection.step)
-
+        
+        format = "json"
+         
         if use_base64:
             
             if self.id.uuid.startswith("d-"):
-                # server is HSDS, use binary data use param values for selection
-                headers['Content-Type'] = "application/octet-stream"
-                body = val.tobytes()
-                if selection.start:
-                    setSliceQueryParam(params, self.shape, selection)
+                # server is HSDS, use binary data, use param values for selection
+                format = "binary"
+                body = val.tobytes()     
+                self.log.debug("writing binary data, {} bytes".format(len(body)))
             else:
                 # h5serv, base64 encode, body json for selection
                 # TBD - replace with above once h5serv supports binary req
-                data = val.tostring()
+                data = val.tobytes()
                 data = base64.b64encode(data)
                 data = data.decode("ascii")
                 body['value_base64'] = data
+                self.log.debug("writing base64 data, {} bytes".format(len(data)))
         else:
             if type(val) is not list:
                 val = val.tolist()
             val = self._decode(val)
+            self.log.debug("writing json data, {} bytes".format(len(val)))
             body['value'] = val
 
-        self.PUT(req, body=body, headers=headers, params=params)
+        if selection.select_type != sel.H5S_SELECT_ALL:
+            if format == "binary":
+                # set selection using query parameters
+                setSliceQueryParam(params, self._shape, selection)
+            else:
+                # set selection as body keys
+                body['start'] = list(selection.start)
+                stop = list(selection.start)
+                for i in range(len(stop)):
+                    stop[i] += selection.count[i]
+                body['stop'] = stop
+                if selection.step:
+                    body['step'] = list(selection.step)
+
+        self.PUT(req, body=body, format=format, params=params)
         """
         mspace = h5s.create_simple(mshape_pad, (h5s.UNLIMITED,)*len(mshape_pad))
         for fspace in selection.broadcast(mshape):
@@ -959,9 +1046,9 @@ class Dataset(HLObject):
         #todo
         with phil:
             if source_sel is None:
-                source_sel = sel.SimpleSelection(self.shape)
+                source_sel = sel.SimpleSelection(self._shape)
             else:
-                source_sel = sel.select(self.shape, source_sel, self.id)  # for numpy.s_
+                source_sel = sel.select(self._shape, source_sel, self.id)  # for numpy.s_
             fspace = source_sel._id
 
             if dest_sel is None:
@@ -992,9 +1079,9 @@ class Dataset(HLObject):
             mspace = source_sel._id
 
             if dest_sel is None:
-                dest_sel = sel.SimpleSelection(self.shape)
+                dest_sel = sel.SimpleSelection(self._shape)
             else:
-                dest_sel = sel.select(self.shape, dest_sel, self.id)
+                dest_sel = sel.select(self._shape, dest_sel, self.id)
 
             for fspace in dest_sel.broadcast(source_sel.mshape):
                 self.id.write(mspace, fspace, source)
@@ -1005,10 +1092,10 @@ class Dataset(HLObject):
         THIS MEANS DATASETS ARE INTERCHANGABLE WITH ARRAYS.  For one thing,
         you have to read the whole dataset everytime this method is called.
         """
-        arr = numpy.empty(self.shape, dtype=self.dtype if dtype is None else dtype)
+        arr = numpy.empty(self._shape, dtype=self.dtype if dtype is None else dtype)
 
         # Special case for (0,)*-shape datasets
-        if numpy.product(self.shape) == 0:
+        if self._shape is None or numpy.product(self._shape) == 0:
             return arr
 
         # todo
@@ -1026,7 +1113,7 @@ class Dataset(HLObject):
                 namestr = six.u('"%s"') % (
                     name if name != six.u('') else six.u('/'))
             r = six.u('<HDF5 dataset %s: shape %s, type "%s">') % \
-                (namestr, self.shape, self.dtype.str)
+                (namestr, self._shape, self.dtype.str)
         if six.PY3:
             return r
         return r.encode('utf8')

@@ -12,8 +12,8 @@
 import os
 
 cfg = {
-    'hdf_server_endpoint': "http://127.0.0.1:5000",
-    'domain':   'h5pyd_test.hdfgroup.org',
+    #'hdf_server_endpoint': "http://127.0.0.1:5000",
+    #'domain':   'h5pyd_test.hdfgroup.org',
     'use_h5py': False
 }
 

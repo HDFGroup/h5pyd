@@ -23,6 +23,7 @@ from common import ut, TestCase
 from datetime import datetime
 from copy import copy
 import six
+import time
 
 
 class TestFile(TestCase):
@@ -38,17 +39,38 @@ class TestFile(TestCase):
     def test_create(self):
         filename = self.getFileName("new_file")
         print("filename:", filename)
-        
+        now = time.time()
         f = h5py.File(filename, 'w')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 0)
         self.assertEqual(f.mode, 'r+')
+        is_hsds = False
+        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+            is_hsds = True  # HSDS has different permission defaults
         if h5py.__name__ == "h5pyd":
-            self.assertTrue(f.id.endpoint.startswith("http"))
+            self.assertTrue(f.id.http_conn.endpoint.startswith("http"))
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
+        # Check domain's timestamps
+        if h5py.__name__ == "h5pyd" and is_hsds:
+            # TBD: remove is_hsds when h5serv timestamp changed to float
+            #print("modified:", datetime.fromtimestamp(f.modified), f.modified)
+            #print("created: ", datetime.fromtimestamp(f.created), f.created)
+            #print("now:     ", datetime.fromtimestamp(now), now)
+            # verify the timestamps make sense
+            # we add a 30-sec margin to account for possible time skew
+            # between client and server
+            self.assertTrue(f.created - 30.0 < now)
+            self.assertTrue(f.created + 30.0 > now)
+            self.assertTrue(f.modified - 30.0 < now)
+            self.assertTrue(f.modified + 30.0 > now)
+            self.assertEqual(f.modified, f.created)
+        if is_hsds:
+            # owner prop is just for HSDS
+            self.assertEqual(f.owner, self.test_user1["name"]) 
+         
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
@@ -77,12 +99,6 @@ class TestFile(TestCase):
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
-       
-
-        # Check domain's last modified time
-        if h5py.__name__ == "h5pyd":
-            self.assertTrue(isinstance(f.modified, datetime))
-            #self.assertEqual(f.modified.tzname(), six.u('UTC'))
 
         try:
             f.create_group("another_subgrp")
@@ -109,7 +125,11 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
+        
+
+    def test_open_notfound(self):
         # verify open of non-existent file throws exception
+   
         try:
             filename = self.getFileName("no_file_here")
             print("filename:", filename)
@@ -117,54 +137,7 @@ class TestFile(TestCase):
             self.assertTrue(False) #expect exception
         except IOError:
             pass
-
-    def test_delete(self):
-        filename = self.getFileName("delete_me")        
-        print("filename:", filename)
-
-        f = h5py.File(filename, 'w')
-
-        for name in ("g1", "g2", "g1/g1.1"):
-            f.create_group(name)
-        f.close()
-
-        f = h5py.File(filename, 'r') 
-        self.assertEqual(f.filename, filename)
-        self.assertEqual(f.name, "/")
-        self.assertTrue(f.id.id is not None)
-        self.assertEqual(len(f.keys()), 2)
-
-        # removing file in read-mode should fail
-        if h5py.__name__ == "h5pyd":
-            try:
-                f.remove()
-                self.assertTrue(False)  # expected exception
-            except ValueError as ve:
-                self.assertEqual(str(ve), "Unable to remove file (No write intent on file)")
-
-        f.close()
         
-        f = h5py.File(filename, 'r+')
-        self.assertEqual(f.filename, filename)
-        self.assertEqual(f.name, "/")
-        self.assertTrue(f.id.id is not None)
-        self.assertEqual(len(f.keys()), 2)
-
-        # delete the file
-        if h5py.__name__ == "h5py":
-            os.remove(filename)
-        else:
-            f.remove()
-        if h5py.__name__ == "h5pyd":
-            self.assertEqual(f.id.id, 0)
-
-        # opening in read-mode should fail
-        try:
-            f = h5py.File(filename, 'r') 
-            self.assertTrue(False)  # expected exception
-        except IOError as ioe:
-            if h5py.__name__ == "h5pyd":
-                self.assertEqual(str(ioe), "Not Found")
 
     def test_auth(self):
         if h5py.__name__ == "h5py":
@@ -181,109 +154,94 @@ class TestFile(TestCase):
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
+        root_id = f.id.id
         self.assertEqual(len(f.keys()), 2)
+
+        is_hsds = False
+        if root_id.startswith("g-"):
+            is_hsds = True  # HSDS has different permission defaults
         
         # no explicit ACLs yet
         file_acls = f.getACLs()
-        self.assertEqual(len(file_acls), 0)
+        if is_hsds:
+            self.assertEqual(len(file_acls), 2)  # HSDS setup creates two initial acls - "default" and test_user1
+        else:
+            self.assertEqual(len(file_acls), 0)
 
-        file_acl = f.getACL("test_user1")
+        file_acl = f.getACL(self.test_user1["name"])
         # there's no ACL for test_User1 yet, so this should return the default ACL
         acl_keys = ("create", "read", "update", "delete", "readACL", "updateACL")
-        self.assertEqual(file_acl["userName"], "default")   
+        #self.assertEqual(file_acl["userName"], "default")   
         for k in acl_keys:
             self.assertEqual(file_acl[k], True)
 
-        # same as getting "default" for username
+        # Should always be able to get default acl
         default_acl = f.getACL("default")
-        # there's no ACL for test_User1 yet, so this should return the default ACL
-        self.assertEqual(default_acl["userName"], "default")  
         for k in acl_keys:
-            self.assertEqual(default_acl[k], True)      
-
+            if k == "read" or not is_hsds:
+                self.assertEqual(default_acl[k], True)
+            else:
+                self.assertEqual(default_acl[k], False)
+       
         user1_acl = copy(default_acl)
-        user1_acl["userName"] = "test_user1"
-        f.putACL(user1_acl)
-        user1_acl = f.getACL("test_user1")
-        
-        for k in acl_keys:
-            # no permission for unauthenticated users
-            default_acl[k] = False
-
-        # add an acl for test_user2 that has only read access
-        user2_acl = copy(default_acl)
-        user2_acl["userName"] = "test_user2"
-        user2_acl["read"] = True  # allow read access
-        f.putACL(user2_acl)
-
-        f.putACL(default_acl)  # after this call, each request will need authentication
-
+        user1_acl["userName"] = self.test_user1["name"]
         f.close()
-        
-        
-        # opening in read-mode should fail
-        try:
-            f = h5py.File(filename, 'r') 
-            self.assertTrue(False)  # expected exception
-        except IOError as ioe:
-            self.assertEqual(str(ioe), "Unauthorized")  # need to be authenticated
 
-        # same with write mode
-        try:
-            f = h5py.File(filename, 'w') 
-            self.assertTrue(False)  # expected exception
-        except IOError:
-            pass  # expected
 
         # test_user2 has read access, but opening in write mode should fail
         try:
-            f = h5py.File(filename, 'w', username="test_user2", password="test")
-            self.assertEqual(len(f.keys()), 0)
-            self.assertTrue(False)  # expected exception
+            f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
+            self.assertFalse(is_hsds)  # expect exception for hsds
         except IOError as ioe:
-            self.assertEqual(str(ioe), "Forbidden")  # user is not authorized
+            self.assertTrue(is_hsds)
+            self.assertEqual(ioe.errno, 403)  # user is not authorized
 
-        f = h5py.File(filename, 'r', username="test_user2", password="test") 
-        self.assertEqual(f.filename, filename)
-        self.assertEqual(f.name, "/")
-        self.assertTrue(f.id.id is not None)
-        self.assertEqual(len(f.keys()), 2)
+        # append mode w/ test_user2
         try:
-            file_acls = f.getACLs()  # test_user2 doesn't have readACL permissio'
-            self.assertTrue(False) # expected exception
+            f = h5py.File(filename, 'a', username=self.test_user2["name"], password=self.test_user2["password"])
+            self.assertFalse(is_hsds)  # expected exception
         except IOError as ioe:
-            self.assertEqual(str(ioe), "Forbidden")
+            self.assertTrue(is_hsds)
+            self.assertEqual(ioe.errno, 403)  # user is not authorized
         
+        f = h5py.File(filename, 'a')  # open for append with original username
+        # add an acl for test_user2 that has only read/update access
+        user2_acl = copy(default_acl)
+        user2_acl["userName"] = self.test_user2["name"]
+        user2_acl["read"] = True  # allow read access
+        user2_acl["update"] = True
+        f.putACL(user2_acl)
+ 
+        f.close()
+
+        # test_user2  opening in write mode should still fail
+        try:
+            f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
+            self.assertFalse(is_hsds)  # expected exception
+        except IOError as ioe:
+            self.assertTrue(is_hsds)
+            self.assertEqual(ioe.errno, 403)  # user is not authorized
+
+        # append mode w/ test_user2
+        try:
+            f = h5py.File(filename, 'a', username=self.test_user2["name"], password=self.test_user2["password"])
+        except IOError as ioe:
+            self.assertTrue(False)  # shouldn't get here
+
         grp = f['/']
         grp.file.close()  # try closing the file via a group reference
-
-        f = h5py.File(filename, 'r', username="test_user2", password="test") 
-        # try delete the file (should throw an exception)
-        try:
-            f.remove()
-            self.assertTrue(False)  # expected exception
-        except ValueError as ve:
-            self.assertEqual(str(ve), "Unable to remove file (No write intent on file)")
-        f.close()
-        self.assertEqual(f.id.id, 0)
         
-        f = h5py.File(filename, 'r+', username="test_user1", password="test") 
-        self.assertEqual(f.filename, filename)
-        self.assertEqual(f.name, "/")
-        self.assertTrue(f.id.id is not None)
-        self.assertEqual(len(f.keys()), 2)
-        file_acls = f.getACLs()
-        self.assertEqual(len(file_acls), 3)
+        
+         
 
-        # delete the file
-        f.remove()
-        self.assertEqual(f.id.id, 0)
-
-        try:
-            f = h5py.File(filename, 'r+', username="test_user1", password="test") 
-        except IOError as ioe:
-            self.assertEqual(str(ioe), "Not Found")
-            
+    def test_close(self):
+        filename = self.getFileName("close_file")
+        print("filename:", filename)
+        f = h5py.File(filename, 'w')
+        self.assertTrue(f)
+        f.close()
+        self.assertFalse(f)
+           
               
 if __name__ == '__main__':
     ut.main()

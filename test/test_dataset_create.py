@@ -9,7 +9,7 @@
 # distribution tree.  If you do not have access to this file, you may        #
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
-
+import logging
 import numpy as np
 import math
 
@@ -88,8 +88,6 @@ class TestCreateDataset(TestCase):
         dims = (10,)
         dset = f.create_dataset('simple_1d_dset', dims, dtype='uint32')
 
-        print(dset.id.id)
-
         self.assertEqual(dset.name, "/simple_1d_dset")
         self.assertTrue(isinstance(dset.shape, tuple))
         self.assertEqual(len(dset.shape), 1)
@@ -99,7 +97,7 @@ class TestCreateDataset(TestCase):
         self.assertEqual(len(dset.maxshape), 1)
         self.assertEqual(dset.maxshape[0], 10)
         self.assertEqual(dset.fillvalue, 0)
-        print(dset[0])
+
         self.assertEqual(dset[0], 0)
         
         dset[:] = np.ones((10,), dtype='uint32')
@@ -186,6 +184,50 @@ class TestCreateDataset(TestCase):
 
         f.close()
 
+    def test_bool_dset(self):
+        filename = self.getFileName("bool_dset")
+        print("filename:", filename)
+        print("h5py:", h5py.__name__)
+        f = h5py.File(filename, "w")
+
+        dims = (10,)
+        dset = f.create_dataset('bool_dset', dims, dtype=np.bool)
+
+        self.assertEqual(dset.name, "/bool_dset")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 1)
+        self.assertEqual(dset.shape[0], 10)
+        self.assertEqual(str(dset.dtype), 'bool')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 1)
+        self.assertEqual(dset.maxshape[0], 10)
+        self.assertEqual(dset.fillvalue, 0)
+
+        self.assertEqual(dset[0], False)
+        
+        
+        vals = dset[:]  # read back
+        for i in range(10):
+            self.assertEqual(vals[i], False)
+
+        # Write True's to the first five elements
+        dset[0:5] = [True,]*5
+
+        dset = None
+        dset = f["/bool_dset"]
+
+        # read back
+        vals = dset[...]
+        for i in range(5):
+            if i<5:
+                self.assertEqual(vals[i], True)
+            else:
+                self.assertEqual(vals[i], False)
+           
+        f.close()
+
 
 if __name__ == '__main__':
+    loglevel = logging.DEBUG
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

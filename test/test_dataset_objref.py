@@ -67,6 +67,7 @@ class TestObjRef(TestCase):
         #print("dt:", dt)
         #print("dt.kind:", dt.kind)
         #print("dt.meta:", dt.metadata['ref'])
+        print("special_dtype:", type(dt.metadata['ref']))
         self.assertTrue(dt.metadata['ref'] is h5py.Reference)
 
         dset = g1.create_dataset('myrefs', (10,), dtype=dt)

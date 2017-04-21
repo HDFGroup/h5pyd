@@ -15,13 +15,13 @@ from __future__ import absolute_import
 import os
 import six
 
-import requests
 import json
 
 from .objectid import GroupID
-from .base import phil, parse_lastmodified, getHeaders
 from .group import Group
 from .. import version
+from .httpconn import HttpConn
+from .config import Config
 
 
 hdf5_version = version.hdf5_version_tuple[0:3]
@@ -44,7 +44,7 @@ class File(Group):
     @property
     def filename(self):
         """File name on disk"""
-        return self.id.domain
+        return self.id.http_conn.domain
 
     @property
     def driver(self):
@@ -53,7 +53,7 @@ class File(Group):
     @property
     def mode(self):
         """ Python mode used to open file """
-        return self.id._mode
+        return self.id.http_conn.mode
 
     @property
     def fid(self):
@@ -75,15 +75,25 @@ class File(Group):
     @property
     def modified(self):
         """Last modified time of the domain as a datetime object."""
-        return self._modified
+        return self.id.http_conn.modified
 
-    def __init__(self, domain_name, mode=None, endpoint=None, 
-        username=None, password=None, **kwds):
+    @property
+    def created(self):
+        """Creation time of the domain"""
+        return self.id.http_conn.created
+
+    @property
+    def owner(self):
+        """Username of the owner of the domain"""
+        return self.id.http_conn.owner
+
+    def __init__(self, domain, mode=None, endpoint=None, username=None, password=None, 
+        use_session=True, use_cache=False, logger=None, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
 
-        domain_name
+        domain
             URI of the domain name to access. E.g.: tall.data.hdfgroup.org.
         mode
             Access mode: 'r', 'r+', 'w', or 'a'
@@ -91,21 +101,15 @@ class File(Group):
             Server endpoint.   Defaults to "http://localhost:5000"
         """
 
-        with phil:
-            """
-            if isinstance(name, _objects.ObjectID):
-                fid = h5i.get_file_id(name)
-            else:
-                try:
-                    # If the byte string doesn't match the default
-                    # encoding, just pass it on as-is.  Note Unicode
-                    # objects can always be encoded.
-                    name = name.encode(sys.getfilesystemencoding())
-                except (UnicodeError, LookupError):
-                    pass
-
-                fapl = make_fapl(driver, libver, **kwds)
-            """
+        
+        groupid = None
+        # if we're passed a GroupId as domain, jsut initialize the file object
+        # with that.  This will be faster and enable the File object to share the same http connection.
+        if mode is None and endpoint is None and username is None \
+            and password is None and isinstance(domain, GroupID):
+            groupid = domain
+        else:
+            
             if mode and mode not in ('r', 'r+', 'w', 'w-', 'x', 'a'):
                 raise ValueError(
                     "Invalid mode; must be one of r, r+, w, w-, x, a")
@@ -113,97 +117,144 @@ class File(Group):
             if mode is None:
                 mode = 'a'
 
+            cfg = None
+            if endpoint is None or username is None or password is None:
+                # unless we'r given all the connect info, create a config object that
+                # pulls in state from a .hscfg file (if found).
+                cfg = Config()
+ 
             if endpoint is None:
                 if "H5SERV_ENDPOINT" in os.environ:
                     endpoint = os.environ["H5SERV_ENDPOINT"]
+                elif "hs_endpoint" in cfg:
+                    endpoint = cfg["hs_endpoint"]
                 else:
                     endpoint = "http://127.0.0.1:5000"
 
-            if username is None and "H5SERV_USERNAME" in os.environ:
-                username = os.environ["H5SERV_USERNAME"]
-
-            if password is None and "H5SERV_PASSWORD" in os.environ:
-                password = os.environ["H5SERV_PASSWORD"]
-
+            if username is None:
+                if "H5SERV_USERNAME" in os.environ:
+                    username = os.environ["H5SERV_USERNAME"]
+                elif "hs_username" in cfg:
+                    username = cfg["hs_username"]
+                
+            if password is None:
+                if "H5SERV_PASSWORD" in os.environ:
+                    password = os.environ["H5SERV_PASSWORD"]
+                elif "hs_password" in cfg:
+                    password = cfg["hs_password"]
+  
+            http_conn =  HttpConn(domain, endpoint=endpoint, 
+                    username=username, password=password, mode=mode, 
+                    use_session=use_session, use_cache=use_cache, logger=logger)
+        
             root_json = None
 
             # try to do a GET from the domain
-            req = endpoint + "/"
-             
-            headers = getHeaders(domain=domain_name, username=username, password=password)
+            req = "/"      
                         
-            rsp = requests.get(req, headers=headers, verify=self.verifyCert())
+            rsp = http_conn.GET(req)  
 
             if rsp.status_code == 200:
                 root_json = json.loads(rsp.text)
             if rsp.status_code != 200 and mode in ('r', 'r+'):
                 # file must exist
-                raise IOError(rsp.reason)
+                http_conn.close() 
+                raise IOError(rsp.status_code, rsp.reason)
             if rsp.status_code == 200 and mode in ('w-', 'x'):
                 # Fail if exists
-                raise IOError("domain already exists")
+                http_conn.close() 
+                raise IOError(409, "domain already exists")
             if rsp.status_code == 200 and mode == 'w':
                 # delete existing domain
-                rsp = requests.delete(req, headers=headers,
-                                      verify=self.verifyCert())
+                rsp = http_conn.DELETE(req)
                 if rsp.status_code != 200:
                     # failed to delete
-                    raise IOError(rsp.reason)
+                    http_conn.close() 
+                    raise IOError(rsp.status_code, rsp.reason)
                 root_json = None
             if root_json is None:
                 # create the domain
-                if mode not in ('w', 'a'):
-                    raise IOError("File not found")
-                rsp = requests.put(req, headers=headers,
-                                   verify=self.verifyCert())
+                if mode not in ('w', 'a', 'x'):
+                    http_conn.close() 
+                    raise IOError(404, "File not found")
+                rsp = http_conn.PUT(req)  
                 if rsp.status_code != 201:
-                    raise IOError(rsp.reason)
+                    http_conn.close() 
+                    raise IOError(rsp.status_code, rsp.reason)
+                 
                 root_json = json.loads(rsp.text)
 
             if 'root' not in root_json:
-                raise IOError("Unexpected error")
-            if 'created' not in root_json:
-                raise IOError("Unexpected error")
-            if 'lastModified' not in root_json:
-                raise IOError("Unexpected error")
-
-            if mode in ('w', 'w-', 'x', 'a'):
-                mode = 'r+'
-
-            # print "root_json:", root_json
+                http_conn.close() 
+                raise IOError(500, "Unexpected error")
             root_uuid = root_json['root']
 
+            if mode == 'a':
+                # for append, verify we have 'update' permission on the domain
+                # try first with getting the acl for the current user, then as default
+                for name in (username, "default"):
+                    if not username:
+                        continue
+                    req = "/acls/" + name
+                    rsp = http_conn.GET(req)  
+                    if rsp.status_code == 200:
+                        rspJson = json.loads(rsp.text)
+                        domain_acl = rspJson["acl"]
+                        if not domain_acl["update"]:
+                            http_conn.close() 
+                            raise IOError(403, "Forbidden")
+                        else:
+                            break  # don't check with "default" user in this case
+
+            if mode in ('w', 'w-', 'x', 'a'):
+                http_conn._mode = 'r+'
+
             # get the group json for the root group
-            req = endpoint + "/groups/" + root_uuid
+            req = "/groups/" + root_uuid
 
-            rsp = requests.get(req, headers=headers, verify=self.verifyCert())
-
-            # print "req:", req
+            rsp = http_conn.GET(req)
 
             if rsp.status_code != 200:
-                raise IOError("Unexpected Error")
+                http_conn.close() 
+                raise IOError(rsp.status_code, "Unexpected Error")
             group_json = json.loads(rsp.text)
 
-            self._id = GroupID(None, group_json, domain=domain_name,
-                               endpoint=endpoint, username=username,
-                               password=password, mode=mode)
+            groupid = GroupID(None, group_json, http_conn=http_conn)
+        # end else
+        self._name = '/'
+        self._id = groupid
+        
 
-            self._name = '/'
-            self._created = root_json['created']
-            self._modified = parse_lastmodified(root_json['lastModified'])
+        Group.__init__(self, self._id)
 
-            Group.__init__(self, self._id)
+    # override base implemention of ACL methods to use the domain rather than update root group
+    def getACL(self, username):
+        req = '/acls/' + username
+        rsp_json = self.GET(req)
+        acl_json = rsp_json["acl"]
+        return acl_json
+
+    def getACLs(self):
+        req = '/acls'
+        rsp_json = self.GET(req)
+        acls_json = rsp_json["acls"] 
+        return acls_json
+
+    def putACL(self, acl):
+        if "userName" not in acl:
+            raise IOError(404, "ACL has no 'userName' key")
+        perm = {}
+        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
+            perm[k] = acl[k]
+         
+        req = '/acls/' + acl['userName']
+        self.PUT(req, body=perm)
 
     def close(self):
         """ Clears reference to remote resource.
         """
-        self._id.close()
-
-    def remove(self):
-        """ Deletes the domain on the server"""
-        if self.id.mode == 'r':
-            raise ValueError("Unable to remove file (No write intent on file)")
-        self.DELETE('/')
+        # this will close the socket of the http_conn singleton
+        self._id._http_conn.close()   
         self._id.close()
 
     def flush(self):

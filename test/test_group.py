@@ -22,12 +22,30 @@ import six
 
 class TestGroup(TestCase):
 
+
+    def test_cache(self):
+        # create main test file
+        filename = self.getFileName("create_group_cache")
+        print("filename:", filename)
+        f = h5py.File(filename, 'w', use_cache=True)
+        self.assertTrue('/' in f)
+        r = f['/'] 
+        self.assertEqual(len(r), 0)
+        self.assertTrue(isinstance(r, h5py.Group))
+        self.assertTrue(r.name, '/')
+        self.assertEqual(len(r.attrs.keys()), 0)
+        self.assertFalse('g1' in r)
+         
+        g1 = r.create_group('g1')
+        self.assertEqual(len(r), 1)
+        file = g1.file
+        f.close()
+
     def test_create(self):
         # create main test file
         filename = self.getFileName("create_group")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
-        self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
         r = f['/'] 
         self.assertEqual(len(r), 0)
@@ -107,7 +125,6 @@ class TestGroup(TestCase):
         self.assertEqual(len(g1), 1)
         self.assertEqual(len(g1_1), 0)
 
-        #print r.get_link_json("/mysoftlink")
         slink = r['mysoftlink']
         self.assertEqual(slink.id, g1_1.id)
 
@@ -119,7 +136,6 @@ class TestGroup(TestCase):
 
         # create a external hardlink
         r['myexternallink'] = h5py.ExternalLink(link_target_filename, "somepath")
-        #print("link_target_filename:", link_target_filename)
         # test getclass
         g1_class = r.get('g1', getclass=True)
         self.assertEqual(g1_class, h5py.Group)
@@ -128,22 +144,33 @@ class TestGroup(TestCase):
         link_class = r.get('mysoftlink', getclass=True, getlink=True)
         self.assertEqual(link_class, h5py.SoftLink)
         softlink = r.get('mysoftlink', getlink=True)
-        #print("softlink class:", softlink.__class__.__name__)
         self.assertEqual(softlink.path, '/g1/g1.1')
 
-        try:
-            linkee_class = r.get('myexternallink', getclass=True)
-            if not config.get('use_h5py'):
-                self.assertTrue(True)  # TODO - implement for h5pyd
-        except OSError:
-            if config.get('use_h5py'):
-                self.assertTrue(False)  # Should work for h5py
-
-
+        linkee_class = r.get('myexternallink', getclass=True)
         link_class = r.get('myexternallink', getclass=True, getlink=True)
         self.assertEqual(link_class, h5py.ExternalLink)
         external_link = r.get('myexternallink', getlink=True)
         self.assertEqual(external_link.path, 'somepath')
+        external_link_filename = external_link.filename
+        if config.get('use_h5py'):
+            # h5py external link should be a posix path
+            self.assertTrue(external_link_filename.find('/') > 0)
+        else:
+            # HDF Server should be a DNS style name
+            self.assertEqual(external_link_filename.find('/'), -1)
+
+        links = r.items()
+        got_external_link = False
+        for link in links:
+            title = link[0]
+            obj = link[1]
+            if title == 'myexternallink':
+                self.assertTrue(obj is not None)            
+                self.assertEqual(len(obj), 0)
+                self.assertTrue(obj.file.filename != filename)
+                got_external_link = True
+
+        self.assertTrue(got_external_link)
 
         del r['mysoftlink']
         self.assertEqual(len(r), 5)
@@ -151,14 +178,22 @@ class TestGroup(TestCase):
         del r['myexternallink']
         self.assertEqual(len(r), 4)
 
+        # create group using nested path
+        g2 = r['g2']
+        r['g1/g1.3'] = g2
+        self.assertEqual(len(r), 5)
+
+        # try creating a link with a space in the name
+        r["a space"] = g2
+        self.assertEqual(len(r), 6)
+         
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":
             self.assertTrue(isinstance(g1.modified, datetime))
             #self.assertEqual(g1.modified.tzname(), six.u('UTC'))
-
+         
         f.close()
-        if h5py.__name__ == "h5pyd":
-            self.assertEqual(f.id.id, 0)
+        
 
 if __name__ == '__main__':
     ut.main()
