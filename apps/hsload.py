@@ -37,7 +37,7 @@ UTILNAME = 'hsload'
 verbose = False
 nodata = False
  
-if sys.version_info >= (3, 0): 
+if sys.version_info >= (3, 0):
     from urllib.parse import urlparse
 else:
     from urlparse import urlparse
@@ -218,7 +218,6 @@ def load_file(filename, domain, endpoint=None, username=None, password=None):
     
 #----------------------------------------------------------------------------------
 def stage_file(uri, netfam=None, sslv=True):
-    global PYCRUL
     if PYCRUL == None:
         logging.warn("pycurl not available for inline staging of input %s, see pip search pycurl." % uri)
         return None
@@ -232,9 +231,9 @@ def stage_file(uri, netfam=None, sslv=True):
             crlc.setopt(crlc.SSL_VERIFYPEER, sslv)
 
         if netfam == 4: 
-            crlc.setopt(crlc.IPRESOLVE, crlc.IPRESOLVE_V4) 
+            crlc.setopt(crlc.IPRESOLVE, crlc.IPRESOLVE_V4)
         elif netfam == 6:
-            crlc.setopt(crlc.IPRESOLVE, crlc.IPRESOLVE_V6) 
+            crlc.setopt(crlc.IPRESOLVE, crlc.IPRESOLVE_V6)
 
         if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
             crlc.setopt(crlc.VERBOSE, True)
@@ -271,7 +270,7 @@ def usage():
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --nodata :: Do not upload dataset data")
     print("     -4 :: Force ipv4 for any file staging (doesn\'t set hsds loading net)")
-    print("     -6 :: Force ipv6 (see -4)") 
+    print("     -6 :: Force ipv6 (see -4)")
     print("     -h | --help    :: This message.")
     print("")
     print(("%s version %s\n" % (UTILNAME, __version__)))
@@ -395,7 +394,7 @@ if __name__ == "__main__":
 
             if src_file_chk.scheme == 'http' or src_file_chk.scheme == 'https' or src_file_chk.scheme == 'ftp':
                 src_file = stage_file(src_file, netfam=ipvfam)
-                if src_file == None: 
+                if src_file == None:
                     continue
                 istmp = True
                 logging.info('temp source data: '+str(src_file))
@@ -410,10 +409,10 @@ if __name__ == "__main__":
             r = load_file(src_file, tgt, endpoint=endpoint, username=username, password=password)
 
             # cleanup if needed
-            if istmp: 
+            if istmp:
                 try:    
                     os.unlink(src_file)
-                except OSError as e: 
+                except OSError as e:
                     logging.warn("failed to delete %s : %s" % (src_file, sr(e)))
         
     except KeyboardInterrupt:
