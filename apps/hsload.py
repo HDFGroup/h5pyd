@@ -12,7 +12,9 @@
 
 import sys
 import logging
+import os
 import os.path as op
+import tempfile
     
 try:
     import h5py 
@@ -20,6 +22,12 @@ try:
 except ImportError as e:
     sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e)) 
     sys.exit(1)
+
+try:
+    import pycurl as PYCRUL
+except ImportError as e:
+    PYCRUL = None
+
 from config import Config
 from chunkiter import ChunkIterator
 
@@ -29,7 +37,10 @@ UTILNAME = 'hsload'
 verbose = False
 nodata = False
  
-#get_sizes
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlparse
+else:
+    from urlparse import urlparse
 
 #----------------------------------------------------------------------------------
 def copy_attribute(obj, name, attrobj):
@@ -94,6 +105,7 @@ def create_dataset(fd, dobj):
         print(msg)
     try:
         it = ChunkIterator(dset)
+
         logging.debug("src dtype: {}".format(dobj.dtype))
         logging.debug("des dtype: {}".format(dset.dtype))
         
@@ -102,8 +114,8 @@ def create_dataset(fd, dobj):
             logging.info(msg)
             if verbose:
                 print(msg)
-            arr = dobj[s]
-            dset[s] = arr
+            #arr = dobj[s]
+            #dset[s] = arr
     except (IOError, TypeError) as e:
         msg = "ERROR : failed to copy dataset data : {}".format(str(e))
         logging.error(msg)
@@ -112,8 +124,6 @@ def create_dataset(fd, dobj):
     logging.info(msg)
     if verbose:
         print(msg)
-    
-     
 # create_dataset
 
 #----------------------------------------------------------------------------------
@@ -153,11 +163,7 @@ def create_group(fd, gobj):
             logging.warning(msg)
             if verbose:
                 print(msg)
-            
-
 # create_group
-
-# create_datatype
 
 #----------------------------------------------------------------------------------
 def create_datatype(fd, obj):
@@ -170,7 +176,7 @@ def create_datatype(fd, obj):
     # create attributes
     for ga in obj.attrs:
         copy_attribute(ctype, ga, obj.attrs[ga])
-# create_group
+# create_datatype
       
 #----------------------------------------------------------------------------------
 def load_file(filename, domain, endpoint=None, username=None, password=None):
@@ -208,8 +214,38 @@ def load_file(filename, domain, endpoint=None, username=None, password=None):
         print(msg)
 
     return 0
+# load_file
     
-# hsds_basic_load
+#----------------------------------------------------------------------------------
+def stage_file(uri, netfam=None, sslv=True):
+    if PYCRUL == None:
+        logging.warn("pycurl not available for inline staging of input %s, see pip search pycurl." % uri)
+        return None
+    try:
+        fout = tempfile.NamedTemporaryFile(prefix='hsload.', suffix='.h5', delete=False)
+        logging.info("staging %s --> %s" % (uri, fout.name))
+        if verbose: print("staging %s" % uri)
+        crlc = PYCRUL.Curl()
+        crlc.setopt(crlc.URL, uri)
+        if sslv == True:
+            crlc.setopt(crlc.SSL_VERIFYPEER, sslv)
+
+        if netfam == 4: 
+            crlc.setopt(crlc.IPRESOLVE, crlc.IPRESOLVE_V4)
+        elif netfam == 6:
+            crlc.setopt(crlc.IPRESOLVE, crlc.IPRESOLVE_V6)
+
+        if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
+            crlc.setopt(crlc.VERBOSE, True)
+        crlc.setopt(crlc.WRITEFUNCTION, fout.write)
+        crlc.perform()
+        crlc.close()
+        fout.close()
+        return fout.name
+    except (IOError, PYCRUL.error) as e:
+      logging.error("%s : %s" % (uri, str(e)))
+      return None
+#stage_file
 
 #----------------------------------------------------------------------------------
 def usage():
@@ -233,11 +269,12 @@ def usage():
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --nodata :: Do not upload dataset data")
+    print("     -4 :: Force ipv4 for any file staging (doesn\'t set hsds loading net)")
+    print("     -6 :: Force ipv6 (see -4)")
     print("     -h | --help    :: This message.")
     print("")
     print(("%s version %s\n" % (UTILNAME, __version__)))
 #end print_usage
-
 
 #----------------------------------------------------------------------------------
 def print_config_example():
@@ -256,6 +293,7 @@ if __name__ == "__main__":
     username=cfg["hs_username"]
     password=cfg["hs_password"]
     logfname=None
+    ipvfam=None
     
     src_files = []
     argn = 1
@@ -293,6 +331,10 @@ if __name__ == "__main__":
         elif arg == '--logfile':
             logfname = val
             argn += 2     
+        elif arg == '-4':
+            ipvfam = 4
+        elif arg == '-6':
+            ipvfam = 6
         elif arg in ("-h", "--help"):
             usage()
             sys.exit(0)
@@ -346,13 +388,32 @@ if __name__ == "__main__":
     try:
          
         for src_file in src_files:
+            # check if this is a non local file, if it is remote (http, etc...) stage it first then insert it into hsds
+            src_file_chk  = urlparse(src_file)
+            logging.debug(src_file_chk)
+
+            if src_file_chk.scheme == 'http' or src_file_chk.scheme == 'https' or src_file_chk.scheme == 'ftp':
+                src_file = stage_file(src_file, netfam=ipvfam)
+                if src_file == None:
+                    continue
+                istmp = True
+                logging.info('temp source data: '+str(src_file))
+            else:
+                istmp = False
+
             tgt = domain
             if tgt[-1] == '/':
                 # folder destination
                 tgt = tgt + op.basename
 
             r = load_file(src_file, tgt, endpoint=endpoint, username=username, password=password)
-          
+
+            # cleanup if needed
+            if istmp:
+                try:    
+                    os.unlink(src_file)
+                except OSError as e:
+                    logging.warn("failed to delete %s : %s" % (src_file, sr(e)))
         
     except KeyboardInterrupt:
         logging.error('Aborted by user via keyboard interrupt.')
