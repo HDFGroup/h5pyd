@@ -114,8 +114,8 @@ def create_dataset(fd, dobj):
             logging.info(msg)
             if verbose:
                 print(msg)
-            #arr = dobj[s]
-            #dset[s] = arr
+            arr = dobj[s]
+            dset[s] = arr
     except (IOError, TypeError) as e:
         msg = "ERROR : failed to copy dataset data : {}".format(str(e))
         logging.error(msg)
