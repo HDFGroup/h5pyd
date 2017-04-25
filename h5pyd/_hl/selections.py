@@ -380,6 +380,8 @@ class SimpleSelection(Selection):
             for i in range(rank):
                 start = self.start[i]
                 stop = start + (self.count[i] * self.step[i])
+                if stop > self._shape[i]:
+                    stop = self._shape[i]
                 dim_sel = str(start) + ':' + str(stop)
                 if self.step[i] != 1:
                     dim_sel += ':' + str(self.step[i])
