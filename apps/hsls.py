@@ -38,20 +38,26 @@ def visititems(name, grp, visited):
     for k in grp:
         item = grp.get(k, getlink=True)
         class_name = item.__class__.__name__
+        item_name = op.join(name, k)
         if class_name == "HardLink":
-            # follow hardlinks
-            item = grp.get(k)
-            item_name = op.join(name, k)
-            dump(item_name, item, visited=visited)
+            # follow hardlinks    
+            try:
+                item = grp.get(k)         
+                dump(item_name, item, visited=visited)
+            except IOError:
+                # object deleted but hardlink left?
+                desc = "{Missing hardlink object}"
+                print("{0:24} {1} {2}".format(item_name, class_name, desc))
+            
         elif class_name == "SoftLink":
             desc = '{' + item.path + '}'
-            print("{0:24} {1} {2}".format(name, class_name, desc))
+            print("{0:24} {1} {2}".format(item_name, class_name, desc))
         elif class_name == "ExternalLink":
             desc = '{' + item.path + '//' + item.filename + '}'
-            print("{0:24} {1} {2}".format(name, class_name, desc))
+            print("{0:24} {1} {2}".format(item_name, class_name, desc))
         else:
             desc = '{Unknown Link Type}'
-            print("{0:24} {1} {2}".format(name, class_name, desc))
+            print("{0:24} {1} {2}".format(item_name, class_name, desc))
 
 
 def dump(name, obj, visited=None):
@@ -323,7 +329,11 @@ for domain in domains:
                 item = grp.get(k, getlink=True)
                 if item.__class__.__name__ == "HardLink":
                     # follow hardlinks
-                    item = grp.get(k)
+                    try:
+                        item = grp.get(k)
+                    except IOError:
+                        # object deleted?  Just dump link info
+                        pass
                 dump(k, item)
         if showacls:
             dumpAcls(grp)
