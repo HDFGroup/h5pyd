@@ -1,9 +1,6 @@
-import numpy as np
 import sys
 import os.path as op
-import os
 import logging
-from datetime import datetime
 import h5pyd as h5py
 from config import Config
 
@@ -66,7 +63,7 @@ def touchDomain(domain):
     if not parent_domain.endswith('/'):
         parent_domain += '/'
     try:
-        hparent = getFolder(parent_domain)
+        getFolder(parent_domain)
     except OSError as oe:
         #print("errno:", oe.errno)
         if oe.errno in (404, 410):   # Not Found

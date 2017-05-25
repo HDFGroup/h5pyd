@@ -1,11 +1,9 @@
 
 import sys
 import os.path as op
-import os
 import logging
 from datetime import datetime
 import h5pyd as h5py
-import numpy as np
 from config import Config
 
 #
@@ -101,10 +99,10 @@ def dump(name, obj, visited=None):
             el = "..."  # show this if the attribute is too large
             rank = len(attr.shape)
             if rank > 1:
-                val = "["*rank + "..." + "]"*rank
+                val = "["*rank + el + "]"*rank
                 print("   attr: {0:24} {1}".format(attr_name, val))
             elif rank == 1 and attr.shape[0] > 1:
-                val = "[{},...]".format(attr[0])
+                val = "[{},{}]".format(attr[0], el)
                 print("   attr: {0:24} {1}".format(attr_name, val))
             else:
                 print("   attr: {0:24} {1}".format(attr_name, attr))
@@ -184,7 +182,6 @@ def visitDomains(domain, depth=1):
     if domain[-1] == '/':
         domain = domain[:-1]  # strip off trailing slash
     
-    got_folder = False
     try:
         dir = getFolder(domain + '/')
         dir_class = "domain"
@@ -226,7 +223,7 @@ def getGroupFromDomain(domain):
     try:
         f = getFile(domain)
         return f['/']
-    except OSError as err:
+    except OSError:
         return None
 
 #

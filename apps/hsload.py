@@ -15,7 +15,6 @@ import logging
 import os
 import os.path as op
 import tempfile
-import numpy as np
     
 try:
     import h5py 
@@ -419,7 +418,7 @@ if __name__ == "__main__":
                 try:    
                     os.unlink(src_file)
                 except OSError as e:
-                    logging.warn("failed to delete %s : %s" % (src_file, sr(e)))
+                    logging.warn("failed to delete %s : %s" % (src_file, str(e)))
         
     except KeyboardInterrupt:
         logging.error('Aborted by user via keyboard interrupt.')
