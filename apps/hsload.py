@@ -15,6 +15,7 @@ import logging
 import os
 import os.path as op
 import tempfile
+import numpy as np
     
 try:
     import h5py 
@@ -43,15 +44,19 @@ else:
     from urlparse import urlparse
 
 #----------------------------------------------------------------------------------
-def copy_attribute(obj, name, attrobj):
-    msg = "creating attribute {} in {}".format(name, obj.name)
+def copy_attribute(desobj, name, srcobj):
+    msg = "creating attribute {} in {}".format(name, srcobj.name)
     logging.debug(msg)
     if verbose:
         print(msg)
     try:
-        obj.attrs.create(name, attrobj)
+        # TBD: we are potentially losing some fidelity here by accessing 
+        # the attribute as a numpy array and then passing that to the 
+        # the create method.  Better would be to use the h5py low-level
+        # API to ensure we get the exact type of the attribute.
+        desobj.attrs.create(name, srcobj.attrs[name])
     except (IOError, TypeError) as e:
-        msg = "ERROR: failed to create attribute {} of dataset {} -- {}".format(name, obj.name, str(e))
+        msg = "ERROR: failed to create attribute {} of object {} -- {}".format(name, desobj.name, str(e))
         logging.error(msg)
         print(msg)
 # copy_attribute
@@ -90,7 +95,7 @@ def create_dataset(fd, dobj):
         return
     # create attributes
     for da in dobj.attrs:
-        copy_attribute(dset, da, dobj.attrs[da])
+        copy_attribute(dset, da, dobj)
 
     if nodata:
         msg = "skipping data load"
@@ -136,7 +141,7 @@ def create_group(fd, gobj):
 
     # create attributes
     for ga in gobj.attrs:
-        copy_attribute(grp, ga, gobj.attrs[ga])
+        copy_attribute(grp, ga, gobj)
 
     # create any soft/external links
     for title in gobj:
@@ -175,7 +180,7 @@ def create_datatype(fd, obj):
     ctype = fd[obj.name]
     # create attributes
     for ga in obj.attrs:
-        copy_attribute(ctype, ga, obj.attrs[ga])
+        copy_attribute(ctype, ga, obj)
 # create_datatype
       
 #----------------------------------------------------------------------------------
@@ -187,7 +192,7 @@ def load_file(filename, domain, endpoint=None, username=None, password=None):
 
     # create any root attributes
     for ga in finfd.attrs:
-        copy_attribute(foutfd, ga, finfd.attrs[ga])
+        copy_attribute(foutfd, ga, finfd)
 
     def object_create_helper(name, obj):
         if isinstance(obj, h5py.Dataset):
@@ -365,6 +370,7 @@ if __name__ == "__main__":
     logging.info("username: {}".format(username))
     logging.info("password: {}".format(password))
     logging.info("endpoint: {}".format(endpoint))
+    logging.info("verbose: {}".format(verbose))
     
     if len(src_files) < 2:
         # need at least a src and destination
