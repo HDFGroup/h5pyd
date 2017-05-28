@@ -46,7 +46,6 @@ class Config:
         # override any config values with environment variable if found
         for k in self._cfg.keys():
             if k.upper() in os.environ:
-                print("using env override for :", k)
                 self._cfg[k] = os.environ[k.upper()]
 
         # finally update any values that are passed in to the constructor
@@ -55,6 +54,11 @@ class Config:
 
     def __getitem__(self, name):
         """ Get a config item  """
+        if name not in self._cfg:
+            if name.upper() in os.environ:
+                self._cfg[name] = os.environ[name.upper()]
+            else:
+                return None
         return self._cfg[name]
 
     def __setitem__(self, name, obj):
