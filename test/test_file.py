@@ -115,7 +115,7 @@ class TestFile(TestCase):
             self.assertEqual(f.num_groups, 0)
             self.assertEqual(f.num_datasets, 0)
             self.assertEqual(f.num_datatypes, 0)
-            self.assertTrue(f.allocated_bytes > 0)
+            self.assertTrue(f.allocated_bytes >= 0)
 
         f.close()
         self.assertEqual(f.id.id, 0)
