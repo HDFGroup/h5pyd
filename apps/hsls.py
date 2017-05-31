@@ -89,8 +89,36 @@ def dump(name, obj, visited=None):
         print("{0:24} {1} {2}".format(name, class_name, desc))
     if verbose and obj_id is not None:
         print("    {0:>12}: {1}".format("UUID", obj_id))
-    if verbose and class_name == "Dataset":
-        print("    {0:>12}: {1}".format("Chunks", obj.chunks))
+    if verbose and class_name == "Dataset" and obj.shape is not None and obj.chunks is not None:
+        chunk_size = obj.dtype.itemsize
+        for chunk_dim in obj.chunks:
+            chunk_size *= chunk_dim
+        dset_size = obj.dtype.itemsize
+        for dim_extent in obj.shape:
+            dset_size *= dim_extent
+        
+        num_chunks = obj.num_chunks
+        allocated_size = obj.allocated_size
+        if num_chunks is not None and allocated_size is not None:
+            utilization = dset_size / allocated_size
+            if human_readable:
+                fstr = "    {0:>12}: {1} {2:,} bytes, {3:,} allocated"
+            else:
+                fstr = "    {0:>12}: {1} {2} bytes, {3} allocated"
+            print(fstr.format("Chunks", obj.chunks, chunk_size, num_chunks))
+            if human_readable:
+                fstr = "    {0:>12}: {1:,} logical bytes, {2:,} allocated bytes, {3:.2f}% utilization"
+            else:
+                fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes, {3:.2f}% utilization"
+            print(fstr.format("Storage", dset_size, allocated_size, utilization*100.0))
+        else:
+            # verbose info not available, just show the chunk layout
+            if human_readable:
+                fstr = "    {0:>12}: {1} {2} bytes"
+            else:
+                fstr = "    {0:>12}: {1} {2:,} bytes"
+            print(fstr.format("Chunks", obj.chunks, chunk_size))
+    
         
 
     if showattrs and class_name in ("Dataset", "Group", "Datatype"):

@@ -14,6 +14,7 @@ from __future__ import absolute_import
 
 import posixpath as pp
 import sys
+import time
 import base64
 import numpy as np
 
@@ -34,6 +35,7 @@ from .datatype import Datatype
 from .h5type import getTypeItem, createDataType, check_dtype, special_dtype, getItemSize
 
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
+VERBOSE_REFRESH_TIME=1.0  # 1 second
 
 def readtime_dtype(basetype, names):
     """ Make a NumPy dtype appropriate for reading """
@@ -378,6 +380,18 @@ class Dataset(HLObject):
  
         return fill_value
 
+    @property
+    def num_chunks(self):
+        """ return number of allocated chunks"""
+        self._getVerboseInfo()
+        return self._num_chunks
+
+    @property
+    def allocated_size(self):
+        """ return storage used by all allocated chunks """
+        self._getVerboseInfo()
+        return self._allocated_size
+
 
     def __init__(self, bind):
         """ Create a new Dataset object by binding to a low-level DatasetID.
@@ -398,11 +412,25 @@ class Dataset(HLObject):
 
         self._shape = self.get_shape()
          
-        self._req_prefix = "/datasets/" + self.id.uuid
+        self._num_chunks = None  # aditional state we'll get when requested
+        self._allocated_size = None # as above
+        self._verboseUpdated = None # when the verbose data was fetched
 
 
         # self._local.astype = None #todo
 
+    def _getVerboseInfo(self):
+        now = time.time()
+        if self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME:
+            # resynch the verbose data
+            req = "/datasets/" + self.id.uuid + '?verbose=1'
+            rsp_json = self.GET(req)
+            if "num_chunks" in rsp_json:
+                self._num_chunks = rsp_json["num_chunks"]
+            if "allocated_size" in rsp_json:
+                self._allocated_size = rsp_json["allocated_size"]
+            self._verboseUpdated = now
+    
     def resize(self, size, axis=None):
         """ Resize the dataset, or the specified axis.
 

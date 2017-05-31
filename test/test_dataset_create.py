@@ -56,6 +56,12 @@ class TestCreateDataset(TestCase):
             # Check dataset's last modified time
             self.assertTrue(isinstance(dset.modified, datetime))
 
+        if h5py.__name__ == "h5pyd":
+            # test h5pyd extensions
+            print("test h5pyd extensions")
+            self.assertEqual(dset.num_chunks, None)
+            self.assertEqual(dset.allocated_size, None)
+
         f.close()
 
     def test_fillvalue_simple_dset(self):
@@ -108,6 +114,7 @@ class TestCreateDataset(TestCase):
         # Write 2's to the first five elements
         dset[0:5] = [2,] * 5
         vals = dset[:]
+
 
         f.close()
 
