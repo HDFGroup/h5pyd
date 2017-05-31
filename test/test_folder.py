@@ -33,18 +33,27 @@ class TestFolders(TestCase):
         #loglevel = logging.DEBUG
         #logging.basicConfig( format='%(asctime)s %(message)s', level=loglevel)
         test_domain = self.getFileName("folder_test")  
-         
-        filepath = self.getPathFromDomain(test_domain)
 
-        folder_name = op.dirname(filepath)  + '/' 
+        
+        filepath = self.getPathFromDomain(test_domain)
+        print("test_domain:", filepath)
+        # create test file if not present.
+        # on first run, this may take a minute before it is visible as a folder item
+        f = h5py.File(filepath, mode='a')  
+        self.assertTrue(f.id.id is not None)
+        f.close()
+
+        folder_name = op.dirname(filepath)  + '/'  
         print("folder_name:", folder_name)
          
         dir = h5py.Folder(folder_name)  # get folder object
+         
         self.assertEqual(dir.domain, folder_name)
         self.assertTrue(dir.modified)
         self.assertTrue(dir.created) 
         self.assertEqual(str(dir), folder_name)
         self.assertEqual(dir.owner, self.test_user1["name"])
+        
         dir_parent = dir.parent
         self.assertEqual(dir.parent[:-1], op.dirname(folder_name[:-1]))
 
@@ -72,15 +81,29 @@ class TestFolders(TestCase):
             self.assertTrue("created" in item)
             self.assertTrue("owner" in item)
             self.assertEqual(item["owner"], self.test_user1["name"])
+            self.assertTrue("num_groups" in item)
+            self.assertTrue("num_datasets" in item)
+            self.assertTrue("num_datatypes" in item)
+            self.assertTrue("allocated_bytes" in item)
+            self.assertTrue("num_chunks" in item)
+
             i += 1
         self.assertTrue(test_domain_found)
         self.assertEqual(i, count)
         dir.close()
+
+        # try opening a domain object as a folder
+        print("opening:", filepath)
+        f = h5py.Folder(filepath + '/')
+        print("count:", len(f))
+        for name in f:
+            print(name)
+        f.close()
          
 
     def test_create_folder(self):
-        #loglevel = logging.DEBUG
-        #logging.basicConfig( format='%(asctime)s %(message)s', level=loglevel)
+        loglevel = logging.DEBUG
+        logging.basicConfig( format='%(asctime)s %(message)s', level=loglevel)
         folder_test = self.getFileName("create_folder_test")  
         folder_path = self.getPathFromDomain(folder_test) + '/'
 

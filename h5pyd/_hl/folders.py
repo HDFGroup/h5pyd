@@ -199,6 +199,7 @@ class Folder():
         if "domains" not in rsp_json:
             raise IOError(500, "Unexpected Error")
         domains = rsp_json["domains"]
+        
         return domains
 
 

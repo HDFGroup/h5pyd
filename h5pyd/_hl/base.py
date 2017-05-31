@@ -420,11 +420,11 @@ class HLObject(CommonStateObject):
         return True
       
 
-    def GET(self, req, format="json"):
+    def GET(self, req, params=None, format="json"):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
          
-        rsp = self.id._http_conn.GET(req, format=format)
+        rsp = self.id._http_conn.GET(req, params=params, format=format)
         if rsp.status_code != 200:
             self.log.info("Got response: {}".format(rsp.status_code))
             raise IOError(rsp.status_code, rsp.reason)

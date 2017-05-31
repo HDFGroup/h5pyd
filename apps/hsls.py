@@ -13,6 +13,7 @@ from config import Config
 verbose = False
 showacls = False
 showattrs = False
+human_readable = False
  
 cfg = Config()
 
@@ -174,6 +175,21 @@ def getFile(domain):
     fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username, password=password, use_cache=True)
     return fh
 
+def format_size(n):
+    if n is None or n == ' ':
+        return ' '*8
+    symbol = ' '
+    for s in ('B', 'K', 'M', 'G', 'T'):
+        if n < 1024:
+            symbol = s
+            break
+        n /= 1024
+    if symbol == 'B':
+        return "{:7}B".format(n)
+    else:
+        return "{:7.1f}{}".format(n, symbol)
+
+
 def visitDomains(domain, depth=1):
     if depth == 0:
         return 0
@@ -186,14 +202,25 @@ def visitDomains(domain, depth=1):
         dir = getFolder(domain + '/')
         dir_class = "domain"
         display_name = domain
+        num_bytes = ' '
         if dir.is_folder:
             dir_class = "folder"
             display_name += '/'
+        elif verbose:
+            # get the number of allocated bytes
+            f = getFile(domain)
+            num_bytes = f.allocated_bytes
+            f.close()
         
         owner = dir.owner
         timestamp = datetime.fromtimestamp(int(dir.modified))
-                
-        print("{:24} {:8} {} {}".format(owner, dir_class, timestamp, display_name))
+
+        if human_readable: 
+            print("{:15} {:10} {:8} {} {}".format(owner, format_size(num_bytes), dir_class, timestamp, display_name))
+        else:
+            print("{:15} {:15} {:8} {} {}".format(owner, num_bytes, dir_class, timestamp, display_name))
+
+         
         count += 1
         if showacls:
             dumpAcls(dir)
@@ -230,8 +257,21 @@ def getGroupFromDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: python hsls.py [-r] [-a] [-v] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains")
+    print("usage: python hsls.py [-r] [-a] [-v] [-h] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains")
     print("example: python hsls.py -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5")
+    print("")
+    print("Options:")
+    print("     -v | --verbose :: verbose output")
+    print("     -H | --human-readable :: with -v, print human readable sizes (e.g. 123M)")
+    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://example.com:8080")
+    print("     -u | --user <username>   :: User name credential")
+    print("     -p | --password <password> :: Password credential")
+    print("     -c | --conf <file.cnf>  :: A credential and config file")
+    print("     --showacls :: print domain ACLs")
+    print("     --showattrs :: print attributes")
+    print("     --logfile <logfile> :: logfile path")
+    print("     --loglevel debug|info|warning|error :: Change log level")
+    print("     -h | --help    :: This message.")
     sys.exit()
 
 #
@@ -254,6 +294,9 @@ while argn < len(sys.argv):
         argn += 1
     elif arg in ("-v", "--verbose"):
         verbose = True
+        argn += 1
+    elif arg in ("-H", "--human-readable"):
+        human_readable = True
         argn += 1
     elif arg == "--loglevel":
         val = val.upper()

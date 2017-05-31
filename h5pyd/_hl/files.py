@@ -14,7 +14,7 @@ from __future__ import absolute_import
 
 import os
 import six
-
+import time
 import json
 
 from .objectid import GroupID
@@ -25,6 +25,8 @@ from .config import Config
 
 
 hdf5_version = version.hdf5_version_tuple[0:3]
+
+VERBOSE_REFRESH_TIME=1.0
 
 
 class File(Group):
@@ -223,9 +225,66 @@ class File(Group):
         # end else
         self._name = '/'
         self._id = groupid
+        self._verboseInfo = None  # aditional state we'll get when requested
+        self._verboseUpdated = None # when the verbose data was fetched
         
 
         Group.__init__(self, self._id)
+
+    def _getVerboseInfo(self):
+        now = time.time()
+        if self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME:
+            # resynch the verbose data
+            req = '/?verbose=1'
+            rsp_json = self.GET(req)
+            props = {}
+            for k in ("num_chunks", "num_datatypes", "num_groups", "num_datasets", "allocated_bytes"):
+                if k in rsp_json:
+                    props[k] = rsp_json[k]
+            self._verboseInfo = props
+            self._verboseUpdated = now
+        return self._verboseInfo
+
+    @property
+    def num_chunks(self):
+        props = self._getVerboseInfo()
+        num_chunks = 0
+        if "num_chunks" in props:
+            num_chunks = props["num_chunks"]
+        return num_chunks
+
+    @property
+    def num_datatypes(self):
+        props = self._getVerboseInfo()
+        num_datatypes = 0
+        if "num_datatypes" in props:
+            num_datatypes = props["num_datatypes"]
+        return num_datatypes
+
+    @property
+    def num_groups(self):
+        props = self._getVerboseInfo()
+        num_groups = 0
+        if "num_groups" in props:
+            num_groups = props["num_groups"]
+        return num_groups
+
+    @property
+    def num_datasets(self):
+        props = self._getVerboseInfo()
+        num_datasets = 0
+        if "num_datasets" in props:
+            num_datasets = props["num_datasets"]
+        return num_datasets
+
+    @property
+    def allocated_bytes(self):
+        props = self._getVerboseInfo()
+        allocated_bytes = 0
+        if "allocated_bytes" in props:
+            allocated_bytes = props["allocated_bytes"]
+        return allocated_bytes
+
 
     # override base implemention of ACL methods to use the domain rather than update root group
     def getACL(self, username):
