@@ -17,6 +17,30 @@ human_readable = False
  
 cfg = Config()
 
+def intToStr(n):
+    if human_readable:
+        s = "{:,}".format(n)
+    else:
+        s = "{}".format(n)
+    return s
+
+def format_size(n):
+    if n is None or n == ' ':
+        return ' '*8
+    symbol = ' '
+    if not human_readable:
+        return str(n)
+    # convert to common storage unit    
+    for s in ('B', 'K', 'M', 'G', 'T'):
+        if n < 1024:
+            symbol = s
+            break
+        n /= 1024
+    if symbol == 'B':
+        return "{:7}B".format(n)
+    else:
+        return "{:7.1f}{}".format(n, symbol)
+
 def getShapeText(dset):
     shape_text = "Scalar"
     shape = dset.shape
@@ -30,6 +54,14 @@ def getShapeText(dset):
                 if dim != 0:
                     shape_text += ", "
                 shape_text += str(shape[dim])
+                if verbose:
+                    # get unlimited dimension
+                    max_extent = dset.maxshape[dim]
+                    shape_text += '/'
+                    if max_extent is None:
+                        shape_text += "Inf"
+                    else:
+                        shape_text += str(max_extent)
         shape_text += "}"
     return shape_text
 
@@ -100,24 +132,15 @@ def dump(name, obj, visited=None):
         num_chunks = obj.num_chunks
         allocated_size = obj.allocated_size
         if num_chunks is not None and allocated_size is not None:
-            utilization = dset_size / allocated_size
-            if human_readable:
-                fstr = "    {0:>12}: {1} {2:,} bytes, {3:,} allocated"
-            else:
-                fstr = "    {0:>12}: {1} {2} bytes, {3} allocated"
-            print(fstr.format("Chunks", obj.chunks, chunk_size, num_chunks))
-            if human_readable:
-                fstr = "    {0:>12}: {1:,} logical bytes, {2:,} allocated bytes, {3:.2f}% utilization"
-            else:
-                fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes, {3:.2f}% utilization"
-            print(fstr.format("Storage", dset_size, allocated_size, utilization*100.0))
+            utilization = dset_size / allocated_size   
+            fstr = "    {0:>12}: {1} {2} bytes, {3} allocated chunks"
+            print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size), intToStr(num_chunks)))
+            fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes, {3:.2f}% utilization"
+            print(fstr.format("Storage", intToStr(dset_size), intToStr(allocated_size), utilization*100.0))
         else:
             # verbose info not available, just show the chunk layout
-            if human_readable:
-                fstr = "    {0:>12}: {1} {2} bytes"
-            else:
-                fstr = "    {0:>12}: {1} {2:,} bytes"
-            print(fstr.format("Chunks", obj.chunks, chunk_size))
+            fstr = "    {0:>12}: {1} {2} bytes"
+            print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size)))
     
         
 
@@ -203,20 +226,6 @@ def getFile(domain):
     fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username, password=password, use_cache=True)
     return fh
 
-def format_size(n):
-    if n is None or n == ' ':
-        return ' '*8
-    symbol = ' '
-    for s in ('B', 'K', 'M', 'G', 'T'):
-        if n < 1024:
-            symbol = s
-            break
-        n /= 1024
-    if symbol == 'B':
-        return "{:7}B".format(n)
-    else:
-        return "{:7.1f}{}".format(n, symbol)
-
 
 def visitDomains(domain, depth=1):
     if depth == 0:
@@ -242,12 +251,8 @@ def visitDomains(domain, depth=1):
         
         owner = dir.owner
         timestamp = datetime.fromtimestamp(int(dir.modified))
-
-        if human_readable: 
-            print("{:15} {:10} {:8} {} {}".format(owner, format_size(num_bytes), dir_class, timestamp, display_name))
-        else:
-            print("{:15} {:15} {:8} {} {}".format(owner, num_bytes, dir_class, timestamp, display_name))
-
+ 
+        print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes), dir_class, timestamp, display_name))
          
         count += 1
         if showacls:
