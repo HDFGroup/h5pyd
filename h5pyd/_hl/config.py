@@ -46,7 +46,6 @@ class Config:
         # override any config values with environment variable if found
         for k in self._cfg.keys():
             if k.upper() in os.environ:
-                print("using env override for :", k)
                 self._cfg[k] = os.environ[k.upper()]
 
         # finally update any values that are passed in to the constructor

@@ -118,6 +118,36 @@ class TestCreateDataset(TestCase):
 
         f.close()
 
+    def test_fixed_len_str_dset(self):
+        filename = self.getFileName("fixed_len_str_dset")
+        print("filename:", filename)
+        print("h5py:", h5py.__name__)
+        f = h5py.File(filename, "w")
+
+        dims = (10,)
+        dset = f.create_dataset('fixed_len_str_dset', dims, dtype='|S6')
+
+        self.assertEqual(dset.name, "/fixed_len_str_dset")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 1)
+        self.assertEqual(dset.shape[0], 10)
+        self.assertEqual(str(dset.dtype), '|S6')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 1)
+        self.assertEqual(dset.maxshape[0], 10)
+        self.assertEqual(dset.fillvalue, b'')
+
+        self.assertEqual(dset[0], b'')
+        
+        words = (b"one", b"two", b"three", b"four", b"five", b"six", b"seven", b"eight", b"nine", b"ten")
+        dset[:] = words
+        vals = dset[:]  # read back
+        for i in range(10):
+            self.assertEqual(vals[i], words[i])
+
+        
+        f.close()
+
     def test_create_dset_by_path(self):
         filename = self.getFileName("create_dset_by_path")
         print("filename:", filename)

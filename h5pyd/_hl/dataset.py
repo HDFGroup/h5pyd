@@ -133,7 +133,7 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
         else:
             dtype = numpy.dtype(dtype)
 
-        if dtype.kind == 'S' and dtype.metadata['ref']:
+        if dtype.kind == 'O' and dtype.metadata['ref']:
             type_json = {}
             type_json["class"] = "H5T_REFERENCE"
             meta_type = dtype.metadata['ref']
