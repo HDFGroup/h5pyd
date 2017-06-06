@@ -131,12 +131,17 @@ def dump(name, obj, visited=None):
         
         num_chunks = obj.num_chunks
         allocated_size = obj.allocated_size
-        if num_chunks is not None and allocated_size is not None:
-            utilization = dset_size / allocated_size   
+        if num_chunks is not None and allocated_size is not None:    
             fstr = "    {0:>12}: {1} {2} bytes, {3} allocated chunks"
             print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size), intToStr(num_chunks)))
-            fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes, {3:.2f}% utilization"
-            print(fstr.format("Storage", intToStr(dset_size), intToStr(allocated_size), utilization*100.0))
+            if allocated_size > 0:
+                utilization = dset_size / allocated_size   
+                fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes, {3:.2f}% utilization"
+                print(fstr.format("Storage", intToStr(dset_size), intToStr(allocated_size), utilization*100.0))
+            else:
+                fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes"
+                print(fstr.format("Storage", intToStr(dset_size), intToStr(allocated_size)))
+            
         else:
             # verbose info not available, just show the chunk layout
             fstr = "    {0:>12}: {1} {2} bytes"
