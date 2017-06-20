@@ -118,9 +118,8 @@ class HttpConn:
     def GET(self, req, format="json", params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
-        if self._domain is None:
-            raise IOError("no domain defined")
-                
+        #if self._domain is None:
+        #    raise IOError("no domain defined")
         rsp = None
 
         if not headers:

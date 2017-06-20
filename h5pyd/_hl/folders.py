@@ -78,8 +78,11 @@ class Folder():
 
         self.log = logging.getLogger("h5pyd")
 
-        if len(domain_name) < 2: 
+        if len(domain_name) == 0: 
             raise ValueError("Invalid folder name")
+        
+        if domain_name[0] != '/':
+            raise ValueError("Folder name must start with '/'")
 
         if domain_name[-1] != '/':
             raise ValueError("Folder name must end with '/'")
@@ -104,8 +107,11 @@ class Folder():
               
         if password is None and "hs_password" in cfg:
             password = cfg["hs_password"]
-                 
-        self._domain = domain_name[:-1]
+
+        if len(domain_name) <= 1:
+            self._domain = None
+        else:
+            self._domain = domain_name[:-1]
         self._subdomains = None
         self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, password=password, mode=mode, logger=logger)
         self.log = self._http_conn.logging
@@ -113,7 +119,12 @@ class Folder():
         domain_json = None
 
         # try to do a GET from the domain
-        req = "/"
+        if domain_name == '/':
+            if mode != 'r':
+                raise IOError(400, "mode must be 'r' for top-level domain")
+            req = "/domains"
+        else:
+            req = '/'
                         
         rsp = self._http_conn.GET(req)
 
@@ -139,10 +150,11 @@ class Folder():
         else:
             # open with Folder but actually has a root group
             self._obj_class = "domain"  
-         
         self._name = domain_name
-        self._created = domain_json['created']
-        self._modified = domain_json['lastModified']
+        if "created" in domain_json:
+            self._created = domain_json['created']
+        if "lastModified" in domain_json:
+            self._modified = domain_json['lastModified']
         if "owner" in domain_json:
             self._owner = domain_json["owner"]
         else:
@@ -191,7 +203,10 @@ class Folder():
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         req = '/domains'
-        params = {"domain": self._domain + '/'}
+        if self._domain is None:
+            params = {"domain": '/'}
+        else:
+            params = {"domain": self._domain + '/'}
         rsp = self._http_conn.GET(req, params=params)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
