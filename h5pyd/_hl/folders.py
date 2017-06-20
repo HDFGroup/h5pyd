@@ -147,14 +147,20 @@ class Folder():
             if domain_json["class"] != "folder":
                 self.log.warning("Not a folder domain")
             self._obj_class = domain_json["class"]
-        else:
+        elif "root" in domain_json:
             # open with Folder but actually has a root group
-            self._obj_class = "domain"  
+            self._obj_class = "domain" 
+        else:
+            self._obj_class = "folder" 
         self._name = domain_name
         if "created" in domain_json:
             self._created = domain_json['created']
+        else:
+            self._created = None
         if "lastModified" in domain_json:
             self._modified = domain_json['lastModified']
+        else:
+            self._modified = None
         if "owner" in domain_json:
             self._owner = domain_json["owner"]
         else:

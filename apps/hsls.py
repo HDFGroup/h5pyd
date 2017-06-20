@@ -235,7 +235,7 @@ def getFile(domain):
 def visitDomains(domain, depth=1):
     if depth == 0:
         return 0
-    #print("recursive:", depth)
+     
     count = 0
     if domain[-1] == '/':
         domain = domain[:-1]  # strip off trailing slash
@@ -255,7 +255,12 @@ def visitDomains(domain, depth=1):
             f.close()
         
         owner = dir.owner
-        timestamp = datetime.fromtimestamp(int(dir.modified))
+        if owner is None:
+            owner = ""
+        if dir.modified is None:
+            timestamp = ""
+        else:
+            timestamp = datetime.fromtimestamp(int(dir.modified))
  
         print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes), dir_class, timestamp, display_name))
          
@@ -265,7 +270,6 @@ def visitDomains(domain, depth=1):
         if dir.is_folder:
             for name in dir:
                 # recurse for items in folder
-                #print("got name:", name)
                 n = visitDomains(domain + '/' + name, depth=(depth-1))
                 count += n
                     
@@ -381,8 +385,8 @@ logging.debug("set log_level to {}".format(loglevel))
  
  
 if len(domains) == 0:
-    # add a generic url
-    domains.append("hdfgroup.org")
+    # add top-level domain
+    domains.append("/")
 
 for domain in domains:
     if domain.endswith('/'):

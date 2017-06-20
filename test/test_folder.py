@@ -120,6 +120,7 @@ class TestFolders(TestCase):
         dir = h5py.Folder('/')  # get folder object for root
         found = False
         self.assertTrue(len(dir) > 0)
+        self.assertTrue(dir.is_folder)
         for name in dir:
             # we should come across the given domain
             if top_level_domain == name:
