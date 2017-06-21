@@ -36,6 +36,16 @@ class TestFile(TestCase):
         m = version[(n+1):].find('.')
         self.assertTrue(m>=1)
 
+    def test_serverinfo(self):
+        if h5py.__name__ == "h5pyd":
+            info = h5py.getServerInfo()
+            self.assertTrue("greeting" in info)
+            self.assertTrue("name" in info)
+            self.assertTrue("about" in info)
+            self.assertTrue("endpoint" in info)
+            self.assertTrue("username" in info)
+            self.assertTrue("password" in info)
+       
     def test_create(self):
         filename = self.getFileName("new_file")
         print("filename:", filename)
@@ -112,7 +122,7 @@ class TestFile(TestCase):
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously
             self.assertEqual(f.num_chunks, 0)
-            self.assertEqual(f.num_groups, 0)
+            self.assertTrue(f.num_groups >= 0)
             self.assertEqual(f.num_datasets, 0)
             self.assertEqual(f.num_datatypes, 0)
             self.assertTrue(f.allocated_bytes >= 0)

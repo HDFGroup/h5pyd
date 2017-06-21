@@ -23,9 +23,6 @@ from .. import version
 from .httpconn import HttpConn
 from .config import Config
 
-
-hdf5_version = version.hdf5_version_tuple[0:3]
-
 VERBOSE_REFRESH_TIME=1.0  # 1 second
 
 

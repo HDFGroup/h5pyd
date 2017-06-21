@@ -30,35 +30,19 @@ from ._hl.group import Group, SoftLink, ExternalLink, UserDefinedLink, HardLink
 from ._hl.dataset import Dataset
 from ._hl.datatype import Datatype
 from ._hl.attrs import AttributeManager
-#from ._hl.httputil import HttpUtil
-
-
-#from .h5 import get_config
-#from .h5r import Reference, RegionReference
-#from .h5t import special_dtype, check_dtype
-
-# Deprecated functions
-#from .h5t import py_new_vlen as new_vlen
-#from .h5t import py_get_vlen as get_vlen
-#from .h5t import py_new_enum as new_enum
-#from .h5t import py_get_enum as get_enum
-
-
-#from .tests import run_tests
-
+from ._hl.serverinfo import getServerInfo
+ 
 __version__ = version.version
 
  
 
 __doc__ = \
 """
-    This is the h5py package, a Python interface to the HDF5
-    scientific data format.
+    This is the h5pyd package, a Python interface to the HDF REST Server.
 
     Version %s
-
-    HDF5 %s
-""" % (version.version, version.hdf5_version)
+ 
+""" % (version.version)
 
 
 def enable_ipython_completer():
