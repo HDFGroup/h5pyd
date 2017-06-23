@@ -89,7 +89,6 @@ if __name__ == "__main__":
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1] 
-        print("arg:", arg, "val:", val)
         if arg in ("-v", "--verbose"):
             verbose = True
             argn += 1
@@ -197,6 +196,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logging.error('Aborted by user via keyboard interrupt.')
         sys.exit(1)
-    print("done")
 #__main__
 

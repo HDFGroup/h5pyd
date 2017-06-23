@@ -264,6 +264,11 @@ if __name__ == "__main__":
                     os.unlink(src_file)
                 except OSError as e:
                     logging.warn("failed to delete %s : %s" % (src_file, str(e)))
+
+            msg = "File {} uploaded to domain: {}".format(src_file, tgt)
+            logging.info(msg)
+            if verbose:
+                print(msg)  
         
     except KeyboardInterrupt:
         logging.error('Aborted by user via keyboard interrupt.')

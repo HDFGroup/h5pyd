@@ -171,6 +171,9 @@ class File(Group):
                     http_conn.close() 
                     raise IOError(rsp.status_code, rsp.reason)
                 root_json = None
+            if root_json and 'root' not in root_json:
+                http_conn.close()
+                raise IOError(404, "Location is a folder, not a file")
             if root_json is None:
                 # create the domain
                 if mode not in ('w', 'a', 'x'):
@@ -182,10 +185,10 @@ class File(Group):
                     raise IOError(rsp.status_code, rsp.reason)
                  
                 root_json = json.loads(rsp.text)
-
+            
             if 'root' not in root_json:
                 http_conn.close() 
-                raise IOError(500, "Unexpected error")
+                raise IOError(404, "Unexpected error")
             root_uuid = root_json['root']
 
             if mode == 'a':
