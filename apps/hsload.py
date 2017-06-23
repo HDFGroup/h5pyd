@@ -29,196 +29,18 @@ except ImportError as e:
     PYCRUL = None
 
 from config import Config
-from chunkiter import ChunkIterator
+from utillib import load_file
 
 __version__ = '0.0.1'
 
 UTILNAME = 'hsload'
-verbose = False
-nodata = False
  
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse
 else:
     from urlparse import urlparse
-
-#----------------------------------------------------------------------------------
-def copy_attribute(desobj, name, srcobj):
-    msg = "creating attribute {} in {}".format(name, srcobj.name)
-    logging.debug(msg)
-    if verbose:
-        print(msg)
-    try:
-        # TBD: we are potentially losing some fidelity here by accessing 
-        # the attribute as a numpy array and then passing that to the 
-        # the create method.  Better would be to use the h5py low-level
-        # API to ensure we get the exact type of the attribute.
-        desobj.attrs.create(name, srcobj.attrs[name])
-    except (IOError, TypeError) as e:
-        msg = "ERROR: failed to create attribute {} of object {} -- {}".format(name, desobj.name, str(e))
-        logging.error(msg)
-        print(msg)
-# copy_attribute
-      
-#----------------------------------------------------------------------------------
-def create_dataset(fd, dobj):
-    """ create a dataset using the properties of the passed in h5py dataset.
-        If successful, proceed to copy attributes and data.
-    """
-    msg = "creating dataset {}, shape: {}, type: {}".format(dobj.name, dobj.shape, dobj.dtype)
-    logging.info(msg)
-    if verbose:
-        print(msg) 
-       
-    fillvalue = None
-    try:    
-        # can trigger a runtime error if fillvalue is undefined
-        fillvalue = dobj.fillvalue
-    except RuntimeError:
-        pass  # ignore
-    
-    try:
-        dset = fd.create_dataset( dobj.name, shape=dobj.shape, dtype=dobj.dtype, chunks=dobj.chunks, \
-                compression=dobj.compression, shuffle=dobj.shuffle, \
-                fletcher32=dobj.fletcher32, maxshape=dobj.maxshape, \
-                compression_opts=dobj.compression_opts, fillvalue=fillvalue, \
-                scaleoffset=dobj.scaleoffset)
-        msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))  
-        logging.info(msg)
-        if verbose:
-            print(msg)
-    except (IOError, TypeError) as e:
-        msg = "ERROR: failed to create dataset: {}".format(str(e))
-        logging.error(msg)
-        print(msg)
-        return
-    # create attributes
-    for da in dobj.attrs:
-        copy_attribute(dset, da, dobj)
-
-    if nodata:
-        msg = "skipping data load"
-        logging.info(msg)
-        if verbose:
-            print(msg)
-        return
-
-    msg = "iterating over chunks for {}".format(dobj.name)
-    logging.info(msg)
-    if verbose:
-        print(msg)
-    try:
-        it = ChunkIterator(dset)
-
-        logging.debug("src dtype: {}".format(dobj.dtype))
-        logging.debug("des dtype: {}".format(dset.dtype))
-        
-        for s in it:
-            msg = "writing dataset data for slice: {}".format(s)
-            logging.info(msg)
-            if verbose:
-                print(msg)
-            arr = dobj[s]
-            dset[s] = arr
-    except (IOError, TypeError) as e:
-        msg = "ERROR : failed to copy dataset data : {}".format(str(e))
-        logging.error(msg)
-        print(msg)
-    msg = "done with dataload for {}".format(dobj.name)
-    logging.info(msg)
-    if verbose:
-        print(msg)
-# create_dataset
-
-#----------------------------------------------------------------------------------
-def create_group(fd, gobj):
-    msg = "creating group {}".format(gobj.name)
-    logging.info(msg)
-    if verbose:
-        print(msg)
-    grp = fd.create_group(gobj.name)
-
-    # create attributes
-    for ga in gobj.attrs:
-        copy_attribute(grp, ga, gobj)
-
-    # create any soft/external links
-    for title in gobj:
-        lnk = gobj.get(title, getlink=True)
-        if isinstance(lnk, h5py.HardLink):
-            logging.debug("Got hardlink: {}".format(title))
-            # TBD: handle the case where multiple hardlinks point to same object
-        elif isinstance(lnk, h5py.SoftLink):
-            msg = "creating SoftLink({}) with title: {}".format(lnk.path, title)
-            if verbose:
-                print(msg)
-            logging.info(msg)
-            soft_link = h5pyd.SoftLink(lnk.path)
-            grp[title] = soft_link
-        elif isinstance(lnk, h5py.ExternalLink):
-            msg = "creating ExternalLink({}, {}) with title: {}".format(lnk.filename, lnk.path, title)
-            if verbose:
-                print(msg)
-            logging.info(msg)
-            ext_link = h5pyd.ExternalLink(lnk.filename, lnk.path)
-            grp[title] = ext_link
-        else:
-            msg = "Unexpected link type: {}".format(lnk.__class__.__name__)
-            logging.warning(msg)
-            if verbose:
-                print(msg)
-# create_group
-
-#----------------------------------------------------------------------------------
-def create_datatype(fd, obj):
-    msg = "creating datatype {}".format(obj.name)
-    logging.info(msg)
-    if verbose:
-        print(msg)
-    fd[obj.name] = obj.dtype
-    ctype = fd[obj.name]
-    # create attributes
-    for ga in obj.attrs:
-        copy_attribute(ctype, ga, obj)
-# create_datatype
-      
-#----------------------------------------------------------------------------------
-def load_file(filename, domain, endpoint=None, username=None, password=None):
-    logging.info("input file: {}".format(filename))   
-    finfd = h5py.File(filename, "r")
-    logging.info("output domain: {}".format(domain))
-    foutfd = h5pyd.File(domain, "w", endpoint=endpoint, username=username, password=password)
-
-    # create any root attributes
-    for ga in finfd.attrs:
-        copy_attribute(foutfd, ga, finfd)
-
-    def object_create_helper(name, obj):
-        if isinstance(obj, h5py.Dataset):
-            create_dataset(foutfd, obj)
-        elif isinstance(obj, h5py.Group):
-            create_group(foutfd, obj)
-        elif isinstance(obj, h5py.Datatype):
-            create_datatype(foutfd, obj)
-        else:
-            logging.error("no handler for object class: {}".format(type(obj)))
-
-    # build a rough map of the file using the internal function above
-    finfd.visititems(object_create_helper)
-        
-    # Fully flush the h5pyd handle. The core of the source hdf5 file 
-    # has been created on the hsds service up to now.
-    foutfd.close() 
-      
-    # close up the source file, see reason(s) for this below
-    finfd.close() 
-    msg = "File {} uploaded to domain: {}".format(filename, domain)
-    logging.info(msg)
-    if verbose:
-        print(msg)
-
-    return 0
-# load_file
+ 
+ 
     
 #----------------------------------------------------------------------------------
 def stage_file(uri, netfam=None, sslv=True):
@@ -292,6 +114,8 @@ def print_config_example():
 if __name__ == "__main__":
      
     loglevel = logging.ERROR
+    verbose = False
+    nodata = False
     cfg = Config()  #  config object
     endpoint=cfg["hs_endpoint"]
     username=cfg["hs_username"]
@@ -411,7 +235,28 @@ if __name__ == "__main__":
                 # folder destination
                 tgt = tgt + op.basename
 
-            r = load_file(src_file, tgt, endpoint=endpoint, username=username, password=password)
+            # get a handle to input file
+            try:
+                fin = h5py.File(src_file, mode='r')
+            except IOError as ioe:
+                logging.error("Error opening file {}: {}".format(src_domain, ioe))
+                sys.exit(1)
+
+            # create the output domain
+            try:
+                fout = h5pyd.File(tgt, 'w', endpoint=endpoint, username=username, password=password)
+            except IOError as ioe:
+                if ioe.errno == 404:
+                    logging.error("Domain: {} not found".format(src_domain))
+                elif ioe.errno == 403:
+                    logging.error("No write access to domain: {}".format(src_domain))
+                else:
+                    logging.error("Error creating file {}: {}".format(des_file, ioe))
+                sys.exit(1)
+
+
+            # do the actual load
+            r = load_file(fin, fout, verbose=verbose, nodata=nodata)
 
             # cleanup if needed
             if istmp:
