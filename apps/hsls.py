@@ -299,7 +299,7 @@ def getGroupFromDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: python hsls.py [-r] [-a] [-v] [-h] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains")
+    print("usage: python hsls.py [-r] [-v] [-h] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains")
     print("example: python hsls.py -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5")
     print("")
     print("Options:")

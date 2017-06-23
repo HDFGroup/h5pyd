@@ -304,6 +304,8 @@ class File(Group):
             raise IOError(404, "ACL has no 'userName' key")
         perm = {}
         for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
+            if k not in acl:
+                raise IOError(404, "Missing ACL field: {}".format(k))
             perm[k] = acl[k]
          
         req = '/acls/' + acl['userName']
