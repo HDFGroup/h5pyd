@@ -23,7 +23,6 @@ def printUsage():
     print("example: python hsinfo.py  -e http://data.hdfgroup.org:7253")
     print("")
     print("Options:")
-    print("     -v | --verbose :: verbose output")
     print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://example.com:8080")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
