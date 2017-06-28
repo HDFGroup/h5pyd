@@ -4,6 +4,7 @@ import os.path as op
 import logging
 from datetime import datetime
 import h5pyd as h5py
+import numpy as np
 from config import Config
 
 #
@@ -154,7 +155,10 @@ def dump(name, obj, visited=None):
         for attr_name in obj.attrs:
             attr = obj.attrs[attr_name]
             el = "..."  # show this if the attribute is too large
-            rank = len(attr.shape)
+            if isinstance(attr, np.ndarray):
+                rank = len(attr.shape)
+            else:
+                rank = 0  # scalar data
             if rank > 1:
                 val = "["*rank + el + "]"*rank
                 print("   attr: {0:24} {1}".format(attr_name, val))
