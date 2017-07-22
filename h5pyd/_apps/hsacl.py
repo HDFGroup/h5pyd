@@ -13,7 +13,10 @@
 import sys
 import logging
 import h5pyd
-from config import Config
+if __name__ == "__main__":
+    from config import Config
+else:
+    from .config import Config
 
 #
 # get given ACL, return None if not found   
@@ -288,7 +291,8 @@ def main():
 
     f.close()  
 
-main()
+if __name__ == "__main__":
+    main()
 
     
 	

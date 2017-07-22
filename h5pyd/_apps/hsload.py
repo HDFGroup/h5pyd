@@ -28,8 +28,12 @@ try:
 except ImportError as e:
     PYCRUL = None
 
-from config import Config
-from utillib import load_file
+if __name__ == "__main__":
+    from config import Config
+    from utillib import load_file
+else:
+    from .config import Config
+    from .utillib import load_file
 
 __version__ = '0.0.1'
 
@@ -111,7 +115,7 @@ def print_config_example():
 #print_config_example
 
 #----------------------------------------------------------------------------------
-if __name__ == "__main__":
+def main():
      
     loglevel = logging.ERROR
     verbose = False
@@ -274,4 +278,7 @@ if __name__ == "__main__":
         logging.error('Aborted by user via keyboard interrupt.')
         sys.exit(1)
 #__main__
+
+if __name__ == "__main__":
+    main()
 

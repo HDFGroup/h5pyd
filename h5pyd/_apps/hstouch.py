@@ -2,14 +2,14 @@ import sys
 import os.path as op
 import logging
 import h5pyd as h5py
-from config import Config
+if __name__ == "__main__":
+    from config import Config
+else:
+    from .config import Config
 
 #
 # Create domain or update timestamp if domain already exist
 #
-
-verbose = False
-showacls = False
  
 cfg = Config()
 
@@ -102,16 +102,20 @@ def touchDomain(domain):
         if not make_folder:
             try:
                 fh = createFile(domain)
-                #print("domain created", fh.id.id)
+                if cfg["verbose"]:
+                    print("domain created: {}, root id: {}".format(domain, fh.id.id))
                 fh.close()
             except OSError as oe:
                 sys.exit("Got error updating domain: {}".format(oe))
         else:
             # make folder
-            fh = createFolder(domain + '/')
-            print("folder: ", domain + '/', "created")
-            fh.close()
-
+            try:
+                fh = createFolder(domain + '/')
+                if cfg["verbose"]:
+                    print("folder created", domain + '/')
+                fh.close()
+            except OSError as oe:
+                sys.exit("Got error updating domain: {}".format(oe))
 
 #
 # Usage
@@ -124,67 +128,69 @@ def printUsage():
 #
 # Main
 #
+def main():
+    domains = []
+    argn = 1
+    depth = 2
+    loglevel = logging.ERROR
+    logfname=None
+    cfg["verbose"] = False
 
-domains = []
-argn = 1
-depth = 2
-loglevel = logging.ERROR
-logfname=None
-
-while argn < len(sys.argv):
-    arg = sys.argv[argn]
-    val = None
-    if len(sys.argv) > argn + 1:
-        val = sys.argv[argn+1]
+    while argn < len(sys.argv):
+        arg = sys.argv[argn]
+        val = None
+        if len(sys.argv) > argn + 1:
+            val = sys.argv[argn+1]
     
-    if arg in ("-h", "--help"):
-        printUsage()
-    elif arg in ("-v", "--verbose"):
-        verbose = True
-        argn += 1
-    elif arg == "--loglevel":
-        val = val.upper()
-        if val == "DEBUG":
-            loglevel = logging.DEBUG
-        elif val == "INFO":
-            loglevel = logging.INFO
-        elif val in ("WARN", "WARNING"):
-            loglevel = logging.WARNING
-        elif val == "ERROR":
-            loglevel = logging.ERROR
+        if arg in ("-h", "--help"):
+            printUsage()
+        elif arg in ("-v", "--verbose"):
+            cfg["verbose"] = True
+            argn += 1
+        elif arg == "--loglevel":
+            val = val.upper()
+            if val == "DEBUG":
+                loglevel = logging.DEBUG
+            elif val == "INFO":
+                loglevel = logging.INFO
+            elif val in ("WARN", "WARNING"):
+                loglevel = logging.WARNING
+            elif val == "ERROR":
+                loglevel = logging.ERROR
+            else:
+                printUsage()  
+            argn += 2
+        elif arg in ("-e", "--endpoint"):
+            cfg["hs_endpoint"] = sys.argv[argn+1]
+            argn += 2
+        elif arg in ("-u", "--username"):
+            cfg["hs_username"] = sys.argv[argn+1]
+            argn += 2
+        elif arg in ("-p", "--password"):
+            cfg["hs_password"] = sys.argv[argn+1]
+            argn += 2
+        elif arg[0] == '-':
+            printUsage()
         else:
-            printUsage()  
-        argn += 2
-    elif arg in ("-e", "--endpoint"):
-        cfg["hs_endpoint"] = sys.argv[argn+1]
-        argn += 2
-    elif arg in ("-u", "--username"):
-        cfg["hs_username"] = sys.argv[argn+1]
-        argn += 2
-    elif arg in ("-p", "--password"):
-         cfg["hs_password"] = sys.argv[argn+1]
-         argn += 2
-    elif arg[0] == '-':
-         printUsage()
-    else:
-         domains.append(arg)
-         argn += 1
+            domains.append(arg)
+            argn += 1
  
-if len(domains) == 0:
-    # need a domain
-    printUsage()
+    if len(domains) == 0:
+        # need a domain
+        printUsage()
 
-# setup logging
-logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
-logging.debug("set log_level to {}".format(loglevel))
+    # setup logging
+    logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
+    logging.debug("set log_level to {}".format(loglevel))
 
-for domain in domains:
-    if not domain.startswith('/'):
-        sys.exit("domain: {} must start with a slash".format(domain))
+    for domain in domains:
+        if not domain.startswith('/'):
+            sys.exit("domain: {} must start with a slash".format(domain))
        
-    touchDomain(domain)
+        touchDomain(domain)
 
-    
+if __name__ == "__main__":
+    main()
     
      
 

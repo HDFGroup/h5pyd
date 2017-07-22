@@ -32,6 +32,9 @@ from ._hl.datatype import Datatype
 from ._hl.attrs import AttributeManager
 from ._hl.serverinfo import getServerInfo
  
+
+from .config import Config
+#from . import hsinfo 
 __version__ = version.version
 
  

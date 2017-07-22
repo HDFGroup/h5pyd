@@ -5,21 +5,19 @@ import logging
 from datetime import datetime
 import h5pyd as h5py
 import numpy as np
-from config import Config
+if __name__ == "__main__":
+    from config import Config
+else:
+    from .config import Config
 
 #
 # Print objects in a domain in the style of the hsls utilitiy
 #
-
-verbose = False
-showacls = False
-showattrs = False
-human_readable = False
  
 cfg = Config()
 
 def intToStr(n):
-    if human_readable:
+    if cfg["human_readable"]:
         s = "{:,}".format(n)
     else:
         s = "{}".format(n)
@@ -29,7 +27,7 @@ def format_size(n):
     if n is None or n == ' ':
         return ' '*8
     symbol = ' '
-    if not human_readable:
+    if not cfg["human_readable"]:
         return str(n)
     # convert to common storage unit    
     for s in ('B', 'K', 'M', 'G', 'T'):
@@ -55,7 +53,7 @@ def getShapeText(dset):
                 if dim != 0:
                     shape_text += ", "
                 shape_text += str(shape[dim])
-                if verbose:
+                if cfg["verbose"]:
                     # get unlimited dimension
                     max_extent = dset.maxshape[dim]
                     shape_text += '/'
@@ -120,9 +118,9 @@ def dump(name, obj, visited=None):
         print("{0:24} {1}".format(name, class_name))
     else:
         print("{0:24} {1} {2}".format(name, class_name, desc))
-    if verbose and obj_id is not None:
+    if cfg["verbose"] and obj_id is not None:
         print("    {0:>12}: {1}".format("UUID", obj_id))
-    if verbose and class_name == "Dataset" and obj.shape is not None and obj.chunks is not None:
+    if cfg["verbose"] and class_name == "Dataset" and obj.shape is not None and obj.chunks is not None:
         chunk_size = obj.dtype.itemsize
         for chunk_dim in obj.chunks:
             chunk_size *= chunk_dim
@@ -150,7 +148,7 @@ def dump(name, obj, visited=None):
     
         
 
-    if showattrs and class_name in ("Dataset", "Group", "Datatype"):
+    if cfg["showattrs"] and class_name in ("Dataset", "Group", "Datatype"):
         # dump attributes for the object
         for attr_name in obj.attrs:
             attr = obj.attrs[attr_name]
@@ -252,7 +250,7 @@ def visitDomains(domain, depth=1):
         if dir.is_folder:
             dir_class = "folder"
             display_name += '/'
-        elif verbose:
+        elif cfg["verbose"]:
             # get the number of allocated bytes
             f = getFile(domain)
             num_bytes = f.allocated_bytes
@@ -269,7 +267,7 @@ def visitDomains(domain, depth=1):
         print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes), dir_class, timestamp, display_name))
          
         count += 1
-        if showacls:
+        if cfg["showacls"]:
             dumpAcls(dir)
         if dir.is_folder:
             for name in dir:
@@ -323,106 +321,111 @@ def printUsage():
 #
 # Main
 #
+def main():
+    domains = []
+    argn = 1
+    depth = 2
+    loglevel = logging.ERROR
+    logfname=None
+    cfg["verbose"] = False
+    cfg["showacls"] = False
+    cfg["showattrs"] = False
+    cfg["human_readable"] = False
 
-domains = []
-argn = 1
-depth = 2
-loglevel = logging.ERROR
-logfname=None
-
-while argn < len(sys.argv):
-    arg = sys.argv[argn]
-    val = None
-    if len(sys.argv) > argn + 1:
-        val = sys.argv[argn+1]
-    if arg in ("-r", "--recursive"):
-        depth = -1
-        argn += 1
-    elif arg in ("-v", "--verbose"):
-        verbose = True
-        argn += 1
-    elif arg in ("-H", "--human-readable"):
-        human_readable = True
-        argn += 1
-    elif arg == "--loglevel":
-        val = val.upper()
-        if val == "DEBUG":
-            loglevel = logging.DEBUG
-        elif val == "INFO":
-            loglevel = logging.INFO
-        elif val in ("WARN", "WARNING"):
-            loglevel = logging.WARNING
-        elif val == "ERROR":
-            loglevel = logging.ERROR
+    while argn < len(sys.argv):
+        arg = sys.argv[argn]
+        val = None
+        if len(sys.argv) > argn + 1:
+            val = sys.argv[argn+1]
+        if arg in ("-r", "--recursive"):
+            depth = -1
+            argn += 1
+        elif arg in ("-v", "--verbose"):
+            cfg["verbose"] = True
+            argn += 1
+        elif arg in ("-H", "--human-readable"):
+            cfg["human_readable"] = True
+            argn += 1
+        elif arg == "--loglevel":
+            val = val.upper()
+            if val == "DEBUG":
+                loglevel = logging.DEBUG
+            elif val == "INFO":
+                loglevel = logging.INFO
+            elif val in ("WARN", "WARNING"):
+                loglevel = logging.WARNING
+            elif val == "ERROR":
+                loglevel = logging.ERROR
+            else:
+                printUsage()  
+            argn += 2
+        elif arg == '--logfile':
+            logfname = val
+            argn += 2
+        elif arg in ("-showacls", "--showacls"):
+            cfg["showacls"] = True
+            argn += 1
+        elif arg in ("-showattrs", "--showattrs"):
+            cfg["showattrs"] = True
+            argn += 1
+        elif arg in ("-h", "--help"):
+            printUsage()
+        elif arg in ("-e", "--endpoint"):
+            cfg["hs_endpoint"] = val
+            argn += 2
+        elif arg in ("-u", "--username"):
+            cfg["hs_username"] = val
+            argn += 2
+        elif arg in ("-p", "--password"):
+            cfg["hs_password"] = val
+            argn += 2
+        elif arg[0] == '-':
+            printUsage()
         else:
-            printUsage()  
-        argn += 2
-    elif arg == '--logfile':
-        logfname = val
-        argn += 2
-    elif arg in ("-showacls", "--showacls"):
-        showacls = True
-        argn += 1
-    elif arg in ("-showattrs", "--showattrs"):
-        showattrs = True
-        argn += 1
-    elif arg in ("-h", "--help"):
-        printUsage()
-    elif arg in ("-e", "--endpoint"):
-        cfg["hs_endpoint"] = val
-        argn += 2
-    elif arg in ("-u", "--username"):
-        cfg["hs_username"] = val
-        argn += 2
-    elif arg in ("-p", "--password"):
-         cfg["hs_password"] = val
-         argn += 2
-    elif arg[0] == '-':
-         printUsage()
-    else:
-         domains.append(arg)
-         argn += 1
+            domains.append(arg)
+            argn += 1
 
-# setup logging
-logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
-logging.debug("set log_level to {}".format(loglevel))
+    # setup logging
+    logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
+    logging.debug("set log_level to {}".format(loglevel))
  
  
-if len(domains) == 0:
-    # add top-level domain
-    domains.append("/")
+    if len(domains) == 0:
+        # add top-level domain
+        domains.append("/")
 
-for domain in domains:
-    if domain.endswith('/'):
-        # given a folder path
-        count = visitDomains(domain, depth=depth)
-        print("{} items".format(count))
-    else:
+    for domain in domains:
+        if domain.endswith('/'):
+            # given a folder path
+            count = visitDomains(domain, depth=depth)
+            print("{} items".format(count))
+        else:
          
-        grp = getGroupFromDomain(domain)
-        if grp is None:
-            print("{}: No such domain".format(domain))
-            continue
-        dump('/', grp)
+            grp = getGroupFromDomain(domain)
+            if grp is None:
+                print("{}: No such domain".format(domain))
+                continue
+            dump('/', grp)
     
-        if depth < 0:
-            # recursive
-            visited = {} # dict of id to h5path
-            visited[grp.id.id] = '/'
-            visititems('/', grp, visited)
-        else:
-            for k in grp:
-                item = grp.get(k, getlink=True)
-                if item.__class__.__name__ == "HardLink":
-                    # follow hardlinks
-                    try:
-                        item = grp.get(k)
-                    except IOError:
-                        # object deleted?  Just dump link info
-                        pass
-                dump(k, item)
-        if showacls:
-            dumpAcls(grp)
-        grp.file.close()
+            if depth < 0:
+                # recursive
+                visited = {} # dict of id to h5path
+                visited[grp.id.id] = '/'
+                visititems('/', grp, visited)
+            else:
+                for k in grp:
+                    item = grp.get(k, getlink=True)
+                    if item.__class__.__name__ == "HardLink":
+                        # follow hardlinks
+                        try:
+                            item = grp.get(k)
+                        except IOError:
+                            # object deleted?  Just dump link info
+                            pass
+                    dump(k, item)
+            if cfg["showacls"]:
+                dumpAcls(grp)
+            grp.file.close()
 
-
+if __name__ == "__main__":
+    main()

@@ -21,8 +21,18 @@ setup(name='h5pyd',
       author='John Readey',
       author_email='jreadey@hdfgrouup.org',
       license='BSD',
-      packages=['h5pyd', 'h5pyd._hl'],
+      packages=['h5pyd', 'h5pyd._hl', 'h5pyd._apps'],
       # requires=['h5py (>=2.5.0)', 'h5json>=1.0.2'],
       install_requires=['six', 'pytz'],
       setup_requires=['pkgconfig', 'six'],
-      zip_safe=False)
+      zip_safe=False,
+      entry_points={'console_scripts':
+          ['hsinfo = h5pyd._apps.hsinfo:main', 
+           'hsls = h5pyd._apps.hsls:main',
+           'hstouch = h5pyd._apps.hstouch:main',
+           'hsacl = h5pyd._apps.hsacl:main',
+           'hsdel = h5pyd._apps.hsdel:main',
+           'hsget = h5pyd._apps.hsget:main',
+           'hsload = h5pyd._apps.hsload:main']
+      },
+)  

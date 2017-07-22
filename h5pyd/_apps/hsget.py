@@ -20,8 +20,12 @@ except ImportError as e:
     sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e)) 
     sys.exit(1)
  
-from config import Config
-from utillib import load_file
+if __name__ == "__main__":
+    from config import Config
+    from utillib import load_file
+else:
+    from .config import Config
+    from .utillib import load_file
 
 __version__ = '0.0.1'
 
@@ -30,12 +34,12 @@ UTILNAME = 'hsget'
 #----------------------------------------------------------------------------------
 def usage():
     print("Usage:\n")
-    print(("    %s [ OPTIONS ]  DOMAIN SOURCE" % UTILNAME))
+    print(("    %s [ OPTIONS ]  DOMAIN DES" % UTILNAME))
     print("")
     print("Description:")
     print("    Copy server domain to local HDF5 file")
     print("       DOMAIN: HDF Server domain (Unix or DNS style)")
-    print("       SOURCE: HDF5 file ")
+    print("       DES: HDF5 file to be created ")
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
@@ -63,7 +67,7 @@ def print_config_example():
 #print_config_example
 
 #----------------------------------------------------------------------------------
-if __name__ == "__main__":
+def main():
      
     loglevel = logging.ERROR
     verbose = False
@@ -197,4 +201,6 @@ if __name__ == "__main__":
         logging.error('Aborted by user via keyboard interrupt.')
         sys.exit(1)
 #__main__
+if __name__ == "__main__":
+    main()
 

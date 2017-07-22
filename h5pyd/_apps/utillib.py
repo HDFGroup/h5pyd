@@ -20,7 +20,10 @@ except ImportError as e:
     sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e)) 
     sys.exit(1)
  
-from chunkiter import ChunkIterator
+if __name__ == "utillib":
+    from chunkiter import ChunkIterator
+else:
+    from .chunkiter import ChunkIterator
   
 def is_h5py(objref):
     # Return True if objref is a h5py reference and False is not 
