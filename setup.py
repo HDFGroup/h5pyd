@@ -4,6 +4,9 @@ from setuptools import setup
 # or (if you'll be modifying the package):
 #   setup.py develop
 # To use a consistent encoding
+# To upload to PyPI:
+# python setup.py register sdist upload
+#
 from codecs import open
 from os import path
 
@@ -14,7 +17,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='h5pyd',
-      version='0.2.1',
+      version='0.2.2',
       description='h5py compatible client lib for HDF REST API',
       long_description=long_description,
       url='http://github.com/HDFGroup/h5pyd',
@@ -23,7 +26,7 @@ setup(name='h5pyd',
       license='BSD',
       packages=['h5pyd', 'h5pyd._hl', 'h5pyd._apps'],
       # requires=['h5py (>=2.5.0)', 'h5json>=1.0.2'],
-      install_requires=['six', 'pytz'],
+      install_requires=['numpy >= 1.10.4', 'requests', 'six', 'pytz'],
       setup_requires=['pkgconfig', 'six'],
       zip_safe=False,
       entry_points={'console_scripts':
