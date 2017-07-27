@@ -243,7 +243,7 @@ def main():
             try:
                 fin = h5py.File(src_file, mode='r')
             except IOError as ioe:
-                logging.error("Error opening file {}: {}".format(src_domain, ioe))
+                logging.error("Error opening file {}: {}".format(src_file, ioe))
                 sys.exit(1)
 
             # create the output domain
@@ -251,11 +251,11 @@ def main():
                 fout = h5pyd.File(tgt, 'w', endpoint=endpoint, username=username, password=password)
             except IOError as ioe:
                 if ioe.errno == 404:
-                    logging.error("Domain: {} not found".format(src_domain))
+                    logging.error("Domain: {} not found".format(tgt))
                 elif ioe.errno == 403:
-                    logging.error("No write access to domain: {}".format(src_domain))
+                    logging.error("No write access to domain: {}".format(tgt))
                 else:
-                    logging.error("Error creating file {}: {}".format(des_file, ioe))
+                    logging.error("Error creating file {}: {}".format(tgt, ioe))
                 sys.exit(1)
 
 
