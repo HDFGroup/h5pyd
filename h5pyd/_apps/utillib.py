@@ -79,7 +79,7 @@ def create_dataset(fd, dobj, verbose=False, nodata=False):
         logging.info(msg)
         if verbose:
             print(msg)
-    except (IOError, TypeError) as e:
+    except (IOError, TypeError, KeyError) as e:
         msg = "ERROR: failed to create dataset: {}".format(str(e))
         logging.error(msg)
         print(msg)
@@ -93,6 +93,24 @@ def create_dataset(fd, dobj, verbose=False, nodata=False):
         logging.info(msg)
         if verbose:
             print(msg)
+        return
+
+    if dset.shape is None:
+        # null space dataset
+        msg = "no data for null space dataset: {}".format(dobj.name)
+        logging.info(msg)
+        if verbose:
+            print(msg)
+        return  # no data 
+
+    if len(dset.shape) == 0:
+        # scalar dataset
+        x = dobj[()]
+        msg = "writing: {} for scalar dataset: {}".format(x, dobj.name)
+        logging.info(msg)
+        if verbose:
+            print(msg)
+        dset[()] = x
         return
 
     msg = "iterating over chunks for {}".format(dobj.name)
