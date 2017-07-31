@@ -78,6 +78,29 @@ def guess_dtype(data):
     # print("guess_dtype")
     return None
 
+def _decode(item, encoding="ascii"):
+        """decode any byte items to python 3 strings
+        """
+        ret_val = None
+        if type(item) is bytes:
+            ret_val = item.decode(encoding)
+        elif type(item) is list:
+            ret_val = []
+            for x in item:
+                ret_val.append(_decode(x, encoding))
+        elif type(item) is tuple:
+            ret_val = []
+            for x in item:
+                ret_val.append(_decode(x, encoding))
+            ret_val = tuple(ret_val)
+        elif type(item) is dict:
+            ret_val = {}
+            for k in dict:
+                ret_val[k] = _decode(item[k], encoding)
+        else:
+            ret_val = item
+        return ret_val
+
 
 def getHeaders(domain, username=None, password=None, headers=None):
         if headers is None:
@@ -196,28 +219,7 @@ class CommonStateObject(object):
             return name, get_lcpl(coding)
         return name
 
-    def _decode(self, item, encoding="ascii"):
-        """decode any byte items to python 3 strings
-        """
-        ret_val = None
-        if type(item) is bytes:
-            ret_val = item.decode(encoding)
-        elif type(item) is list:
-            ret_val = []
-            for x in item:
-                ret_val.append(self._decode(x, encoding))
-        elif type(item) is tuple:
-            ret_val = []
-            for x in item:
-                ret_val.append(self._decode(x, encoding))
-            ret_val = tuple(ret_val)
-        elif type(item) is dict:
-            ret_val = {}
-            for k in dict:
-                ret_val[k] = self._decode(item[k], encoding)
-        else:
-            ret_val = item
-        return ret_val
+    
 
     def _d(self, name):
         """ Decode a name according to the current file settings.

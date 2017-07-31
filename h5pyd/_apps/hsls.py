@@ -89,6 +89,9 @@ def visititems(name, grp, visited):
             desc = '{Unknown Link Type}'
             print("{0:24} {1} {2}".format(item_name, class_name, desc))
 
+def getTypeStr(dt):
+    # TBD: convert dt to more HDF5-like representation
+    return str(dt)
 
 def dump(name, obj, visited=None):
     class_name = obj.__class__.__name__
@@ -145,6 +148,9 @@ def dump(name, obj, visited=None):
             # verbose info not available, just show the chunk layout
             fstr = "    {0:>12}: {1} {2} bytes"
             print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size)))
+        
+        fstr = "    {0:>12}: {1}"
+        print(fstr.format("Type:", getTypeStr(obj.dtype)))  # dump out type info
     
         
 

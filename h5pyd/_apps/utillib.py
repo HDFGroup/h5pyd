@@ -227,7 +227,7 @@ def load_file(fin, fout, verbose=False, nodata=False):
       
     # close up the source domain, see reason(s) for this below
     fin.close() 
-    msg="load_file complete: {}"
+    msg="load_file complete"
     logging.info(msg)
     if verbose:
         print(msg)

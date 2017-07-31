@@ -26,7 +26,7 @@ import numpy
 #from . import base
 from .base import HLObject
 from .h5type import Reference, RegionReference
-from .base import phil
+from .base import phil, _decode
 from .objectid import DatasetID
 from . import filters
 from . import selections as sel
@@ -173,7 +173,11 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
         # is it compatible with the array type?
         fillvalue = numpy.asarray(fillvalue,dtype=dtype)
         if fillvalue:
-            dcpl["fillValue"] = fillvalue.tolist()
+            fillvalue_list = fillvalue.tolist()
+            fillvalue_list = _decode(fillvalue_list) # convert any byte strings to unicode
+            dcpl["fillValue"] = fillvalue_list
+        else:
+            print("Warning: Unable to convert fillvalue: {} to numpy array".format(fillvalue))
     body['creationProperties'] = dcpl
 
     """
@@ -187,7 +191,7 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
             maxshape = tuple(m if m is not None else 0 for m in maxshape)
             body['maxdims'] = maxshape
         else:
-            self.log.warning("maxshape provided but no shape")
+            print("Warning: maxshape provided but no shape")
     #sid = h5s.create_simple(shape, maxshape)
 
 
@@ -1035,7 +1039,7 @@ class Dataset(HLObject):
         else:
             if type(val) is not list:
                 val = val.tolist()
-            val = self._decode(val)
+            val = _decode(val)
             self.log.debug("writing json data, {} bytes".format(len(val)))
             body['value'] = val
 
