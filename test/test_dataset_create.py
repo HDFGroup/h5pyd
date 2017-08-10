@@ -205,8 +205,13 @@ class TestCreateDataset(TestCase):
         chunks = dset.chunks  # chunk layout auto-generated
         self.assertTrue(chunks is not None)
         self.assertEqual(len(chunks), 2)
-        self.assertEqual(chunks[0], 20)
-        self.assertEqual(chunks[1], 40)
+        if dset.id.id.startswith("d-"):
+            # HSDS will create a different chunk layout
+            self.assertEqual(chunks[0], 40)
+            self.assertEqual(chunks[1], 80)
+        else:
+            self.assertEqual(chunks[0], 20)
+            self.assertEqual(chunks[1], 40)
         self.assertEqual(dset.compression, 'gzip')
         self.assertEqual(dset.compression_opts, 9)
 
