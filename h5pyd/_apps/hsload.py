@@ -43,6 +43,8 @@ if sys.version_info >= (3, 0):
     from urllib.parse import urlparse
 else:
     from urlparse import urlparse
+     
+cfg = Config()
  
  
     
@@ -54,7 +56,7 @@ def stage_file(uri, netfam=None, sslv=True):
     try:
         fout = tempfile.NamedTemporaryFile(prefix='hsload.', suffix='.h5', delete=False)
         logging.info("staging %s --> %s" % (uri, fout.name))
-        if verbose: print("staging %s" % uri)
+        if cfg["verbose"]: print("staging %s" % uri)
         crlc = PYCRUL.Curl()
         crlc.setopt(crlc.URL, uri)
         if sslv == True:
@@ -120,10 +122,8 @@ def main():
     loglevel = logging.ERROR
     verbose = False
     nodata = False
-    cfg = Config()  #  config object
-    endpoint=cfg["hs_endpoint"]
-    username=cfg["hs_username"]
-    password=cfg["hs_password"]
+    cfg["verbose"] = False
+    cfg["logfname"] = None
     logfname=None
     ipvfam=None
     
@@ -141,7 +141,7 @@ def main():
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1] 
         if arg in ("-v", "--verbose"):
-            verbose = True
+            cfg["verbose"] = True
             argn += 1
         elif arg == "--nodata":
             nodata = True
@@ -171,13 +171,13 @@ def main():
             usage()
             sys.exit(0)
         elif arg in ("-e", "--endpoint"):
-            endpoint = val
+            cfg["hs_endpoint"] = val
             argn += 2
         elif arg in ("-u", "--username"):
-            username = val
+            cfg["hs_username"] = val
             argn += 2
         elif arg in ("-p", "--password"):
-            password = val
+            cfg["hs_password"] = val
             argn += 2
         elif arg == '--cnf-eg':
             print_config_example()
@@ -194,10 +194,10 @@ def main():
     logging.debug("set log_level to {}".format(loglevel))
     
     # end arg parsing
-    logging.info("username: {}".format(username))
-    logging.info("password: {}".format(password))
-    logging.info("endpoint: {}".format(endpoint))
-    logging.info("verbose: {}".format(verbose))
+    logging.info("username: {}".format(cfg["hs_username"]))
+    logging.info("password: {}".format(cfg["hs_password"]))
+    logging.info("endpoint: {}".format(cfg["hs_password"]))
+    logging.info("verbose: {}".format(cfg["verbose"]))
     
     if len(src_files) < 2:
         # need at least a src and destination
@@ -213,10 +213,10 @@ def main():
         usage()
         sys.exit(-1)
         
-    if endpoint is None:
+    if cfg["hs_endpoint"] is None:
         logging.error('No endpoint given, try -h for help\n')
         sys.exit(1)
-    logging.info("endpoint: {}".format(endpoint))
+    logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
 
     try:
          
@@ -248,6 +248,9 @@ def main():
 
             # create the output domain
             try:
+                username = cfg["hs_username"]
+                password = cfg["hs_password"]
+                endpoint = cfg["hs_endpoint"]
                 fout = h5pyd.File(tgt, 'w', endpoint=endpoint, username=username, password=password)
             except IOError as ioe:
                 if ioe.errno == 404:
@@ -260,7 +263,7 @@ def main():
 
 
             # do the actual load
-            r = load_file(fin, fout, verbose=verbose, nodata=nodata)
+            load_file(fin, fout, verbose=verbose, nodata=nodata)
 
             # cleanup if needed
             if istmp:
@@ -271,7 +274,7 @@ def main():
 
             msg = "File {} uploaded to domain: {}".format(src_file, tgt)
             logging.info(msg)
-            if verbose:
+            if cfg["verbose"]:
                 print(msg)  
         
     except KeyboardInterrupt:
