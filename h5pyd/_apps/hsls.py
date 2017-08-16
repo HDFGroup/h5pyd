@@ -150,7 +150,7 @@ def dump(name, obj, visited=None):
             print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size)))
         
         fstr = "    {0:>12}: {1}"
-        print(fstr.format("Type:", getTypeStr(obj.dtype)))  # dump out type info
+        print(fstr.format("Type", getTypeStr(obj.dtype)))  # dump out type info
     
         
 
