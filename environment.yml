@@ -9,6 +9,7 @@ dependencies:
   - nb_conda_kernels
   - pytz
   - requests
+  - matplotlib
   - pip:
       - h5pyd  #latest release on PyPi
 #      - git+https://github.com/HDFGroup/h5pyd.git #latest from master
