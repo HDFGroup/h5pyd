@@ -1,0 +1,15 @@
+name: hsds
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.6
+  - h5py
+  - jupyter
+  - nb_conda_kernels
+  - pytz
+  - requests
+  - matplotlib
+  - pip:
+      - h5pyd  #latest release on PyPi
+#      - git+https://github.com/HDFGroup/h5pyd.git #latest from master
