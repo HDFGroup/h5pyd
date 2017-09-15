@@ -38,7 +38,7 @@ def deleteDomain(domain):
         parent_domain += '/'
     try:
         hparent = getFolder(parent_domain, mode='a')
-    except OSError as oe:
+    except IOError as oe:
         if oe.errno == 404:   # Not Found
             sys.exit("Parent domain: {} not found".format(parent_domain))
         elif oe.errno == 401:  # Unauthorized

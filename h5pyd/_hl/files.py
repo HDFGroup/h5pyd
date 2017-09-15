@@ -315,7 +315,8 @@ class File(Group):
         """ Clears reference to remote resource.
         """
         # this will close the socket of the http_conn singleton
-        self._id._http_conn.close()   
+        if self._id._http_conn:
+            self._id._http_conn.close()   
         self._id.close()
 
     def flush(self):

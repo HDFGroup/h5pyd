@@ -269,7 +269,7 @@ def main():
             if istmp:
                 try:    
                     os.unlink(src_file)
-                except OSError as e:
+                except IOError as e:
                     logging.warn("failed to delete %s : %s" % (src_file, str(e)))
 
             msg = "File {} uploaded to domain: {}".format(src_file, tgt)

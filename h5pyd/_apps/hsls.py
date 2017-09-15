@@ -209,7 +209,7 @@ def dumpAcls(obj):
     try:
         default_acl = obj.getACL("default")
         dumpACL(default_acl)
-    except OSError:
+    except IOError:
         print("read ACLs is not permitted")
         return
 
@@ -220,7 +220,7 @@ def dumpAcls(obj):
             if acl["userName"] == "default":
                 continue
             dumpACL(acl)
-    except OSError:
+    except IOError:
         # if requesting user does not permission to read non-default acl,
         # just ignore
         pass 
@@ -281,7 +281,7 @@ def visitDomains(domain, depth=1):
                 n = visitDomains(domain + '/' + name, depth=(depth-1))
                 count += n
                     
-    except OSError as oe:
+    except IOError as oe:
         if oe.errno in (404, 410):
             # TBD: recently creating domains may not be immediately visible to the service
             # Once the flush operation is implemented, this should be an issue for h5pyd apps
@@ -300,7 +300,7 @@ def getGroupFromDomain(domain):
     try:
         f = getFile(domain)
         return f['/']
-    except OSError:
+    except IOError:
         return None
 
 #

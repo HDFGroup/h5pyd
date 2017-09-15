@@ -64,7 +64,7 @@ def touchDomain(domain):
         parent_domain += '/'
     try:
         getFolder(parent_domain)
-    except OSError as oe:
+    except IOError as oe:
         #print("errno:", oe.errno)
         if oe.errno in (404, 410):   # Not Found
             sys.exit("Parent domain: {} not found".format(parent_domain))
@@ -78,7 +78,7 @@ def touchDomain(domain):
     hdomain = None
     try:
         hdomain = getFile(domain)
-    except OSError as oe:
+    except IOError as oe:
         #print("errno:", oe.errno)
         if oe.errno in (404, 410):   # Not Found
             pass  # domain not found
@@ -92,7 +92,7 @@ def touchDomain(domain):
                 # create/update attribute to update lastModified timestamp of domain
                 r.attrs["hstouch"] = 1
                 hdomain.close()
-            except OSError as oe:
+            except IOError as oe:
                 sys.exit("Got error updating domain: {}".format(oe))
         else:
             sys.exit("Can not update timestamp of folder object")
@@ -105,7 +105,7 @@ def touchDomain(domain):
                 if cfg["verbose"]:
                     print("domain created: {}, root id: {}".format(domain, fh.id.id))
                 fh.close()
-            except OSError as oe:
+            except IOError as oe:
                 sys.exit("Got error updating domain: {}".format(oe))
         else:
             # make folder
@@ -114,7 +114,7 @@ def touchDomain(domain):
                 if cfg["verbose"]:
                     print("folder created", domain + '/')
                 fh.close()
-            except OSError as oe:
+            except IOError as oe:
                 sys.exit("Got error updating domain: {}".format(oe))
 
 #
