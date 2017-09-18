@@ -176,8 +176,6 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
             fillvalue_list = fillvalue.tolist()
             fillvalue_list = _decode(fillvalue_list) # convert any byte strings to unicode
             dcpl["fillValue"] = fillvalue_list
-        else:
-            print("Warning: Unable to convert fillvalue: {} to numpy array".format(fillvalue))
     body['creationProperties'] = dcpl
 
     """
