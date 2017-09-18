@@ -113,13 +113,20 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
             raise ValueError("Shape tuple is incompatible with data")
     body['shape'] = shape
 
-    tmp_shape = maxshape if maxshape is not None else shape
     # Validate chunk shape
-    if isinstance(chunks, tuple) and (~numpy.array([ i>=j for i,j in zip(tmp_shape,chunks) if i is not None])).any():
-        errmsg = "Chunk shape must not be greater than data shape in any dimension. "\
-                 "{} is not compatible with {}".format(chunks, shape)
-        raise ValueError(errmsg)
-
+    if chunks is not None:
+         errmsg = "Chunk shape must not be greater than data shape in any dimension. "\
+                  "{} is not compatible with {}".format(chunks, shape)
+         if len(chunks) != len(shape):
+             raise ValueError("chunk is of wrong dimension")
+         for i in range(len(shape)):
+             if maxshape is not None:
+                 if maxshape[i] is not None and maxshape[i] < chunks[i]:
+                     raise ValueError(errmsg)
+             else:
+                 if shape[i] < chunks[i]:
+                     raise ValueError(errmsg)
+     
     if isinstance(dtype, Datatype):
         # Named types are used as-is
         type_json = dtype.id.type_json
