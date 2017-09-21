@@ -157,10 +157,6 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
     body['type'] = type_json
 
     # Legacy
-    if any((compression, shuffle, fletcher32, maxshape,scaleoffset)) and chunks is False:
-        raise ValueError("Chunked format required for given storage options")
-
-    # Legacy
     if compression is True:
         if compression_opts is None:
             compression_opts = 4

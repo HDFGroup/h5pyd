@@ -21,19 +21,17 @@ ENDPOINT = "http://192.168.99.100:5101"
 if len(sys.argv) > 1:
     cube_side = int(sys.argv[1])
 
-filename = "cube_" + str(cube_side) + "_" + str(cube_side) + "_" + str(cube_side)
+filename = "cube_" + str(cube_side) + "_" + str(cube_side) + "_" + str(cube_side) + "_gz"
 filename += ".h5pyd_test.hdfgroup.org"
 #filename += ".h5"
 print("filename:", filename)
 
 f = h5pyd.File(filename, "w", username=USER_NAME, password=USER_PASSWD, endpoint=ENDPOINT)
-#f = h5pyd.File(filename, "w")
-
-print("filename,", f.filename)
+# f = h5pyd.File(filename, "w")
 
 print("create dataset")
 
-dset = f.create_dataset('dset', (cube_side, cube_side, cube_side),  dtype='int8')
+dset = f.create_dataset('dset', (cube_side, cube_side, cube_side), compression="gzip", dtype='int8')
 
 print("name:", dset.name)
 print("shape:", dset.shape)
