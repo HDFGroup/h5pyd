@@ -13,17 +13,31 @@ import sys
 import h5pyd
 import numpy as np
 
-endpoint="http://127.0.0.1:5000"
-
-cube_side = 64
+cube_side = 256
+USER_NAME = "test_user1"
+USER_PASSWD = "test"
+ENDPOINT = "http://192.168.99.100:5101"
 if len(sys.argv) > 1:
+    if sys.argv[1] in ("-h", "--help"):
+        print("Usage: python readdatacube [side] [-z]")
+        sys.exit(1)
     cube_side = int(sys.argv[1])
 
-filename = "cube_" + str(cube_side) + "_" + str(cube_side) + "_" + str(cube_side) + ".client_test.hdfgroup.org"
+filename = "cube_" + str(cube_side) + "_" + str(cube_side) + "_" + str(cube_side)
 
-f = h5pyd.File(filename, "r", endpoint=endpoint)
 
-print("filename,", f.filename)
+if len(sys.argv) > 2:
+    if sys.argv[2] == "-z":
+        filename += "_gz"
+
+
+filename += ".h5pyd_test.hdfgroup.org"
+
+
+print("filename:", filename)
+
+f = h5pyd.File(filename, "r", username=USER_NAME, password=USER_PASSWD, endpoint=ENDPOINT)
+
 print("name:", f.name)
 print("uuid:", f.id.uuid)
 
