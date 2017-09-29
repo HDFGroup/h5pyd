@@ -141,7 +141,7 @@ class File(Group):
                     password = os.environ["H5SERV_PASSWORD"]
                 elif "hs_password" in cfg:
                     password = cfg["hs_password"]
-  
+            print("new HttpConn({})".format(domain))
             http_conn =  HttpConn(domain, endpoint=endpoint, 
                     username=username, password=password, mode=mode, 
                     use_session=use_session, use_cache=use_cache, logger=logger)
@@ -165,6 +165,7 @@ class File(Group):
                 raise IOError(409, "domain already exists")
             if rsp.status_code == 200 and mode == 'w':
                 # delete existing domain
+                print("delete:", domain)
                 rsp = http_conn.DELETE(req)
                 if rsp.status_code != 200:
                     # failed to delete

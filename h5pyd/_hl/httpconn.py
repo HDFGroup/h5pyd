@@ -94,7 +94,7 @@ class HttpConn:
             username = self._username
         if password is None:
             password = self._password
-        headers['host'] = domain
+        #headers['host'] = domain
         if username is not None and password is not None:
             auth_string = username + ':' + password
             auth_string = auth_string.encode('utf-8')
@@ -125,15 +125,20 @@ class HttpConn:
         if not headers:
             headers = self.getHeaders() 
          
+        if params is None:
+            params = {}
+        if "domain" not in params:
+            params["domain"] = self._domain 
+         
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
 
-        if self._cache is not None and format == "json" and headers["host"] == self._domain:
+        if self._cache is not None and format == "json" and params["domain"] == self._domain:
             if req in self._cache:
                 rsp = self._cache[req]
                 return rsp
         
-        self.log.info("GET: {} [{}]".format(self._endpoint + req, headers["host"]))
+        self.log.info("GET: {} [{}]".format(self._endpoint + req, params["domain"]))
         if self._username and self._password:
             auth = (self._username, self._password)
         else:
@@ -154,13 +159,14 @@ class HttpConn:
                 content_length = MAX_CACHE_ITEM_SIZE + 1
 
             if rsp_headers['Content-Type'] == 'application/json' and content_length < MAX_CACHE_ITEM_SIZE:
-            
+
                 # add to our _cache
                 cache_rsp = CacheResponse(rsp)
                 self._cache[req] = cache_rsp
         return rsp
 
     def PUT(self, req, body=None, format="json", params=None, headers=None):
+        print("HttpCon PUT")
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
@@ -170,6 +176,11 @@ class HttpConn:
             self._cache = {}  
         if params:
             self.log.info("PUT params: {}".format(params))
+        else:
+            params = {}
+
+        if "domain" not in params:
+            params["domain"] = self._domain 
 
         req = self._endpoint + req
         
@@ -191,21 +202,28 @@ class HttpConn:
             auth = None
         try:
             s = self.session
+            print("PUT: {} params: {}, data: {}  headers: {}".format(req, params, data, headers))
             rsp = s.put(req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
+            print("error:", ce)
             self.log.error("connection error: {}".format(ce))
             raise IOError("Connection Error")
  
         return rsp
 
-    def POST(self, req, body=None, headers=None):
+    def POST(self, req, body=None, params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
         if self._cache is not None:  
             self._cache = {}
+
+        if params is None:
+            params = {}
+        if "domain" not in params:
+            params["domain"] = self._domain 
             
         # try to do a POST to the domain
         req = self._endpoint + req
@@ -223,21 +241,24 @@ class HttpConn:
             auth = None
         try: 
             s = self.session
-            rsp = s.post(req, data=data, headers=headers, auth=auth, verify=self.verifyCert())
+            rsp = s.post(req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
         except ConnectionError as ce:
             self.log.warn("connection error: ", ce)
             raise IOError(str(ce))
 
         return rsp
 
-    def DELETE(self, req, headers=None):
+    def DELETE(self, req, params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
         if self._cache is not None:
             self._cache = {}
-             
+        if params is None:
+            params = {}
+        if "domain" not in params:
+            params["domain"] = self._domain      
         # try to do a DELETE of the resource
         req = self._endpoint + req
 
@@ -251,7 +272,7 @@ class HttpConn:
             auth = None
         try:
             s = self.session
-            rsp = s.delete(req, headers=headers, auth=auth, verify=self.verifyCert())
+            rsp = s.delete(req, headers=headers, params=params, auth=auth, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))

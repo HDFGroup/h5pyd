@@ -252,9 +252,10 @@ class Folder():
         if self._http_conn.mode == 'r':
             raise IOError(400, "folder is open as read-onnly")
         domain = self._domain + '/' + name
-        headers = self._http_conn.getHeaders(domain=domain)
+        headers = self._http_conn.getHeaders()
         req = '/'
-        self._http_conn.DELETE(req, headers=headers)
+        params = {"domain": domain}
+        self._http_conn.DELETE(req, headers=headers, params=params)
         self._subdomains = None # reset the cache list
         #self.id.unlink(self._e(name))
 
