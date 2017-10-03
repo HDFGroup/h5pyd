@@ -166,7 +166,6 @@ class HttpConn:
         return rsp
 
     def PUT(self, req, body=None, format="json", params=None, headers=None):
-        print("HttpCon PUT")
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
@@ -202,11 +201,9 @@ class HttpConn:
             auth = None
         try:
             s = self.session
-            print("PUT: {} params: {}, data: {}  headers: {}".format(req, params, data, headers))
             rsp = s.put(req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
-            print("error:", ce)
             self.log.error("connection error: {}".format(ce))
             raise IOError("Connection Error")
  
