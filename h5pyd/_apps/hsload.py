@@ -97,6 +97,7 @@ def usage():
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
+    print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
@@ -122,7 +123,7 @@ def main():
     loglevel = logging.ERROR
     verbose = False
     nodata = False
-    cfg["verbose"] = False
+    deflate = None
     cfg["logfname"] = None
     logfname=None
     ipvfam=None
@@ -141,7 +142,7 @@ def main():
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1] 
         if arg in ("-v", "--verbose"):
-            cfg["verbose"] = True
+            verbose = True
             argn += 1
         elif arg == "--nodata":
             nodata = True
@@ -182,6 +183,16 @@ def main():
         elif arg == '--cnf-eg':
             print_config_example()
             sys.exit(0)
+        elif arg.startswith("-z"):
+            compressLevel = 4
+            if len(arg) > 2:
+                try:
+                    compressLevel = int(arg[2:])
+                except ValueError:
+                    print("Compression Level must be int between 0 and 9")
+                    sys.exit(-1)
+            deflate = compressLevel
+            argn += 1
         elif arg[0] == '-':
             usage()
             sys.exit(-1)
@@ -197,7 +208,7 @@ def main():
     logging.info("username: {}".format(cfg["hs_username"]))
     logging.info("password: {}".format(cfg["hs_password"]))
     logging.info("endpoint: {}".format(cfg["hs_password"]))
-    logging.info("verbose: {}".format(cfg["verbose"]))
+    logging.info("verbose: {}".format(verbose))
     
     if len(src_files) < 2:
         # need at least a src and destination
@@ -263,7 +274,7 @@ def main():
 
 
             # do the actual load
-            load_file(fin, fout, verbose=verbose, nodata=nodata)
+            load_file(fin, fout, verbose=verbose, nodata=nodata, deflate=deflate)
 
             # cleanup if needed
             if istmp:
@@ -274,7 +285,7 @@ def main():
 
             msg = "File {} uploaded to domain: {}".format(src_file, tgt)
             logging.info(msg)
-            if cfg["verbose"]:
+            if verbose:
                 print(msg)  
         
     except KeyboardInterrupt:

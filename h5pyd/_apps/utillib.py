@@ -51,7 +51,7 @@ def copy_attribute(desobj, name, srcobj, verbose=False):
 # copy_attribute
       
 #----------------------------------------------------------------------------------
-def create_dataset(fd, dobj, verbose=False, nodata=False):
+def create_dataset(fd, dobj, verbose=False, nodata=False, deflate=None):
     """ create a dataset using the properties of the passed in h5py dataset.
         If successful, proceed to copy attributes and data.
     """
@@ -70,10 +70,18 @@ def create_dataset(fd, dobj, verbose=False, nodata=False):
     if dobj.chunks:
         chunks = tuple(dobj.chunks)
     try:
+        compression_filter = dobj.compression
+        compression_opts = dobj.compression_opts
+        if deflate is not None and compression_filter is None:
+            compression_filter = "gzip"
+            compression_opts = deflate
+            if verbose:
+                print("applying gzip filter with level: {}".format(deflate))
+
         dset = fd.create_dataset( dobj.name, shape=dobj.shape, dtype=dobj.dtype, chunks=chunks, \
-                compression=dobj.compression, shuffle=dobj.shuffle, \
+                compression=compression_filter, shuffle=dobj.shuffle, \
                 fletcher32=dobj.fletcher32, maxshape=dobj.maxshape, \
-                compression_opts=dobj.compression_opts, fillvalue=fillvalue, \
+                compression_opts=compression_opts, fillvalue=fillvalue, \
                 scaleoffset=dobj.scaleoffset)
         msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))  
         logging.info(msg)
@@ -200,7 +208,7 @@ def create_datatype(fd, obj, verbose=False):
 # create_datatype
       
 #----------------------------------------------------------------------------------
-def load_file(fin, fout, verbose=False, nodata=False):
+def load_file(fin, fout, verbose=False, nodata=False, deflate=None):
     logging.info("input file: {}".format(fin.filename))   
     logging.info("output file: {}".format(fout.filename))
      
@@ -211,7 +219,7 @@ def load_file(fin, fout, verbose=False, nodata=False):
     def object_create_helper(name, obj):
         class_name = obj.__class__.__name__
         if class_name == "Dataset":
-            create_dataset(fout, obj, verbose=verbose, nodata=nodata)
+            create_dataset(fout, obj, verbose=verbose, nodata=nodata, deflate=deflate)
         elif class_name == "Group":
             create_group(fout, obj, verbose=verbose)
         elif class_name == "Datatype":
