@@ -65,7 +65,7 @@ class Folder():
         
 
     def __init__(self, domain_name, mode=None, endpoint=None, 
-        username=None, password=None, logger=None, **kwds):
+        username=None, password=None, api_key=None, logger=None, **kwds):
         """Create a new Folders object.
 
 
@@ -113,7 +113,15 @@ class Folder():
         else:
             self._domain = domain_name[:-1]
         self._subdomains = None
-        self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, password=password, mode=mode, logger=logger)
+
+        if api_key is None:
+                if "HS_API_KEY" in os.environ:
+                    api_key = os.environ["HS_API_KEY"]
+                elif "hs_api_key" in cfg:
+                    api_key = cfg["hs_api_key"]
+                    
+        self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, 
+            password=password, api_key=api_key, mode=mode, logger=logger)
         self.log = self._http_conn.logging
 
         domain_json = None

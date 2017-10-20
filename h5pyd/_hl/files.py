@@ -87,7 +87,7 @@ class File(Group):
         return self.id.http_conn.owner
 
     def __init__(self, domain, mode=None, endpoint=None, username=None, password=None, 
-        use_session=True, use_cache=False, logger=None, **kwds):
+        api_key=None, use_session=True, use_cache=False, logger=None, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -107,8 +107,7 @@ class File(Group):
         if mode is None and endpoint is None and username is None \
             and password is None and isinstance(domain, GroupID):
             groupid = domain
-        else:
-            
+        else:       
             if mode and mode not in ('r', 'r+', 'w', 'w-', 'x', 'a'):
                 raise ValueError(
                     "Invalid mode; must be one of r, r+, w, w-, x, a")
@@ -141,9 +140,16 @@ class File(Group):
                     password = os.environ["H5SERV_PASSWORD"]
                 elif "hs_password" in cfg:
                     password = cfg["hs_password"]
+
+            if api_key is None:
+                if "HS_API_KEY" in os.environ:
+                    api_key = os.environ["HS_API_KEY"]
+                elif "hs_api_key" in cfg:
+                    api_key = cfg["hs_api_key"]
+
             http_conn =  HttpConn(domain, endpoint=endpoint, 
                     username=username, password=password, mode=mode, 
-                    use_session=use_session, use_cache=use_cache, logger=logger)
+                    api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger)
         
             root_json = None
 

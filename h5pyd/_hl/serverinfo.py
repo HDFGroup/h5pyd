@@ -16,14 +16,10 @@ import json
 from .httpconn import HttpConn
 from .config import Config
   
-def getServerInfo( endpoint=None, username=None, password=None, **kwds):
+def getServerInfo( endpoint=None, username=None, password=None, api_key=None, **kwds):
      
-    cfg = None
-    if endpoint is None or username is None or password is None:
-        # unless we'r given all the connect info, create a config object that
-        # pulls in state from a .hscfg file (if found).
-        cfg = Config()
- 
+    cfg = Config()  # get credentials from .hscfg file (if found)
+     
     if endpoint is None and "hs_endpoint" in cfg:
         endpoint = cfg["hs_endpoint"]
 
@@ -33,8 +29,11 @@ def getServerInfo( endpoint=None, username=None, password=None, **kwds):
     if password is None and "hs_password" in cfg:
         password = cfg["hs_password"]
 
+    if api_key is None and "hs_api_key" in cfg:
+        api_key = cfg["hs_api_key"]
+
     # http_conn without a domain
-    http_conn = HttpConn(None, endpoint=endpoint, username=username, password=password)
+    http_conn = HttpConn(None, endpoint=endpoint, username=username, password=password, api_key=api_key)
           
     rsp = http_conn.GET("/about")
     if rsp.status_code == 400:

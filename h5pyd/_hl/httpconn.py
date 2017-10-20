@@ -51,7 +51,7 @@ class HttpConn:
     TBD: Should refactor these to a common base class
     """
     def __init__(self, domain_name, endpoint=None, username=None, password=None, 
-            mode='a', use_session=True, use_cache=False, logger=None, **kwds):
+            api_key=None, mode='a', use_session=True, use_cache=False, logger=None, **kwds):
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
@@ -68,20 +68,30 @@ class HttpConn:
         self.log = logging
         if endpoint is None:
             if "H5SERV_ENDPOINT" in os.environ:
-                self._endpoint = os.environ["H5SERV_ENDPOINT"]
+                endpoint = os.environ["H5SERV_ENDPOINT"]
             else:
-                self._endpoint = "http://127.0.0.1:5000"
-        else:
-            self._endpoint = endpoint
+                endpoint = "http://127.0.0.1:5000"
+        
+        self._endpoint = endpoint
 
         if username is None and "H5SERV_USERNAME" in os.environ:
-            self._username = os.environ["H5SERV_USERNAME"]
-        else:
-            self._username = username
+            username = os.environ["H5SERV_USERNAME"]
+        if isinstance(username, str) and (not username or username.upper() == "NONE"):
+            username = None
+        self._username = username
+
         if password is None and "H5SERV_PASSWORD" in os.environ:
-            self._password = os.environ["H5SERV_PASSWORD"]
-        else:
-            self._password = password
+            password = os.environ["H5SERV_PASSWORD"]
+        if isinstance(password, str) and (not password or password.upper() == "NONE"):
+            password = None
+        self._password = password
+
+        if api_key is None and "HS_API_KEY" in os.environ:
+            api_key = os.environ["HS_API_KEY"]
+        if isinstance(api_key, str) and (not api_key or api_key.upper() == "NONE"):
+            api_key = None
+        self._api_key = api_key
+
         self._s = None  # Sessions 
         
 
@@ -129,6 +139,8 @@ class HttpConn:
             params = {}
         if "domain" not in params:
             params["domain"] = self._domain 
+        if self._api_key:
+            params["api_key"] = self._api_key
          
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
@@ -180,6 +192,8 @@ class HttpConn:
 
         if "domain" not in params:
             params["domain"] = self._domain 
+        if self._api_key:
+            params["api_key"] = self._api_key
 
         req = self._endpoint + req
         
@@ -221,6 +235,8 @@ class HttpConn:
             params = {}
         if "domain" not in params:
             params["domain"] = self._domain 
+        if self._api_key:
+            params["api_key"] = self._api_key
             
         # try to do a POST to the domain
         req = self._endpoint + req
@@ -255,7 +271,10 @@ class HttpConn:
         if params is None:
             params = {}
         if "domain" not in params:
-            params["domain"] = self._domain      
+            params["domain"] = self._domain    
+        if self._api_key:
+            params["api_key"] = self._api_key
+
         # try to do a DELETE of the resource
         req = self._endpoint + req
 
