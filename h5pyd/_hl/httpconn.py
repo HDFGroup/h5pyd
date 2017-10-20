@@ -165,10 +165,11 @@ class HttpConn:
         if rsp.status_code == 200 and self._cache is not None:
             rsp_headers = rsp.headers
             content_length = 0
-            try:
-                content_length = int(rsp_headers['Content-Length'])
-            except ValueError:
-                content_length = MAX_CACHE_ITEM_SIZE + 1
+            if "Content-Length" in rsp_headers:
+                try:
+                    content_length = int(rsp_headers['Content-Length'])
+                except ValueError:
+                    content_length = MAX_CACHE_ITEM_SIZE + 1
 
             if rsp_headers['Content-Type'] == 'application/json' and content_length < MAX_CACHE_ITEM_SIZE:
 

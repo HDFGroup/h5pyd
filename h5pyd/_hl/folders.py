@@ -12,6 +12,7 @@
 
 from __future__ import absolute_import
 
+import os
 import os.path as op
 import six
 #from requests import ConnectionError
@@ -93,12 +94,8 @@ class Folder():
         if mode is None:
             mode = 'r'
 
-        cfg = None
-        if endpoint is None or username is None or password is None:
-            # unless we'r given all the connect info, create a config object that
-            # pulls in state from a .hscfg file (if found).
-            cfg = Config()
- 
+        cfg = Config()  # pulls in state from a .hscfg file (if found).
+        
         if endpoint is None and "hs_endpoint" in cfg:
             endpoint = cfg["hs_endpoint"]
 
@@ -115,11 +112,11 @@ class Folder():
         self._subdomains = None
 
         if api_key is None:
-                if "HS_API_KEY" in os.environ:
-                    api_key = os.environ["HS_API_KEY"]
-                elif "hs_api_key" in cfg:
-                    api_key = cfg["hs_api_key"]
-                    
+            if "HS_API_KEY" in os.environ:
+                api_key = os.environ["HS_API_KEY"]
+            elif "hs_api_key" in cfg:
+                api_key = cfg["hs_api_key"]
+
         self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, 
             password=password, api_key=api_key, mode=mode, logger=logger)
         self.log = self._http_conn.logging

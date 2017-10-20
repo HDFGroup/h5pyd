@@ -1,8 +1,6 @@
 
 import sys
-import os.path as op
 import logging
-from datetime import datetime
 import time
 import h5pyd  
 if __name__ == "__main__":
@@ -62,7 +60,6 @@ def getUpTime(start_time):
 #
 def main():
     argn = 1
-    depth = 2
     cfg["loglevel"] = logging.ERROR
     cfg["logfname"] = None
 

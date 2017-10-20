@@ -1,4 +1,3 @@
-import sys
 import os
 import json
 import six
@@ -104,7 +103,6 @@ def main():
     while not done:
         print("Enter new values or accept defaults in brackets with Enter.")
         print("")
-        print("hs_endpoint: ", hs_endpoint, "type:", type(hs_endpoint))
         new_endpoint = get_input("Server endpoint [{}]: ".format(hs_endpoint))
         if new_endpoint:
             print("Updated endpoint [{}]:".format(new_endpoint))

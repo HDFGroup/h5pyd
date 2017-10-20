@@ -7,6 +7,8 @@ from setuptools import setup
 # To upload to PyPI:
 # python setup.py register sdist upload
 #
+# Tag the release in github!
+#
 from codecs import open
 from os import path
 
@@ -17,7 +19,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='h5pyd',
-      version='0.2.5',
+      version='0.2.6',
       description='h5py compatible client lib for HDF REST API',
       long_description=long_description,
       url='http://github.com/HDFGroup/h5pyd',

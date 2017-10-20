@@ -131,7 +131,6 @@ def printUsage():
 def main():
     domains = []
     argn = 1
-    depth = 2
     loglevel = logging.ERROR
     logfname=None
     cfg["verbose"] = False

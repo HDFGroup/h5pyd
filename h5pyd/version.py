@@ -16,14 +16,14 @@ from distutils.version import StrictVersion as _sv
 import sys
 import numpy
 
-version = "0.2.5"
+version = "0.2.6"
 
 _exp = _sv(version)
 
 version_tuple = _exp.version + ((''.join(str(x) for x in _exp.prerelease),) if _exp.prerelease is not None else ('',))
 
-api_version_tuple = (0,2,5)
-api_version = "0.2.5"
+api_version_tuple = (0,2,6)
+api_version = "0.2.6"
 
 __doc__ = """\
 This is h5pyd **%s**

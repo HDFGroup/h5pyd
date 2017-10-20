@@ -19,7 +19,6 @@ import json
 
 from .objectid import GroupID
 from .group import Group
-from .. import version
 from .httpconn import HttpConn
 from .config import Config
 
@@ -115,12 +114,8 @@ class File(Group):
             if mode is None:
                 mode = 'a'
 
-            cfg = None
-            if endpoint is None or username is None or password is None:
-                # unless we'r given all the connect info, create a config object that
-                # pulls in state from a .hscfg file (if found).
-                cfg = Config()
- 
+            cfg = Config() # pulls in state from a .hscfg file (if found).
+            
             if endpoint is None:
                 if "H5SERV_ENDPOINT" in os.environ:
                     endpoint = os.environ["H5SERV_ENDPOINT"]

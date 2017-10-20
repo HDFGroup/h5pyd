@@ -12,7 +12,6 @@
 import unittest
 import logging
 import numpy as np
-import sys
 from h5type import special_dtype
 from h5type import check_dtype
 from base import Reference
