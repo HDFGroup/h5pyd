@@ -17,7 +17,6 @@ from copy import copy
 import sys
 import time
 import base64
-import math
 import numpy as np
 
 import six
@@ -681,7 +680,10 @@ class Dataset(HLObject):
                 if scalar_selection[i]:
                     # scalar index so will hit just one chunk
                     continue
-                num_chunks = math.ceil((sel_stop[i] - sel_start[i]) / chunk_layout[i])
+                count = sel_stop[i] - sel_start[i]
+                num_chunks = count // chunk_layout[i]
+                if count % chunk_layout[i] > 0:
+                    num_chunks += 1  # get the integer ceiling
                 if split_dim < 0 or num_chunks > max_chunks:
                     max_chunks = num_chunks
                     split_dim = i
