@@ -686,7 +686,7 @@ class Dataset(HLObject):
                     max_chunks = num_chunks
                     split_dim = i
                 chunks_per_page = max_chunks  
-                
+
             self.log.info("selection: start {} stop {} step {}".format(sel_start, sel_stop, sel_step))
             self.log.debug("split_dim: {}".format(split_dim))
             self.log.debug("chunks_per_page: {}".format(chunks_per_page))
@@ -770,10 +770,9 @@ class Dataset(HLObject):
                             for i in range(len(data)):
                                 converted_data.append(self.toTuple(data[i]))
                             data = converted_data
+                        input_arr = np.asarray(data, dtype=mtype)
+                        page_arr = input_arr.reshape(page_mshape)
 
-                        page_arr = numpy.empty(page_mshape, dtype=mtype)
-                        page_arr[...] = data
-                    
                     # get the slices to copy into the target array
                     slices = []
                     for i in range(len(mshape)):
