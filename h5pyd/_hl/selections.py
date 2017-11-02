@@ -375,22 +375,23 @@ class SimpleSelection(Selection):
     def getQueryParam(self):
         param = ''
         rank = len(self._shape)
-        if rank > 0:
-            param += "select=["
-            for i in range(rank):
-                start = self.start[i]
-                stop = start + (self.count[i] * self.step[i])
-                if stop > self._shape[i]:
-                    stop = self._shape[i]
-                dim_sel = str(start) + ':' + str(stop)
-                if self.step[i] != 1:
-                    dim_sel += ':' + str(self.step[i])
-                if i != rank-1:
-                    dim_sel += ','
-                param += dim_sel
-            param += ']'
+        if rank == 0:
+            return None
+        
+        param += "["
+        for i in range(rank):
+            start = self.start[i]
+            stop = start + (self.count[i] * self.step[i])
+            if stop > self._shape[i]:
+                stop = self._shape[i]
+            dim_sel = str(start) + ':' + str(stop)
+            if self.step[i] != 1:
+                dim_sel += ':' + str(self.step[i])
+            if i != rank-1:
+                dim_sel += ','
+            param += dim_sel
+        param += ']'
         return param
-
 
     def broadcast(self, target_shape):
         """ Return an iterator over target dataspaces for broadcasting.

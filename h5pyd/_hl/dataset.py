@@ -13,9 +13,11 @@
 from __future__ import absolute_import
 
 import posixpath as pp
+from copy import copy
 import sys
 import time
 import base64
+import math
 import numpy as np
 
 import six
@@ -508,6 +510,22 @@ class Dataset(HLObject):
         for i in xrange(shape[0]):
             yield self[i]
 
+    def _getQueryParam(self, start, stop, step=None):
+        param = ''
+        rank = len(self._shape)
+        if rank == 0:
+            return None
+        if step is None:
+            step = (1,) * rank
+        param += "["
+        for i in range(rank):
+            field = "{}:{}:{}".format(start[i], stop[i], step[i])
+            param += field
+            if i != rank-1:
+                param += ','
+        param += ']'
+        return param
+
 
     def __getitem__(self, args):
         """ Read a slice from the HDF5 dataset.
@@ -619,6 +637,9 @@ class Dataset(HLObject):
 
         # Perform the dataspace selection
         selection = sel.select(self, args)
+        self.log.debug("selection_constructor:")
+        for arg in args:
+            self.log.debug("arg: {} type: {}".format(arg, type(arg)))
          
         if selection.nselect == 0:
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
@@ -626,42 +647,154 @@ class Dataset(HLObject):
         # np.void rows in case of multi-field dtype. (issue 135)
         single_element = selection.mshape == ()
         mshape = (1,) if single_element else selection.mshape
-        #arr = numpy.ndarray(mshape, new_dtype, order='C')
-
-        # HDF5 has a bug where if the memory shape has a different rank
-        # than the dataset, the read is very slow
-        if len(mshape) < len(self._shape):
-            # pad with ones
-            mshape = (1,)*(len(self._shape)-len(mshape)) + mshape
-
+    
+        rank = len(self._shape)
+         
+        self.log.debug("dataset shape: {}".format(self._shape))
+        self.log.debug("mshape: {}".format(mshape))
         # Perfom the actual read
         rsp = None
         req = "/datasets/" + self.id.uuid + "/value"
-        if isinstance(selection, sel.SimpleSelection):         
-            sel_query = selection.getQueryParam() #TBD - move getQueryParam to this file?
-            if sel_query:
-                req += "?" + sel_query
-            # get binary if available
-            #rsp = self.GET(req, format="json")
-            rsp = self.GET(req, format="binary")
-            if type(rsp) is bytes:
-                # got binary response
-                arr1d = numpy.fromstring(rsp, dtype=mtype)
-                arr = numpy.reshape(arr1d, mshape)
-            else:
-                # got JSON response
-                # need some special conversion for compound types --
-                # each element must be a tuple, but the JSON decoder
-                # gives us a list instead.
-                data = rsp['value']
-                if len(mtype) > 1 and type(data) in (list, tuple):
-                    converted_data = []
-                    for i in range(len(data)):
-                        converted_data.append(self.toTuple(data[i]))
-                    data = converted_data
+        if isinstance(selection, sel.SimpleSelection):    
+            # Divy up large selections into pages, so no one request
+            # to the server will take unduly long to process
+            chunk_layout = self.id.chunks
+            if chunk_layout is None:
+                chunk_layout = self._shape
+            
+            max_chunks = 1
+            split_dim = -1
+            
+            sel_start = selection.start
+            sel_step = selection.step
+            sel_stop = []
+            
+            self.log.debug("selection._sel: {}".format(selection._sel))
+            scalar_selection = selection._sel[3]
+            chunks_per_page = 1
+            # determine the dimension for paging
+            for i in range(rank):
+                stop = sel_start[i] + selection.count[i]*sel_step[i]
+                if stop > self._shape[i]:
+                    stop = self._shape[i]
+                sel_stop.append(stop)
+                if scalar_selection[i]:
+                    # scalar index so will hit just one chunk
+                    continue
+                num_chunks = math.ceil((sel_stop[i] - sel_start[i]) / chunk_layout[i])
+                if split_dim < 0 or num_chunks > max_chunks:
+                    max_chunks = num_chunks
+                    split_dim = i
+                chunks_per_page = max_chunks  
+                
+            self.log.info("selection: start {} stop {} step {}".format(sel_start, sel_stop, sel_step))
+            self.log.debug("split_dim: {}".format(split_dim))
+            self.log.debug("chunks_per_page: {}".format(chunks_per_page))
 
-                arr = numpy.empty(mshape, dtype=mtype)
-                arr[...] = data
+            # determine which dimension of the target array to split on    
+            mshape_split_dim = 0
+            for i in range(rank):
+                if scalar_selection[i]:
+                    continue
+                if i == split_dim:
+                    break
+                mshape_split_dim += 1
+             
+            self.log.debug("mshape_split_dim: {}".format(split_dim))
+            chunk_size = chunk_layout[split_dim]
+            self.log.debug("chunk size for split_dim: {}".format(chunk_size))
+            
+            arr = numpy.empty(mshape, dtype=mtype)
+            params = {}
+            done = False
+             
+            while not done:
+                num_rows = chunks_per_page * chunk_layout[split_dim]
+                self.log.debug("num_rows: {}".format(num_rows))
+                page_start = list(copy(sel_start))  
+                
+                num_pages = max_chunks // chunks_per_page
+                if max_chunks % chunks_per_page > 0:
+                    num_pages += 1   # get the integer ceiling
+
+                des_index = 0  # this is where we'll copy to the arr for each page
+                
+                self.log.debug("paged read, chunks_per_page: {} max_chunks: {}, num_pages: {}".format(chunks_per_page, max_chunks, num_pages))
+            
+                for page_number in range(num_pages):
+                    self.log.debug("page_number: {}".format(page_number))
+                    self.log.debug("start: {}  stop: {}".format(page_start, sel_stop))
+                    
+                    page_stop = list(copy(sel_stop))
+                    page_stop[split_dim] = page_start[split_dim] + num_rows
+                    
+                    if sel_step[split_dim] > 1:
+                        # make sure the stop is aligned with the step value
+                        rem = page_stop[split_dim] % sel_step[split_dim]
+                        if rem != 0:
+                            page_stop[split_dim] += sel_step[split_dim] - rem 
+                    if page_stop[split_dim] > sel_stop[split_dim]:
+                        page_stop[split_dim] = sel_stop[split_dim]
+                     
+                    self.log.info("page_stop: {}".format(page_stop[split_dim]))
+
+                    page_mshape = list(copy(mshape))
+                    page_mshape[mshape_split_dim] =  1 + (page_stop[split_dim] - page_start[split_dim] - 1) // sel_step[split_dim]
+                    
+                    page_mshape = tuple(page_mshape)
+                     
+                    params["select"] = self._getQueryParam(page_start, page_stop, sel_step)
+                    try:
+                        rsp = self.GET(req, params=params, format="binary")
+                    except IOError as ioe: 
+                        self.log.info("got IOError: {}".format(ioe.errno))
+                        if ioe.errno == 413 and chunks_per_page > 1:
+                            # server rejected the request, reduce the page size
+                            chunks_per_page //= 2
+                            self.log.info("New chunks_per_page: {}".format(chunks_per_page))
+                            break
+                        else:
+                            raise IOError("Error retrieving data: {}".format(ioe.errno))
+                    if type(rsp) is bytes:
+                        # got binary response
+                        arr1d = numpy.fromstring(rsp, dtype=mtype)
+                        page_arr = numpy.reshape(arr1d, page_mshape)
+                    else:
+                        # got JSON response
+                        # need some special conversion for compound types --
+                        # each element must be a tuple, but the JSON decoder
+                        # gives us a list instead.
+                        data = rsp['value']
+                        if len(mtype) > 1 and type(data) in (list, tuple):
+                            converted_data = []
+                            for i in range(len(data)):
+                                converted_data.append(self.toTuple(data[i]))
+                            data = converted_data
+
+                        page_arr = numpy.empty(page_mshape, dtype=mtype)
+                        page_arr[...] = data
+                    
+                    # get the slices to copy into the target array
+                    slices = []
+                    for i in range(len(mshape)):
+                        if i == mshape_split_dim:
+                            num_rows = page_arr.shape[mshape_split_dim]
+                            slices.append(slice(des_index, des_index+num_rows))
+                            des_index += num_rows
+                        else:
+                            slices.append(slice(0, mshape[i]))
+                    self.log.debug("slices: {}".format(slices))
+                    arr[slices] = page_arr
+
+                    page_start[split_dim] = page_stop[split_dim]
+                    self.log.debug("new page_start: {}".format(page_start))
+                    rows_remaining = sel_stop[split_dim] - page_start[split_dim]
+                    if rows_remaining <= 0:
+                        self.log.debug("done = True")
+                        done = True
+                        break
+                    self.log.debug("{} rows left".format(rows_remaining))
+                
         elif isinstance(selection, sel.FancySelection):
             raise ValueError("selection type not supported")
         elif isinstance(selection, sel.PointSelection):
@@ -727,7 +860,7 @@ class Dataset(HLObject):
             raise ValueError("selection type not supported")
 
         
-
+        self.log.info("got arr: {}, cleaning up shape".format(arr.shape))
         # Patch up the output for NumPy
         if len(names) == 1:
             arr = arr[names[0]]     # Single-field recarray convention
@@ -805,18 +938,20 @@ class Dataset(HLObject):
         while True:
             # Perfom the actual read
             req = "/datasets/" + self.id.uuid + "/value"
-            req += "?query=" + condition
+            params = {}
+            params["query"] = condition
             self.log.info("req - cursor: {} page_size: {}".format(cursor, page_size))
             end_row = cursor+page_size
             if end_row > stop:
                 end_row = stop
             selection_arg = slice(cursor, end_row)
             selection = sel.select(self, selection_arg)
+            
             sel_param = selection.getQueryParam()
             if sel_param:
-                req += "&" + sel_param
+                params[sel_param[0]] = sel_param[1]
             try:
-                rsp = self.GET(req)
+                rsp = self.GET(req, params=params)
                 count = len(rsp["value"])
                 self.log.info("got {} rows".format(count))
                 if count > 0:
