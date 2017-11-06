@@ -62,14 +62,21 @@ class Reference():
     def tolist(self):
         if type(self._id.id) is not six.text_type:
             raise TypeError("Expected string id")
-        if self._id.objtype_code == 'd':
-            return [("datasets/" + self._id.id), ]
-        elif self._id.objtype_code == 'g':
-            return [("groups/" + self._id.id), ]
-        elif self._id.objtype_code == 't':
-            return [("datatypes/" + self._id.id), ]
+        item = None
+        if self._id.id[1] == '-':
+            # HSDS format
+            item = self._id.id
         else:
-            raise TypeError("Unexpected id type")
+            # H5Serv format
+            if self._id.objtype_code == 'd':
+                item = "datasets/" + self._id.id
+            elif self._id.objtype_code == 'g':
+                item =  "groups/" + self._id.id
+            elif self._id.objtype_code == 't':
+                item = "datatypes/" + self._id.id
+            else:
+                raise TypeError("Unexpected id type")
+        return [item,]
 
 class RegionReference():
 
@@ -137,12 +144,11 @@ def special_dtype(**kwds):
         return np.dtype(dt, metadata={'enum': enum_vals})
 
     if name == 'ref':
-
         dt = None
         if val is Reference:
-            dt = np.dtype('S48', metadata={'ref': val.__class__})
+            dt = np.dtype('S38', metadata={'ref': val})
         elif val is RegionReference:
-            dt = np.dtype('S48', metadata={'ref': val.__class__})
+            dt = np.dtype('S48', metadata={'ref': val})
         else:
             raise ValueError("Ref class must be Reference or RegionReference")
 
@@ -321,8 +327,22 @@ def getTypeItem(dt):
         type_info['size'] = dt.itemsize
         type_info['tag'] = ''  # todo - determine tag
     elif dt.base.kind == 'S':
+        ref_check = check_dtype(ref=dt.base)
+        if ref_check is not None:
+            # a reference type
+            type_info['class'] = 'H5T_REFERENCE'
+
+            if ref_check is Reference:
+                type_info['base'] = 'H5T_STD_REF_OBJ'  # objref
+            elif ref_check is RegionReference:
+                type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
+            else:
+                raise TypeError("unexpected reference type")
+        else:
+            # Fixed length string type
+            type_info['class'] = 'H5T_STRING'
+
         # Fixed length string type
-        type_info['class'] = 'H5T_STRING'
         type_info['charSet'] = 'H5T_CSET_ASCII'
         type_info['length'] = dt.itemsize
         type_info['strPad'] = 'H5T_STR_NULLPAD'

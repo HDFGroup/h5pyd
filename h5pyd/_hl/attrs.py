@@ -66,7 +66,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         else:
             # "unknown id"
             self._req_prefix = "<unknown>"
-
+   
     
     def _bytesArrayToList(self, data):
         """
@@ -88,7 +88,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                     is_list = False
             else:
                 is_list = True        
-        elif type(data) in (list, tuple):
+        elif isinstance(data, list) or isintance(data, tuple):
             is_list = True
         else:
             is_list = False
@@ -97,7 +97,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             out = []
             for item in data:
                 out.append(self._bytesArrayToList(item)) # recursive call  
-        elif type(data) is bytes:
+        elif isinstance(data, bytes):
             if six.PY3:
                 out = data.decode("utf-8")
             else:
@@ -274,29 +274,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 # now add again
                 self._parent.PUT(req, body=body)
 
-            """
-            try:
-                attr = h5a.create(self._id, self._e(tempname), htype, space)
-            except:
-                raise
-            else:
-                try:
-                    attr.write(data, mtype=htype2)
-                except:
-                    attr.close()
-                    h5a.delete(self._id, self._e(tempname))
-                    raise
-                else:
-                    try:
-                        # No atomic rename in HDF5 :(
-                        if h5a.exists(self._id, self._e(name)):
-                            h5a.delete(self._id, self._e(name))
-                        h5a.rename(self._id, self._e(tempname), self._e(name))
-                    except:
-                        attr.close()
-                        h5a.delete(self._id, self._e(tempname))
-                        raise
-            """
 
     def modify(self, name, value):
         """ Change the value of an attribute while preserving its type.

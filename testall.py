@@ -20,7 +20,7 @@ tests = ('test_attribute',
          'test_dataset_create',
          'test_dataset_extend', 
          'test_dataset_fancyselect',
-         #'test_dataset_objref',
+         'test_dataset_objref',
          'test_dataset_getitem', 
          'test_dataset_pointselect',
          'test_dataset_query',
@@ -28,6 +28,7 @@ tests = ('test_attribute',
          'test_dataset_setitem',
          'test_file',
          'test_group',
+         'test_vlentype',
          #'test_visit')
          )
 

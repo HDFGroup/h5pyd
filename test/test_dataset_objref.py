@@ -10,6 +10,7 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 import json
+import six
 import config
 if config.get("use_h5py"):
     import h5py
@@ -29,63 +30,62 @@ class TestObjRef(TestCase):
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
         r = f['/']
+        is_h5serv = False
+        if six.PY3:
+            if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+                is_h5serv = True  # h5serv doesn't have support for objref datasets yet
+        else:
+            if isinstance(f.id.id, unicode) and not f.id.id.startswith(u"g-"):
+                is_h5serv = True
 
+        
+        # create subgroup g1
         r.create_group('g1')
         self.assertTrue('g1' in r)
         g1 = r['g1']
 
-
+        # create subgroup g1/g1.1
         g11 = g1.create_group('g1.1')
 
-        g11_ref = g11.ref
-        #print("g11_ref:", g11_ref)
-        #print("uuid:", g11_ref.id.uuid)
-        #print("domain:", g11_ref.id.domain)
-        #print("type:", g11_ref.id.objtype_code)
-        #print("g11_ref_tolist:", g11_ref.tolist())
+        # get ref to g1/g1.1
+        g11_ref = g11.ref         
+        self.assertTrue(isinstance(g11_ref, h5py.Reference))
 
-        # todo - fix
-        #self.assertTrue(isinstance(g11_ref, h5py.Reference))
-
-
+        # create subgroup g2
         r.create_group('g2')
         self.assertEqual(len(r), 2)
         g2 = r['g2']
-        #print("json dump:", json.dumps(g2.__dict__))
-        """
+    
+        # get ref to g1/g1.1 from g2
         g11ref = g2[g11_ref]
-        #print("g11ref:", g11ref)
-        #print("g11ref name:", g11ref.name)
-        #print("g11ref type:", type(g11ref))
-        g11ref.create_group("foo")
-        """
+         
+        # create subgroup /g1/g1.1/foo 
+        g11ref.create_group("foo")   
+        self.assertEqual(len(g11), 1)
+        self.assertTrue("foo" in g11)
+        
+        # create datset /g2/d1
         d1 = g2.create_dataset('d1', (10,), dtype='i8')
 
+        # get ref to d1
         d1_ref = d1.ref
-
         dt = h5py.special_dtype(ref=h5py.Reference)
-        #print("dt:", dt)
-        #print("dt.kind:", dt.kind)
-        #print("dt.meta:", dt.metadata['ref'])
-        print("special_dtype:", type(dt.metadata['ref']))
         self.assertTrue(dt.metadata['ref'] is h5py.Reference)
+        ref = h5py.check_dtype(ref=dt)
+        self.assertEqual(ref, h5py.Reference)
 
+        # create dataset of ref types
         dset = g1.create_dataset('myrefs', (10,), dtype=dt)
-        #print("dset kind:", dset.dtype.kind)
-        #print("dset.dtype.kind:", dset.dtype.kind)
         ref = h5py.check_dtype(ref=dset.dtype)
-        #print("check_dtype:", ref)
-        null_ref = dset[0]
-        #print("null_ref:", null_ref)
-        dset[0] = g11_ref
-        dset[1] = d1_ref
-        #g2.attrs['dataset'] = dset.ref
+        self.assertEqual(ref, h5py.Reference)
 
-        # todo - references as data will need h5pyd equivalent of h5t module
-        # g2.attrs.create('dataset', dset.ref, dtype=dt)
-        #print("g11_ref type:", type(g11_ref))
-        a_ref = dset[0]
-        #print("a_ref", type(a_ref) )
+        if not is_h5serv:
+            dset[0] = g11_ref
+            dset[1] = d1_ref
+         
+            a_ref = dset[0]
+            # TBD - fix for hsds
+            #self.assertEqual(f[a_ref].name, "/g1/g1.1")  # ref to g1.1
 
         f.close()
 

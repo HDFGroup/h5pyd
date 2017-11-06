@@ -314,7 +314,6 @@ class Group(HLObject, MutableMappingHDF5):
             return tgt
 
         tgt = None
-
         if isinstance(name, h5type.Reference):
             tgt = name.objref()  # weak reference to ref object
             if tgt is not None:
