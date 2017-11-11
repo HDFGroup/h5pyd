@@ -88,7 +88,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                     is_list = False
             else:
                 is_list = True        
-        elif isinstance(data, list) or isintance(data, tuple):
+        elif isinstance(data, list) or isinstance(data, tuple):
             is_list = True
         else:
             is_list = False
@@ -251,7 +251,9 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
             # Make HDF5 datatype and dataspace for the H5A calls
             if use_htype is None:
+                print("getTypeItem({})".format(dtype))
                 type_json = getTypeItem(dtype)
+                print("got type_json: {}".format(type_json))
                
  
             # This mess exists because you can't overwrite attributes in HDF5.
@@ -264,6 +266,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             body['type'] = type_json
             body['shape'] = shape
             body['value'] = self._bytesArrayToList(data) 
+            print("create attribute {}: {}".format(name, body))
 
             try:
                 self._parent.PUT(req, body=body)

@@ -82,10 +82,13 @@ class TestObjRef(TestCase):
         if not is_h5serv:
             dset[0] = g11_ref
             dset[1] = d1_ref
-         
+           
             a_ref = dset[0]
-            # TBD - fix for hsds
-            #self.assertEqual(f[a_ref].name, "/g1/g1.1")  # ref to g1.1
+            obj = f[a_ref]
+            self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
+            b_ref = dset[1]
+            obj = f[b_ref]
+            self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
 
         f.close()
 

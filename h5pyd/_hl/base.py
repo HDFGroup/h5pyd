@@ -491,6 +491,7 @@ class HLObject(CommonStateObject):
         self.log = self._id.http_conn.logging
         self.req_prefix  = None # derived class should set this to the URI of the object
         self._file = file
+        self._name = None
         
         if not self.log.handlers:
             # setup logging

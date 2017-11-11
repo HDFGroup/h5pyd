@@ -235,6 +235,8 @@ class Group(HLObject, MutableMappingHDF5):
         """ Return parent_uuid and json description of link for given path """
         parent_uuid = self.id.uuid
         tgt_json = None
+        if isinstance(h5path, bytes):
+            h5path = h5path.decode('utf-8')
         if h5path.find('/') == -1:
             in_group = True   # link owned by this group
         else:
@@ -294,18 +296,21 @@ class Group(HLObject, MutableMappingHDF5):
     def __getitem__(self, name):
         """ Open an object in the file """
          
+        # convert bytes to str for PY3
+        if isinstance(name, bytes):
+            name = name.decode('utf-8')
 
-        def getObjByUuid(collection_type, uuid):
+        def getObjByUuid(uuid, collection_type=None):
             """ Utility method to get an obj based on collection type and uuid """
-            if collection_type == 'groups':
+            if collection_type == 'groups' or uuid.startswith("g-"):
                 req = "/groups/" + uuid
                 group_json = self.GET(req)
                 tgt = Group(GroupID(self, group_json))
-            elif link_json['collection'] == 'datatypes':
+            elif collection_type == 'datatypes' or uuid.startswith("t-"):
                 req = "/datatypes/" + uuid
                 datatype_json = self.GET(req)
                 tgt = Datatype(TypeID(self, datatype_json))
-            elif link_json['collection'] == 'datasets':
+            elif collection_type == 'datasets' or uuid.startswith("d-"):
                 req = "/datasets/" + uuid
                 dataset_json = self.GET(req)
                 tgt = Dataset(DatasetID(self, dataset_json))
@@ -313,30 +318,43 @@ class Group(HLObject, MutableMappingHDF5):
                 raise IOError("Unexpected Error - collection type: " + link_json['collection'])
             return tgt
 
+        def isUUID(name):
+            if isinstance(name, six.string_types) and len(name) == 38 and name[0] in ('g', 'd', 't') and name[1] == '-':
+                return True
+            else:
+                return False
+
+
         tgt = None
-        if isinstance(name, h5type.Reference):
+        
+        if isinstance(name, h5type.Reference): 
             tgt = name.objref()  # weak reference to ref object
             if tgt is not None:
                 return tgt  # ref'd object has not been deleted
             if isinstance(name.id, GroupID):
-                tgt = getObjByUuid('groups', name.id.uuid)
+                tgt = getObjByUuid(name.id.uuid, collection_type="groups")
             elif isinstance(name.id, DatasetID):
-                tgt = getObjByUuid('datasets', name.id.uuid)
+                tgt = getObjByUuid(name.id.uuid, collection_type="datasets")
             elif isinstance(name.id, TypeID):
-                tgt = getObjByUuid('datatypes', name.id.uuid)
+                tgt = getObjByUuid(name.id.uuid, collection_type="datasets")
             else:
                 raise IOError("Unexpected Error - ObjectID type: " + name.__class__.__name__)
             return tgt
+
+        if isUUID(name):
+            tgt = getObjByUuid(name)
+            return tgt
+
 
         parent_uuid, link_json = self.get_link_json(name)
         link_class = link_json['class']
 
         if link_class == 'H5L_TYPE_HARD':
-            tgt = getObjByUuid(link_json['collection'], link_json['id'])
+            tgt = getObjByUuid(link_json['id'], collection_type=link_json['collection'])
         elif link_class == 'H5L_TYPE_SOFT':
             h5path = link_json['h5path']
             soft_parent_uuid, soft_json = self.get_link_json(h5path)
-            tgt = getObjByUuid(soft_json['collection'], soft_json['id'])
+            tgt = getObjByUuid(soft_json['id'], collection_type=soft_json['collection'])
 
         elif link_class == 'H5L_TYPE_EXTERNAL':
             # try to get a handle to the file and return the linked object...

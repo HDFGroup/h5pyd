@@ -13,27 +13,42 @@
 from __future__ import absolute_import
 
 import numpy as np
-# trying to import these results in circule references, so just use is_reference, is_regionreference helpers to identify
+# trying to import these results in circular references, so just use is_reference, is_regionreference helpers to identify
 #from .base import Reference, RegionReference
 import six
 import weakref
 
 if six.PY3:
     unicode = str
-"""
-def is_reference(obj):
-    if isinstance(val, object) and val.__class__.__name__ == "Reference":
-        return True 
-    else:
-        return False
 
-def is_regionreference(obj):
-    if isinstance(val, object) and val.__class__.__name__ == "RegionReference":
-        return True 
-    else:
-        return False
-"""
+def is_reference(val):
+    try: 
+        if  val.__class__.__name__ == "Reference":
+            return True 
+    except AttributeError:
+        pass # ignore
+    try:
+        if val.__name__ == "Reference":
+            return True
+    except AttributeError:
+        pass # ignore
+    
+    return False
 
+def is_regionreference(val):
+    try: 
+        if  val.__class__.__name__ == "RegionReference":
+            return True 
+    except AttributeError:
+        pass # ignore
+    try:
+        if val.__name__ == "RegionReference":
+            return True
+    except AttributeError:
+        pass # ignore
+    
+    return False
+ 
 
 class Reference():
 
@@ -145,9 +160,9 @@ def special_dtype(**kwds):
 
     if name == 'ref':
         dt = None
-        if val is Reference:
+        if is_reference(val):
             dt = np.dtype('S38', metadata={'ref': val})
-        elif val is RegionReference:
+        elif is_regionreference(val):
             dt = np.dtype('S48', metadata={'ref': val})
         else:
             raise ValueError("Ref class must be Reference or RegionReference")
@@ -313,12 +328,13 @@ def getTypeItem(dt):
             # a reference type
             type_info['class'] = 'H5T_REFERENCE'
 
-            if ref_check is Reference:  
+            # use type name to support cases we're passed and h5py.h5r.Reference or RegionReference
+            if is_reference(ref_check):  
                 type_info['base'] = 'H5T_STD_REF_OBJ'  # objref
-            elif ref_check is RegionReference:  
+            elif is_regionreference(ref_check):  
                 type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
             else:
-                raise TypeError("unexpected reference type: {}".format(type(ref_check)))
+                raise TypeError("unexpected reference type: {}".format(ref_check))
         else:
             raise TypeError("unknown object type")
     elif dt.kind == 'V':
@@ -332,9 +348,9 @@ def getTypeItem(dt):
             # a reference type
             type_info['class'] = 'H5T_REFERENCE'
 
-            if ref_check is Reference:
+            if is_reference(ref_check):
                 type_info['base'] = 'H5T_STD_REF_OBJ'  # objref
-            elif ref_check is RegionReference:
+            elif is_regionreference(ref_check):  
                 type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
             else:
                 raise TypeError("unexpected reference type")
