@@ -16,7 +16,6 @@ import math
 import config
 
 if config.get("use_h5py"):
-    print("use_h5py")
     import h5py
 else:
     import h5pyd as h5py
@@ -30,7 +29,6 @@ class TestCreateDataset(TestCase):
     def test_create_simple_dset(self):
         filename = self.getFileName("create_simple_dset")
         print("filename:", filename)
-        print("h5py:", h5py.__name__)
         f = h5py.File(filename, "w")
 
         dims = (40, 80)
@@ -88,7 +86,6 @@ class TestCreateDataset(TestCase):
     def test_simple_1d_dset(self):
         filename = self.getFileName("simple_1d_dset")
         print("filename:", filename)
-        print("h5py:", h5py.__name__)
         f = h5py.File(filename, "w")
 
         dims = (10,)
@@ -121,7 +118,6 @@ class TestCreateDataset(TestCase):
     def test_fixed_len_str_dset(self):
         filename = self.getFileName("fixed_len_str_dset")
         print("filename:", filename)
-        print("h5py:", h5py.__name__)
         f = h5py.File(filename, "w")
 
         dims = (10,)
@@ -229,7 +225,6 @@ class TestCreateDataset(TestCase):
     def test_bool_dset(self):
         filename = self.getFileName("bool_dset")
         print("filename:", filename)
-        print("h5py:", h5py.__name__)
         f = h5py.File(filename, "w")
 
         dims = (10,)
@@ -270,6 +265,6 @@ class TestCreateDataset(TestCase):
 
 
 if __name__ == '__main__':
-    loglevel = logging.DEBUG
+    loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

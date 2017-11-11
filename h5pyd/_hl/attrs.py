@@ -151,8 +151,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         #arr = numpy.ndarray(shape, dtype=dtype, order='C')
         #attr.read(arr, mtype=htype)
 
-        #print "value:", rsp['value']
-        #print "new_dtype:", new_dtype
         arr = numpy.array(value_json, dtype=htype)
 
         if len(arr.shape) == 0:
@@ -251,9 +249,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
             # Make HDF5 datatype and dataspace for the H5A calls
             if use_htype is None:
-                print("getTypeItem({})".format(dtype))
                 type_json = getTypeItem(dtype)
-                print("got type_json: {}".format(type_json))
                
  
             # This mess exists because you can't overwrite attributes in HDF5.
@@ -266,7 +262,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             body['type'] = type_json
             body['shape'] = shape
             body['value'] = self._bytesArrayToList(data) 
-            print("create attribute {}: {}".format(name, body))
 
             try:
                 self._parent.PUT(req, body=body)
