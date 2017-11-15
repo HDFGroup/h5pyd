@@ -58,6 +58,7 @@ class TestAttribute(TestCase):
 
         # create attribute with as a fixed length string
         g1.attrs.create('d1', np.string_("This is a numpy string"))
+        value = g1.attrs['d1']
 
         attr_names = []
         for a in g1.attrs:
@@ -71,6 +72,7 @@ class TestAttribute(TestCase):
         # create an array attribute
         g1.attrs["ones"] = np.ones((10,))
         arr = g1.attrs["ones"]
+        self.assertTrue(isinstance(arr, np.ndarray))
         self.assertEqual(arr.shape, (10,))
         for i in range(10):
             self.assertEqual(arr[i], 1)
@@ -88,8 +90,29 @@ class TestAttribute(TestCase):
         # TBD - h5serv is returning S11 here for some reason
         #self.assertEqual(arr.dtype, np.dtype("S8"))
 
-        # byte values
-        g1.attrs['e1'] = b"Hello"
+        # scalar byte values
+        g1.attrs['e1'] = "Hello"
+        s = g1.attrs['e1']
+        print(s)
+        self.assertEqual(s, "Hello" )
+
+        # scalar objref attribute
+        g11 = g1.create_group('g1.1') # create subgroup g1/g1.1
+        g11.attrs['name'] = 'g1.1'   # tag group with an attribute
+
+        
+        g11_ref = g11.ref   # get ref to g1/g1.1       
+        print("g11_ref:", g11_ref)
+        self.assertTrue(isinstance(g11_ref, h5py.Reference))
+        refdt = h5py.special_dtype(ref=h5py.Reference)  # create ref dtype
+        g1.attrs.create('f1', g11_ref, dtype=refdt)     # create attribute with ref to g1.1
+        ref = g1.attrs['f1'] # read back the attribute
+
+        refobj = f[ref]  # get the ref'd object
+        self.assertTrue('name' in refobj.attrs)  # should see the tag attribute
+        print(refobj.attrs['name'])  
+        self.assertEqual(refobj.attrs['name'], 'g1.1')  # check tag value
+
 
         # close file
         f.close()

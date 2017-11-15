@@ -72,9 +72,6 @@ class Reference():
         self._objref = weakref.ref(bind)
 
     def __repr__(self):
-        return "<HDF5 object reference>"
-
-    def tolist(self):
         if type(self._id.id) is not six.text_type:
             raise TypeError("Expected string id")
         item = None
@@ -91,7 +88,10 @@ class Reference():
                 item = "datatypes/" + self._id.id
             else:
                 raise TypeError("Unexpected id type")
-        return [item,]
+        return item
+
+    def tolist(self):
+        return [self.__repr__(),]
 
 class RegionReference():
 
