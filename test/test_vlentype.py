@@ -10,7 +10,6 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 
-import sys
 import numpy as np
 import logging
 import six
@@ -39,7 +38,7 @@ class TestVlenTypes(TestCase):
         if not is_hsds:
             # vlen ref types not working for h5serv, so abort here
             f.close()
-            sys.exit(0)
+            return
 
         g1 = f.create_group('g1')
         print("g1_id:", g1.id.id)
