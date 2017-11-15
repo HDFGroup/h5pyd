@@ -28,7 +28,7 @@ tests = ('test_attribute',
          'test_dataset_setitem',
          'test_file',
          'test_group',
-         #'test_vlentype', # not working with h5serv
+         'test_vlentype', 
          #'test_visit')
          )
 
