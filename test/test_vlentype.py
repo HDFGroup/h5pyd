@@ -22,8 +22,9 @@ else:
 
 from common import ut, TestCase
 
+# Note: this test currently works with the HSDS server but not h5serv
 
-class TestVlenAttribute(TestCase):
+class TestVlenTypes(TestCase):
 
 
     def test_create_vlen(self):
