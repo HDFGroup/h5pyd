@@ -40,7 +40,7 @@ VERBOSE_REFRESH_TIME=1.0  # 1 second
 
 def readtime_dtype(basetype, names):
     """ Make a NumPy dtype appropriate for reading """
-  
+
     if len(names) == 0:  # Not compound, or we want all fields
         return basetype
 
@@ -52,7 +52,7 @@ def readtime_dtype(basetype, names):
             raise ValueError("Field %s does not appear in this type." % name)
 
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
-    
+
 
 
     """
@@ -65,7 +65,7 @@ def readtime_dtype(basetype, names):
                 start and end: n:m
                 start, end, and stride: n:m:s
     """
-def setSliceQueryParam(params, dims, sel):  
+def setSliceQueryParam(params, dims, sel):
     # pass dimensions, and selection as query params
     rank = len(dims)
     start = list(sel.start)
@@ -127,7 +127,7 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
              else:
                  if shape[i] < chunks[i]:
                      raise ValueError(errmsg)
-     
+
     if isinstance(dtype, Datatype):
         # Named types are used as-is
         type_json = dtype.id.type_json
@@ -261,16 +261,15 @@ class Dataset(HLObject):
 
     @property
     def dims(self):
-        pass
-        #from . dims import DimensionManager
-        #return DimensionManager(self)
+        from .dims import DimensionManager
+        return DimensionManager(self)
 
     @property
     def shape(self):
         """Numpy-style shape tuple giving dataset dimensions"""
-        # just return the cached shape value 
+        # just return the cached shape value
         # (although potentially it could have changed on server)
-        return self._shape 
+        return self._shape
 
     def get_shape(self, check_server=False):
         # this version will optionally refetch the shape from the server
@@ -318,7 +317,7 @@ class Dataset(HLObject):
     def chunks(self):
         """Dataset chunks (or None)"""
         return self.id.chunks
-        
+
     @property
     def compression(self):
         """Compression strategy (or None)"""
@@ -383,7 +382,7 @@ class Dataset(HLObject):
         else:
             arr = np.zeros((), dtype=self._dtype)
             fill_value = arr.tolist()
- 
+
         return fill_value
 
     @property
@@ -402,7 +401,7 @@ class Dataset(HLObject):
     def __init__(self, bind):
         """ Create a new Dataset object by binding to a low-level DatasetID.
         """
-        
+
         if not isinstance(bind, DatasetID):
             raise ValueError("%s is not a DatasetID" % bind)
         HLObject.__init__(self, bind)
@@ -417,7 +416,7 @@ class Dataset(HLObject):
         self._item_size = getItemSize(self.id.type_json)
 
         self._shape = self.get_shape()
-         
+
         self._num_chunks = None  # aditional state we'll get when requested
         self._allocated_size = None # as above
         self._verboseUpdated = None # when the verbose data was fetched
@@ -436,7 +435,7 @@ class Dataset(HLObject):
             if "allocated_size" in rsp_json:
                 self._allocated_size = rsp_json["allocated_size"]
             self._verboseUpdated = now
-    
+
     def resize(self, size, axis=None):
         """ Resize the dataset, or the specified axis.
 
@@ -595,7 +594,7 @@ class Dataset(HLObject):
             #fspace = self.id.get_space()
             #selection = sel2.select_read(fspace, args)
             selection = sel.select(self, args)
-     
+
             # TBD - refactor the following with the code for the non-scalar case
             req = "/datasets/" + self.id.uuid + "/value"
             rsp = self.GET(req, format="binary")
@@ -639,35 +638,35 @@ class Dataset(HLObject):
         self.log.debug("selection_constructor:")
         for arg in args:
             self.log.debug("arg: {} type: {}".format(arg, type(arg)))
-         
+
         if selection.nselect == 0:
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
         # Up-converting to (1,) so that numpy.ndarray correctly creates
         # np.void rows in case of multi-field dtype. (issue 135)
         single_element = selection.mshape == ()
         mshape = (1,) if single_element else selection.mshape
-    
+
         rank = len(self._shape)
-         
+
         self.log.debug("dataset shape: {}".format(self._shape))
         self.log.debug("mshape: {}".format(mshape))
         # Perfom the actual read
         rsp = None
         req = "/datasets/" + self.id.uuid + "/value"
-        if isinstance(selection, sel.SimpleSelection):    
+        if isinstance(selection, sel.SimpleSelection):
             # Divy up large selections into pages, so no one request
             # to the server will take unduly long to process
             chunk_layout = self.id.chunks
             if chunk_layout is None:
                 chunk_layout = self._shape
-            
+
             max_chunks = 1
             split_dim = -1
-            
+
             sel_start = selection.start
             sel_step = selection.step
             sel_stop = []
-            
+
             self.log.debug("selection._sel: {}".format(selection._sel))
             scalar_selection = selection._sel[3]
             chunks_per_page = 1
@@ -687,13 +686,13 @@ class Dataset(HLObject):
                 if split_dim < 0 or num_chunks > max_chunks:
                     max_chunks = num_chunks
                     split_dim = i
-                chunks_per_page = max_chunks  
+                chunks_per_page = max_chunks
 
             self.log.info("selection: start {} stop {} step {}".format(sel_start, sel_stop, sel_step))
             self.log.debug("split_dim: {}".format(split_dim))
             self.log.debug("chunks_per_page: {}".format(chunks_per_page))
 
-            # determine which dimension of the target array to split on    
+            # determine which dimension of the target array to split on
             mshape_split_dim = 0
             for i in range(rank):
                 if scalar_selection[i]:
@@ -701,54 +700,54 @@ class Dataset(HLObject):
                 if i == split_dim:
                     break
                 mshape_split_dim += 1
-             
+
             self.log.debug("mshape_split_dim: {}".format(split_dim))
             chunk_size = chunk_layout[split_dim]
             self.log.debug("chunk size for split_dim: {}".format(chunk_size))
-            
+
             arr = numpy.empty(mshape, dtype=mtype)
             params = {}
             done = False
-             
+
             while not done:
                 num_rows = chunks_per_page * chunk_layout[split_dim]
                 self.log.debug("num_rows: {}".format(num_rows))
-                page_start = list(copy(sel_start))  
-                
+                page_start = list(copy(sel_start))
+
                 num_pages = max_chunks // chunks_per_page
                 if max_chunks % chunks_per_page > 0:
                     num_pages += 1   # get the integer ceiling
 
                 des_index = 0  # this is where we'll copy to the arr for each page
-                
+
                 self.log.debug("paged read, chunks_per_page: {} max_chunks: {}, num_pages: {}".format(chunks_per_page, max_chunks, num_pages))
-            
+
                 for page_number in range(num_pages):
                     self.log.debug("page_number: {}".format(page_number))
                     self.log.debug("start: {}  stop: {}".format(page_start, sel_stop))
-                    
+
                     page_stop = list(copy(sel_stop))
                     page_stop[split_dim] = page_start[split_dim] + num_rows
-                    
+
                     if sel_step[split_dim] > 1:
                         # make sure the stop is aligned with the step value
                         rem = page_stop[split_dim] % sel_step[split_dim]
                         if rem != 0:
-                            page_stop[split_dim] += sel_step[split_dim] - rem 
+                            page_stop[split_dim] += sel_step[split_dim] - rem
                     if page_stop[split_dim] > sel_stop[split_dim]:
                         page_stop[split_dim] = sel_stop[split_dim]
-                     
+
                     self.log.info("page_stop: {}".format(page_stop[split_dim]))
 
                     page_mshape = list(copy(mshape))
                     page_mshape[mshape_split_dim] =  1 + (page_stop[split_dim] - page_start[split_dim] - 1) // sel_step[split_dim]
-                    
+
                     page_mshape = tuple(page_mshape)
-                     
+
                     params["select"] = self._getQueryParam(page_start, page_stop, sel_step)
                     try:
                         rsp = self.GET(req, params=params, format="binary")
-                    except IOError as ioe: 
+                    except IOError as ioe:
                         self.log.info("got IOError: {}".format(ioe.errno))
                         if ioe.errno == 413 and chunks_per_page > 1:
                             # server rejected the request, reduce the page size
@@ -795,7 +794,7 @@ class Dataset(HLObject):
                         done = True
                         break
                     self.log.debug("{} rows left".format(rows_remaining))
-                
+
         elif isinstance(selection, sel.FancySelection):
             raise ValueError("selection type not supported")
         elif isinstance(selection, sel.PointSelection):
@@ -808,7 +807,7 @@ class Dataset(HLObject):
             # verify the points are in range and strictly monotonic (for the 1d case)
             last_point = -1
             delistify = False
-             
+
             if len(points) == rank and isinstance(points[0], six.integer_types) and rank > 1:
                 # Single point selection - need to wrap this in an array
                 self.log.info("single point selection")
@@ -851,7 +850,7 @@ class Dataset(HLObject):
                 body["points"] = points
             rsp = self.POST(req, body=body)
             data = rsp["value"]
-             
+
             if len(data) != selection.mshape[0]:
                 raise IOError("Expected {} elements, but got {}".format(selection.mshape[0], len(data)))
 
@@ -860,7 +859,7 @@ class Dataset(HLObject):
         else:
             raise ValueError("selection type not supported")
 
-        
+
         self.log.info("got arr: {}, cleaning up shape".format(arr.shape))
         # Patch up the output for NumPy
         if len(names) == 1:
@@ -935,7 +934,7 @@ class Dataset(HLObject):
         data = []
         cursor = start
         page_size = stop - start
-        
+
         while True:
             # Perfom the actual read
             req = "/datasets/" + self.id.uuid + "/value"
@@ -947,7 +946,7 @@ class Dataset(HLObject):
                 end_row = stop
             selection_arg = slice(cursor, end_row)
             selection = sel.select(self, selection_arg)
-            
+
             sel_param = selection.getQueryParam()
             if sel_param:
                 params[sel_param[0]] = sel_param[1]
@@ -962,7 +961,7 @@ class Dataset(HLObject):
             except IOError as ioe:
                 if ioe.errno == 413 and page_size > 1024:
                     # too large a query target, try reducing the page size
-                    # if it is not already relatively small (1024)         
+                    # if it is not already relatively small (1024)
                     page_size //= 2
                     page_size += 1  # bump up to avoid tiny pages in the last iteration
                     self.log.info("Got 413, reducing page_size to: {}".format(page_size))
@@ -1091,7 +1090,7 @@ class Dataset(HLObject):
                 raise TypeError("When writing to array types, last N dimensions have to match (got %s, but should be %s)" % (valshp, shp,))
             mtype = h5t.py_create(numpy.dtype((val.dtype, shp)))
             mshape = val.shape[0:len(val.shape)-len(shp)]
-        
+
 
         # Make a compound memory type if field-name slicing is required
         elif len(names) != 0:
@@ -1120,7 +1119,7 @@ class Dataset(HLObject):
                     subtype = h5t.py_create(val.dtype.fields[fieldname][0])
                     offset = val.dtype.fields[fieldname][1]
                    mtype.insert(self._e(fieldname), offset, subtype)
-       
+
         # Use mtype derived from array (let DatasetID.write figure it out)
         else:
             mshape = val.shape
@@ -1130,7 +1129,7 @@ class Dataset(HLObject):
         selection = sel.select(self, args)
         if selection.nselect == 0:
             return
-        
+
         # Broadcast scalars if necessary.
         if (mshape == () and selection.mshape != ()):
             if self.dtype.subdtype is not None:
@@ -1143,7 +1142,7 @@ class Dataset(HLObject):
         # Perform the write, with broadcasting
         # Be careful to pad memory shape with ones to avoid HDF5 chunking
         # glitch, which kicks in for mismatched memory/file selections
-        """ 
+        """
         # TBD: do we need this adjustment?
         if(len(mshape) < len(self._shape)):
             mshape_pad = (1,)*(len(self._shape)-len(mshape)) + mshape
@@ -1155,15 +1154,15 @@ class Dataset(HLObject):
         params = {}
         body = {}
 
-        
+
         format = "json"
-         
+
         if use_base64:
-            
+
             if self.id.uuid.startswith("d-"):
                 # server is HSDS, use binary data, use param values for selection
                 format = "binary"
-                body = val.tobytes()     
+                body = val.tobytes()
                 self.log.debug("writing binary data, {} bytes".format(len(body)))
             else:
                 # h5serv, base64 encode, body json for selection
