@@ -106,7 +106,7 @@ def getHeaders(domain, username=None, password=None, headers=None):
         if headers is None:
             headers = {}
         headers['host'] = domain
-        
+
         if username is not None and password is not None:
             auth_string = username + ':' + password
             auth_string = auth_string.encode('utf-8')
@@ -173,7 +173,7 @@ class CommonStateObject(object):
 
         Also implements Unicode operations.
     """
-    
+
 
     @property
     def _lapl(self):
@@ -219,7 +219,7 @@ class CommonStateObject(object):
             return name, get_lcpl(coding)
         return name
 
-    
+
 
     def _d(self, name):
         """ Decode a name according to the current file settings.
@@ -265,17 +265,17 @@ class _RegionProxy(object):
     def __getitem__(self, args):
         pass
         # bases classes will override
-         
+
 
     def shape(self, ref):
         pass
-        
+
 
     def selection(self, ref):
         """ Get the shape of the target dataspace selection referred to by *ref*
         """
         pass
-         
+
 
 class ACL(object):
 
@@ -308,7 +308,7 @@ class ACL(object):
     def updateACL(self):
         return self._updateACL
 
-     
+
 
     """
         Proxy object which handles ACLs (access control list)
@@ -351,7 +351,7 @@ class HLObject(CommonStateObject):
         group_json["domain"] = http_conn.domain
         group_json["created"] = http_conn.created
         group_json["lastModified"] = http_conn.modified
-    
+
         groupid = GroupID(None, group_json, http_conn=http_conn)
 
         return File(groupid)
@@ -420,12 +420,12 @@ class HLObject(CommonStateObject):
             if verify_cert.startswith('F'):
                 return False
         return True
-      
+
 
     def GET(self, req, params=None, format="json"):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
-         
+
         rsp = self.id._http_conn.GET(req, params=params, format=format)
         if rsp.status_code != 200:
             self.log.info("Got response: {}".format(rsp.status_code))
@@ -442,10 +442,10 @@ class HLObject(CommonStateObject):
     def PUT(self, req, body=None, params=None, format="json"):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
-        
+
         # try to do a PUT to the domain
         rsp = self._id._http_conn.PUT(req, body=body, params=params, format=format)
-         
+
         if rsp.status_code not in (200, 201):
             if rsp.status_code == 409:
                 raise RuntimeError(rsp.reason)
@@ -459,11 +459,11 @@ class HLObject(CommonStateObject):
     def POST(self, req, body=None):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
-         
+
         # try to do a POST to the domain
-         
-        self.log.info("PST: {} [{}]".format(req, self.id.domain))
-         
+
+        self.log.info("POST: {} [{}]".format(req, self.id.domain))
+
         rsp = self.id._http_conn.POST(req, body=body)
         if rsp.status_code == 409:
             raise ValueError("name already exists")
@@ -476,11 +476,11 @@ class HLObject(CommonStateObject):
     def DELETE(self, req):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
-         
+
         # try to do a DELETE of the resource
-        
+
         self.log.info("DEL: {} [{}]".format(req, self.id.domain))
-        rsp = self.id._http_conn.DELETE(req)  
+        rsp = self.id._http_conn.DELETE(req)
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
@@ -492,7 +492,7 @@ class HLObject(CommonStateObject):
         self.req_prefix  = None # derived class should set this to the URI of the object
         self._file = file
         #self._name = None
-        
+
         if not self.log.handlers:
             # setup logging
             log_path = os.getcwd()
@@ -530,7 +530,7 @@ class HLObject(CommonStateObject):
     def getACLs(self):
         req = self._req_prefix + '/acls'
         rsp_json = self.GET(req)
-        acls_json = rsp_json["acls"] 
+        acls_json = rsp_json["acls"]
         return acls_json
 
     def putACL(self, acl):
@@ -539,10 +539,10 @@ class HLObject(CommonStateObject):
         perm = {}
         for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
             perm[k] = acl[k]
-         
+
         req = self._req_prefix + '/acls/' + acl['userName']
         self.PUT(req, body=perm)
-   
+
 
 # --- Dictionary-style interface ----------------------------------------------
 
