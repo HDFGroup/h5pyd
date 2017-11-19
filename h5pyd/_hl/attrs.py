@@ -26,9 +26,53 @@ from . import base
 from .base import phil, with_phil
 from .datatype import Datatype
 from .objectid import GroupID, DatasetID, TypeID
-from .h5type import getTypeItem, createDataType, special_dtype
+from .h5type import getTypeItem, createDataType, special_dtype, check_dtype
 
+"""
+Convert a list to a tuple, recursively.
+Example. [[1,2],[3,4]] -> ((1,2),(3,4))
+"""
+def toTuple(rank, data):
+    if type(data) in (list, tuple):
+        if rank > 0:
+            return list(toTuple(rank-1, x) for x in data)
+        else:
+            return tuple(toTuple(rank-1, x) for x in data)
+    else:
+        return data
 
+"""
+Return numpy array from the given json array.
+Note: copied from hsds arrayUti.py
+"""
+def jsonToArray(data_shape, data_dtype, data_json):
+    # need some special conversion for compound types --
+    # each element must be a tuple, but the JSON decoder
+    # gives us a list instead.
+    if len(data_dtype) > 1 and not isinstance(data_json, (list, tuple)):
+        raise TypeError("expected list data for compound data type")
+    npoints = numpy.product(data_shape)
+    if type(data_json) in (list, tuple):
+        np_shape_rank = len(data_shape)
+        converted_data = []
+        if npoints == 1 and len(data_json) == len(data_dtype):
+            converted_data.append(toTuple(0, data_json))
+        else:  
+            converted_data = toTuple(np_shape_rank, data_json)
+        data_json = converted_data
+
+    arr = numpy.array(data_json, dtype=data_dtype)
+    # raise an exception of the array shape doesn't match the selection shape
+    # allow if the array is a scalar and the selection shape is one element,
+    # numpy is ok with this
+    if arr.size != npoints:
+        msg = "Input data doesn't match selection number of elements"
+        msg += " Expected {}, but received: {}".format(npoints, arr.size)
+        raise ValueError(msg)
+    if arr.shape != data_shape:
+        arr = arr.reshape(data_shape)  # reshape to match selection
+
+    return arr
 
 
 class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
@@ -121,15 +165,12 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         
         shape_json = attr_json['shape']
         type_json = attr_json['type']
-        #if attr.get_space().get_simple_extent_type() == h5s.NULL:
         if shape_json['class'] == 'H5S_NULL':
             raise IOError("Empty attributes cannot be read")
         value_json = attr_json['value']
-
-        #dtype = readtime_dtype(attr.dtype, [])
+        
         dtype = createDataType(type_json)
 
-        #shape = attr.shape
         if 'dims' in shape_json:
             shape = shape_json['dims']
         else:
@@ -137,7 +178,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         # Do this first, as we'll be fiddling with the dtype for top-level
         # array types
-        #htype = h5t.py_create(dtype)
         htype = dtype
 
         # NumPy doesn't support top-level array types, so we have to "fake"
@@ -148,10 +188,17 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             shape = shape + subshape   # (5, 3)
             dtype = subdtype                # 'f'
 
-        #arr = numpy.ndarray(shape, dtype=dtype, order='C')
-        #attr.read(arr, mtype=htype)
+        vlen_base = check_dtype(vlen=dtype)
 
-        arr = numpy.array(value_json, dtype=htype)
+        #arr = numpy.array(value_json, dtype=htype)
+        arr = jsonToArray(shape, htype, value_json)
+        vlen_base = check_dtype(vlen=dtype)
+        if vlen_base is not None and len(arr.shape) > 0:
+            # convert list elements to ndarrays
+            nelements = numpy.product(arr.shape)
+            arr_1d = arr.reshape((nelements,))
+            for i in range(nelements):
+                arr_1d[i] = numpy.array(arr_1d[i], dtype=vlen_base)
 
         if len(arr.shape) == 0:
             return arr[()]
@@ -172,7 +219,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         """ Delete an attribute (which must already exist). """
         req = self._req_prefix + name
         self._parent.DELETE(req)
-        #h5a.delete(self._id, self._e(name))
 
     def create(self, name, data, shape=None, dtype=None):
         """ Create a new attribute, overwriting any existing attribute.
@@ -188,6 +234,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             Data type of the attribute.  Overrides data.dtype if both
             are given.
         """
+        self._parent.log.info("attrs.create({})".format(name))
 
 
         with phil:
@@ -250,12 +297,11 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             # Make HDF5 datatype and dataspace for the H5A calls
             if use_htype is None:
                 type_json = getTypeItem(dtype)
+                self._parent.log.debug("attrs.create type_json: {}".format(type_json))
                
  
             # This mess exists because you can't overwrite attributes in HDF5.
             # So we write to a temporary attribute first, and then rename.
-
-            #tempname = uuid.uuid4().hex
 
             req = self._req_prefix + name
             body = {}
@@ -328,15 +374,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             attrlist = []
             for attr in attributes:
                 attrlist.append(attr['name'])
-            """
-            def iter_cb(name, *args):
-                #Callback to gather attribute names
-                attrlist.append(self._d(name))
-
-            h5a.iterate(self._id, iter_cb)
-            """
-
-
+            
         for name in attrlist:
             yield name
 

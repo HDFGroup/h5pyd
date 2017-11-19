@@ -86,7 +86,6 @@ def setSliceQueryParam(params, dims, sel):
         params["select"] = sel_param
 
 
-
 def make_new_dset(parent, shape=None, dtype=None, data=None,
                  chunks=None, compression=None, shuffle=None,
                     fletcher32=None, maxshape=None, compression_opts=None,
