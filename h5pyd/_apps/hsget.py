@@ -176,10 +176,12 @@ def main():
     try:
         fin = h5pyd.File(src_domain, mode='r', endpoint=endpoint, username=username, password=password, use_cache=True)
     except IOError as ioe:
-        if ioe.errno == 404:
-            logging.error("Domain: {} not found".format(src_domain))
-        elif ioe.errno == 403:
+        if ioe.errno == 403:
             logging.error("No read access to domain: {}".format(src_domain))
+        elif ioe.errno == 404:
+            logging.error("Domain: {} not found".format(src_domain))
+        elif ioe.errno == 410:
+            logging.error("Domain: {} has been recently deleted".format(src_domain))
         else:
             logging.error("Error opening domain {}: {}".format(src_domain, ioe))
         sys.exit(1)

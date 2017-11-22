@@ -359,7 +359,13 @@ class HLObject(CommonStateObject):
     @property
     def name(self):
         """ Return the full name of this object.  None if anonymous. """
-        return self._name
+        try:
+            obj_name = self._name
+        except AttributeError:
+            # name hasn't been assigned yet
+            obj_name = None
+
+        return obj_name
         # return self._d(h5i.get_name(self.id))
 
     @property
