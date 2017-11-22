@@ -66,6 +66,7 @@ class TestObjRef(TestCase):
         
         # create datset /g2/d1
         d1 = g2.create_dataset('d1', (10,), dtype='i8')
+        print(d1.name)
 
         # get ref to d1
         d1_ref = d1.ref
@@ -85,10 +86,14 @@ class TestObjRef(TestCase):
            
             a_ref = dset[0]
             obj = f[a_ref]
-            self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
+            if not config.get("use_h5py"):
+                self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
             b_ref = dset[1]
             obj = f[b_ref]
-            self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
+            if not config.get("use_h5py"):
+                self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
+            
+            print(obj.name)
 
         f.close()
 
