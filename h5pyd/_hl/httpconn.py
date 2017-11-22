@@ -65,7 +65,6 @@ class HttpConn:
             self.log = logging
         else:
             self.log = logging.getLogger(logger)
-        self.log = logging
         if endpoint is None:
             if "H5SERV_ENDPOINT" in os.environ:
                 endpoint = os.environ["H5SERV_ENDPOINT"]
