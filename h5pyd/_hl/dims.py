@@ -365,6 +365,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
             dset.PUT(req, body=body)
 
         if name:
+            name = str(name).encode('utf-8').decode('ascii')
             body = {
                 'creationProperties': {
                     'nameCharEncoding': 'H5T_CSET_UTF8'
@@ -373,7 +374,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
                     'class': 'H5S_SCALAR'
                 },
                 'type': {
-                    'charSet': 'H5T_CSET_UTF8',
+                    'charSet': 'H5T_CSET_ASCII',
                     'class': 'H5T_STRING',
                     'length': len(name) + 1,
                     'strPad': 'H5T_STR_NULLTERM'
