@@ -72,7 +72,6 @@ def is_regionreference(val):
         return False
 
 def has_reference(dtype):
-    print("has_reference({})".format(dtype))
     has_ref = False
     if len(dtype) > 0:
         for name in dtype.fields:
@@ -85,9 +84,7 @@ def has_reference(dtype):
         has_ref = is_reference(basedt)
     elif dtype.metadata and 'vlen' in dtype.metadata:
         basedt = dtype.metadata['vlen']
-        print("has_reference: got vlen base:", basedt)
         has_ref = has_reference(basedt)
-    print("has_reference->", has_ref)
     return has_ref
 
 
@@ -100,9 +97,7 @@ def convert_dtype(srcdt, ctx):
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
-    print(msg)
      
-    print("check srcdt len")
     if len(srcdt) > 0:
         fields = []
         for name in srcdt.fields:
@@ -113,12 +108,9 @@ def convert_dtype(srcdt, ctx):
         tgt_dt = np.dtype(fields)
     else:
         # check if this a "special dtype"
-        print("check for refmetadata")
         if srcdt.metadata and 'ref' in srcdt.metadata:
             ref = srcdt.metadata['ref']
-            print("ref:", ref, "name:", ref.__class__.__name__)
             if is_reference(ref):
-                print("is_reference")
                 if is_h5py(ctx['fout']):
                     tgt_dt = h5py.special_dtype(ref=h5py.Reference)
                 else:
@@ -135,21 +127,18 @@ def convert_dtype(srcdt, ctx):
         elif srcdt.metadata and 'vlen' in srcdt.metadata:
             src_vlen = srcdt.metadata['vlen']
             tgt_base = convert_dtype(src_vlen, ctx)
-            print("vlen base type:", tgt_base)
             if is_h5py(ctx['fout']):
                 tgt_dt = h5py.special_dtype(vlen=tgt_base)
             else:
                 tgt_dt = h5pyd.special_dtype(vlen=tgt_base)
         else:
             tgt_dt = srcdt
-    print("returning tgt_dt:", tgt_dt)
     return tgt_dt
 
 #----------------------------------------------------------------------------------
 def copy_element(val, src_dt, tgt_dt, ctx):
-    print("copy_element, val:", val, "val type:", type(val), "src_dt:",  dump_dtype(src_dt), "tgt_dt:", dump_dtype(tgt_dt))
-    #if not isinstance(val, np.ndarray):
-    #    raise TypeError("Expected {} to be ndarray, but got: {}".format(val, type(val)))
+    logging.debug("copy_element, val:", val, "val type:", type(val), "src_dt:",  dump_dtype(src_dt), "tgt_dt:", dump_dtype(tgt_dt))
+     
     fin = ctx["fin"]
     fout = ctx["fout"]
     out = None
@@ -165,27 +154,37 @@ def copy_element(val, src_dt, tgt_dt, ctx):
             out_fields.append(out_field)
             out = tuple(out_fields)
     elif src_dt.metadata and 'ref' in src_dt.metadata:
-        print("copy_element, got ref element")
         if not tgt_dt.metadata or 'ref' not in tgt_dt.metadata:
             raise TypeError("Expected tgt dtype to be ref, but got: {}".format(tgt_dt))
         ref = tgt_dt.metadata['ref']
         if is_reference(ref):
-            print("copy_element, ref:", val)
-            out = ''
+            # initialize out to null ref
+            if is_h5py(ctx['fout']):
+                out = h5py.Reference()  # null h5py ref
+            else:
+                out = '' # h5pyd refs are strings
+             
             if ref:
-                print("following ref value")
                 fin_obj = fin[val]
+                # TBD - for hsget, the name property is not getting set
                 h5path = fin_obj.name
-                print("got refd path:", h5path)
-                fout_obj = fout[h5path]
-                print("outputting refid: ", fout_obj.id.id)
-                out = fout_obj.id.id
+                if not h5path:
+                    msg = "No path found for ref object"
+                    logging.warn(msg)
+                    if ctx["verbose"]:
+                        print(msg)
+                else:
+                    fout_obj = fout[h5path]
+                    
+                    out = fout_obj.ref
+            
+            
         elif is_regionreference(ref):
             out = "tbd"
         else:
             raise TypeError("Unexpected ref type: {}".format(type(ref)))
     elif src_dt.metadata and 'vlen' in src_dt.metadata:
-        print("copy_elment, got vlen element, dt:", src_dt.metadata["vlen"])
+        logging.debug("copy_elment, got vlen element, dt:", src_dt.metadata["vlen"])
         if not isinstance(val, np.ndarray):
             raise TypeError("Expecting ndarray or vlen element, but got: {}".format(type(val)))
         if not tgt_dt.metadata or 'vlen' not in tgt_dt.metadata:
@@ -202,7 +201,6 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                 out = np.zeros(val.shape, dtype=tgt_dt)
                 for i in range(len(out)):
                     e = val[i]
-                    print("e:", e, "e type:", type(e))
                     out[i] = copy_element(e, src_vlen_dt, tgt_vlen_dt, ctx)
         else:
             # can just directly copy the array
@@ -221,27 +219,21 @@ def copy_array(src_arr, ctx):
     """
     if not isinstance(src_arr, np.ndarray):
         raise TypeError("Expecting ndarray, but got: {}".format(src_arr))
-    print("copy_array, src:", src_arr, "dtype:", dump_dtype(src_arr.dtype))
     tgt_dt = convert_dtype(src_arr.dtype, ctx)
-    print("got tgt_dt:", dump_dtype(tgt_dt))
     tgt_arr = np.zeros(src_arr.shape, dtype=tgt_dt)
-    print("copy np array data")
 
     if has_reference(src_arr.dtype):
-        print("copy with ref data")
         # flatten array to simplify iteration
         count = np.product(src_arr.shape)
         tgt_arr_flat = tgt_arr.reshape((count,))
         src_arr_flat = src_arr.reshape((count,))
         for i in range(count):
             element = copy_element(src_arr_flat[i], src_arr.dtype, tgt_dt, ctx)
-            print("got element: {}".format(element))
             tgt_arr_flat[i] = element
         tgt_arr = tgt_arr_flat.reshape(src_arr.shape)
     else:
         # can just copy the entire array
         tgt_arr[...] = src_arr[...]
-    print("returning tgt_arr:", tgt_arr)
     return tgt_arr
 
 
@@ -252,19 +244,12 @@ def copy_attribute(desobj, name, srcobj, ctx):
     if ctx["verbose"]:
         print(msg)
     srcarr = srcobj.attrs[name]
-    if isinstance(srcarr, np.ndarray):
-        tgtarr = copy_array(srcarr, ctx)
-        print("got tgtarr: {} shape: {} [...]={}".format(tgtarr, tgtarr.shape, tgtarr[...]))
-        desobj.attrs.create(name, tgtarr)
-    else:
-        # scalars are just read as the native type
-        desobj.attrs.create(name, srcarr)
-    """
+
+    
     try:
         srcarr = srcobj.attrs[name]
         if isinstance(srcarr, np.ndarray):
             tgtarr = copy_array(srcarr, ctx)
-            print("got tgtarr: {} shape: {} [...]={}".format(tgtarr, tgtarr.shape, tgtarr[...]))
             desobj.attrs.create(name, tgtarr)
         else:
             # scalars are just read as the native type
@@ -273,8 +258,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
         msg = "ERROR: failed to create attribute {} of object {} -- {}".format(name, desobj.name, str(e))
         logging.error(msg)
         print(msg)
-        sys.exit(1)
-    """
+    
 # copy_attribute
       
 #----------------------------------------------------------------------------------
@@ -432,6 +416,7 @@ def create_datatype(obj, ctx):
         print(msg)
     fout = ctx["fout"]
     fout[obj.name] = obj.dtype
+
      
 # create_datatype
       
@@ -449,6 +434,7 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None):
     ctx["verbose"] = verbose
     ctx["nodata"] = nodata
     ctx["deflate"] = deflate
+    
 
     # create any root attributes
     for ga in fin.attrs:
@@ -456,6 +442,7 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None):
 
     def object_create_helper(name, obj):
         class_name = obj.__class__.__name__
+         
         if class_name == "Dataset":
             create_dataset(obj, ctx)
         elif class_name == "Group":
