@@ -14,24 +14,24 @@
 import os
 import sys
 
-tests = ('test_attribute', 
-         'test_committedtype',       
+tests = ('test_attribute',
+         'test_committedtype',
          'test_dataset_compound',
          'test_dataset_create',
-         'test_dataset_extend', 
+         'test_dataset_extend',
          'test_dataset_fancyselect',
          'test_dataset_objref',
-         'test_dataset_getitem', 
+         'test_dataset_getitem',
          'test_dataset_pointselect',
          'test_dataset_query',
          'test_dataset_scalar',
          'test_dataset_setitem',
          'test_file',
          'test_group',
-         'test_vlentype', 
-         #'test_visit')
+         'test_vlentype',
+         'test_dimscale',
+         # 'test_visit')
          )
-
 
 #
 # Run tests
