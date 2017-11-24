@@ -264,8 +264,9 @@ class DimensionProxy(base.CommonStateObject):
             dimlist = dset.GET(dset.attrs._req_prefix + 'DIMENSION_LIST')
             scales = []
             for d in dimlist['value'][self._dimension]:
-                dscale_json = dset.GET(d)
-                dscale = Dataset(DatasetID(parent=None, item=dscale_json))
+                dscale_json = dset.GET('/' + d)
+                dscale = Dataset(DatasetID(parent=None, item=dscale_json,
+                                           http_conn=self._id.http_conn))
                 scales.append((dscale.attrs['NAME'], dscale))
         return scales
 
