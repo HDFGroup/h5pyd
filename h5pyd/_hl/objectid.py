@@ -14,7 +14,7 @@ from __future__ import absolute_import
 from datetime import datetime
 import pytz
 import time
- 
+
 
 def parse_lastmodified(datestr):
     """Turn last modified datetime string into a datetime object."""
@@ -27,8 +27,9 @@ def parse_lastmodified(datestr):
         # if the time is an int or float, interpet as seconds since epoch
         dt = datetime.fromtimestamp(time.time())
 
-    return dt                
- 
+    return dt
+
+
 class ObjectID:
 
     """
@@ -42,7 +43,7 @@ class ObjectID:
     @property
     def id(self):
         return self._uuid
- 
+
     @property
     def objtype_code(self):
         """ return one char code to denote what type of object
@@ -72,8 +73,9 @@ class ObjectID:
         """ http connector """
         return self._http_conn
 
-    def __init__(self, parent, item, objtype_code=None, http_conn=None, **kwds):
-                 
+    def __init__(self, parent, item, objtype_code=None,
+                 http_conn=None, **kwds):
+
         """Create a new objectId.
         """
         parent_id = None
@@ -101,7 +103,7 @@ class ObjectID:
         elif parent_id is not None and parent_id.http_conn is not None:
             self._http_conn = parent_id.http_conn
         else:
-            raise IOError("Expected parent to have http connector") 
+            raise IOError("Expected parent to have http connector")
 
         self._objtype_code = objtype_code
 
@@ -121,7 +123,6 @@ class ObjectID:
         self._uuid = 0
         self._obj_json = None
         self._http_conn = None
-         
 
     def __bool__(self):
         return bool(self._uuid)
@@ -139,9 +140,8 @@ class TypeID(ObjectID):
         """Create a new TypeID.
         """
 
-        ObjectID.__init__(self, parent, item, objtype_code='t')
-                              
-                               
+        ObjectID.__init__(self, parent, item, objtype_code='t', **kwds)
+
 
 class DatasetID(ObjectID):
 
@@ -183,12 +183,11 @@ class DatasetID(ObjectID):
                         chunks = layout['dims']
         return chunks
 
-
     def __init__(self, parent, item, **kwds):
         """Create a new DatasetID.
         """
 
-        ObjectID.__init__(self, parent, item, objtype_code='d')
+        ObjectID.__init__(self, parent, item, objtype_code='d', **kwds)
 
 
 class GroupID(ObjectID):
@@ -196,6 +195,6 @@ class GroupID(ObjectID):
     def __init__(self, parent, item, http_conn=None, **kwds):
         """Create a new GroupID.
         """
-        
-        ObjectID.__init__(self, parent, item, http_conn=http_conn, objtype_code='g')
-                               
+
+        ObjectID.__init__(self, parent, item, http_conn=http_conn,
+                          objtype_code='g')
