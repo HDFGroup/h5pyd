@@ -243,8 +243,6 @@ def copy_attribute(desobj, name, srcobj, ctx):
     logging.debug(msg)
     if ctx["verbose"]:
         print(msg)
-    srcarr = srcobj.attrs[name]
-
     
     try:
         srcarr = srcobj.attrs[name]
