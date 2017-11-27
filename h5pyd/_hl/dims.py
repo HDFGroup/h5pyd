@@ -152,7 +152,7 @@ class DimensionProxy(base.CommonStateObject):
             value = [list() for r in range(rank)]
             dimlist = {
                 'creationProperties': {
-                    'nameCharEncoding': 'H5T_CSET_UTF8'
+                    'nameCharEncoding': 'H5T_CSET_ASCII'
                 },
                 'shape': {
                     'class': 'H5S_SIMPLE',
@@ -182,7 +182,7 @@ class DimensionProxy(base.CommonStateObject):
             # Create the REFERENCE_LIST attribute
             reflist = {
                 'creationProperties': {
-                    'nameCharEncoding': 'H5T_CSET_UTF8'
+                    'nameCharEncoding': 'H5T_CSET_ASCII'
                 },
                 'shape': {
                     'class': 'H5S_SIMPLE',
@@ -350,7 +350,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
         # Create the CLASS attribute with the value 'DIMENSION_SCALE'
         body = {
             'creationProperties': {
-                'nameCharEncoding': 'H5T_CSET_UTF8'
+                'nameCharEncoding': 'H5T_CSET_ASCII'
             },
             'shape': {
                 'class': 'H5S_SCALAR'
@@ -371,7 +371,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
             name = str(name).encode('utf-8').decode('ascii')
             body = {
                 'creationProperties': {
-                    'nameCharEncoding': 'H5T_CSET_UTF8'
+                    'nameCharEncoding': 'H5T_CSET_ASCII'
                 },
                 'shape': {
                     'class': 'H5S_SCALAR'
