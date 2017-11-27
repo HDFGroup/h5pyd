@@ -94,28 +94,30 @@ class DimensionProxy(base.CommonStateObject):
 
             if isinstance(item, int):
                 dscale_req = dimlist['value'][self._dimension][item]
-                dscale_json = dset.GET(dscale_req)
-                return Dataset(DatasetID(parent=None, item=dscale_json))
+                dscale_json = dset.GET('/' + dscale_req)
+                return Dataset(DatasetID(parent=None, item=dscale_json,
+                                         http_conn=self._id.http_conn))
 
             else:
                 # The assumtion here is that the item argument is the name of a
                 # dimension scale attached to this dimension.
-                item = str(item)
+                item = str(item).encode('ascii')
 
                 # Iterate through the dimension scales finding one with the
                 # correct name
                 dscales = dimlist['value'][self._dimension]
                 for d in dscales:
-                    dscale_json = dset.GET(d)
-                    dscale = Dataset(DatasetID(parent=None, item=dscale_json))
+                    dscale_json = dset.GET('/' + d)
+                    dscale = Dataset(DatasetID(parent=None, item=dscale_json,
+                                               http_conn=self._id.http_conn))
                     try:
                         if dscale.attrs['NAME'] == item:
                             return dscale
                     except KeyError:
                         pass
-                else:
-                    raise IndexError('Dimension scale for {} not found'
-                                     .format(item))
+
+        raise IndexError('Dimension scale for "{}" not found'
+                         .format(item))
 
     def attach_scale(self, dscale):
         ''' Attach a scale to this dimension.
