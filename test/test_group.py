@@ -152,9 +152,9 @@ class TestGroup(TestCase):
         external_link = r.get('myexternallink', getlink=True)
         self.assertEqual(external_link.path, 'somepath')
         external_link_filename = external_link.filename
-        if config.get('use_h5py'):
-            # h5py external link should be a posix path
-            self.assertTrue(external_link_filename.find('/') > 0)
+        if config.get('use_h5py') or isinstance(r.id.id, str):
+            # h5py and hsds external link should be a posix path
+            self.assertTrue(external_link_filename.find('/') > -1)
         else:
             # HDF Server should be a DNS style name
             self.assertEqual(external_link_filename.find('/'), -1)
