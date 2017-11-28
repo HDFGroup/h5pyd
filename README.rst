@@ -52,7 +52,8 @@ to point to an existing HSDS instance.
 
 Testing
 -------
-Setup the following environment variables that inform h5pyd which endpoint and user to use:
+Setup the following environment variables that inform h5pyd which endpoint and username to use:
+
 * HS_ENDPOINT - "http://127.0.0.1:5000" for h5serv installed locally
 * HS_USERNAME - "test_user1" or your preferred useranme 
 * HS_PASSWORD - password for above username - "test" for test_user1 with local h5serv install
