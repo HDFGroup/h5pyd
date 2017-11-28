@@ -72,7 +72,7 @@ class Reference():
         self._objref = weakref.ref(bind)
 
     def __repr__(self):
-        if type(self._id.id) is not six.text_type:
+        if not isinstance(self._id.id, str):
             raise TypeError("Expected string id")
         item = None
         if self._id.id[1] == '-':

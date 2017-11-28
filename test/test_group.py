@@ -46,6 +46,9 @@ class TestGroup(TestCase):
         filename = self.getFileName("create_group")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
+        is_hsds = False
+        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+            is_hsds = True  # HSDS has different permission defaults
         self.assertTrue('/' in f)
         r = f['/'] 
         self.assertEqual(len(r), 0)
@@ -152,7 +155,7 @@ class TestGroup(TestCase):
         external_link = r.get('myexternallink', getlink=True)
         self.assertEqual(external_link.path, 'somepath')
         external_link_filename = external_link.filename
-        if config.get('use_h5py') or isinstance(r.id.id, str):
+        if config.get('use_h5py') or is_hsds:
             # h5py and hsds external link should be a posix path
             self.assertTrue(external_link_filename.find('/') > -1)
         else:
