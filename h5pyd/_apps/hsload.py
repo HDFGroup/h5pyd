@@ -15,12 +15,12 @@ import logging
 import os
 import os.path as op
 import tempfile
-    
+
 try:
-    import h5py 
-    import h5pyd 
+    import h5py
+    import h5pyd
 except ImportError as e:
-    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e)) 
+    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
     sys.exit(1)
 
 try:
@@ -38,16 +38,16 @@ else:
 __version__ = '0.0.1'
 
 UTILNAME = 'hsload'
- 
+
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse
 else:
     from urlparse import urlparse
-     
+
 cfg = Config()
- 
- 
-    
+
+
+
 #----------------------------------------------------------------------------------
 def stage_file(uri, netfam=None, sslv=True):
     if PYCRUL == None:
@@ -62,7 +62,7 @@ def stage_file(uri, netfam=None, sslv=True):
         if sslv == True:
             crlc.setopt(crlc.SSL_VERIFYPEER, sslv)
 
-        if netfam == 4: 
+        if netfam == 4:
             crlc.setopt(crlc.IPRESOLVE, crlc.IPRESOLVE_V4)
         elif netfam == 6:
             crlc.setopt(crlc.IPRESOLVE, crlc.IPRESOLVE_V6)
@@ -119,7 +119,7 @@ def print_config_example():
 
 #----------------------------------------------------------------------------------
 def main():
-     
+
     loglevel = logging.ERROR
     verbose = False
     nodata = False
@@ -127,20 +127,20 @@ def main():
     cfg["logfname"] = None
     logfname=None
     ipvfam=None
-    
+
     src_files = []
     argn = 1
     while argn < len(sys.argv):
         arg = sys.argv[argn]
         val = None
-         
+
         if arg[0] == '-' and len(src_files) > 0:
             # options must be placed before filenames
             print("options must precead source files")
             usage()
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
-            val = sys.argv[argn+1] 
+            val = sys.argv[argn+1]
         if arg in ("-v", "--verbose"):
             verbose = True
             argn += 1
@@ -158,12 +158,12 @@ def main():
                 loglevel = logging.ERROR
             else:
                 print("unknown loglevel")
-                usage()  
+                usage()
                 sys.exit(-1)
             argn += 2
         elif arg == '--logfile':
             logfname = val
-            argn += 2     
+            argn += 2
         elif arg == '-4':
             ipvfam = 4
         elif arg == '-6':
@@ -203,13 +203,13 @@ def main():
     # setup logging
     logging.basicConfig(filename=logfname, format='%(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
-    
+
     # end arg parsing
     logging.info("username: {}".format(cfg["hs_username"]))
     logging.info("password: {}".format(cfg["hs_password"]))
     logging.info("endpoint: {}".format(cfg["hs_password"]))
     logging.info("verbose: {}".format(verbose))
-    
+
     if len(src_files) < 2:
         # need at least a src and destination
         usage()
@@ -223,14 +223,14 @@ def main():
         print("target must be a folder if multiple source files are provided")
         usage()
         sys.exit(-1)
-        
+
     if cfg["hs_endpoint"] is None:
         logging.error('No endpoint given, try -h for help\n')
         sys.exit(1)
     logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
 
     try:
-         
+
         for src_file in src_files:
             # check if this is a non local file, if it is remote (http, etc...) stage it first then insert it into hsds
             src_file_chk  = urlparse(src_file)
@@ -248,7 +248,7 @@ def main():
             tgt = domain
             if tgt[-1] == '/':
                 # folder destination
-                tgt = tgt + op.basename
+                tgt = tgt + op.basename(src_file)
 
             # get a handle to input file
             try:
@@ -278,7 +278,7 @@ def main():
 
             # cleanup if needed
             if istmp:
-                try:    
+                try:
                     os.unlink(src_file)
                 except IOError as e:
                     logging.warn("failed to delete %s : %s" % (src_file, str(e)))
@@ -286,13 +286,13 @@ def main():
             msg = "File {} uploaded to domain: {}".format(src_file, tgt)
             logging.info(msg)
             if verbose:
-                print(msg)  
-        
+                print(msg)
+
     except KeyboardInterrupt:
         logging.error('Aborted by user via keyboard interrupt.')
         sys.exit(1)
-#__main__
 
+
+# __main__
 if __name__ == "__main__":
     main()
-
