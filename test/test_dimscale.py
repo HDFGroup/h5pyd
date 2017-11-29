@@ -28,9 +28,10 @@ class TestDimensionScale(TestCase):
         filename = self.getFileName('test_dimscale')
         print('filename:', filename)
         f = h5py.File(filename, 'w')
-        is_h5serv= False
+        is_h5serv = False
         if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            is_h5serv = True  # HSDS currently supports dimscales, but h5serv does not
+            # HSDS currently supports dimscales, but h5serv does not
+            is_h5serv = True
 
         dset = f.create_dataset('temperatures', (10, 10, 10), dtype='f')
         f.create_dataset('scale_x', data=np.arange(10) * 10e3)
@@ -42,7 +43,7 @@ class TestDimensionScale(TestCase):
         self.assertEqual(len(dset.dims), len(dset.shape))
         for d in dset.dims:
             self.assertIsInstance(d, h5py._hl.dims.DimensionProxy)
-        
+
         if is_h5serv:
             f.close()  # can't go any farther with h5serv
             return
@@ -52,9 +53,11 @@ class TestDimensionScale(TestCase):
         dset.dims.create_scale(f['scale_y'], 'Simulation Y (East) axis')
         dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
 
-        with self.assertRaises(RuntimeError):
-            dset.dims[1].attach_scale(f['not_scale'])
+        # Attach a non-dimension scale (and in the process make it a dimension
+        # scale)
+        dset.dims[1].attach_scale(f['not_scale'])
 
+        # Cannot attach a dimension scale to another dimension scale
         with self.assertRaises(RuntimeError):
             f['scale_x'].dims[0].attach_scale(f['scale_z'])
 
@@ -63,23 +66,23 @@ class TestDimensionScale(TestCase):
         dset.dims[0].attach_scale(f['scale_x'])
 
         self.assertEqual(len(dset.dims[0]), 1)
-        self.assertEqual(len(dset.dims[1]), 0)
+        self.assertEqual(len(dset.dims[1]), 1)
         self.assertEqual(len(dset.dims[2]), 0)
 
         dset.dims[1].attach_scale(f['scale_y'])
         dset.dims[2].attach_scale(f['scale_z'])
 
-        self.assertEqual(len(dset.dims[1]), 1)
+        self.assertEqual(len(dset.dims[1]), 2)
         self.assertEqual(len(dset.dims[2]), 1)
-         
+
         scale_x = f['scale_x']
-        self.assertEqual(len(scale_x.dims), 1)
-        # TBD: following assignment is throwing 404 error - should be empty list
-        #dim_names = list(scale_x.dims[0])
+        self.assertEqual(len(scale_x.dims), len(scale_x.shape))
+        self.assertEqual(list(scale_x.dims[0]), [])
 
         dset.dims[1].detach_scale(f['scale_y'])
-
-        self.assertEqual(len(dset.dims[1]), 0)
+        self.assertEqual(len(dset.dims[1]), 1)
+        dset.dims[1].detach_scale(f['not_scale'])
+        self.assertEqual(dset.dims[1].items(), [])
 
         self.assertEqual(dset.dims[0].label, '')
         self.assertEqual(dset.dims[1].label, '')
@@ -93,14 +96,15 @@ class TestDimensionScale(TestCase):
         self.assertEqual(dset.dims[1].label, 'y')
         self.assertEqual(dset.dims[2].label, 'z')
 
-        self.assertEqual(dset.dims[1].items(), [])
-
         for s in dset.dims[2].items():
             self.assertIsInstance(s, tuple)
-            self.assertIsInstance(s[0], six.binary_type)
             self.assertIsInstance(s[1], h5py.Dataset)
-            # TBD: the following value should be of type str, not bytes (for Py3)
-            self.assertEqual(s[0], b'Simulation Z (Vertical) axis')
+            if config.get("use_h5py"):
+                self.assertIsInstance(s[0], six.string_types)
+                self.assertEqual(s[0], 'Simulation Z (Vertical) axis')
+            else:
+                self.assertIsInstance(s[0], six.binary_type)
+                self.assertEqual(s[0], b'Simulation Z (Vertical) axis')
 
         self.assertIsInstance(dset.dims[0][0], h5py.Dataset)
         self.assertIsInstance(dset.dims[0]['Simulation X (North) axis'],
@@ -109,7 +113,7 @@ class TestDimensionScale(TestCase):
         with self.assertRaises(IndexError):
             dset.dims[0][10]
 
-        with self.assertRaises(IndexError):
+        with self.assertRaises(KeyError):
             dset.dims[0]['foobar']
 
         f.close()

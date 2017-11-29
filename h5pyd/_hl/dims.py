@@ -110,29 +110,29 @@ class DimensionProxy(base.CommonStateObject):
                     dscale_json = dset.GET('/' + d)
                     dscale = Dataset(DatasetID(parent=None, item=dscale_json,
                                                http_conn=self._id.http_conn))
-                    try:
-                        if dscale.attrs['NAME'] == item:
-                            return dscale
-                    except KeyError:
-                        pass
-
-        raise IndexError('Dimension scale for "{}" not found'
-                         .format(item))
+                    if dscale.attrs['NAME'] == item:
+                        return dscale
+                    raise KeyError('No dimension scale with name"{}" found'
+                                   .format(item))
 
     def attach_scale(self, dscale):
         ''' Attach a scale to this dimension.
 
         Provide the Dataset of the scale you would like to attach.
         '''
+        dset = Dataset(self._id)
         try:
             rsp = dscale.GET(dscale.attrs._req_prefix + 'CLASS')
-            if rsp['value'] != 'DIMENSION_SCALE':
-                raise IOError
         except IOError:
+            dset.dims.create_scale(dscale)
+            rsp = None
+
+        if not rsp:
+            rsp = dscale.GET(dscale.attrs._req_prefix + 'CLASS')
+        if rsp['value'] != 'DIMENSION_SCALE':
             raise RuntimeError(
                 '{} is not a dimension scale'.format(dscale.name))
 
-        dset = Dataset(self._id)
         try:
             rsp = dset.GET(dset.attrs._req_prefix + 'CLASS')
             if rsp['value'] == 'DIMENSION_SCALE':
@@ -263,8 +263,11 @@ class DimensionProxy(base.CommonStateObject):
         '''
         dset = Dataset(self._id)
         with phil:
-            dimlist = dset.GET(dset.attrs._req_prefix + 'DIMENSION_LIST')
             scales = []
+            try:
+                dimlist = dset.GET(dset.attrs._req_prefix + 'DIMENSION_LIST')
+            except IOError:
+                return scales
             for d in dimlist['value'][self._dimension]:
                 dscale_json = dset.GET('/' + d)
                 dscale = Dataset(DatasetID(parent=None, item=dscale_json,
