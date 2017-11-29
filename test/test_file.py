@@ -79,7 +79,7 @@ class TestFile(TestCase):
             self.assertEqual(f.modified, f.created)
         if is_hsds:
             # owner prop is just for HSDS
-            self.assertEqual(f.owner, self.test_user1["name"]) 
+            self.assertTrue(len(f.owner) > 0) 
          
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
@@ -188,8 +188,8 @@ class TestFile(TestCase):
         else:
             self.assertEqual(len(file_acls), 0)
 
-        file_acl = f.getACL(self.test_user1["name"])
-        # there's no ACL for test_User1 yet, so this should return the default ACL
+        file_acl = f.getACL(f.owner)
+        # default owner ACL should grant full permissions
         acl_keys = ("create", "read", "update", "delete", "readACL", "updateACL")
         #self.assertEqual(file_acl["userName"], "default")   
         for k in acl_keys:

@@ -47,7 +47,7 @@ class ObjectID:
 
     @property
     def id(self):
-        if six.PY2:
+        if six.PY2 and isinstance(self._uuid, unicode):
             # convert unicode to native string type
             return self._uuid.encode('ascii')
         else:
