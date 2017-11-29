@@ -75,19 +75,15 @@ class Reference():
         if type(self._id.id) is not six.text_type:
             raise TypeError("Expected string id")
         item = None
-        if self._id.id[1] == '-':
-            # HSDS format
-            item = self._id.id
+        
+        if self._id.objtype_code == 'd':
+            item = "datasets/" + self._id.id
+        elif self._id.objtype_code == 'g':
+            item =  "groups/" + self._id.id
+        elif self._id.objtype_code == 't':
+            item = "datatypes/" + self._id.id
         else:
-            # H5Serv format
-            if self._id.objtype_code == 'd':
-                item = "datasets/" + self._id.id
-            elif self._id.objtype_code == 'g':
-                item =  "groups/" + self._id.id
-            elif self._id.objtype_code == 't':
-                item = "datatypes/" + self._id.id
-            else:
-                raise TypeError("Unexpected id type")
+            raise TypeError("Unexpected id type")
         return item
 
     def tolist(self):
@@ -161,7 +157,7 @@ def special_dtype(**kwds):
     if name == 'ref':
         dt = None
         if is_reference(val):
-            dt = np.dtype('S38', metadata={'ref': val})
+            dt = np.dtype('S48', metadata={'ref': val})
         elif is_regionreference(val):
             dt = np.dtype('S48', metadata={'ref': val})
         else:
