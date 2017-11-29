@@ -28,9 +28,9 @@ class TestDimensionScale(TestCase):
         filename = self.getFileName('test_dimscale')
         print('filename:', filename)
         f = h5py.File(filename, 'w')
-        is_hsds = False
-        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-            is_hsds = True  # HSDS currently supports dimscales, but h5serv does not
+        is_h5serv= False
+        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+            is_h5serv = True  # HSDS currently supports dimscales, but h5serv does not
 
         dset = f.create_dataset('temperatures', (10, 10, 10), dtype='f')
         f.create_dataset('scale_x', data=np.arange(10) * 10e3)
@@ -43,7 +43,7 @@ class TestDimensionScale(TestCase):
         for d in dset.dims:
             self.assertIsInstance(d, h5py._hl.dims.DimensionProxy)
         
-        if not is_hsds:
+        if is_h5serv:
             f.close()  # can't go any farther with h5serv
             return
 
