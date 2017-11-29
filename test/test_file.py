@@ -187,8 +187,14 @@ class TestFile(TestCase):
             self.assertEqual(len(file_acls), 2)  # HSDS setup creates two initial acls - "default" and test_user1
         else:
             self.assertEqual(len(file_acls), 0)
+        print(file_acls)
+        
+        if is_hsds:
+            username = f.owner
+        else:
+            username = "test_user1"
 
-        file_acl = f.getACL(f.owner)
+        file_acl = f.getACL(username)
         # default owner ACL should grant full permissions
         acl_keys = ("create", "read", "update", "delete", "readACL", "updateACL")
         #self.assertEqual(file_acl["userName"], "default")   
