@@ -48,7 +48,7 @@ class TestObjRef(TestCase):
         g11 = g1.create_group('g1.1')
 
         # get ref to g1/g1.1
-        g11_ref = g11.ref         
+        g11_ref = g11.ref    
         self.assertTrue(isinstance(g11_ref, h5py.Reference))
 
         # create subgroup g2
@@ -58,6 +58,7 @@ class TestObjRef(TestCase):
     
         # get ref to g1/g1.1 from g2
         g11ref = g2[g11_ref]
+       
          
         # create subgroup /g1/g1.1/foo 
         g11ref.create_group("foo")   
@@ -66,7 +67,6 @@ class TestObjRef(TestCase):
         
         # create datset /g2/d1
         d1 = g2.create_dataset('d1', (10,), dtype='i8')
-        print(d1.name)
 
         # get ref to d1
         d1_ref = d1.ref
@@ -75,12 +75,13 @@ class TestObjRef(TestCase):
         ref = h5py.check_dtype(ref=dt)
         self.assertEqual(ref, h5py.Reference)
 
-        # create dataset of ref types
-        dset = g1.create_dataset('myrefs', (10,), dtype=dt)
-        ref = h5py.check_dtype(ref=dset.dtype)
-        self.assertEqual(ref, h5py.Reference)
-
+        
         if not is_h5serv:
+            # create dataset of ref types
+            dset = g1.create_dataset('myrefs', (10,), dtype=dt)
+            ref = h5py.check_dtype(ref=dset.dtype)
+            self.assertEqual(ref, h5py.Reference)
+
             dset[0] = g11_ref
             dset[1] = d1_ref
            
@@ -92,8 +93,26 @@ class TestObjRef(TestCase):
             obj = f[b_ref]
             if not config.get("use_h5py"):
                 self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
-            
-            print(obj.name)
+
+            # try the same thing using attributes
+            ref_values = [g11_ref, d1_ref]
+            g1.attrs.create("a1", ref_values, dtype=dt)
+
+            # read back the attribute
+            attr =g1.attrs["a1"]
+            self.assertEqual(attr.shape, (2,))
+            ref = h5py.check_dtype(ref=attr.dtype)
+            self.assertEqual(ref, h5py.Reference)
+            a_ref = attr[0]
+            obj = f[a_ref]
+            if not config.get("use_h5py"):
+                self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
+            b_ref = attr[1]
+            obj = f[b_ref]
+            if not config.get("use_h5py"):
+                self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
+
+    
 
         f.close()
 

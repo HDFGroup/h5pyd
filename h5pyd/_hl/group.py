@@ -302,6 +302,20 @@ class Group(HLObject, MutableMappingHDF5):
 
         def getObjByUuid(uuid, collection_type=None):
             """ Utility method to get an obj based on collection type and uuid """
+            # trim off any collection prefix from the input
+            if uuid.startswith("groups/"):
+                uuid = uuid[len("groups/"):]
+                if collection_type is None:
+                    collection_type = 'groups'
+            elif uuid.startswith("datasets/"):
+                uuid = uuid[len("datasets/"):]
+                if collection_type is None:
+                    collection_type = 'datasets'
+            elif uuid.startswith("datatypes/"):
+                uuid = uuid[len("datatypes/"):]
+                if collection_type is None:
+                    collection_type = 'datasets'
+
             if collection_type == 'groups' or uuid.startswith("g-"):
                 req = "/groups/" + uuid
                 group_json = self.GET(req)
@@ -319,14 +333,23 @@ class Group(HLObject, MutableMappingHDF5):
             return tgt
 
         def isUUID(name):
-            if isinstance(name, six.string_types) and len(name) == 38 and name[0] in ('g', 'd', 't') and name[1] == '-':
-                return True
+            # return True if name looks like an object id
+            # There are some additional checks we could add to reduce false positives
+            # (like checking for hyphens in the right places)
+            if isinstance(name, six.string_types) and len(name) >= 38:
+                if name.startswith("groups/"):
+                    return True
+                elif name.startswith("datatypes/"):
+                    return True
+                elif name.startswith("datasets/"):
+                    return True
+                else:
+                    return False
             else:
                 return False
 
 
         tgt = None
-        
         if isinstance(name, h5type.Reference): 
             tgt = name.objref()  # weak reference to ref object
             if tgt is not None:

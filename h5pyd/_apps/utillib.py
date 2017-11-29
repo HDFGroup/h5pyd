@@ -137,7 +137,7 @@ def convert_dtype(srcdt, ctx):
 
 #----------------------------------------------------------------------------------
 def copy_element(val, src_dt, tgt_dt, ctx):
-    logging.debug("copy_element, val: " + str(val) + " val type: " + type(val) + "src_dt: " + dump_dtype(src_dt) + " tgt_dt: " + dump_dtype(tgt_dt))
+    logging.debug("copy_element, val: " + str(val) + " val type: " + str(type(val)) + "src_dt: " + dump_dtype(src_dt) + " tgt_dt: " + dump_dtype(tgt_dt))
      
     fin = ctx["fin"]
     fout = ctx["fout"]
@@ -184,7 +184,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
         else:
             raise TypeError("Unexpected ref type: {}".format(type(ref)))
     elif src_dt.metadata and 'vlen' in src_dt.metadata:
-        logging.debug("copy_elment, got vlen element, dt: " + src_dt.metadata["vlen"])
+        logging.debug("copy_elment, got vlen element, dt: {}".format(src_dt.metadata["vlen"]))
         if not isinstance(val, np.ndarray):
             raise TypeError("Expecting ndarray or vlen element, but got: {}".format(type(val)))
         if not tgt_dt.metadata or 'vlen' not in tgt_dt.metadata:

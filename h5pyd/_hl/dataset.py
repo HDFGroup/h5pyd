@@ -552,11 +552,9 @@ class Dataset(HLObject):
             # This is necessary because in the case of array types, NumPy
             # discards the array information at the top level.
             new_dtype = readtime_dtype(self.dtype, names)
-
         if new_dtype.kind == 'S' and check_dtype(ref=self.dtype):
             new_dtype = special_dtype(ref=Reference)
-        # todo - will need the following once we have binary transfers
-        # mtype = h5t.py_create(new_dtype)
+        
         mtype = new_dtype
 
 
