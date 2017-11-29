@@ -175,8 +175,10 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                         print(msg)
                 else:
                     fout_obj = fout[h5path]
-                    
-                    out = fout_obj.ref
+                    if is_h5py(ctx['fout']):
+                        out = fout_obj.ref
+                    else:
+                        out = str(fout_obj.ref) # convert to string for JSON serialization
             
             
         elif is_regionreference(ref):

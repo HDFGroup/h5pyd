@@ -52,10 +52,6 @@ else:
     del testfile
 
 
-
-
-
-
 class TestCase(ut.TestCase):
 
     """
@@ -65,8 +61,8 @@ class TestCase(ut.TestCase):
 
     @property
     def endpoint(self):
-        if "H5SERV_ENDPOINT" in os.environ:
-            endpoint = os.environ["H5SERV_ENDPOINT"]
+        if "HS_ENDPOINT" in os.environ:
+            endpoint = os.environ["HS_ENDPOINT"]
         else:
             endpoint = "http://127.0.0.1:5000"
         return endpoint
@@ -74,15 +70,15 @@ class TestCase(ut.TestCase):
    
     @property
     def test_user1(self):
-        # H5SERV_USERNAME is the username h5pyd will look up if
+        # HS_USERNAME is the username h5pyd will look up if
         #   if not provided in the File constructor
         user1 = {}
-        if  "H5SERV_USERNAME" in os.environ:
-            user1["name"] = os.environ["H5SERV_USERNAME"]
+        if  "HS_USERNAME" in os.environ:
+            user1["name"] = os.environ["HS_USERNAME"]
         else:
             user1["name"] = "test_user1"
-        if "H5SERV_PASSWORD" in os.environ:
-            user1["password"] = os.environ["H5SERV_PASSWORD"]
+        if "HS_PASSWORD" in os.environ:
+            user1["password"] = os.environ["HS_PASSWORD"]
         else:
             # only use "test_user1/test" for desktop testing
             user1["password"] = "test"
@@ -226,13 +222,19 @@ class TestCase(ut.TestCase):
         if config.get("use_h5py"):
             if not op.isdir("out"):
                 os.mkdir("out")
-            return "out/" + basename + ".h5"
+            filename = "out/" + basename + ".h5"
         else:
-            if "DOMAIN" in os.environ:
-                domain = os.environ["DOMAIN"]
+            if "H5PYD_TEST_FOLDER" in os.environ:
+                domain = os.environ["H5PYD_TEST_FOLDER"]
             else:
-                domain = "h5pyd_test.hdfgroup.org"  #+ self.test_user1["name"] + ".home" 
-            return basename + "." + domain
+                domain = "h5pyd_test.hdfgroup.org"  
+            if domain.find('/') > -1:
+                # Use path-style domain naming
+                filename = op.join(domain, basename)
+                filename += ".h5"
+            else:
+                filename = basename + "." + domain
+        return filename
 
     
     def getPathFromDomain(self, domain):
@@ -241,6 +243,10 @@ class TestCase(ut.TestCase):
         E.g. "mytest.h5pyd_test.hdfgroup.org" to
              "/org/hdfgroup/h5pyd_test/mytest
         """
+        if domain.find('/') > -1:
+            # looks like the domain already is specified as a path
+            return domain
+
         names = domain.split('.')
         names.reverse()
         path = '/'

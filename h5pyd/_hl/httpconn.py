@@ -23,7 +23,7 @@ MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
 
 class CacheResponse(object):
     """ Wrap a json response in a Requests.Response looking class.
-        Note: we don't want to keep a proper requests obj in the cache since it 
+        Note: we don't want to keep a proper requests obj in the cache since it
         would contain refernces to other objects
     """
     def __init__(self, rsp):
@@ -44,13 +44,13 @@ class CacheResponse(object):
     def headers(self):
         return self._headers
 
- 
+
 class HttpConn:
     """
     Some utility methods based on equivalents in base class.
     TBD: Should refactor these to a common base class
     """
-    def __init__(self, domain_name, endpoint=None, username=None, password=None, 
+    def __init__(self, domain_name, endpoint=None, username=None, password=None,
             api_key=None, mode='a', use_session=True, use_cache=False, logger=None, **kwds):
         self._domain = domain_name
         self._mode = mode
@@ -65,13 +65,12 @@ class HttpConn:
             self.log = logging
         else:
             self.log = logging.getLogger(logger)
-        self.log = logging
         if endpoint is None:
             if "H5SERV_ENDPOINT" in os.environ:
                 endpoint = os.environ["H5SERV_ENDPOINT"]
             else:
                 endpoint = "http://127.0.0.1:5000"
-        
+
         self._endpoint = endpoint
 
         if username is None and "H5SERV_USERNAME" in os.environ:
@@ -92,8 +91,8 @@ class HttpConn:
             api_key = None
         self._api_key = api_key
 
-        self._s = None  # Sessions 
-        
+        self._s = None  # Sessions
+
 
     def getHeaders(self, domain=None, username=None, password=None, headers=None):
         if headers is None:
@@ -133,15 +132,15 @@ class HttpConn:
         rsp = None
 
         if not headers:
-            headers = self.getHeaders() 
-         
+            headers = self.getHeaders()
+
         if params is None:
             params = {}
         if "domain" not in params:
-            params["domain"] = self._domain 
+            params["domain"] = self._domain
         if self._api_key:
             params["api_key"] = self._api_key
-         
+
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
 
@@ -149,7 +148,7 @@ class HttpConn:
             if req in self._cache:
                 rsp = self._cache[req]
                 return rsp
-        
+
         self.log.info("GET: {} [{}]".format(self._endpoint + req, params["domain"]))
         if self._username and self._password:
             auth = (self._username, self._password)
@@ -183,30 +182,30 @@ class HttpConn:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
-        if self._cache is not None:   
+        if self._cache is not None:
             # domain deletin, invalidate everything in cache
-            self._cache = {}  
+            self._cache = {}
         if params:
             self.log.info("PUT params: {}".format(params))
         else:
             params = {}
 
         if "domain" not in params:
-            params["domain"] = self._domain 
+            params["domain"] = self._domain
         if self._api_key:
             params["api_key"] = self._api_key
 
         req = self._endpoint + req
-        
+
         # try to do a PUT to the domain
-         
+
         if not headers:
-            headers = self.getHeaders() 
-        
+            headers = self.getHeaders()
+
         if format=="binary":
             headers['Content-Type'] = "application/octet-stream"
             # binary write
-            data = body    
+            data = body
         else:
             data = json.dumps(body)
         self.log.info("PUT: {} format: {} [{} bytes]".format(req, format, len(data)))
@@ -221,7 +220,7 @@ class HttpConn:
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))
             raise IOError("Connection Error")
- 
+
         return rsp
 
     def POST(self, req, body=None, params=None, headers=None):
@@ -229,31 +228,31 @@ class HttpConn:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
-        if self._cache is not None:  
+        if self._cache is not None:
             self._cache = {}
 
         if params is None:
             params = {}
         if "domain" not in params:
-            params["domain"] = self._domain 
+            params["domain"] = self._domain
         if self._api_key:
             params["api_key"] = self._api_key
-            
+
         # try to do a POST to the domain
         req = self._endpoint + req
 
         data = json.dumps(body)
 
         if not headers:
-            headers = self.getHeaders() 
+            headers = self.getHeaders()
 
-        self.log.info("PST: " + req)
+        self.log.info("POST: " + req)
 
         if self._username and self._password:
             auth = (self._username, self._password)
         else:
             auth = None
-        try: 
+        try:
             s = self.session
             rsp = s.post(req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
         except ConnectionError as ce:
@@ -272,7 +271,7 @@ class HttpConn:
         if params is None:
             params = {}
         if "domain" not in params:
-            params["domain"] = self._domain    
+            params["domain"] = self._domain
         if self._api_key:
             params["api_key"] = self._api_key
 
@@ -280,7 +279,7 @@ class HttpConn:
         req = self._endpoint + req
 
         if not headers:
-            headers = self.getHeaders() 
+            headers = self.getHeaders()
 
         self.log.info("DEL: " + req)
         if self._username and self._password:
@@ -294,9 +293,9 @@ class HttpConn:
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))
             raise IOError("Connection Error")
- 
+
         return rsp
-    
+
     @property
     def session(self):
         # create a session object to re-use http connection when possible
@@ -348,7 +347,7 @@ class HttpConn:
         domain_json = self.domain_json
         if "root" not in domain_json:
             raise IOError("Unexpected response")
-        root_uuid = domain_json["root"] 
+        root_uuid = domain_json["root"]
         return root_uuid
 
     @property
@@ -375,7 +374,7 @@ class HttpConn:
         domain_json = self.domain_json
         username = None
         if 'owner' in domain_json:
-            # currently this is only available for HSDS 
+            # currently this is only available for HSDS
             username = domain_json["owner"]
         return username
 
