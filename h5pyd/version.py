@@ -18,16 +18,24 @@ import numpy
 
 version = "0.2.6"
 
+hdf5_version = "REST"
+
 _exp = _sv(version)
 
-version_tuple = _exp.version + ((''.join(str(x) for x in _exp.prerelease),) if _exp.prerelease is not None else ('',))
+version_tuple = (
+    _exp.version +
+    (
+        (''.join(str(x) for x in _exp.prerelease),)
+        if _exp.prerelease is not None else ('',)
+    )
+)
 
-api_version_tuple = (0,2,6)
+api_version_tuple = (0, 2, 6)
 api_version = "0.2.6"
 
 __doc__ = """\
 This is h5pyd **%s**
- 
+
 """ % (version)
 
 info = """\
@@ -39,10 +47,8 @@ Python  %(python)s
 sys.platform    %(platform)s
 sys.maxsize     %(maxsize)s
 numpy   %(numpy)s
-""" % { 'h5pyd': version,
-        'python': sys.version,
-        'platform': sys.platform,
-        'maxsize': sys.maxsize,
-        'numpy': numpy.__version__ }
-
-
+""" % {'h5pyd': version,
+       'python': sys.version,
+       'platform': sys.platform,
+       'maxsize': sys.maxsize,
+       'numpy': numpy.__version__}
