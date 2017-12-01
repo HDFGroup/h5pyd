@@ -165,7 +165,14 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                 out = '' # h5pyd refs are strings
              
             if ref:
-                fin_obj = fin[val]
+                try:
+                    fin_obj = fin[val]
+                except AttributeError as ae:
+                    msg = "Unable able to get obj for ref value: {}".format(ae)
+                    logging.error(msg)
+                    print(msg)
+                    return None
+
                 # TBD - for hsget, the name property is not getting set
                 h5path = fin_obj.name
                 if not h5path:
