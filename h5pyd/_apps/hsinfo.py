@@ -108,29 +108,31 @@ def main():
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
  
-    print("endpoint:", endpoint) 
+    print("endpoint: {}".format(endpoint)) 
+    if endpoint[-1] == '/' or endpoint[:4] != "http":
+        print("WARNING: endpoint: {} doesn't appear to be valid".format(endpoint))
     try:
         info = h5pyd.getServerInfo(username=username, password=password, endpoint=endpoint)
-        print("server name:", info["name"])
+        print("server name:".format(info["name"]))
         if "state" in info:
-            print("server state:", info['state'])
-        print("username:", info["username"])
-        print("password:", info["password"])
+            print("server state: {}".format(info['state']))
+        print("username: {}".format(info["username"]))
+        print("password: {}".format(info["password"]))
     
         if "hsds_version" in info:
-            print("server version:", info["hsds_version"])
+            print("server version: {}".format(info["hsds_version"]))
         elif "h5serv_version" in info:
-            print("server version", info["h5serv_version"])
+            print("server version: {}".format(info["h5serv_version"]))
         if "start_time" in info:
             uptime = getUpTime(info["start_time"])
             print("up: {}".format(uptime))
-        print("h5pyd version:", h5pyd.version.version)
+        print("h5pyd version: {}".format(h5pyd.version.version))
         
     except IOError as ioe:
         if ioe.errno == 401:
-            print("username/password not valid for username:", username)
+            print("username/password not valid for username: {}".format(username))
         else:
-            print("Error:", ioe)
+            print("Error: {}".format(ioe))
 
 if __name__ == "__main__":
     main()
