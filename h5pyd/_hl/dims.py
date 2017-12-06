@@ -372,21 +372,22 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
 
         if name:
             name = str(name).encode('utf-8').decode('ascii')
-            body = {
-                'creationProperties': {
-                    'nameCharEncoding': 'H5T_CSET_ASCII'
-                },
-                'shape': {
-                    'class': 'H5S_SCALAR'
-                },
-                'type': {
-                    'charSet': 'H5T_CSET_ASCII',
-                    'class': 'H5T_STRING',
-                    'length': len(name) + 1,
-                    'strPad': 'H5T_STR_NULLTERM'
-                },
-                'value': name
-            }
-            req = dset.attrs._req_prefix + 'NAME'
-            with phil:
-                dset.PUT(req, body=body)
+
+        body = {
+            'creationProperties': {
+                'nameCharEncoding': 'H5T_CSET_ASCII'
+            },
+            'shape': {
+                'class': 'H5S_SCALAR'
+            },
+            'type': {
+                'charSet': 'H5T_CSET_ASCII',
+                'class': 'H5T_STRING',
+                'length': len(name) + 1,
+                'strPad': 'H5T_STR_NULLTERM'
+            },
+            'value': name
+        }
+        req = dset.attrs._req_prefix + 'NAME'
+        with phil:
+            dset.PUT(req, body=body)
