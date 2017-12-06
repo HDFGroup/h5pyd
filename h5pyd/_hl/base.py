@@ -364,6 +364,24 @@ class HLObject(CommonStateObject):
         except AttributeError:
             # name hasn't been assigned yet
             obj_name = None
+            # query the server for the name
+            req = None
+            if self._id.id.startswith("g-"):
+                req = "/groups/" + self._id.id
+            elif self._id.id.startswith("d-"):
+                req = "/datasets/" + self._id.id
+            elif self._id.id.startswith("t-"):
+                req = "/datatypes/" + self._id
+            if req:
+                params=params = {"getalias": 1}
+                self.log.info("sending get allias request for id: {}".format(self._id.id))
+                obj_json = self.GET(req, params)
+                if "alias" in obj_json:
+                    alias = obj_json["alias"]
+                    if len(alias) > 0:
+                        obj_name = alias[0]
+                        self._name = obj_name
+
 
         return obj_name
         # return self._d(h5i.get_name(self.id))

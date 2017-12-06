@@ -89,10 +89,13 @@ class TestObjRef(TestCase):
             obj = f[a_ref]
             if not config.get("use_h5py"):
                 self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
+            self.assertEqual(obj.name, "/g1/g1.1")
+             
             b_ref = dset[1]
             obj = f[b_ref]
             if not config.get("use_h5py"):
                 self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
+            self.assertEqual(obj.name, "/g2/d1")
 
             # try the same thing using attributes
             ref_values = [g11_ref, d1_ref]
@@ -107,10 +110,12 @@ class TestObjRef(TestCase):
             obj = f[a_ref]
             if not config.get("use_h5py"):
                 self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
+            self.assertEqual(obj.name, "/g1/g1.1")
             b_ref = attr[1]
             obj = f[b_ref]
             if not config.get("use_h5py"):
                 self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
+            self.assertEqual(obj.name, "/g2/d1")
 
     
 
