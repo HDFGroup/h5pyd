@@ -38,6 +38,7 @@ class TestDimensionScale(TestCase):
         f.create_dataset('scale_y', data=np.arange(10) * 10e3)
         f.create_dataset('scale_z', data=np.arange(10) * 10e3)
         f.create_dataset('not_scale', data=np.arange(10) * 10e3)
+        f.create_dataset('scale_name', data=np.arange(10) * 10e3)
 
         self.assertIsInstance(dset.dims, h5py._hl.dims.DimensionManager)
         self.assertEqual(len(dset.dims), len(dset.shape))
@@ -115,6 +116,12 @@ class TestDimensionScale(TestCase):
 
         with self.assertRaises(KeyError):
             dset.dims[0]['foobar']
+
+        # Test dimension scale names
+        with self.assertRaises(UnicodeError):
+            dset.dims.create_scale(f['scale_name'], '√')
+        with self.assertRaises(AttributeError):
+            dset.dims.create_scale(f['scale_name'], 67)
 
         f.close()
 

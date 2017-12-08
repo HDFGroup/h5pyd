@@ -11,6 +11,7 @@
 ##############################################################################
 
 from __future__ import absolute_import
+import six
 from . import base
 from .base import phil, with_phil
 from .dataset import Dataset
@@ -350,8 +351,8 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
         except KeyError:
             pass
 
-        # Create the CLASS attribute with the value 'DIMENSION_SCALE'
-        body = {
+        # CLASS attribute with the value 'DIMENSION_SCALE'
+        class_attr = {
             'creationProperties': {
                 'nameCharEncoding': 'H5T_CSET_ASCII'
             },
@@ -366,14 +367,14 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
             },
             'value': 'DIMENSION_SCALE'
         }
-        req = dset.attrs._req_prefix + 'CLASS'
-        with phil:
-            dset.PUT(req, body=body)
 
-        if name:
-            name = str(name).encode('utf-8').decode('ascii')
+        # NAME attribute with dimension scale's name
+        if isinstance(name, six.binary_type):
+            name = name.decode('ascii')
+        else:
+            name = name.encode('utf-8').decode('ascii')
 
-        body = {
+        name_attr = {
             'creationProperties': {
                 'nameCharEncoding': 'H5T_CSET_ASCII'
             },
@@ -388,6 +389,11 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
             },
             'value': name
         }
-        req = dset.attrs._req_prefix + 'NAME'
+        req_class = dset.attrs._req_prefix + 'CLASS'
+        req_name = dset.attrs._req_prefix + 'NAME'
         with phil:
-            dset.PUT(req, body=body)
+            dset.PUT(req_class, body=class_attr)
+            try:
+                dset.PUT(req_name, body=name_attr)
+            except Exception:
+                dset.DELETE(req_class)
