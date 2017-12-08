@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 ##############################################################################
 # Copyright by The HDF Group.                                                #
 # All rights reserved.                                                       #
