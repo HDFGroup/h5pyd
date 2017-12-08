@@ -113,7 +113,6 @@ def main():
         print("WARNING: endpoint: {} doesn't appear to be valid".format(endpoint))
     try:
         info = h5pyd.getServerInfo(username=username, password=password, endpoint=endpoint)
-        print(info)
         print("server name: {}".format(info["name"]))
         if "state" in info:
             print("server state: {}".format(info['state']))
