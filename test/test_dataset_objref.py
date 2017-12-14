@@ -31,14 +31,9 @@ class TestObjRef(TestCase):
         self.assertTrue('/' in f)
         r = f['/']
         is_h5serv = False
-        if six.PY3:
-            if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-                is_h5serv = True  # h5serv doesn't have support for objref datasets yet
-        else:
-            if isinstance(f.id.id, unicode) and not f.id.id.startswith(u"g-"):
-                is_h5serv = True
+        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+            is_h5serv = True  # h5serv doesn't have support for objref datasets yet
 
-        
         # create subgroup g1
         r.create_group('g1')
         self.assertTrue('g1' in r)
