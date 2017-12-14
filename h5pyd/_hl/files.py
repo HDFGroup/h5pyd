@@ -137,7 +137,7 @@ class File(Group):
                         endpoint = protocol + domain[:n]
                         domain = domain[n:]
                      
-            if not domain or domain[0] != '/':
+            if domain.find('/') > 0:  
                 raise IOError(400, "relative paths or not valid")
                 
             if endpoint is None:
