@@ -115,7 +115,31 @@ class File(Group):
                 mode = 'a'
 
             cfg = Config() # pulls in state from a .hscfg file (if found).
-            
+
+            # accept domain values in the form:
+            #   http://server:port/home/user/myfile.h5
+            #    or
+            #   https://server:port/home/user/myfile.h5
+            #    or 
+            #   hdf5://home/user/myfile.h5
+            #    or just
+            #   /home/user/myfile.h5
+            #  
+            #  For http prefixed values, extract the endpont and use the rest as domain path
+            for protocol in ("http://", "http://", "hdf5://"):
+                if domain.startswith(protocol):
+                    domain = domain[len(protocol):]
+                    if protocol.startswith("http"):
+                        # extract the endpoint
+                        n = domain.find('/')
+                        if n < 0:
+                            raise IOError(400, "invalid url format")
+                        endpoint = protocol + domain[:n]
+                        domain = domain[n:]
+                     
+            if not domain or domain[0] != '/':
+                raise IOError(400, "relative paths or not valid")
+                
             if endpoint is None:
                 if "H5SERV_ENDPOINT" in os.environ:
                     endpoint = os.environ["H5SERV_ENDPOINT"]

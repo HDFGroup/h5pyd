@@ -130,6 +130,17 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
+        # re-open using hdf5:// prefix
+        f = h5py.File("hdf5://" + filename, 'r')
+        self.assertEqual(f.filename, filename)
+        self.assertEqual(f.name, "/")
+        self.assertTrue(f.id.id is not None)
+        self.assertEqual(len(f.keys()), 1)
+        self.assertEqual(f.mode, 'r')
+        self.assertTrue('/' in f)
+        f.close()
+
+
         # open in truncate mode
         f = h5py.File(filename, 'w')
         self.assertEqual(f.filename, filename)
@@ -187,7 +198,6 @@ class TestFile(TestCase):
             self.assertEqual(len(file_acls), 2)  # HSDS setup creates two initial acls - "default" and test_user1
         else:
             self.assertEqual(len(file_acls), 0)
-        print(file_acls)
         
         if is_hsds:
             username = f.owner
