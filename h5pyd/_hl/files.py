@@ -85,7 +85,7 @@ class File(Group):
         """Username of the owner of the domain"""
         return self.id.http_conn.owner
 
-    def __init__(self, domain, mode=None, endpoint=None, username=None, password=None, 
+    def __init__(self, domain, mode=None, endpoint=None, username=None, password=None,
         api_key=None, use_session=True, use_cache=False, logger=None, **kwds):
         """Create a new file object.
 
@@ -99,14 +99,14 @@ class File(Group):
             Server endpoint.   Defaults to "http://localhost:5000"
         """
 
-        
+
         groupid = None
         # if we're passed a GroupId as domain, jsut initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
         if mode is None and endpoint is None and username is None \
             and password is None and isinstance(domain, GroupID):
             groupid = domain
-        else:       
+        else:
             if mode and mode not in ('r', 'r+', 'w', 'w-', 'x', 'a'):
                 raise ValueError(
                     "Invalid mode; must be one of r, r+, w, w-, x, a")
@@ -120,13 +120,13 @@ class File(Group):
             #   http://server:port/home/user/myfile.h5
             #    or
             #   https://server:port/home/user/myfile.h5
-            #    or 
+            #    or
             #   hdf5://home/user/myfile.h5
             #    or just
             #   /home/user/myfile.h5
-            #  
+            #
             #  For http prefixed values, extract the endpont and use the rest as domain path
-            for protocol in ("http://", "http://", "hdf5://"):
+            for protocol in ("http://", "https://", "hdf5://"):
                 if domain.startswith(protocol):
                     domain = domain[len(protocol):]
                     if protocol.startswith("http"):
@@ -136,10 +136,10 @@ class File(Group):
                             raise IOError(400, "invalid url format")
                         endpoint = protocol + domain[:n]
                         domain = domain[n:]
-                     
-            if domain.find('/') > 0:  
+
+            if domain.find('/') > 0:
                 raise IOError(400, "relative paths or not valid")
-                
+
             if endpoint is None:
                 if "H5SERV_ENDPOINT" in os.environ:
                     endpoint = os.environ["H5SERV_ENDPOINT"]
@@ -153,7 +153,7 @@ class File(Group):
                     username = os.environ["H5SERV_USERNAME"]
                 elif "hs_username" in cfg:
                     username = cfg["hs_username"]
-                
+
             if password is None:
                 if "H5SERV_PASSWORD" in os.environ:
                     password = os.environ["H5SERV_PASSWORD"]
@@ -166,33 +166,33 @@ class File(Group):
                 elif "hs_api_key" in cfg:
                     api_key = cfg["hs_api_key"]
 
-            http_conn =  HttpConn(domain, endpoint=endpoint, 
-                    username=username, password=password, mode=mode, 
+            http_conn =  HttpConn(domain, endpoint=endpoint,
+                    username=username, password=password, mode=mode,
                     api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger)
-        
+
             root_json = None
 
             # try to do a GET from the domain
-            req = "/"      
-                        
-            rsp = http_conn.GET(req)  
+            req = "/"
+
+            rsp = http_conn.GET(req)
 
             if rsp.status_code == 200:
                 root_json = json.loads(rsp.text)
             if rsp.status_code != 200 and mode in ('r', 'r+'):
                 # file must exist
-                http_conn.close() 
+                http_conn.close()
                 raise IOError(rsp.status_code, rsp.reason)
             if rsp.status_code == 200 and mode in ('w-', 'x'):
                 # Fail if exists
-                http_conn.close() 
+                http_conn.close()
                 raise IOError(409, "domain already exists")
             if rsp.status_code == 200 and mode == 'w':
                 # delete existing domain
                 rsp = http_conn.DELETE(req)
                 if rsp.status_code != 200:
                     # failed to delete
-                    http_conn.close() 
+                    http_conn.close()
                     raise IOError(rsp.status_code, rsp.reason)
                 root_json = None
             if root_json and 'root' not in root_json:
@@ -201,17 +201,17 @@ class File(Group):
             if root_json is None:
                 # create the domain
                 if mode not in ('w', 'a', 'x'):
-                    http_conn.close() 
+                    http_conn.close()
                     raise IOError(404, "File not found")
-                rsp = http_conn.PUT(req)  
+                rsp = http_conn.PUT(req)
                 if rsp.status_code != 201:
-                    http_conn.close() 
+                    http_conn.close()
                     raise IOError(rsp.status_code, rsp.reason)
-                 
+
                 root_json = json.loads(rsp.text)
-            
+
             if 'root' not in root_json:
-                http_conn.close() 
+                http_conn.close()
                 raise IOError(404, "Unexpected error")
             root_uuid = root_json['root']
 
@@ -222,12 +222,12 @@ class File(Group):
                     if not username:
                         continue
                     req = "/acls/" + name
-                    rsp = http_conn.GET(req)  
+                    rsp = http_conn.GET(req)
                     if rsp.status_code == 200:
                         rspJson = json.loads(rsp.text)
                         domain_acl = rspJson["acl"]
                         if not domain_acl["update"]:
-                            http_conn.close() 
+                            http_conn.close()
                             raise IOError(403, "Forbidden")
                         else:
                             break  # don't check with "default" user in this case
@@ -241,7 +241,7 @@ class File(Group):
             rsp = http_conn.GET(req)
 
             if rsp.status_code != 200:
-                http_conn.close() 
+                http_conn.close()
                 raise IOError(rsp.status_code, "Unexpected Error")
             group_json = json.loads(rsp.text)
 
@@ -251,7 +251,7 @@ class File(Group):
         self._id = groupid
         self._verboseInfo = None  # aditional state we'll get when requested
         self._verboseUpdated = None # when the verbose data was fetched
-        
+
 
         Group.__init__(self, self._id)
 
@@ -320,7 +320,7 @@ class File(Group):
     def getACLs(self):
         req = '/acls'
         rsp_json = self.GET(req)
-        acls_json = rsp_json["acls"] 
+        acls_json = rsp_json["acls"]
         return acls_json
 
     def putACL(self, acl):
@@ -331,7 +331,7 @@ class File(Group):
             if k not in acl:
                 raise IOError(404, "Missing ACL field: {}".format(k))
             perm[k] = acl[k]
-         
+
         req = '/acls/' + acl['userName']
         self.PUT(req, body=perm)
 
@@ -340,7 +340,7 @@ class File(Group):
         """
         # this will close the socket of the http_conn singleton
         if self._id._http_conn:
-            self._id._http_conn.close()   
+            self._id._http_conn.close()
         self._id.close()
 
     def flush(self):
