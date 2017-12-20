@@ -6,6 +6,9 @@ python:
 - '3.4'
 - '3.5'
 - '3.6'
+env:
+- HS_ENDPOINT=http://127.0.0.1:5000 H5PYD_TEST_FOLDER=h5pyd_test.hdfgroup.org
+- HS_ENDPOINT=http://52.4.181.237:5104 H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test
 install:
 - sudo apt-get update -qq
 - sudo apt-get install -qq libhdf5-serial-dev
@@ -31,12 +34,4 @@ script:
 - cd ..
 - python setup.py install
 - python testall.py
-- echo "Testing with HSDS"
-- export HS_ENDPOINT=http://52.4.181.237:5104
-- export HS_USERNAME=test_user1
-- export TEST2_USERNAME=test_user2
-- echo "HS_ENDPOINT ${HS_ENDPOINT}"
-- echo "HS_PASSWORD ${HS_PASSWORD}"
-- python testall.py
-dd:
-  secure: kybaPfHlvpRJcBKmES41fp0K1Wpf+Fgxf1v6B/42xzwmzohj4cT6LpLmtVEMblSNb++lPvUBt2rB5uyBSWzMPmoqJ5h5Jtk0B24ai6qFvzxeb9LcyxPvJicEWkw9BR37pzOfQbwsYtpFjcbolanLrSYm98uCR7xg4mYzEJs6Qswf8gErhkxVlfBmx4tXZE/kPG9HszNs/nOtMXpgpusFRAL/gRXQ8tdOBf6CIGPUHdj2LvHL5DBUVC0ob6QFEPxCyZhklmHDU5V6Ncundtpg9IMC2p6Komwp+V+p5Kz0hKIunYWVO4Xcj6AJAlZpGRGDj+aPOC89qRAWsbJTLqpqT4ikmMEaNt4/IN1U7E0gwNjybiJV/lvRUdskqw75bplPi2E7prHf/suFcnAJgYVISWriooxwRUhBB8uxIpF9dAOYsE0cu69P4RnsRlbis63JNSP5aXNnDyLdUfVuY85J8uQ5xk7VvwFEB/wWYfsnRF6ePu+hjfxoj+K/EcRr+uFfqX1wwRpAhGt3H8U5A2tm8X3SDti12j6fs61CQ9U4a+v+71IfXsUtG4+xKk72RftEUEYGB3szhWGVpJQYvaeQH9Ut9d3ZCDjyGZt1fO1LHf+EEXHHvoDeXr+Y2I1xuWV0o31hnwe3o+Az4jE0++gcZZUm3KBBoGZd7VaPPwMxtLw=
+ 
