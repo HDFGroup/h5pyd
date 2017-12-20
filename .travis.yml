@@ -1,38 +1,40 @@
 language: python
-
 notifications:
   email: false
-
 python:
-  - "2.7"
-  - "3.4"
-  - "3.5"
-  - "3.6"
-
+- '2.7'
+- '3.4'
+- '3.5'
+- '3.6'
 install:
-    - sudo apt-get update -qq
-    - sudo apt-get install -qq libhdf5-serial-dev
-    - pip uninstall numpy -y 
-    - pip install numpy>=1.10.4
-    - pip install requests
-    - pip install pytz
-    - pip install tornado
-    - pip install watchdog
-    - git clone https://github.com/HDFGroup/hdf5-json.git
-    - cd hdf5-json
-    - python setup.py install
-    - cd .. 
-    - git clone https://github.com/HDFGroup/h5serv.git
-
-
+- sudo apt-get update -qq
+- sudo apt-get install -qq libhdf5-serial-dev
+- pip uninstall numpy -y
+- pip install numpy>=1.10.4
+- pip install requests
+- pip install pytz
+- pip install tornado
+- pip install watchdog
+- git clone https://github.com/HDFGroup/hdf5-json.git
+- cd hdf5-json
+- python setup.py install
+- cd ..
+- git clone https://github.com/HDFGroup/h5serv.git
 script:
-    - cd h5serv/util/admin
-    - python makepwd_file.py
-    - python update_pwd.py -a -u test_user1 -p test
-    - python update_pwd.py -a -u test_user2 -p test
-    - cd ../..
-    - python server/app.py >app.out &
-    - sleep 5
-    - cd ..
-    - python setup.py install
-    - python testall.py
+- cd h5serv/util/admin
+- python makepwd_file.py
+- python update_pwd.py -a -u test_user1 -p test
+- python update_pwd.py -a -u test_user2 -p test
+- cd ../..
+- python server/app.py >app.out &
+- sleep 5
+- cd ..
+- python setup.py install
+- python testall.py
+- echo "Testing with HSDS"
+- export HS_ENDPOINT=http://52.4.181.237:5104
+- export HS_USERNAME=test_user1
+- export TEST2_USERNAME=test_user2
+- python testall.py
+dd:
+  secure: kybaPfHlvpRJcBKmES41fp0K1Wpf+Fgxf1v6B/42xzwmzohj4cT6LpLmtVEMblSNb++lPvUBt2rB5uyBSWzMPmoqJ5h5Jtk0B24ai6qFvzxeb9LcyxPvJicEWkw9BR37pzOfQbwsYtpFjcbolanLrSYm98uCR7xg4mYzEJs6Qswf8gErhkxVlfBmx4tXZE/kPG9HszNs/nOtMXpgpusFRAL/gRXQ8tdOBf6CIGPUHdj2LvHL5DBUVC0ob6QFEPxCyZhklmHDU5V6Ncundtpg9IMC2p6Komwp+V+p5Kz0hKIunYWVO4Xcj6AJAlZpGRGDj+aPOC89qRAWsbJTLqpqT4ikmMEaNt4/IN1U7E0gwNjybiJV/lvRUdskqw75bplPi2E7prHf/suFcnAJgYVISWriooxwRUhBB8uxIpF9dAOYsE0cu69P4RnsRlbis63JNSP5aXNnDyLdUfVuY85J8uQ5xk7VvwFEB/wWYfsnRF6ePu+hjfxoj+K/EcRr+uFfqX1wwRpAhGt3H8U5A2tm8X3SDti12j6fs61CQ9U4a+v+71IfXsUtG4+xKk72RftEUEYGB3szhWGVpJQYvaeQH9Ut9d3ZCDjyGZt1fO1LHf+EEXHHvoDeXr+Y2I1xuWV0o31hnwe3o+Az4jE0++gcZZUm3KBBoGZd7VaPPwMxtLw=
