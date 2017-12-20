@@ -7,8 +7,8 @@ python:
 - '3.5'
 - '3.6'
 env:
-- HS_ENDPOINT=http://127.0.0.1:5000 USE_H5SERV=true H5PYD_TEST_FOLDER=h5pyd_test.hdfgroup.org 
-- HS_ENDPOINT=http://52.4.181.237:5104 USE_H5SERV=false H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test/${TRAVIS_PYTHON_VERSION}
+- USE_H5SERV=true 
+- USE_H5SERV=false 
 install:
 - sudo apt-get update -qq
 - sudo apt-get install -qq libhdf5-serial-dev
@@ -26,7 +26,9 @@ install:
      git clone https://github.com/HDFGroup/h5serv.git ;
    fi'
 script:
+- echo use_h5serv ${USE_H5SERV}
 - 'if [ "${USE_H5SERV}" == "true" ]; then
+    echo "setting up h5serv"
     cd h5serv/util/admin ;
     python makepwd_file.py ;
     python update_pwd.py -a -u test_user1 -p test ;
@@ -35,6 +37,11 @@ script:
     python server/app.py >app.out & 
     sleep 5 ;
     cd .. ;
+    export HS_ENDPOINT=http://127.0.0.1:5000 ;
+    export H5PYD_TEST_FOLDER=h5pyd_test.hdfgroup.org ;
+  else
+    export HS_ENDPOINT=http://52.4.181.237:5104 ;
+    export H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test/${TRAVIS_PYTHON_VERSION} ;
   fi'
 - python setup.py install
 - echo endpoint ${HS_ENDPOINT}
