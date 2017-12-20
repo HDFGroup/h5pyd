@@ -34,5 +34,8 @@ script:
 - cd ..
 - python setup.py install
 - echo endpoint ${HS_ENDPOINT}
+- curl ${HS_ENDPOINT}/about
+- echo user ${HS_USERNAME}
+- echo password ${HS_PASSWORD}
 - python testall.py
  
