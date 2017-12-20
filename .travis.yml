@@ -32,7 +32,7 @@ script:
     python update_pwd.py -a -u test_user1 -p test ;
     python update_pwd.py -a -u test_user2 -p test ;
     cd ../.. ;
-    python server/app.py >app.out & ;
+    python server/app.py >app.out & 
     sleep 5 ;
     cd .. ;
   fi'
