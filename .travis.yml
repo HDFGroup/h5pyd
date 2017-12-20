@@ -33,5 +33,6 @@ script:
 - sleep 5
 - cd ..
 - python setup.py install
+- echo "endpoint: ${HS_ENDPOINT}"
 - python testall.py
  
