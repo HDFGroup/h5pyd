@@ -7,8 +7,8 @@ python:
 - '3.5'
 - '3.6'
 env:
-- HS_ENDPOINT=http://127.0.0.1:5000 H5PYD_TEST_FOLDER=h5pyd_test.hdfgroup.org
-- HS_ENDPOINT=http://52.4.181.237:5104 H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test
+- HS_ENDPOINT=http://127.0.0.1:5000 USE_H5SERV=true H5PYD_TEST_FOLDER=h5pyd_test.hdfgroup.org 
+- HS_ENDPOINT=http://52.4.181.237:5104 USE_H5SERV=false H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test/${TRAVIS_PYTHON_VERSION}/
 install:
 - sudo apt-get update -qq
 - sudo apt-get install -qq libhdf5-serial-dev
@@ -16,24 +16,29 @@ install:
 - pip install numpy>=1.10.4
 - pip install requests
 - pip install pytz
-- pip install tornado
-- pip install watchdog
-- git clone https://github.com/HDFGroup/hdf5-json.git
-- cd hdf5-json
-- python setup.py install
-- cd ..
-- git clone https://github.com/HDFGroup/h5serv.git
+- 'if [ ${USE_H5SERV} = "true" ]; then
+     pip install tornado ;
+     pip install watchdog ;
+     git clone https://github.com/HDFGroup/hdf5-json.git ;
+     cd hdf5-json ;
+     python setup.py install ;
+     cd .. ;
+     git clone https://github.com/HDFGroup/h5serv.git ;
+   fi'
 script:
-- cd h5serv/util/admin
-- python makepwd_file.py
-- python update_pwd.py -a -u test_user1 -p test
-- python update_pwd.py -a -u test_user2 -p test
-- cd ../..
-- python server/app.py >app.out &
-- sleep 5
-- cd ..
+- 'if [ ${USE_H5SERV} = "true" ]; then
+    cd h5serv/util/admin ;
+    python makepwd_file.py ;
+    python update_pwd.py -a -u test_user1 -p test ;
+    python update_pwd.py -a -u test_user2 -p test ;
+    cd ../.. ;
+    python server/app.py >app.out & ;
+    sleep 5 ;
+    cd .. ;
+  fi'
 - python setup.py install
 - echo endpoint ${HS_ENDPOINT}
+- echo python_version ${TRAVIS_PYTHON_VERSION}
 - curl ${HS_ENDPOINT}/about
 - echo user ${HS_USERNAME}
 - echo password ${HS_PASSWORD}
