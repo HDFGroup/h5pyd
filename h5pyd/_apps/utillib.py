@@ -56,20 +56,28 @@ def is_h5py(obj):
         return False
 
 def is_reference(val):
-    if isinstance(val, object) and val.__class__.__name__ == "Reference":
-        return True 
-    elif isinstance(val, type) and val.__name__ == "Reference":
-        return True
-    else:
-        return False
+    try:
+        if isinstance(val, object) and val.__class__.__name__ == "Reference":
+            return True 
+        elif isinstance(val, type) and val.__name__ == "Reference":
+            return True
+    except AttributeError as ae:
+        msg = "is_reference for {} error: {}".format(val, ae)
+        logging.error(msg)
+     
+    return False
 
 def is_regionreference(val):
-    if isinstance(val, object) and val.__class__.__name__ == "RegionReference":
-        return True 
-    elif isinstance(val, type) and val.__name__ == "RegionReference":
-        return True
-    else:
-        return False
+    try:
+        if isinstance(val, object) and val.__class__.__name__ == "RegionReference":
+            return True 
+        elif isinstance(val, type) and val.__name__ == "RegionReference":
+            return True
+    except AttributeError as ae:
+        msg = "is_reference for {} error: {}".format(val, ae)
+        logging.error(msg)
+     
+    return False
 
 def has_reference(dtype):
     has_ref = False
