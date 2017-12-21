@@ -10,7 +10,7 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 from __future__ import absolute_import
-
+import logging
 import numpy as np
 import config
 
@@ -276,7 +276,7 @@ class TestScalarArray(TestCase):
         self.dset = self.f.create_dataset('x', (), dtype=self.dt)
         try:
             self.dset[...] = self.data
-        except OSError as oe:
+        except (IOError, OSError) as oe:
             #TBD" this is failing on HSDS
             if not self.is_hsds:
                 raise oe
@@ -526,4 +526,6 @@ class Test3DFloat(TestCase):
 
 
 if __name__ == '__main__':
+    loglevel = logging.DEBUG
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()
