@@ -66,21 +66,29 @@ class HttpConn:
         else:
             self.log = logging.getLogger(logger)
         if endpoint is None:
-            if "H5SERV_ENDPOINT" in os.environ:
+            if "HS_ENDPOINT" in os.environ:
+                endpoint = os.environ["HS_ENDPOINT"]
+            elif "H5SERV_ENDPOINT" in os.environ:
                 endpoint = os.environ["H5SERV_ENDPOINT"]
             else:
                 endpoint = "http://127.0.0.1:5000"
 
         self._endpoint = endpoint
 
-        if username is None and "H5SERV_USERNAME" in os.environ:
-            username = os.environ["H5SERV_USERNAME"]
+        if username is None:
+            if "HS_USERNAME" in os.environ:
+                username = os.environ["HS_USERNAME"]
+            elif "H5SERV_USERNAME" in os.environ:
+                username = os.environ["H5SERV_USERNAME"]
         if isinstance(username, str) and (not username or username.upper() == "NONE"):
             username = None
         self._username = username
 
-        if password is None and "H5SERV_PASSWORD" in os.environ:
-            password = os.environ["H5SERV_PASSWORD"]
+        if password is None:
+            if "HS_PASSWORD" in os.environ:
+                password = os.environ["HS_PASSWORD"]
+            elif "H5SERV_PASSWORD" in os.environ:
+                password = os.environ["H5SERV_PASSWORD"]
         if isinstance(password, str) and (not password or password.upper() == "NONE"):
             password = None
         self._password = password

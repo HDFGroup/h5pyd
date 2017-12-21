@@ -36,10 +36,13 @@ class TestFolders(TestCase):
         # on first run, this may take a minute before it is visible as a folder item
         f = h5py.File(filepath, mode='a')  
         self.assertTrue(f.id.id is not None)
+        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+            # HSDS currently supports folders, but h5serv does not
+            f.close()
+            return
         f.close()
 
         folder_name = op.dirname(filepath)  + '/'  
-        print("folder_name:", folder_name)
          
         dir = h5py.Folder(folder_name)  # get folder object
          
@@ -68,7 +71,7 @@ class TestFolders(TestCase):
         
         i = 0
         for name in dir:
-            if name == "folder_test":
+            if name == op.basename(test_domain):   
                 self.assertFalse(test_domain_found)
                 test_domain_found = True
             item = dir[name]
@@ -97,6 +100,19 @@ class TestFolders(TestCase):
          
 
     def test_create_folder(self):
+        empty = self.getFileName("empty")  
+        empty_path = self.getPathFromDomain(empty)
+
+        print("empty_path", empty_path)
+
+        f = h5py.File(empty_path, mode='a')  
+        self.assertTrue(f.id.id is not None)
+        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+            # HSDS currently supports folders, but h5serv does not
+            f.close()
+            return
+        f.close()
+
         folder_test = self.getFileName("create_folder_test")  
         folder_path = self.getPathFromDomain(folder_test) + '/'
 
@@ -114,9 +130,18 @@ class TestFolders(TestCase):
 
         
         filepath = self.getPathFromDomain(test_domain)
+        print(filepath)
+        f = h5py.File(filepath, mode='a')  
+        self.assertTrue(f.id.id is not None)
+        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+            # HSDS currently supports folders, but h5serv does not
+            f.close()
+            return
+        f.close()
+
         path_components = filepath.split('/')
         top_level_domain = path_components[1]
-
+        
         dir = h5py.Folder('/')  # get folder object for root
         found = False
         self.assertTrue(len(dir) > 0)

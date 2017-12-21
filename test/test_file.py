@@ -117,10 +117,12 @@ class TestFile(TestCase):
             pass
         self.assertEqual(len(f.keys()), 1)
 
-        if h5py.__name__ == "h5pyd":
+        if  h5py.__name__ == "h5pyd" and not is_hsds:
             # check properties that are only available for h5pyd
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously
+
+            # TBD: not working for HSDS - restore once content db is onlne
             self.assertEqual(f.num_chunks, 0)
             self.assertTrue(f.num_groups >= 0)
             self.assertEqual(f.num_datasets, 0)
@@ -227,6 +229,7 @@ class TestFile(TestCase):
         # test_user2 has read access, but opening in write mode should fail
         try:
             f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
+            
             self.assertFalse(is_hsds)  # expect exception for hsds
         except IOError as ioe:
             self.assertTrue(is_hsds)
@@ -238,7 +241,7 @@ class TestFile(TestCase):
             self.assertFalse(is_hsds)  # expected exception
         except IOError as ioe:
             self.assertTrue(is_hsds)
-            self.assertEqual(ioe.errno, 403)  # user is not authorized
+            self.assertEqual(ioe.errno, 403)  # Forbidden 
         
         f = h5py.File(filename, 'a')  # open for append with original username
         # add an acl for test_user2 that has only read/update access

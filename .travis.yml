@@ -28,7 +28,7 @@ install:
 script:
 - echo use_h5serv ${USE_H5SERV}
 - 'if [ "${USE_H5SERV}" == "true" ]; then
-    echo "setting up h5serv"
+    echo "setting up h5serv" ;
     cd h5serv/util/admin ;
     python makepwd_file.py ;
     python update_pwd.py -a -u test_user1 -p test ;

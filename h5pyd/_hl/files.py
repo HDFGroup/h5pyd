@@ -145,8 +145,6 @@ class File(Group):
                     endpoint = os.environ["H5SERV_ENDPOINT"]
                 elif "hs_endpoint" in cfg:
                     endpoint = cfg["hs_endpoint"]
-                else:
-                    endpoint = "http://127.0.0.1:5000"
 
             if username is None:
                 if "H5SERV_USERNAME" in os.environ:

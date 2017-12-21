@@ -30,6 +30,7 @@ tests = ('test_attribute',
          'test_group',
          'test_vlentype',
          'test_dimscale',
+         'test_folder',
          # 'test_visit')
          )
 
