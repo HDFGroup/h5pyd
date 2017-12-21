@@ -44,7 +44,7 @@ script:
   else
     export HS_ENDPOINT=http://52.4.181.237:5104 ;
     export H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test/${TRAVIS_PYTHON_VERSION} ;
-    curl ${HS_ENDPOINT}/about
+    curl ${HS_ENDPOINT}/about ;
   fi'
 - python setup.py install
 - echo endpoint ${HS_ENDPOINT}
