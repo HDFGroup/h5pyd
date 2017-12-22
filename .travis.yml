@@ -7,16 +7,17 @@ python:
 - '3.5'
 - '3.6'
 env:
-- USE_H5SERV=true 
-- USE_H5SERV=false 
+- H5_DRIVER=h5serv
+- H5_DRIVER=hsds
+- H5_DRIVER=h5py 
 install:
 - sudo apt-get update -qq
-- sudo apt-get install -qq libhdf5-serial-dev
 - pip uninstall numpy -y
 - pip install numpy>=1.10.4
 - pip install requests
 - pip install pytz
-- 'if [ "${USE_H5SERV}" = "true" ]; then
+- pip install h5py
+- 'if [ "${H5_DRIVER}" == "h5serv" ]; then
      pip install tornado ;
      pip install watchdog ;
      git clone https://github.com/HDFGroup/hdf5-json.git ;
@@ -27,7 +28,7 @@ install:
    fi'
 script:
 - echo use_h5serv ${USE_H5SERV}
-- 'if [ "${USE_H5SERV}" == "true" ]; then
+- 'if [ "${H5_DRIVER}" == "h5serv" ]; then
     echo "setting up h5serv" ;
     cd h5serv/util/admin ;
     python makepwd_file.py ;
@@ -41,10 +42,12 @@ script:
     export H5PYD_TEST_FOLDER=h5pyd_test.hdfgroup.org ;
     export HS_PASSWORD=test ;
     export TEST2_PASSWORD=test ;
-  else
+  elif [ "${H5_DRIVER}" == "hsds" ]; then
     export HS_ENDPOINT=http://52.4.181.237:5104 ;
     export H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test/${TRAVIS_PYTHON_VERSION} ;
     curl ${HS_ENDPOINT}/about ;
+  else
+    export USE_H5PY=1
   fi'
 - python setup.py install
 - echo endpoint ${HS_ENDPOINT}

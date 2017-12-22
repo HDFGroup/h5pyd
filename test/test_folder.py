@@ -35,6 +35,11 @@ class TestFolders(TestCase):
         # create test file if not present.
         # on first run, this may take a minute before it is visible as a folder item
         f = h5py.File(filepath, mode='a')  
+        if config.get("use_h5py"):
+            # Folders not supported for h5py
+            f.close()
+            return
+        
         self.assertTrue(f.id.id is not None)
         if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             # HSDS currently supports folders, but h5serv does not
@@ -107,6 +112,11 @@ class TestFolders(TestCase):
 
         f = h5py.File(empty_path, mode='a')  
         self.assertTrue(f.id.id is not None)
+        if config.get("use_h5py"):
+            # Folders not supported for h5py
+            f.close()
+            return
+
         if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             # HSDS currently supports folders, but h5serv does not
             f.close()
@@ -133,6 +143,10 @@ class TestFolders(TestCase):
         print(filepath)
         f = h5py.File(filepath, mode='a')  
         self.assertTrue(f.id.id is not None)
+        if config.get("use_h5py"):
+            # Folders not supported for h5py
+            f.close()
+            return
         if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             # HSDS currently supports folders, but h5serv does not
             f.close()

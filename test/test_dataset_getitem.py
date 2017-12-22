@@ -247,15 +247,15 @@ class TestScalarCompound(TestCase):
         with self.assertRaises(ValueError):
             self.dset[mask]
 
-    # FIXME: NumPy returns a scalar ndarray
-    @ut.expectedFailure
+    # failed with earlier h5py versions
     def test_fieldnames(self):
         """ field name -> bare value """
         
         #TBD: fix when field access is supported in h5serv/hsds
-        out = self.dset['a']
-        self.assertIsInstance(out, np.float32)
-        self.assertEqual(out, self.dset['a'])
+        if config.get("use_h5py"):
+            out = self.dset['a']
+            self.assertIsInstance(out, np.float32)
+            self.assertEqual(out, self.dset['a'])
          
 
 
@@ -446,7 +446,9 @@ class Test1DFloat(TestCase):
     #@ut.expectedFailure
     # Fails for h5py, but works for h5pyd
     def test_indexlist_empty(self):
-        self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
+        if not config.get('use_h5py'):
+            self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
+         
 
     # FIXME: NumPy has IndexError
     def test_indexlist_outofrange(self):
@@ -519,10 +521,6 @@ class Test3DFloat(TestCase):
 
     def test_index_simple(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[1,2:4,3:6])
-
-     
- 
-
 
 
 if __name__ == '__main__':

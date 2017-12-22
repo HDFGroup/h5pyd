@@ -24,7 +24,7 @@ from datetime import datetime
 from copy import copy
 import six
 import time
-
+import logging
 
 class TestFile(TestCase):
 
@@ -133,14 +133,15 @@ class TestFile(TestCase):
         self.assertEqual(f.id.id, 0)
 
         # re-open using hdf5:// prefix
-        f = h5py.File("hdf5://" + filename, 'r')
-        self.assertEqual(f.filename, filename)
-        self.assertEqual(f.name, "/")
-        self.assertTrue(f.id.id is not None)
-        self.assertEqual(len(f.keys()), 1)
-        self.assertEqual(f.mode, 'r')
-        self.assertTrue('/' in f)
-        f.close()
+        if not config.get("use_h5py"):
+            f = h5py.File("hdf5://" + filename, 'r')
+            self.assertEqual(f.filename, filename)
+            self.assertEqual(f.name, "/")
+            self.assertTrue(f.id.id is not None)
+            self.assertEqual(len(f.keys()), 1)
+            self.assertEqual(f.mode, 'r')
+            self.assertTrue('/' in f)
+            f.close()
 
 
         # open in truncate mode
@@ -283,4 +284,6 @@ class TestFile(TestCase):
            
               
 if __name__ == '__main__':
+    loglevel = logging.DEBUG
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

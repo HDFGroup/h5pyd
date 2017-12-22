@@ -27,6 +27,8 @@ class TestGroup(TestCase):
         # create main test file
         filename = self.getFileName("create_group_cache")
         print("filename:", filename)
+        if config.get("use_h5py"):
+            return # use_cache not supported on h5py
         f = h5py.File(filename, 'w', use_cache=True)
         self.assertTrue('/' in f)
         r = f['/'] 
@@ -184,11 +186,22 @@ class TestGroup(TestCase):
         # create group using nested path
         g2 = r['g2']
         r['g1/g1.3'] = g2
-        self.assertEqual(len(r), 5)
+        # TBD: Fix!
+        # For HSDS & H5SERV, still is showing up as:
+        # ['g1', 'g1.1', 'g2', 'g4', 'g1.3']
+        if config.get("use_h5py"):
+            self.assertEqual(len(r), 4)
+        else:
+            self.assertEqual(len(r), 5)
 
         # try creating a link with a space in the name
         r["a space"] = g2
-        self.assertEqual(len(r), 6)
+        
+        if config.get("use_h5py"):
+            self.assertEqual(len(r), 5)
+        else:
+            self.assertEqual(len(r), 6)
+         
          
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":

@@ -201,7 +201,7 @@ class TestCreateDataset(TestCase):
         chunks = dset.chunks  # chunk layout auto-generated
         self.assertTrue(chunks is not None)
         self.assertEqual(len(chunks), 2)
-        if dset.id.id.startswith("d-"):
+        if isinstance(dset.id.id, str) and dset.id.id.startswith("d-"):
             # HSDS will create a different chunk layout
             self.assertEqual(chunks[0], 40)
             self.assertEqual(chunks[1], 80)
