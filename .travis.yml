@@ -47,7 +47,7 @@ script:
     export H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test/${TRAVIS_PYTHON_VERSION} ;
     curl ${HS_ENDPOINT}/about ;
   else
-    export USE_H5PY=1
+    export USE_H5PY=1 ;
   fi'
 - python setup.py install
 - echo endpoint ${HS_ENDPOINT}
