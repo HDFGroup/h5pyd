@@ -795,8 +795,7 @@ class Dataset(HLObject):
         elif isinstance(selection, sel.FancySelection):
             raise ValueError("selection type not supported")
         elif isinstance(selection, sel.PointSelection):
-            # TBD - using JSON request since h5serv does not yet support binary
-
+            format = "json" # default as JSON request since h5serv does not yet support binary
             body= { }
 
             points = selection.points.tolist()
@@ -820,7 +819,6 @@ class Dataset(HLObject):
                             if point[i]<0 or point[i]>=self._shape[i]:
                                 raise ValueError("point out of range")
                         if rank == 1:
-                            delistify = True
                             if point[0] <= last_point:
                                 raise TypeError("index points must be strictly increasing")
                             last_point = point[0]
@@ -834,18 +832,25 @@ class Dataset(HLObject):
                     else:
                         raise ValueError("invalid point argument")
 
-            if delistify:
-                # convert to int if needed
-                body["points"] = []
-                for point in points:
-                    if isinstance(point, (list, tuple)):
-                        body["points"].append(point[0])
-                    else:
-                        body["points"] = point
+            if self.id.id.startswith("d-"):
+                # send points as binary request for HSDS
+                format = "binary"     
+                arr_points = np.asarray(points, dtype='u8')  # must use unsigned 64-bit int
+                body = arr_points.tobytes()
+                self.log.info("point select binary request, num bytes: {}".format(len(body)))
             else:
-                # can just assign
-                body["points"] = points
-            rsp = self.POST(req, body=body)
+                if delistify:
+                    # convert to int if needed
+                    body["points"] = []
+                    for point in points:
+                        if isinstance(point, (list, tuple)):
+                            body["points"].append(point[0])
+                        else:
+                            body["points"] = point
+                else:
+                    # can just assign
+                    body["points"] = points
+            rsp = self.POST(req, format=format, body=body)
             data = rsp["value"]
 
             if len(data) != selection.mshape[0]:

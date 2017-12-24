@@ -480,7 +480,7 @@ class HLObject(CommonStateObject):
             rsp_json = json.loads(rsp.text)
             return rsp_json
 
-    def POST(self, req, body=None):
+    def POST(self, req, body=None, format="json"):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
 
@@ -488,7 +488,7 @@ class HLObject(CommonStateObject):
 
         self.log.info("POST: {} [{}]".format(req, self.id.domain))
 
-        rsp = self.id._http_conn.POST(req, body=body)
+        rsp = self.id._http_conn.POST(req, body=body, format=format)
         if rsp.status_code == 409:
             raise ValueError("name already exists")
         if rsp.status_code not in (200, 201):

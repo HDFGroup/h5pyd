@@ -231,7 +231,7 @@ class HttpConn:
 
         return rsp
 
-    def POST(self, req, body=None, params=None, headers=None):
+    def POST(self, req, body=None, format="json", params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
@@ -249,10 +249,15 @@ class HttpConn:
         # try to do a POST to the domain
         req = self._endpoint + req
 
-        data = json.dumps(body)
-
         if not headers:
             headers = self.getHeaders()
+
+        if format=="binary":
+            headers['Content-Type'] = "application/octet-stream"
+            # binary write
+            data = body
+        else:
+            data = json.dumps(body)   
 
         self.log.info("POST: " + req)
 
