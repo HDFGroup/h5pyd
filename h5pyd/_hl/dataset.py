@@ -839,6 +839,7 @@ class Dataset(HLObject):
                 body = arr_points.tobytes()
                 self.log.info("point select binary request, num bytes: {}".format(len(body)))
             else:
+                
                 if delistify:
                     # convert to int if needed
                     body["points"] = []
@@ -850,6 +851,7 @@ class Dataset(HLObject):
                 else:
                     # can just assign
                     body["points"] = points
+                self.log.info("sending point selection request: {}".format(body))
             rsp = self.POST(req, format=format, body=body)
             data = rsp["value"]
 
