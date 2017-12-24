@@ -819,6 +819,7 @@ class Dataset(HLObject):
                             if point[i]<0 or point[i]>=self._shape[i]:
                                 raise ValueError("point out of range")
                         if rank == 1:
+                            delistify = True
                             if point[0] <= last_point:
                                 raise TypeError("index points must be strictly increasing")
                             last_point = point[0]
@@ -841,6 +842,7 @@ class Dataset(HLObject):
             else:
                 
                 if delistify:
+                    self.log.info("delistifying point selection")
                     # convert to int if needed
                     body["points"] = []
                     for point in points:
