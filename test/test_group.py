@@ -22,7 +22,6 @@ import six
 
 class TestGroup(TestCase):
 
-
     def test_cache(self):
         # create main test file
         filename = self.getFileName("create_group_cache")
@@ -161,7 +160,7 @@ class TestGroup(TestCase):
             self.assertTrue(external_link_filename.find('link_target') > -1)
         else:
             self.assertTrue(external_link_filename.find('link_target') > -1)
-            # HDF Server should be a DNS style name
+            # h5serv should be a DNS style name
             self.assertEqual(external_link_filename.find('/'), -1)
 
         links = r.items()
@@ -186,22 +185,12 @@ class TestGroup(TestCase):
         # create group using nested path
         g2 = r['g2']
         r['g1/g1.3'] = g2
-        # TBD: Fix!
-        # For HSDS & H5SERV, still is showing up as:
-        # ['g1', 'g1.1', 'g2', 'g4', 'g1.3']
-        if config.get("use_h5py"):
-            self.assertEqual(len(r), 4)
-        else:
-            self.assertEqual(len(r), 5)
-
+         
+        self.assertEqual(len(r), 4)
+        
         # try creating a link with a space in the name
         r["a space"] = g2
-        
-        if config.get("use_h5py"):
-            self.assertEqual(len(r), 5)
-        else:
-            self.assertEqual(len(r), 6)
-         
+        self.assertEqual(len(r), 5) 
          
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":

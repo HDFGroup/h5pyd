@@ -295,7 +295,6 @@ class Group(HLObject, MutableMappingHDF5):
 
     def __getitem__(self, name):
         """ Open an object in the file """
-         
         # convert bytes to str for PY3
         if isinstance(name, bytes):
             name = name.decode('utf-8')
@@ -330,6 +329,7 @@ class Group(HLObject, MutableMappingHDF5):
                 tgt = Dataset(DatasetID(self, dataset_json))
             else:
                 raise IOError("Unexpected Error - collection type: " + link_json['collection'])
+            
             return tgt
 
         def isUUID(name):
@@ -500,8 +500,6 @@ class Group(HLObject, MutableMappingHDF5):
             values are stored as scalar datasets. Raise ValueError if we
             can't understand the resulting array dtype.
         """
-
-        #name, lcpl = self._e(name, lcpl=True)
         if name.find('/') != -1:
             parent_path = op.dirname(name)
             basename = op.basename(name)
@@ -510,6 +508,9 @@ class Group(HLObject, MutableMappingHDF5):
             parent_uuid, link_json = self.get_link_json(parent_path)
             if parent_uuid is None:
                 raise KeyError("group path: {} not found".format(parent_path))
+            if link_json["class"] != 'H5L_TYPE_HARD':
+                raise IOError("cannot create subgroup of softlink")
+            parent_uuid = link_json["id"]
             req = "/groups/" + parent_uuid
             group_json = self.GET(req)
             tgt = Group(GroupID(self, group_json)) 
