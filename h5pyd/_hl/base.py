@@ -494,8 +494,13 @@ class HLObject(CommonStateObject):
         if rsp.status_code not in (200, 201):
             raise IOError(rsp.reason)
 
-        rsp_json = json.loads(rsp.text)
-        return rsp_json
+        if rsp.headers['Content-Type'] == "application/octet-stream":
+            self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
+            return rsp.content
+        else:
+            # assume JSON
+            rsp_json = json.loads(rsp.text)
+            return rsp_json
 
     def DELETE(self, req):
         if self.id.http_conn is None:

@@ -126,6 +126,6 @@ class TestPointSelectDataset(TestCase):
 
 
 if __name__ == '__main__':
-    loglevel = logging.DEBUG
-    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
+    #loglevel = logging.DEBUG
+    #logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

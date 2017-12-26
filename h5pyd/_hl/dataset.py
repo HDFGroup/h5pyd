@@ -839,8 +839,7 @@ class Dataset(HLObject):
                 arr_points = np.asarray(points, dtype='u8')  # must use unsigned 64-bit int
                 body = arr_points.tobytes()
                 self.log.info("point select binary request, num bytes: {}".format(len(body)))
-            else:
-                
+            else:  
                 if delistify:
                     self.log.info("delistifying point selection")
                     # convert to int if needed
@@ -855,12 +854,16 @@ class Dataset(HLObject):
                     body["points"] = points
                 self.log.info("sending point selection request: {}".format(body))
             rsp = self.POST(req, format=format, body=body)
-            data = rsp["value"]
+            if type(rsp) is bytes:
+                if len(rsp) // mtype.itemsize != selection.mshape[0]:
+                    raise IOError("Expected {} elements, but got {}".format(selection.mshape[0], (len(rsp) // mtype.itemsize)))
+                arr = numpy.fromstring(rsp, dtype=mtype)
+            else:
+                data = rsp["value"]
+                if len(data) != selection.mshape[0]:
+                    raise IOError("Expected {} elements, but got {}".format(selection.mshape[0], len(data)))
 
-            if len(data) != selection.mshape[0]:
-                raise IOError("Expected {} elements, but got {}".format(selection.mshape[0], len(data)))
-
-            arr = np.asarray(data, dtype=mtype, order='C')
+                arr = np.asarray(data, dtype=mtype, order='C')
 
         else:
             raise ValueError("selection type not supported")

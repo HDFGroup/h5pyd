@@ -253,7 +253,9 @@ class HttpConn:
             headers = self.getHeaders()
 
         if format=="binary":
+            # For POST, binary we send and recieve data as binary
             headers['Content-Type'] = "application/octet-stream"
+            headers['accept'] = 'application/octet-stream'
             # binary write
             data = body
         else:
