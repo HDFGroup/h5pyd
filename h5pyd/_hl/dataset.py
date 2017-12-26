@@ -536,7 +536,17 @@ class Dataset(HLObject):
         * Boolean "mask" array indexing
         """
         args = args if isinstance(args, tuple) else (args,)
-        self.log.debug("dataset.__getitem__({})".format(args))
+        self.log.debug("dataset.__getitem__")
+        for arg in args:
+            arg_len = 0
+            try:
+                arg_len = len(arg)
+            except TypeError:
+                pass  # ignore
+            if arg_len < 3:
+                self.log.debug("arg: {} type: {}".format(arg, type(arg)))
+            else:
+                self.log.debug("arg: [{},...] type: {}".format(arg[0], type(arg)))
 
         # Sort field indices from the rest of the args.
         names = tuple(x for x in args if isinstance(x, six.string_types))
@@ -632,9 +642,7 @@ class Dataset(HLObject):
 
         # Perform the dataspace selection
         selection = sel.select(self, args)
-        self.log.debug("selection_constructor:")
-        for arg in args:
-            self.log.debug("arg: {} type: {}".format(arg, type(arg)))
+        self.log.debug("selection_constructor")
 
         if selection.nselect == 0:
             return numpy.ndarray(selection.mshape, dtype=new_dtype)
