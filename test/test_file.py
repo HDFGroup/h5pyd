@@ -11,11 +11,10 @@
 ##############################################################################
 
 import config
-
+import os
 
 if config.get("use_h5py"):
-    import h5py
-    import os
+    import h5py 
 else:
     import h5pyd as h5py
 
@@ -273,10 +272,10 @@ class TestFile(TestCase):
 
     def test_http_url(self):
          if h5py.__name__ == "h5pyd":
-            info = h5py.getServerInfo()
-            logging.debug("got server info: {}".format(info))
+            self.assertTrue("HS_ENDPOINT" in os.environ)
+            endpoint = os.environ["HS_ENDPOINT"]
             filename = self.getFileName("test_http_url_file")
-            url = info["endpoint"] + filename
+            url = endpoint + filename
             f = h5py.File(url, 'w')
             self.assertEqual(f.filename, filename)
             self.assertEqual(f.name, "/")
