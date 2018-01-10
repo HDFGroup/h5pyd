@@ -275,14 +275,20 @@ class TestFile(TestCase):
             self.assertTrue("HS_ENDPOINT" in os.environ)
             endpoint = os.environ["HS_ENDPOINT"]
             filename = self.getFileName("test_http_url_file")
-            url = endpoint + filename
-            f = h5py.File(url, 'w')
-            self.assertEqual(f.filename, filename)
-            self.assertEqual(f.name, "/")
-            self.assertTrue(f.id.id is not None)
-            self.assertEqual(len(f.keys()), 0)
-            self.assertEqual(f.mode, 'r+')
-            f.close()       
+            is_hsds = False
+            f = h5py.File(filename, 'w')
+            if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+                is_hsds = True  # HSDS has different permission defaults
+            f.close()
+            if is_hsds:
+                url = endpoint + filename
+                f = h5py.File(url, 'w')
+                self.assertEqual(f.filename, filename)
+                self.assertEqual(f.name, "/")
+                self.assertTrue(f.id.id is not None)
+                self.assertEqual(len(f.keys()), 0)
+                self.assertEqual(f.mode, 'r+')
+                f.close()       
         
          
 
