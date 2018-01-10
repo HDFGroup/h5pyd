@@ -270,6 +270,46 @@ class TestFile(TestCase):
 
         grp = f['/']
         grp.file.close()  # try closing the file via a group reference
+
+    def test_http_url(self):
+         if h5py.__name__ == "h5pyd":
+            info = h5py.getServerInfo()
+            print("endpoint:", info["endpoint"])
+            filename = self.getFileName("test_http_url_file")
+            url = info["endpoint"] + filename
+            print("url:", url)
+            f = h5py.File(url, 'w')
+            self.assertEqual(f.filename, filename)
+            self.assertEqual(f.name, "/")
+            self.assertTrue(f.id.id is not None)
+            self.assertEqual(len(f.keys()), 0)
+            self.assertEqual(f.mode, 'r+')
+            f.close()
+
+    def test_hdf5_protocol(self):
+         if h5py.__name__ == "h5pyd":
+            info = h5py.getServerInfo()
+            print("endpoint:", info["endpoint"])
+            filename = self.getFileName("test_http_url_file")
+            url = info["endpoint"] + filename
+            if url.startswith("http://"):
+                url = url[7:]
+            elif url.startswith("https://"):
+                url = url[8:]
+            else:
+                self.assertTrue(False)  # expected http or https
+            url = "hdf5://" + url
+            print("url:", url)
+            f = h5py.File(url, 'w')
+            self.assertEqual(f.filename, filename)
+            self.assertEqual(f.name, "/")
+            self.assertTrue(f.id.id is not None)
+            self.assertEqual(len(f.keys()), 0)
+            self.assertEqual(f.mode, 'r+')
+            f.close()
+
+             
+       
         
         
          
