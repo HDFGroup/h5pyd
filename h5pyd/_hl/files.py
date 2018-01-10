@@ -129,14 +129,11 @@ class File(Group):
             for protocol in ("http://", "https://", "hdf5://"):
                 if domain.startswith(protocol):
                     domain = domain[len(protocol):]
-                    if protocol.startswith("http") or protocol.startswith("hdf5"):
+                    if protocol.startswith("http"):
                         # extract the endpoint
                         n = domain.find('/')
                         if n < 0:
                             raise IOError(400, "invalid url format")
-                        if protocol == "hdf5://":
-                            # TBD - detectect if this endpoint supports https
-                            protocol = "http://"  
                         endpoint = protocol + domain[:n]
                         domain = domain[n:]
                         break
