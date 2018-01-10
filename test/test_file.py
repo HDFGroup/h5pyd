@@ -274,6 +274,7 @@ class TestFile(TestCase):
     def test_http_url(self):
          if h5py.__name__ == "h5pyd":
             info = h5py.getServerInfo()
+            logging.debug("got server info: {}".format(info))
             filename = self.getFileName("test_http_url_file")
             url = info["endpoint"] + filename
             f = h5py.File(url, 'w')
