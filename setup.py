@@ -37,6 +37,7 @@ setup(name='h5pyd',
            'hstouch = h5pyd._apps.hstouch:main',
            'hsacl = h5pyd._apps.hsacl:main',
            'hsdel = h5pyd._apps.hsdel:main',
+           'hsrm = h5pyd._apps.hsdel:main',
            'hsget = h5pyd._apps.hsget:main',
            'hsload = h5pyd._apps.hsload:main',
            'hsconfigure = h5pyd._apps.hsconfigure:main']
