@@ -132,8 +132,12 @@ class TestFile(TestCase):
         self.assertEqual(f.id.id, 0)
 
         # re-open using hdf5:// prefix
-        if not config.get("use_h5py"):
-            f = h5py.File("hdf5://" + filename, 'r')
+        if h5py.__name__ == "h5pyd" and is_hsds:
+            if filename[0] == '/':
+                filepath = "hdf5:/" + filename
+            else:
+                filepath = "hdf5://" + filename
+            f = h5py.File(filepath, 'r')
             self.assertEqual(f.filename, filename)
             self.assertEqual(f.name, "/")
             self.assertTrue(f.id.id is not None)
@@ -302,6 +306,6 @@ class TestFile(TestCase):
            
               
 if __name__ == '__main__':
-    loglevel = logging.DEBUG
+    loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

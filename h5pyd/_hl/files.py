@@ -98,10 +98,10 @@ class File(Group):
         endpoint
             Server endpoint.   Defaults to "http://localhost:5000"
         """
-
+    
 
         groupid = None
-        # if we're passed a GroupId as domain, jsut initialize the file object
+        # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
         if mode is None and endpoint is None and username is None \
             and password is None and isinstance(domain, GroupID):
@@ -127,9 +127,9 @@ class File(Group):
             #
             #  For http prefixed values, extract the endpont and use the rest as domain path
             for protocol in ("http://", "https://", "hdf5://"):
-                if domain.startswith(protocol):
-                    domain = domain[len(protocol):]
+                if domain.startswith(protocol):     
                     if protocol.startswith("http"):
+                        domain = domain[len(protocol):]
                         # extract the endpoint
                         n = domain.find('/')
                         if n < 0:
@@ -137,6 +137,8 @@ class File(Group):
                         endpoint = protocol + domain[:n]
                         domain = domain[n:]
                         break
+                    else:  # hdf5://
+                        domain = domain[(len(protocol)-1):]
                         
 
             if domain.find('/') > 0:
