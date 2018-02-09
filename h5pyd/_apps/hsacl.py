@@ -18,6 +18,8 @@ if __name__ == "__main__":
 else:
     from .config import Config
 
+cfg = Config()
+
 #
 # get given ACL, return None if not found   
 #
@@ -46,7 +48,7 @@ def getACL(f, username="default"):
 #
 def printUsage():
     print("")
-    print("Usage: python hsacl.py [options] domain [+crudep] [-crudep] [userid1 userid2 ...]")
+    print("Usage: {} [options] domain [+crudep] [-crudep] [userid1 userid2 ...]".format(cfg["cmd"]))
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
@@ -62,16 +64,21 @@ def printUsage():
     print(" crudep :: permission flags: Create, Read, Update, Delete, rEadacl, uPdateacl")
     print("")
     print("examples...")
-    print("list acls: python hsacl.py  /home/jill/myfile.h5")
-    print("list ted's acl (if any): python hsacl.py  /home/jill/myfile.h5  ted")
-    print("add/update acl to give ted read & update permissions: python hsacl +ru /home/jill/myfile.h5 ted")
-    print("remove all permissions except read for jill: python hsacl -cudep /home/jill/myfile.h5 jill ")
+    print("list acls: {} /home/jill/myfile.h5".format(cfg["cmd"]))
+    print("list ted's acl (if any): {} /home/jill/myfile.h5  ted".format(cfg["cmd"]))
+    print("add/update acl to give ted read & update permissions: {} +ru /home/jill/myfile.h5 ted".format(cfg["cmd"]))
+    print("remove all permissions except read for jill: {} -cudep /home/jill/myfile.h5 jill".format(cfg["cmd"]))
     print("")
     sys.exit()
 
  
                   
 def main():
+    cfg["cmd"] = sys.argv[0].split('/')[-1]
+    if cfg["cmd"].endswith(".py"):
+        cfg["cmd"] = "python " + cfg["cmd"]
+    cfg["verbose"] = False
+
     perm_abvr = {'c':'create', 'r': 'read', 'u': 'update', 'd': 'delete', 'e': 'readACL', 'p':'updateACL'} 
     fields = ('username', 'create', 'read', 'update', 'delete', 'readACL', 'updateACL')
     domain = None
@@ -81,6 +88,7 @@ def main():
     usernames = []
     add_list = set()
     remove_list = set()
+
     if len(sys.argv) == 1 or sys.argv[1] == "-h":
         printUsage()
 
@@ -88,7 +96,6 @@ def main():
     logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
 
-    cfg = Config()
          
     argn = 1 
     while argn < len(sys.argv):
@@ -99,7 +106,7 @@ def main():
         logging.debug("arg:", arg, "val:", val)
         
         if domain is None and arg in ("-v", "--verbose"):
-            verbose = True
+            cfg["verbose"] = True
             argn += 1
         elif domain is None and arg == "--loglevel":
             val = val.upper()

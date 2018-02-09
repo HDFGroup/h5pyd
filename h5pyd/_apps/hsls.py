@@ -307,8 +307,8 @@ def getGroupFromDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: python hsls.py [-r] [-v] [-h] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains")
-    print("example: python hsls.py -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5")
+    print("usage: {} [-r] [-v] [-h] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains".format(cfg["cmd"]))
+    print("example: {} -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5".format(cfg["cmd"]))
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
@@ -337,6 +337,9 @@ def main():
     cfg["showacls"] = False
     cfg["showattrs"] = False
     cfg["human_readable"] = False
+    cfg["cmd"] = sys.argv[0].split('/')[-1]
+    if cfg["cmd"].endswith(".py"):
+        cfg["cmd"] = "python " + cfg["cmd"]
 
     while argn < len(sys.argv):
         arg = sys.argv[argn]

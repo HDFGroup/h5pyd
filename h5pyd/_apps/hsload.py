@@ -35,10 +35,6 @@ else:
     from .config import Config
     from .utillib import load_file
 
-__version__ = '0.0.1'
-
-UTILNAME = 'hsload'
-
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse
 else:
@@ -82,14 +78,14 @@ def stage_file(uri, netfam=None, sslv=True):
 #----------------------------------------------------------------------------------
 def usage():
     print("Usage:\n")
-    print(("    %s [ OPTIONS ]  SOURCE  DOMAIN" % UTILNAME))
-    print(("    %s [ OPTIONS ]  SOURCE  FOLDER" % UTILNAME))
+    print(("    {} [ OPTIONS ]  sourcefile  domain".format(cfg["cmd"])))
+    print(("    {} [ OPTIONS ]  sourcefile  folder".format(cfg["cmd"])))
     print("")
     print("Description:")
     print("    Copy HDF5 file to Domain or multiple files to a Domain folder")
-    print("       SOURCE: HDF5 file or multiple files if copying to folder ")
-    print("       DOMAIN: HDF Server domain (Unix or DNS style)")
-    print("       FOLDER: HDF Server folder (Unix style ending in '/')")
+    print("       sourcefile: HDF5 file to be copied ")
+    print("       domain: HDF Server domain (Unix or DNS style)")
+    print("       folder: HDF Server folder (Unix style ending in '/')")
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
@@ -106,7 +102,6 @@ def usage():
     print("     -6 :: Force ipv6 (see -4)")
     print("     -h | --help    :: This message.")
     print("")
-    print(("%s version %s\n" % (UTILNAME, __version__)))
 #end print_usage
 
 #----------------------------------------------------------------------------------
@@ -124,6 +119,9 @@ def main():
     verbose = False
     nodata = False
     deflate = None
+    cfg["cmd"] = sys.argv[0].split('/')[-1]
+    if cfg["cmd"].endswith(".py"):
+        cfg["cmd"] = "python " + cfg["cmd"]
     cfg["logfname"] = None
     logfname=None
     ipvfam=None

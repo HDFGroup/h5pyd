@@ -20,8 +20,8 @@ cfg = Config()
 # Usage
 #
 def printUsage():
-    print("usage: python hsinfo.py [-h] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-c oonf_file] [-e endpoint] [-u username] [-p password]")
-    print("example: python hsinfo.py  -e http://data.hdfgroup.org:7253")
+    print("usage: {} [-h] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-c oonf_file] [-e endpoint] [-u username] [-p password]".format(cfg["cmd"]))
+    print("example: {} -e http://data.hdfgroup.org:7253".format(cfg["cmd"]))
     print("")
     print("Options:")
     print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://example.com:8080")
@@ -60,6 +60,9 @@ def getUpTime(start_time):
 #
 def main():
     argn = 1
+    cfg["cmd"] = sys.argv[0].split('/')[-1]
+    if cfg["cmd"].endswith(".py"):
+        cfg["cmd"] = "python " + cfg["cmd"]
     cfg["loglevel"] = logging.ERROR
     cfg["logfname"] = None
 

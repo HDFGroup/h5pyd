@@ -121,8 +121,8 @@ def touchDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: python hstouch.py [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains")
-    print("example: python hstouch.py -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/emptydomain.h5")
+    print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains".format(cfg["cmd"]))
+    print("example: {} -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/emptydomain.h5".format(cfg["cmd"]))
     sys.exit()
 
 #
@@ -133,6 +133,9 @@ def main():
     argn = 1
     loglevel = logging.ERROR
     logfname=None
+    cfg["cmd"] = sys.argv[0].split('/')[-1]
+    if cfg["cmd"].endswith(".py"):
+        cfg["cmd"] = "python " + cfg["cmd"]
     cfg["verbose"] = False
 
     while argn < len(sys.argv):

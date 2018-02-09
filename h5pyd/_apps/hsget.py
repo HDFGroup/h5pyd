@@ -27,19 +27,17 @@ else:
     from .config import Config
     from .utillib import load_file
 
-__version__ = '0.0.1'
-
-UTILNAME = 'hsget'
+cfg = Config()  #  config object
 
 #----------------------------------------------------------------------------------
 def usage():
     print("Usage:\n")
-    print(("    %s [ OPTIONS ]  DOMAIN DES" % UTILNAME))
+    print(("    {} [ OPTIONS ]  domain filepath".format(cfg["cmd"])))
     print("")
     print("Description:")
     print("    Copy server domain to local HDF5 file")
-    print("       DOMAIN: HDF Server domain (Unix or DNS style)")
-    print("       DES: HDF5 file to be created ")
+    print("       domain: HDF Server domain (Unix or DNS style)")
+    print("       filepath: HDF5 file to be created ")
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
@@ -55,7 +53,7 @@ def usage():
     print("     -6 :: Force ipv6 (see -4)")
     print("     -h | --help    :: This message.")
     print("")
-    print(("%s version %s\n" % (UTILNAME, __version__)))
+     
 #end print_usage
 
 #----------------------------------------------------------------------------------
@@ -72,7 +70,12 @@ def main():
     loglevel = logging.ERROR
     verbose = False
     nodata = False
-    cfg = Config()  #  config object
+    
+    cfg["cmd"] = sys.argv[0].split('/')[-1]
+    if cfg["cmd"].endswith(".py"):
+        cfg["cmd"] = "python " + cfg["cmd"]
+    cfg["verbose"] = False
+
     endpoint=cfg["hs_endpoint"]
     username=cfg["hs_username"]
     password=cfg["hs_password"]
