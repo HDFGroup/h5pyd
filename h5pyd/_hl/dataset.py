@@ -140,7 +140,7 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
         else:
             dtype = numpy.dtype(dtype)
 
-        if dtype.kind == 'O' and dtype.metadata['ref']:
+        if dtype.kind == 'O' and 'ref' in dtype.metadata:
             type_json = {}
             type_json["class"] = "H5T_REFERENCE"
             meta_type = dtype.metadata['ref']
@@ -763,6 +763,7 @@ class Dataset(HLObject):
                             raise IOError("Error retrieving data: {}".format(ioe.errno))
                     if type(rsp) is bytes:
                         # got binary response
+                        self.log.info("binary response, {} bytes".format(len(rsp)))
                         arr1d = numpy.fromstring(rsp, dtype=mtype)
                         page_arr = numpy.reshape(arr1d, page_mshape)
                     else:
@@ -770,6 +771,7 @@ class Dataset(HLObject):
                         # need some special conversion for compound types --
                         # each element must be a tuple, but the JSON decoder
                         # gives us a list instead.
+                        self.log.info("json response")
                         data = rsp['value']
                         if len(mtype) > 1 and type(data) in (list, tuple):
                             converted_data = []
@@ -883,9 +885,9 @@ class Dataset(HLObject):
             arr = arr[names[0]]     # Single-field recarray convention
         if arr.shape == ():
             arr = numpy.asscalar(arr)
-        if single_element:
+        elif single_element:
             arr = arr[0]
-        if len(arr.shape) > 1:
+        elif len(arr.shape) > 1:
             arr = np.squeeze(arr)  # reduce dimension if there are single dimension entries
         return arr
 
