@@ -101,7 +101,7 @@ def convert_dtype(srcdt, ctx):
     h5py style to h5pyd and vice-versa.
     """
     
-    msg = "convert dtype: {}, type: {}, len: {}".format(srcdt, type(srcdt), len(srcdt))
+    msg = "convert dtype: {}, type: {},".format(srcdt, type(srcdt))
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
@@ -134,7 +134,10 @@ def convert_dtype(srcdt, ctx):
                 raise TypeError(msg)
         elif srcdt.metadata and 'vlen' in srcdt.metadata:
             src_vlen = srcdt.metadata['vlen']
-            tgt_base = convert_dtype(src_vlen, ctx)
+            if isinstance(src_vlen, np.dtype):
+                tgt_base = convert_dtype(src_vlen, ctx)
+            else:
+                tgt_base = src_vlen
             if is_h5py(ctx['fout']):
                 tgt_dt = h5py.special_dtype(vlen=tgt_base)
             else:

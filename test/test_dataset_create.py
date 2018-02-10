@@ -192,6 +192,60 @@ class TestCreateDataset(TestCase):
 
         f.close()
 
+    def test_variable_len_unicode_dset(self):
+        filename = self.getFileName("variable_len_unicode_dset")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+        is_hsds = False
+        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+            is_hsds = True  
+
+        dims = (10,)
+        if six.PY2:
+            dt = h5py.special_dtype(vlen=unicode)
+        else:
+            dt = h5py.special_dtype(vlen=str)
+
+        dset = f.create_dataset('variable_len_unicode_dset', dims, dtype=dt)
+
+        self.assertEqual(dset.name, "/variable_len_unicode_dset")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 1)
+        self.assertEqual(dset.shape[0], 10)
+        self.assertEqual(str(dset.dtype), 'object')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 1)
+        self.assertEqual(dset.maxshape[0], 10)
+        if config.get('use_h5py'):
+            self.assertEqual(dset.fillvalue, None)
+        else:
+            self.assertEqual(dset.fillvalue, 0)
+
+        # TBD: h5serv and hsds returning different values for null strings
+        if config.get('use_h5py'):
+            self.assertEqual(dset[0], '')
+        elif is_hsds:
+            self.assertEqual(dset[0], 0)
+        else:
+            self.assertEqual(dset[0], '')
+        
+        
+        words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94", u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
+        dset[:] = words
+        vals = dset[:]  # read back
+        
+        self.assertTrue("vlen" in vals.dtype.metadata)
+            
+        for i in range(10):
+            # TBD: h5serv and HSDS are returning unicode values 
+            if six.PY3 and not config.get('use_h5py'):
+                for i in range(10):
+                    self.assertEqual(vals[i], words[i])
+            else:
+                self.assertEqual(vals[i], words[i])
+
+        f.close()
+
     def test_create_dset_by_path(self):
         filename = self.getFileName("create_dset_by_path")
         print("filename:", filename)
