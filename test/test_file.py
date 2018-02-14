@@ -113,13 +113,15 @@ class TestFile(TestCase):
         try:
             f.create_group("another_subgrp")
             self.assertTrue(False)  # expect exception
-        except ValueError as ve:
+        except (IOError, OSError, ValueError):
+            # h5py throws ValueError
+            # h5pyd is throwing IOError
             pass
 
         try:
             f.attrs["foo"] = "bar"  
             self.assertTrue(False)  # expect exception
-        except ValueError as ve:
+        except (IOError, OSError):
             pass
 
         self.assertEqual(len(f.keys()), 1)
