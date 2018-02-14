@@ -650,7 +650,13 @@ def createBaseDataType(typeItem):
                 raise TypeError("Array Type base type must be integer, float, or string")
 
         baseType = createDataType(arrayBaseType)
-        dtRet = np.dtype(dims+baseType.str)
+        metadata = None
+        if baseType.metadata:
+            metadata = dict(baseType.metadata)
+            dtRet = np.dtype(dims+baseType.str, metadata=metadata)      
+        else:
+            dtRet =  np.dtype(dims+baseType.str) 
+
         return dtRet  # return predefined type
     elif typeClass == 'H5T_REFERENCE':
         if 'base' not in typeItem:
