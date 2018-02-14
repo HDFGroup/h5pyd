@@ -109,11 +109,19 @@ class TestFile(TestCase):
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
 
+        # verify that trying to modify the file fails
         try:
             f.create_group("another_subgrp")
             self.assertTrue(False)  # expect exception
-        except ValueError:
+        except ValueError as ve:
             pass
+
+        try:
+            f.attrs["foo"] = "bar"  
+            self.assertTrue(False)  # expect exception
+        except ValueError as ve:
+            pass
+
         self.assertEqual(len(f.keys()), 1)
 
         if  h5py.__name__ == "h5pyd" and not is_hsds:

@@ -202,6 +202,10 @@ class HttpConn:
             params["domain"] = self._domain
         if self._api_key:
             params["api_key"] = self._api_key
+         
+        # verify the file was open for modification
+        if self._mode == 'r':
+            raise ValueError("Unable to create group (No write intent on file)")
 
         req = self._endpoint + req
 
@@ -246,6 +250,14 @@ class HttpConn:
         if self._api_key:
             params["api_key"] = self._api_key
 
+        # verify we have write intent (unless this is a dataset point selection)
+        if req.startswith("/datasets/") and req.endswith("/value"):
+            point_sel = True
+        else:
+            point_sel = False
+        if self._mode == 'r' and not point_sel:
+            raise ValueError("Unable perform request (No write intent on file)")
+
         # try to do a POST to the domain
         req = self._endpoint + req
 
@@ -289,6 +301,10 @@ class HttpConn:
             params["domain"] = self._domain
         if self._api_key:
             params["api_key"] = self._api_key
+
+        # verify we have write intent  
+        if self._mode == 'r':
+            raise ValueError("Unable perform request (No write intent on file)")
 
         # try to do a DELETE of the resource
         req = self._endpoint + req

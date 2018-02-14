@@ -31,7 +31,7 @@ class TestFolders(TestCase):
 
         
         filepath = self.getPathFromDomain(test_domain)
-        print("test_domain:", filepath)
+        print(filepath)
         # create test file if not present.
         # on first run, this may take a minute before it is visible as a folder item
         f = h5py.File(filepath, mode='a')  
@@ -126,7 +126,6 @@ class TestFolders(TestCase):
         folder_test = self.getFileName("create_folder_test")  
         folder_path = self.getPathFromDomain(folder_test) + '/'
 
-        print("folder_path", folder_path)
         dir = h5py.Folder(folder_path, mode='w')  # create a new folder
         dir.close()
         # re-open

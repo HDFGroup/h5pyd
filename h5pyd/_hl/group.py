@@ -49,8 +49,6 @@ class Group(HLObject, MutableMappingHDF5):
         Name may be absolute or relative.  Fails if the target name already
         exists.
         """
-        if self.id.http_conn.mode == 'r':
-            raise ValueError("Unable to create group (No write intent on file)")
 
         #if self.__contains__(name):
         #    raise ValueError("Unable to create link (Name alredy exists)")
