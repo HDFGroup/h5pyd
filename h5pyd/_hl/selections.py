@@ -108,7 +108,7 @@ def select(obj, args):
                 sel = FancySelection(obj.shape)
                 sel[args]
                 return sel
-   
+    
     sel = SimpleSelection(obj.shape)
     sel[args]
     return sel
@@ -736,7 +736,7 @@ class ScalarSelection(Selection):
         if len(args) > 0:
             arg = args[0]
         if arg == ():
-            self._mshape = None
+            self._mshape = ()
             self._select_type = H5S_SELECT_ALL
         elif arg == (Ellipsis,):
             self._mshape = ()

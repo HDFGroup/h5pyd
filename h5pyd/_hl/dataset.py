@@ -607,7 +607,7 @@ class Dataset(HLObject):
             rsp = self.GET(req, format="binary")
             if type(rsp) is bytes:
                 # got binary response
-                arr = numpy.fromstring(rsp, dtype=new_dtype)
+                arr = numpy.frombuffer(rsp, dtype=new_dtype)
             else:
                 # got JSON response
                 # need some special conversion for compound types --
@@ -764,7 +764,7 @@ class Dataset(HLObject):
                     if type(rsp) is bytes:
                         # got binary response
                         self.log.info("binary response, {} bytes".format(len(rsp)))
-                        arr1d = numpy.fromstring(rsp, dtype=mtype)
+                        arr1d = numpy.frombuffer(rsp, dtype=mtype)
                         page_arr = numpy.reshape(arr1d, page_mshape)
                     else:
                         # got JSON response
@@ -867,7 +867,7 @@ class Dataset(HLObject):
             if type(rsp) is bytes:
                 if len(rsp) // mtype.itemsize != selection.mshape[0]:
                     raise IOError("Expected {} elements, but got {}".format(selection.mshape[0], (len(rsp) // mtype.itemsize)))
-                arr = numpy.fromstring(rsp, dtype=mtype)
+                arr = numpy.frombuffer(rsp, dtype=mtype)
             else:
                 data = rsp["value"]
                 if len(data) != selection.mshape[0]:
@@ -1144,13 +1144,19 @@ class Dataset(HLObject):
             mshape = val.shape
             #mtype = None
         """
+        mshape = val.shape
+        self.log.debug("mshape: {}".format(mshape))
+        
         # Perform the dataspace selection
         selection = sel.select(self, args)
+        self.log.debug("selection.mshape: {}".format(selection.mshape))
         if selection.nselect == 0:
             return
-
+        
         # Broadcast scalars if necessary.
         if (mshape == () and selection.mshape != ()):
+            self.log.debug("broadcast scalar")
+            self.log.debug("selection.mshape: {}".format(selection.mshape))
             if self.dtype.subdtype is not None:
                 raise TypeError("Scalar broadcasting is not supported for array dtypes")
             val2 = numpy.empty(selection.mshape[-1], dtype=val.dtype)
