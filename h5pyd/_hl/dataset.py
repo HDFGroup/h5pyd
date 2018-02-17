@@ -561,6 +561,7 @@ class Dataset(HLObject):
             # This is necessary because in the case of array types, NumPy
             # discards the array information at the top level.
             new_dtype = readtime_dtype(self.dtype, names)
+            self.log.debug("new_dtype: {}".format(new_dtype))
         if new_dtype.kind == 'S' and check_dtype(ref=self.dtype):
             new_dtype = special_dtype(ref=Reference)
         
@@ -601,19 +602,25 @@ class Dataset(HLObject):
             #fspace = self.id.get_space()
             #selection = sel2.select_read(fspace, args)
             selection = sel.select(self, args)
+            self.log.info("selection.mshape: {}".format(selection.mshape))
 
             # TBD - refactor the following with the code for the non-scalar case
             req = "/datasets/" + self.id.uuid + "/value"
             rsp = self.GET(req, format="binary")
             if type(rsp) is bytes:
                 # got binary response
+                self.log.info("got binary response for scalar selection")
                 arr = numpy.frombuffer(rsp, dtype=new_dtype)
+                if not self.dtype.shape:
+                    self.log.debug("reshape arr to: {}".format(self._shape))
+                    arr = numpy.reshape(arr, self._shape)
             else:
                 # got JSON response
                 # need some special conversion for compound types --
                 # each element must be a tuple, but the JSON decoder
                 # gives us a list instead.
                 data = rsp['value']
+                self.log.info("got json response for scalar selection")
                 if len(mtype) > 1 and type(data) in (list, tuple):
                     converted_data = []
                     for i in range(len(data)):
@@ -623,6 +630,7 @@ class Dataset(HLObject):
                 arr = numpy.empty((), dtype=new_dtype)
                 arr[()] = data
             if selection.mshape is None:
+                self.log.info("return scalar selection of: {}, dtype: {}, shape: {}".format(arr, arr.dtype, arr.shape))
                 return arr[()]
 
             return arr
@@ -1154,7 +1162,7 @@ class Dataset(HLObject):
             return
         
         # Broadcast scalars if necessary.
-        if (mshape == () and selection.mshape != ()):
+        if (mshape == () and selection.mshape != None and selection.mshape != ()):
             self.log.debug("broadcast scalar")
             self.log.debug("selection.mshape: {}".format(selection.mshape))
             if self.dtype.subdtype is not None:

@@ -41,6 +41,12 @@ class TestScalarDataset(TestCase):
         dset[...] = 24
         val = dset[()]
         self.assertEqual(val, 24)
+        self.assertTrue(isinstance(val, np.int64))
+
+        # try will ellipsis
+        val = dset[...]
+        self.assertEqual(val, 24)
+        self.assertTrue(isinstance(val, np.ndarray))
 
         # try setting value using tuple
         dset[()] = 99
@@ -57,6 +63,6 @@ class TestScalarDataset(TestCase):
 
 
 if __name__ == '__main__':
-    loglevel = logging.DEBUG
-    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
+    #loglevel = logging.DEBUG
+    #logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()
