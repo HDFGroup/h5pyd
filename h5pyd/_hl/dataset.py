@@ -1167,9 +1167,10 @@ class Dataset(HLObject):
             self.log.debug("selection.mshape: {}".format(selection.mshape))
             if self.dtype.subdtype is not None:
                 raise TypeError("Scalar broadcasting is not supported for array dtypes")
-            val2 = numpy.empty(selection.mshape[-1], dtype=val.dtype)
+            val2 = numpy.empty(selection.mshape, dtype=val.dtype)
             val2[...] = val
             val = val2
+            self.log.debug("updated val: {}".format(val))
             mshape = val.shape
 
         # Perform the write, with broadcasting

@@ -35,6 +35,17 @@ class TestSetItemDataset(TestCase):
         dset[()] = arr
         f.close()
 
+    def test_broadcast(self):
+        filename = self.getFileName("dset_broadcast")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+        dset = f.create_dataset("dset", (4,5), dtype=np.int32)
+        dset[...] = 42
+        for i in range(4):
+            self.assertEqual(dset[i,i], 42)
+        f.close()
+
+
 
 if __name__ == '__main__':
     ut.main()
