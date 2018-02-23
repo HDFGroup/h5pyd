@@ -17,6 +17,7 @@ else:
 
 from common import ut, TestCase
 from datetime import datetime
+import os.path
 import six
 
 
@@ -198,6 +199,55 @@ class TestGroup(TestCase):
             #self.assertEqual(g1.modified.tzname(), six.u('UTC'))
          
         f.close()
+
+    def test_external_links(self):
+        # create a file for use a link target
+        linked_filename = self.getFileName("linked_file")
+        abs_filepath = os.path.abspath(linked_filename)
+        if config.get("use_h5py"):
+            rel_filepath = os.path.relpath(linked_filename)
+        else:
+            rel_filepath = "linked_file.h5"
+        f = h5py.File(linked_filename, 'w')
+        is_hsds = False
+        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+            is_hsds = True  
+        g1 = f.create_group("g1")
+        dset = g1.create_dataset('ds', (5,7), dtype='f4')
+        dset_id = dset.id.id
+        f.close()
+
+        filename = self.getFileName("external_links")
+        print("filename:", filename)
+        
+        f = h5py.File(filename, 'w')
+        f["missing_link"] = h5py.ExternalLink(abs_filepath, "somepath")
+        f["abspath_link"] = h5py.ExternalLink(abs_filepath, "/g1/ds")
+        f["relpath_link"] = h5py.ExternalLink(rel_filepath, "/g1/ds")
+        try:
+            linked_obj = f["missing_link"]
+            self.assertTrue(False)
+        except KeyError:
+            pass # expected
+        
+        try:
+            linked_obj = f["abspath_link"]
+            self.assertTrue(linked_obj.name, "/g1/ds")
+            self.assertEqual(linked_obj.shape, (5, 7))
+            self.assertEqual(linked_obj.id.id, dset_id)
+        except KeyError:
+            if config.get("use_h5py") or is_hsds:
+                # absolute paths aren't working yet for h5serv
+                self.assertTrue(False)
+
+        linked_obj = f["relpath_link"]
+        self.assertTrue(linked_obj.name, "/g1/ds")
+        self.assertEqual(linked_obj.shape, (5, 7))
+        if not config.get("use_h5py"):
+            self.assertEqual(linked_obj.id.id, dset_id)
+        
+        f.close()
+
         
 
 if __name__ == '__main__':

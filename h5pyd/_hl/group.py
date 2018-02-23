@@ -382,8 +382,13 @@ class Group(HLObject, MutableMappingHDF5):
             # Note: set use_session to false since file.close won't be called
             #  (and hince the httpconn socket won't be closed)
             from .files import File
+            external_domain = link_json['h5domain']
+            if not op.isabs(external_domain):
+                current_domain = self._id.http_conn.domain
+                external_domain = op.join(op.dirname(current_domain), external_domain)
+                external_domain = op.normpath(external_domain)
             try:
-                f = File(link_json['h5domain'], endpoint=self.id.http_conn.endpoint, mode='r', use_session=False)
+                f = File(external_domain, endpoint=self.id.http_conn.endpoint, mode='r', use_session=False)
             except IOError:
                 # unable to find external link
                 raise KeyError("Unable to open file: " + link_json['h5domain'])
