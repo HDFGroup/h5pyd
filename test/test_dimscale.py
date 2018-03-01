@@ -15,6 +15,7 @@ import numpy as np
 import six
 import config
 from common import ut, TestCase
+import logging
 
 if config.get("use_h5py"):
     import h5py
@@ -132,4 +133,6 @@ class TestDimensionScale(TestCase):
 
 
 if __name__ == '__main__':
+    loglevel = logging.DEBUG
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

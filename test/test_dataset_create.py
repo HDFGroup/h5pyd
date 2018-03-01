@@ -83,6 +83,41 @@ class TestCreateDataset(TestCase):
 
         f.close()
 
+    def test_fillvalue_char_dset(self):
+        filename = self.getFileName("fillvalue_char_dset")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+        is_h5serv = False
+        if not config.get('use_h5py') and isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+            # the following is failing on h5serv
+            f.close()
+            return
+    
+        dims = (6, 3)
+        dtype = np.dtype("S1")
+        fillvalue = b'X'
+        data = [[b'a', b'', b''],
+                [b'b', b'', b''],
+                [b'c', b'', b''],
+                [b'f', b'o', b'o'],
+                [b'b', b'a', b'r'],
+                [b'b', b'a', b'z']]
+        dset = f.create_dataset('ds1', dims, data=data, fillvalue=fillvalue, dtype=dtype)
+
+        self.assertEqual(dset.name, "/ds1")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 2)
+        self.assertEqual(dset.shape[0], 6)
+        self.assertEqual(dset.shape[1], 3)
+        self.assertEqual(str(dset.dtype), '|S1')
+        self.assertEqual(dset.fillvalue, b'X')
+        self.assertEqual(dset[0,0], b'a')
+        self.assertEqual(dset[5,2], b'z')
+        
+
+        f.close()
+
+
     def test_simple_1d_dset(self):
         filename = self.getFileName("simple_1d_dset")
         print("filename:", filename)

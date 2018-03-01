@@ -86,7 +86,7 @@ def setSliceQueryParam(params, dims, sel):
         params["select"] = sel_param
 
 
-def make_new_dset(parent, shape=None, dtype=None, data=None,
+def make_new_dset(parent, shape=None, dtype=None, 
                  chunks=None, compression=None, shuffle=None,
                     fletcher32=None, maxshape=None, compression_opts=None,
                   fillvalue=None, scaleoffset=None, track_times=None):
@@ -97,20 +97,14 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
 
     # fill in fields for the body of the POST request as we got
     body = { }
-    # Convert data to a C-contiguous ndarray
-    if data is not None:
-        from . import base
-        data = numpy.asarray(data, order="C", dtype=base.guess_dtype(data))
-
+    
     # Validate shape
     if shape is None:
-        if data is None:
-            raise TypeError("Either data or shape must be specified")
-        shape = data.shape
+        raise TypeError("shape must be specified")
     else:
         shape = tuple(shape)
-        if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
-            raise ValueError("Shape tuple is incompatible with data")
+        #if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
+        #    raise ValueError("Shape tuple is incompatible with data")
     body['shape'] = shape
 
     # Validate chunk shape
@@ -133,10 +127,8 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
 
     else:
         # Validate dtype
-        if dtype is None and data is None:
+        if dtype is None:
             dtype = numpy.dtype("=f4")
-        elif dtype is None and data is not None:
-            dtype = data.dtype
         else:
             dtype = numpy.dtype(dtype)
 
@@ -217,14 +209,7 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
     if "layout" in rsp:
         json_rep['layout'] = rsp['layout']
 
-    dset_id = DatasetID(parent, json_rep)
-
-    if data is not None:
-        req = "/datasets/" + dset_id.uuid + "/value"
-        body = {}
-        # TBD - this will be inefficient if data is already a numpy array
-        body['value'] = data.tolist()
-        parent.PUT(req, body=body)
+    dset_id = DatasetID(parent, json_rep) 
 
     return dset_id
 
@@ -375,14 +360,13 @@ class Dataset(HLObject):
     def fillvalue(self):
         """Fill value for this dataset (0 by default)"""
         dcpl = self.id.dcpl_json
+        arr = np.zeros((), dtype=self._dtype)
         fill_value = None
         if "fillValue" in dcpl:
             fill_value = dcpl["fillValue"]
-        else:
-            arr = np.zeros((), dtype=self._dtype)
-            fill_value = arr.tolist()
-
-        return fill_value
+            arr[()] = fill_value
+         
+        return arr[()]
 
     @property
     def num_chunks(self):
@@ -1154,6 +1138,7 @@ class Dataset(HLObject):
         """
         mshape = val.shape
         self.log.debug("mshape: {}".format(mshape))
+        self.log.debug("data dtype: {}".format(val.dtype))
         
         # Perform the dataspace selection
         selection = sel.select(self, args)

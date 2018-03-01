@@ -148,6 +148,7 @@ class TestFile(TestCase):
             else:
                 filepath = "hdf5://" + filename
             f = h5py.File(filepath, 'r')
+            print("hdf5:// filepath:", filepath)
             self.assertEqual(f.filename, filename)
             self.assertEqual(f.name, "/")
             self.assertTrue(f.id.id is not None)

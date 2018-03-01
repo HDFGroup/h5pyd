@@ -17,7 +17,7 @@ import os.path as op
 import numpy
 import collections
 
-from .base import HLObject, MutableMappingHDF5, phil
+from .base import HLObject, MutableMappingHDF5, phil, guess_dtype
 from .objectid import TypeID, GroupID, DatasetID
 from . import dataset
 from .dataset import Dataset
@@ -145,8 +145,34 @@ class Group(HLObject, MutableMappingHDF5):
             raise ValueError("Unable to create dataset (No write intent on file)")
 
         with phil:
-            dsid = dataset.make_new_dset(self, shape, dtype, data, **kwds)
+            if shape is None and data is None:
+                raise TypeError("Either data or shape must be specified")
+            
+            # Convert data to a C-contiguous ndarray
+            if data is not None:
+                if dtype is None:
+                    dtype = guess_dtype(data)
+                if dtype is None:
+                    dtype = numpy.float32
+                if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
+                    data = numpy.asarray(data, order="C", dtype=dtype)
+                self.log.info("data dtype: {}".format(data.dtype))
+
+            # Validate shape
+            if shape is None:
+                if data is None:
+                    raise TypeError("Either data or shape must be specified")
+                shape = data.shape
+            else:
+                shape = tuple(shape)
+            if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
+                raise ValueError("Shape tuple is incompatible with data")
+
+            dsid = dataset.make_new_dset(self, shape, dtype, None, **kwds)
             dset = dataset.Dataset(dsid)
+            if data is not None:
+                self.log.info("initialize data")
+                dset[...] = data
 
             if name is not None:
                 items = name.split('/')
