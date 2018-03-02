@@ -1084,9 +1084,11 @@ class Dataset(HLObject):
                 val = val.astype(numpy.dtype([(names[0], dtype)]))
                 # val = val.reshape(val.shape[:len(val.shape) - len(dtype.shape)])
         elif isinstance(val, numpy.ndarray):
-            # TBD - convert array if needed
+            # convert array if needed
+            # TBD - need to handle cases where the type shape is different
             self.log.debug("got numpy array")
-            if val.dtype != self.dtype:
+            if val.dtype != self.dtype and val.dtype.shape == self.dtype.shape:
+                self.log.info("converting {} to {}".format(val.dtype, self.dtype))
                 # convert array
                 tmp = numpy.empty(val.shape, dtype=self.dtype)
                 tmp[...] = val[...]
