@@ -12,6 +12,7 @@
 
 import numpy as np
 import math
+import logging
 
 import config
 
@@ -45,7 +46,19 @@ class TestSetItemDataset(TestCase):
             self.assertEqual(dset[i,i], 42)
         f.close()
 
+    def test_type_conversion(self):
+        filename = self.getFileName("dset_type_conversion")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+        dset = f.create_dataset("dset", (4,), dtype=np.int32)
+        dset[...] = np.arange(4.0)
+        for i in range(4):
+            self.assertEqual(dset[i], 0.0 + i)
+        f.close()
+
 
 
 if __name__ == '__main__':
+    loglevel = logging.ERROR
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

@@ -1086,7 +1086,11 @@ class Dataset(HLObject):
         elif isinstance(val, numpy.ndarray):
             # TBD - convert array if needed
             self.log.debug("got numpy array")
-            pass
+            if val.dtype != self.dtype:
+                # convert array
+                tmp = numpy.empty(val.shape, dtype=self.dtype)
+                tmp[...] = val[...]
+                val = tmp
         else:
             val = numpy.asarray(val, order='C', dtype=self.dtype)
 
