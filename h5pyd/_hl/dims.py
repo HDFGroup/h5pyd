@@ -338,19 +338,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
 
         Provide the dataset and a name for the scale.
         '''
-        try:
-            dset.attrs['DIMENSION_LIST']
-            raise RuntimeError('{} already has its own dimension scales'
-                               .format(dset.name))
-        except KeyError:
-            pass
-        try:
-            if dset.attrs['CLASS'] == 'DIMENSION_SCALE':
-                raise RuntimeError('{} already a dimension scale'
-                                   .format(dset.name))
-        except KeyError:
-            pass
-
+         
         # CLASS attribute with the value 'DIMENSION_SCALE'
         class_attr = {
             'creationProperties': {

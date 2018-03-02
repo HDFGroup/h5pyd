@@ -58,7 +58,7 @@ class TestDimensionScale(TestCase):
 
         # Try re-creating the last dimscale
         dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
-
+         
         # Attach a non-dimension scale (and in the process make it a dimension
         # scale)
         dset.dims[1].attach_scale(f['not_scale'])
@@ -136,6 +136,6 @@ class TestDimensionScale(TestCase):
 
 
 if __name__ == '__main__':
-    loglevel = logging.ERROR
+    loglevel = logging.DEBUG
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

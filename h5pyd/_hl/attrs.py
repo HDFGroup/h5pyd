@@ -102,14 +102,14 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         self._parent = parent
 
         if isinstance(parent.id, GroupID):
-            self._req_prefix = "/groups/" + parent.id.uuid + "/attributes/"
+            self._req_prefix = u"/groups/" + parent.id.uuid + u"/attributes/"
         elif isinstance(parent.id, TypeID):
-            self._req_prefix = "/datatypes/" + parent.id.uuid + "/attributes/"
+            self._req_prefix = u"/datatypes/" + parent.id.uuid + u"/attributes/"
         elif isinstance(parent.id, DatasetID):
-            self._req_prefix = "/datasets/" + parent.id.uuid + "/attributes/"
+            self._req_prefix = u"/datasets/" + parent.id.uuid + u"/attributes/"
         else:
             # "unknown id"
-            self._req_prefix = "<unknown>"
+            self._req_prefix = u"<unknown>"
    
     
     def _bytesArrayToList(self, data):
@@ -217,6 +217,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     @with_phil
     def __delitem__(self, name):
         """ Delete an attribute (which must already exist). """
+        if six.PY3 and isinstance(name, bytes):
+            name = name.decode("utf-8")
         req = self._req_prefix + name
         self._parent.DELETE(req)
 
@@ -382,6 +384,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     def __contains__(self, name):
         """ Determine if an attribute exists, by name. """
         exists = True
+        if six.PY3 and isinstance(name, bytes):
+            name = name.decode("utf-8")
         req = self._req_prefix + name
         try:
             self._parent.GET(req)
