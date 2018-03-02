@@ -141,6 +141,7 @@ class Group(HLObject, MutableMappingHDF5):
             (T/F) Enable dataset creation timestamps.
         """
 
+        
         if self.id.http_conn.mode == 'r':
             raise ValueError("Unable to create dataset (No write intent on file)")
 
@@ -167,8 +168,8 @@ class Group(HLObject, MutableMappingHDF5):
                 shape = tuple(shape)
             if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
                 raise ValueError("Shape tuple is incompatible with data")
-
-            dsid = dataset.make_new_dset(self, shape, dtype, None, **kwds)
+   
+            dsid = dataset.make_new_dset(self, shape=shape, dtype=dtype, **kwds)
             dset = dataset.Dataset(dsid)
             if data is not None:
                 self.log.info("initialize data")

@@ -347,8 +347,52 @@ class TestCreateDataset(TestCase):
             self.assertEqual(chunks[1], 40)
         self.assertEqual(dset.compression, 'gzip')
         self.assertEqual(dset.compression_opts, 9)
+        self.assertFalse(dset.shuffle)
 
         dset_ref = f['/simple_dset_gzip']
+        self.assertTrue(dset_ref is not None)
+        if not config.get("use_h5py"):
+            # obj ids should be the same with h5pyd (but not h5py)
+            self.assertEqual(dset.id.id, dset_ref.id.id)
+            # Check dataset's last modified time
+            self.assertTrue(isinstance(dset.modified, datetime))
+            #self.assertEqual(dset.modified.tzname(), six.u('UTC'))
+
+        f.close()
+
+    def test_create_dset_gzip_and_shuffle(self):
+        filename = self.getFileName("create_dset_gzip_and_shuffle")
+        print("filename:", filename)
+
+        f = h5py.File(filename, "w")
+
+        dims = (40, 80)
+
+        # create some test data
+        arr = np.random.rand(dims[0], dims[1])
+        kwds = {"chunks": (4,8)}
+        dset = f.create_dataset('simple_dset_gzip_shuffle', data=arr, dtype='f8',
+            compression='gzip', shuffle=True, compression_opts=9, **kwds)
+
+        self.assertEqual(dset.name, "/simple_dset_gzip_shuffle")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 2)
+        self.assertEqual(dset.shape[0], 40)
+        self.assertEqual(dset.shape[1], 80)
+        self.assertEqual(str(dset.dtype), 'float64')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 2)
+        self.assertEqual(dset.maxshape[0], 40)
+        self.assertEqual(dset.maxshape[1], 80)
+
+        chunks = dset.chunks  # chunk layout auto-generated
+        self.assertTrue(chunks is not None)
+        self.assertEqual(len(chunks), 2)
+        self.assertEqual(dset.compression, 'gzip')
+        self.assertEqual(dset.compression_opts, 9)
+        self.assertTrue(dset.shuffle)
+
+        dset_ref = f['/simple_dset_gzip_shuffle']
         self.assertTrue(dset_ref is not None)
         if not config.get("use_h5py"):
             # obj ids should be the same with h5pyd (but not h5py)
