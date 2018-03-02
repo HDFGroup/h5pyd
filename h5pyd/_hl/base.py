@@ -463,7 +463,8 @@ class HLObject(CommonStateObject):
             rsp_json = json.loads(rsp.text)
             return rsp_json
 
-    def PUT(self, req, body=None, params=None, format="json"):
+
+    def PUT(self, req, body=None, params=None, format="json", replace=False):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
 
@@ -472,7 +473,17 @@ class HLObject(CommonStateObject):
 
         if rsp.status_code not in (200, 201):
             if rsp.status_code == 409:
-                raise RuntimeError(rsp.reason)
+                # Conflict error
+                if replace:
+                    self.log.info("replacing resource: {}".format(req))
+                    rsp = self.id._http_conn.DELETE(req)
+                    if rsp.status_code != 200:
+                        raise IOError(rsp.reason)
+                    rsp = self._id._http_conn.PUT(req, body=body, params=params, format=format)
+                    if rsp.status_code not in (200, 201):
+                        raise IOError(rsp.reason)
+                else:
+                    raise RuntimeError(rsp.reason)
             else:
                 raise IOError(rsp.reason)
 

@@ -58,7 +58,7 @@ class DimensionProxy(base.CommonStateObject):
                 'value': ['' for n in range(rank)]
             }
         labels['value'][self._dimension] = val
-        dset.PUT(req, body=labels)
+        dset.PUT(req, body=labels, replace=True)
 
     @with_phil
     def __init__(self, id_, dimension):
@@ -173,7 +173,7 @@ class DimensionProxy(base.CommonStateObject):
         # Update the DIMENSION_LIST attribute with the object reference to the
         # dimension scale
         dimlist['value'][self._dimension].append('datasets/' + dscale.id.id)
-        dset.PUT(req, body=dimlist)
+        dset.PUT(req, body=dimlist, replace=True)
 
         req = dscale.attrs._req_prefix + 'REFERENCE_LIST'
         try:
@@ -217,7 +217,7 @@ class DimensionProxy(base.CommonStateObject):
         reflist['shape']['dims'] = [len(reflist['value'])]
         reflist['shape']['maxdims'] = [len(reflist['value'])]
         with phil:
-            dscale.PUT(req, body=reflist)
+            dscale.PUT(req, body=reflist, replace=True)
 
     def detach_scale(self, dscale):
         ''' Remove a scale from this dimension.
@@ -392,8 +392,8 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
         req_class = dset.attrs._req_prefix + 'CLASS'
         req_name = dset.attrs._req_prefix + 'NAME'
         with phil:
-            dset.PUT(req_class, body=class_attr)
+            dset.PUT(req_class, body=class_attr, replace=True)
             try:
-                dset.PUT(req_name, body=name_attr)
+                dset.PUT(req_name, body=name_attr, replace=True)
             except Exception:
                 dset.DELETE(req_class)
