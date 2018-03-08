@@ -68,11 +68,12 @@ class TestDimensionScale(TestCase):
         with self.assertRaises(RuntimeError):
             f['scale_x'].dims[0].attach_scale(f['scale_z'])
 
-        
-
         self.assertEqual(len(dset.dims[0]), 0)
 
-        #dset.dims[0].attach_scale(f['wrong_dims'])
+        dset.dims[0].attach_scale(f['wrong_dims'])
+        self.assertEqual(len(dset.dims[0]), 1)
+        dset.dims[0].detach_scale(f['wrong_dims'])
+        self.assertEqual(len(dset.dims[0]), 0)
 
         dset.dims[0].attach_scale(f['scale_x'])
 
