@@ -386,7 +386,7 @@ class TestCreateDataset(TestCase):
         self.assertEqual(dset.maxshape[1], 80)
 
         chunks = dset.chunks  # chunk layout auto-generated
-        self.assertTrue(chunks is not None)
+        self.assertTrue(isinstance(chunks, tuple))
         self.assertEqual(len(chunks), 2)
         self.assertEqual(dset.compression, 'gzip')
         self.assertEqual(dset.compression_opts, 9)

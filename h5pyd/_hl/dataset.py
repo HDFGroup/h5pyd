@@ -300,7 +300,10 @@ class Dataset(HLObject):
     @property
     def chunks(self):
         """Dataset chunks (or None)"""
-        return self.id.chunks
+        ret = self.id.chunks
+        if isinstance(ret, list):
+            ret = tuple(ret)
+        return ret
 
     @property
     def compression(self):
