@@ -41,6 +41,7 @@ class TestDimensionScale(TestCase):
         f.create_dataset('scale_z', data=np.arange(10) * 10e3)
         f.create_dataset('not_scale', data=np.arange(10) * 10e3)
         f.create_dataset('scale_name', data=np.arange(10) * 10e3)
+        f.create_dataset('wrong_dims', shape=(10,10), dtype=np.float64)
 
         self.assertIsInstance(dset.dims, h5py._hl.dims.DimensionManager)
         self.assertEqual(len(dset.dims), len(dset.shape))
@@ -67,7 +68,11 @@ class TestDimensionScale(TestCase):
         with self.assertRaises(RuntimeError):
             f['scale_x'].dims[0].attach_scale(f['scale_z'])
 
+        
+
         self.assertEqual(len(dset.dims[0]), 0)
+
+        #dset.dims[0].attach_scale(f['wrong_dims'])
 
         dset.dims[0].attach_scale(f['scale_x'])
 
@@ -136,6 +141,6 @@ class TestDimensionScale(TestCase):
 
 
 if __name__ == '__main__':
-    loglevel = logging.ERROR
+    loglevel = logging.WARN
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

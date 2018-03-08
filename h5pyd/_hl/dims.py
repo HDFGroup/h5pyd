@@ -145,30 +145,33 @@ class DimensionProxy(base.CommonStateObject):
 
         # Create a DIMENSION_LIST attribute if needed
         req = dset.attrs._req_prefix + 'DIMENSION_LIST'
+        rank = len(dset.shape)
+        value = [list() for r in range(rank)]
         try:
             dimlist = dset.GET(req)
+            value = dimlist["value"]
             dset.DELETE(req)
         except IOError:
-            rank = len(dset.shape)
-            value = [list() for r in range(rank)]
-            dimlist = {
-                'creationProperties': {
-                    'nameCharEncoding': 'H5T_CSET_ASCII'
+            pass
+
+        dimlist = {
+            'creationProperties': {
+                'nameCharEncoding': 'H5T_CSET_ASCII'
+            },
+            'shape': {
+                'class': 'H5S_SIMPLE',
+                'dims': [rank],
+                'maxdims': [rank]
+            },
+            'type': {
+                'base': {
+                    'base': 'H5T_STD_REF_OBJ',
+                    'class': 'H5T_REFERENCE'
                 },
-                'shape': {
-                    'class': 'H5S_SIMPLE',
-                    'dims': [rank],
-                    'maxdims': [rank]
-                },
-                'type': {
-                    'base': {
-                        'base': 'H5T_STD_REF_OBJ',
-                        'class': 'H5T_REFERENCE'
-                    },
-                    'class': 'H5T_VLEN'
-                },
-                'value': value
-            }
+                'class': 'H5T_VLEN'
+            },
+            'value': value
+        }
 
         # Update the DIMENSION_LIST attribute with the object reference to the
         # dimension scale
