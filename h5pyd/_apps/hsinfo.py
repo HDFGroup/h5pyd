@@ -112,7 +112,7 @@ def main():
     endpoint = cfg["hs_endpoint"]
  
     print("endpoint: {}".format(endpoint)) 
-    if endpoint[-1] == '/' or endpoint[:4] != "http":
+    if not endpoint or endpoint[-1] == '/' or endpoint[:4] != "http":
         print("WARNING: endpoint: {} doesn't appear to be valid".format(endpoint))
     try:
         info = h5pyd.getServerInfo(username=username, password=password, endpoint=endpoint)
