@@ -54,6 +54,7 @@ class TestDimensionScale(TestCase):
 
         # Create and name dimension scales
         dset.dims.create_scale(f['scale_x'], 'Simulation X (North) axis')
+        print("dimscale_attrs:", list(dset.dims))
         dset.dims.create_scale(f['scale_y'], 'Simulation Y (East) axis')
         dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
 
