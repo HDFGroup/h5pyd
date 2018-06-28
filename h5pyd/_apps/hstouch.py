@@ -26,7 +26,10 @@ def createFolder(domain):
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
     #print("getFolder", domain)
-    dir = h5py.Folder(domain, mode='x', endpoint=endpoint, username=username, password=password)
+    owner = None
+    if "hs_owner" in cfg:
+        owner=cfg["hs_owner"]
+    dir = h5py.Folder(domain, mode='x', endpoint=endpoint, username=username, password=password, owner=owner)
     return dir
 
 def getFile(domain):
@@ -42,7 +45,10 @@ def createFile(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
-    fh = h5py.File(domain, mode='x', endpoint=endpoint, username=username, password=password)
+    owner = None
+    if "hs_owner" in cfg:
+        owner=cfg["hs_owner"]
+    fh = h5py.File(domain, mode='x', endpoint=endpoint, username=username, password=password, owner=owner)
     return fh
 
 
@@ -121,7 +127,7 @@ def touchDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains".format(cfg["cmd"]))
+    print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [-o owner] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains".format(cfg["cmd"]))
     print("example: {} -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/emptydomain.h5".format(cfg["cmd"]))
     sys.exit()
 
@@ -170,6 +176,9 @@ def main():
             argn += 2
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = sys.argv[argn+1]
+            argn += 2
+        elif arg in ("-o", "--owner"):
+            cfg["hs_owner"] = sys.argv[argn+1]
             argn += 2
         elif arg[0] == '-':
             printUsage()

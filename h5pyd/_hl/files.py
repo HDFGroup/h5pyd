@@ -86,7 +86,7 @@ class File(Group):
         return self.id.http_conn.owner
 
     def __init__(self, domain, mode=None, endpoint=None, username=None, password=None,
-        api_key=None, use_session=True, use_cache=False, logger=None, **kwds):
+        api_key=None, use_session=True, use_cache=False, logger=None, owner=None, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -205,7 +205,10 @@ class File(Group):
                 if mode not in ('w', 'a', 'x'):
                     http_conn.close()
                     raise IOError(404, "File not found")
-                rsp = http_conn.PUT(req)
+                body = {}
+                if owner:
+                    body["owner"] = owner
+                rsp = http_conn.PUT(req, body=body)
                 if rsp.status_code != 201:
                     http_conn.close()
                     raise IOError(rsp.status_code, rsp.reason)

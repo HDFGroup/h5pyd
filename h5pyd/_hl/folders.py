@@ -66,7 +66,7 @@ class Folder():
         
 
     def __init__(self, domain_name, mode=None, endpoint=None, 
-        username=None, password=None, api_key=None, logger=None, **kwds):
+        username=None, password=None, api_key=None, logger=None, owner=None, **kwds):
         """Create a new Folders object.
 
 
@@ -136,6 +136,8 @@ class Folder():
         if rsp.status_code in (404, 410) and mode in ('w', 'w-', 'x'):
             # create folder
             body = {"folder": True}
+            if owner:
+                body["owner"] = owner
             rsp = self._http_conn.PUT(req, body=body)  
             if rsp.status_code != 201:
                 self._http_conn.close() 
