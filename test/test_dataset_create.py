@@ -57,8 +57,8 @@ class TestCreateDataset(TestCase):
         if h5py.__name__ == "h5pyd":
             # test h5pyd extensions
             print("test h5pyd extensions")
-            self.assertEqual(dset.num_chunks, None)
-            self.assertEqual(dset.allocated_size, None)
+            self.assertEqual(dset.num_chunks, 0)
+            self.assertEqual(dset.allocated_size, 0)
 
         f.close()
 

@@ -148,6 +148,7 @@ class Folder():
                 self.log.error("status_code: {}".format(rsp.status_code))
             raise IOError(rsp.status_code, rsp.reason)
         domain_json = json.loads(rsp.text)
+        self.log.info("domain_json: {}".format(domain_json))
         if "class" in domain_json:
             if domain_json["class"] != "folder":
                 self.log.warning("Not a folder domain")
@@ -220,6 +221,7 @@ class Folder():
             params = {"domain": '/'}
         else:
             params = {"domain": self._domain + '/'}
+        params["verbose"] = 1  # to get lastModified
         rsp = self._http_conn.GET(req, params=params)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
@@ -227,6 +229,7 @@ class Folder():
         if "domains" not in rsp_json:
             raise IOError(500, "Unexpected Error")
         domains = rsp_json["domains"]
+        #self.log.debug("domains: {}".format(domains))
         
         return domains
 
