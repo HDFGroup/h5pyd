@@ -56,9 +56,10 @@ class TestCreateDataset(TestCase):
 
         if h5py.__name__ == "h5pyd":
             # test h5pyd extensions
-            print("test h5pyd extensions")
-            self.assertEqual(dset.num_chunks, 0)
-            self.assertEqual(dset.allocated_size, 0)
+            if not config.get('use_h5py') and isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+                print("test h5pyd extensions")
+                self.assertEqual(dset.num_chunks, 0)
+                self.assertEqual(dset.allocated_size, 0)
 
         f.close()
 
@@ -87,7 +88,6 @@ class TestCreateDataset(TestCase):
         filename = self.getFileName("fillvalue_char_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-        is_h5serv = False
         if not config.get('use_h5py') and isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             # the following is failing on h5serv
             f.close()
