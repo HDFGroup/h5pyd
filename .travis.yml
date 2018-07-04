@@ -43,7 +43,7 @@ script:
     export HS_PASSWORD=test ;
     export TEST2_PASSWORD=test ;
   elif [ "${H5_DRIVER}" == "hsds" ]; then
-    export HS_ENDPOINT=http://hsds.hdflab.hdfgroup.org ;
+    export HS_ENDPOINT=http://hsdshdflab.hdfgroup.org ;
     export H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test/${TRAVIS_PYTHON_VERSION} ;
     curl ${HS_ENDPOINT}/about ;
   else
