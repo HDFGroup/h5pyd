@@ -55,6 +55,30 @@ def getUpTime(start_time):
 
 
     return ret_str
+
+#
+# Get folder in /home/ that is owned by given user
+#
+def getHomeFolder(username):
+    if not username:
+        return None
+    dir = h5pyd.Folder('/home/')  # get folder object for root
+    homefolder = None
+    for name in dir:
+        # we should come across the given domain
+        if username.startswith(name):
+            # check any folders where the name matches at least part of the username
+            # e.g. folder: "/home/bob/" for username "bob@acme.com"
+            path = '/home/' + name + '/'
+            f = h5pyd.Folder(path)
+            if f.owner == username:
+                homefolder = path
+            f.close()
+            if homefolder:
+                break
+
+    dir.close()
+    return homefolder
 #
 # Main
 #
@@ -121,6 +145,9 @@ def main():
             print("server state: {}".format(info['state']))
         print("username: {}".format(info["username"]))
         print("password: {}".format(info["password"]))
+        home_folder = getHomeFolder(username)
+        if home_folder:
+            print("home: {}".format(home_folder))
     
         if "hsds_version" in info:
             print("server version: {}".format(info["hsds_version"]))
@@ -130,6 +157,7 @@ def main():
             uptime = getUpTime(info["start_time"])
             print("up: {}".format(uptime))
         print("h5pyd version: {}".format(h5pyd.version.version))
+        
         
     except IOError as ioe:
         if ioe.errno == 401:
