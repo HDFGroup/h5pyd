@@ -207,23 +207,13 @@ def dumpACL(acl):
 
 def dumpAcls(obj):
     try:
-        default_acl = obj.getACL("default")
-        dumpACL(default_acl)
+        acls = obj.getACLs()
     except IOError:
         print("read ACLs is not permitted")
         return
-
-    try:
-        acls = obj.getACLs()
-     
-        for acl in acls:
-            if acl["userName"] == "default":
-                continue
-            dumpACL(acl)
-    except IOError:
-        # if requesting user does not permission to read non-default acl,
-        # just ignore
-        pass 
+    
+    for acl in acls:
+        dumpACL(acl)
 
 def getFolder(domain):
     username = cfg["hs_username"]
