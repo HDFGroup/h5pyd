@@ -425,7 +425,6 @@ def main():
             if grp is None:
                 print("{}: No such domain".format(domain))
                 domain += '/'
-                print("Trying as a folder {}".format(domain))
                 count = visitDomains(domain, depth=depth)
                 print("{} items".format(count))
                 continue
