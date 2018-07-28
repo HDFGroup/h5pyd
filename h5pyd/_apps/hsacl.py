@@ -66,8 +66,8 @@ def printUsage():
     print("examples...")
     print("list acls: {} /home/jill/myfile.h5".format(cfg["cmd"]))
     print("list ted's acl (if any): {} /home/jill/myfile.h5  ted".format(cfg["cmd"]))
-    print("add/update acl to give ted read & update permissions: {} +ru /home/jill/myfile.h5 ted".format(cfg["cmd"]))
-    print("remove all permissions except read for jill: {} -cudep /home/jill/myfile.h5 jill".format(cfg["cmd"]))
+    print("add/update acl to give ted read & update permissions: {} /home/jill/myfile.h5 +ru ted".format(cfg["cmd"]))
+    print("remove all permissions except read for jill: {} /home/jill/myfile.h5 -cudep jill".format(cfg["cmd"]))
     print("")
     sys.exit()
 
