@@ -227,8 +227,14 @@ def main():
 
     # update/add ACL if permission flags have been set
     if perm:
-        default_acl = getACL(f)  
-        logging.info("default acl:", default_acl)
+        default_acl = {'updateACL': False, 
+                       'delete': False, 
+                       'create': False, 
+                       'read': False, 
+                       'update': False, 
+                       'readACL': False,
+                       'userName': 'default'
+                       } 
         update_names = usernames.copy()
         if not update_names:
             update_names.append("default")
