@@ -33,7 +33,7 @@ def getACL(f, username="default"):
         elif ioe.errno == 401:
             print("username/password needs to be provided")
             sys.exit(1)
-        elif ioe.errno == 404:
+        elif ioe.errno == 404 or not ioe.errno:
             return None
         else:
             print("unexpected error: {}".format(ioe))
