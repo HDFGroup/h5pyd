@@ -63,9 +63,6 @@ def touchDomain(domain):
     # get handle to parent folder
     parent_domain = op.dirname(domain) 
 
-    if len(parent_domain) < 2:
-        sys.exit("can't create top-level domain")
-
     if not parent_domain.endswith('/'):
         parent_domain += '/'
     try:
