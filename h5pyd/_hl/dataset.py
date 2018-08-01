@@ -786,7 +786,7 @@ class Dataset(HLObject):
                         else:
                             slices.append(slice(0, mshape[i]))
                     self.log.debug("slices: {}".format(slices))
-                    arr[slices] = page_arr
+                    arr[tuple(slices)] = page_arr
 
                     page_start[split_dim] = page_stop[split_dim]
                     self.log.debug("new page_start: {}".format(page_start))
