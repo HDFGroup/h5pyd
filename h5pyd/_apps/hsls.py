@@ -290,10 +290,12 @@ def visitDomains(domain, depth=1):
                 count += n
 
     except IOError as oe:
-        if oe.errno in (404, 410):
-            # TBD: recently creating domains may not be immediately visible to
+        if oe.errno in (403, 404, 410):
+            # TBD: recently created domains may not be immediately visible to
             # the service Once the flush operation is implemented, this should
             # be an issue for h5pyd apps
+            #
+            # Also, ignore domains for which we don't have permsssions (403)
             pass
         else:
             print("error getting domain:", domain)
