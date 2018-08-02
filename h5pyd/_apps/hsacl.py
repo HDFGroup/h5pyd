@@ -235,7 +235,12 @@ def main():
                        'readACL': False,
                        'userName': 'default'
                        } 
-        update_names = usernames.copy()
+        # note: list.copy not supported in py2.7, copy by hand for now
+        # update_names = usernames.copy()
+        update_names = []
+        for username in usernames:
+            update_names.append(username)
+
         if not update_names:
             update_names.append("default")
          

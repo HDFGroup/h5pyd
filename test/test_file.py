@@ -212,7 +212,7 @@ class TestFile(TestCase):
         # no explicit ACLs yet
         file_acls = f.getACLs()
         if is_hsds:
-            self.assertTrue(len(file_acls) >= 2)  # Should have at least the acls - "default" and test_user1
+            self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl
         else:
             self.assertEqual(len(file_acls), 0)
         
