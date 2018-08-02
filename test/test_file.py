@@ -228,8 +228,19 @@ class TestFile(TestCase):
         for k in acl_keys:
             self.assertEqual(file_acl[k], True)
 
-        # Should always be able to get default acl
-        default_acl = f.getACL("default")
+        # for h5serv a default acl should be available
+        # hsds does not create one initially
+        try:
+            default_acl = f.getACL("default")
+        except IOError as ioe:
+            if ioe.errno == 404:
+                # create  public-read ACL
+                default_acl = {}
+                for key in acl_keys:
+                    if key == "read":
+                        default_acl[key] = True
+                    else:
+                        default_acl[key] = False
         for k in acl_keys:
             if k == "read" or not is_hsds:
                 self.assertEqual(default_acl[k], True)
