@@ -369,6 +369,7 @@ def write_dataset(src, tgt, ctx):
             logging.info(msg)
             if ctx["verbose"]:
                 print(msg)
+            
             arr = src[s]
             tgt[s] = arr
     except (IOError, TypeError) as e:
