@@ -63,7 +63,7 @@ for i in range(dims[2]):
     mid_y = dims[1] // 2
     arr[mid_x,:] = 22
     arr[:,mid_y] = 44
-    dset[i,:,:] = arr
+    dset[:,:,i] = arr
 print("done!")
 
 f.close()
