@@ -70,7 +70,12 @@ def getHomeFolder(username):
             # check any folders where the name matches at least part of the username
             # e.g. folder: "/home/bob/" for username "bob@acme.com"
             path = '/home/' + name + '/'
-            f = h5pyd.Folder(path)
+            try:
+                f = h5pyd.Folder(path)
+            except IOError as ioe:
+                print("got ioe:", ioe)
+            except Exception as e:
+                print("got exception:", e)
             if f.owner == username:
                 homefolder = path
             f.close()
@@ -145,9 +150,10 @@ def main():
             print("server state: {}".format(info['state']))
         print("username: {}".format(info["username"]))
         print("password: {}".format(info["password"]))
-        home_folder = getHomeFolder(username)
-        if home_folder:
-            print("home: {}".format(home_folder))
+        if info['state'] == "READY":
+            home_folder = getHomeFolder(username)
+            if home_folder:
+                print("home: {}".format(home_folder))
     
         if "hsds_version" in info:
             print("server version: {}".format(info["hsds_version"]))
