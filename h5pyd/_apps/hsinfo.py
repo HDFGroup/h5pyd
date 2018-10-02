@@ -74,8 +74,10 @@ def getHomeFolder(username):
                 f = h5pyd.Folder(path)
             except IOError as ioe:
                 print("got ioe:", ioe)
+                continue
             except Exception as e:
                 print("got exception:", e)
+                continue
             if f.owner == username:
                 homefolder = path
             f.close()
