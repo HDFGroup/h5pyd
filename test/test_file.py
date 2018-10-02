@@ -148,7 +148,6 @@ class TestFile(TestCase):
             else:
                 filepath = "hdf5://" + filename
             f = h5py.File(filepath, 'r')
-            print("hdf5:// filepath:", filepath)
             self.assertEqual(f.filename, filename)
             self.assertEqual(f.name, "/")
             self.assertTrue(f.id.id is not None)
@@ -195,6 +194,7 @@ class TestFile(TestCase):
         print("filename:", filename)
 
         f = h5py.File(filename, 'w') 
+        
        
         for name in ("g1", "g2", "g1/g1.1"):
             f.create_group(name)
@@ -230,32 +230,41 @@ class TestFile(TestCase):
 
         # for h5serv a default acl should be available
         # hsds does not create one initially
+
+       
         try:
             default_acl = f.getACL("default")
         except IOError as ioe:
             if ioe.errno == 404:
-                # create  public-read ACL
-                default_acl = {}
-                for key in acl_keys:
-                    if key == "read":
-                        default_acl[key] = True
-                    else:
-                        default_acl[key] = False
-        for k in acl_keys:
-            if k == "read" or not is_hsds:
-                self.assertEqual(default_acl[k], True)
-            else:
-                self.assertEqual(default_acl[k], False)
-       
-        user1_acl = copy(default_acl)
-        user1_acl["userName"] = self.test_user1["name"]
+                if is_hsds:
+                    pass # expected
+                else:
+                    self.assertTrue(False)
+
+        if is_hsds:
+            # create  public-read ACL
+            default_acl = {}
+            for key in acl_keys:
+                if key == "read":
+                    default_acl[key] = True
+                else:
+                    default_acl[key] = False
+            default_acl["userName"] = "default"
+            f.putACL(default_acl)
         f.close()
 
+        
+        # ooen with test_user2 should succeed for read mode
+        try:
+            f = h5py.File(filename, 'r', username=self.test_user2["name"], password=self.test_user2["password"])
+            f.close()
+        except IOError as ioe:
+            self.assertTrue(False)
+        
 
         # test_user2 has read access, but opening in write mode should fail
         try:
             f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
-            
             self.assertFalse(is_hsds)  # expect exception for hsds
         except IOError as ioe:
             self.assertTrue(is_hsds)
@@ -269,15 +278,25 @@ class TestFile(TestCase):
             self.assertTrue(is_hsds)
             self.assertEqual(ioe.errno, 403)  # Forbidden 
         
+        
         f = h5py.File(filename, 'a')  # open for append with original username
         # add an acl for test_user2 that has only read/update access
         user2_acl = copy(default_acl)
         user2_acl["userName"] = self.test_user2["name"]
         user2_acl["read"] = True  # allow read access
         user2_acl["update"] = True
+        user2_acl["readACL"] = True
         f.putACL(user2_acl)
  
         f.close()
+
+        # ooen with test_user2 should succeed for read mode
+        try:
+            f = h5py.File(filename, 'r', username=self.test_user2["name"], password=self.test_user2["password"])
+        except IOError as ioe:
+            self.assertTrue(False)
+        return
+
 
         # test_user2  opening in write mode should still fail
         try:
