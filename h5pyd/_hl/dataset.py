@@ -38,6 +38,56 @@ from .h5type import getTypeItem, createDataType, check_dtype, special_dtype, get
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
 VERBOSE_REFRESH_TIME=1.0  # 1 second
 
+
+
+"""
+Convert a list to a tuple, recursively.
+Example. [[1,2],[3,4]] -> ((1,2),(3,4))
+"""
+# TBD: this was cut & pasted from attrs.py
+def toTuple(rank, data):
+    if type(data) in (list, tuple):
+        if rank > 0:
+            return list(toTuple(rank-1, x) for x in data)
+        else:
+            return tuple(toTuple(rank-1, x) for x in data)
+    else:
+        return data
+
+"""
+Return numpy array from the given json array.
+Note: copied from hsds arrayUti.py
+"""
+# TBD: this was cut & pasted from attrs.py
+def jsonToArray(data_shape, data_dtype, data_json):
+    # need some special conversion for compound types --
+    # each element must be a tuple, but the JSON decoder
+    # gives us a list instead.
+    if len(data_dtype) > 1 and not isinstance(data_json, (list, tuple)):
+        raise TypeError("expected list data for compound data type")
+    npoints = numpy.product(data_shape)
+    if type(data_json) in (list, tuple):
+        np_shape_rank = len(data_shape)
+        converted_data = []
+        if npoints == 1 and len(data_json) == len(data_dtype):
+            converted_data.append(toTuple(0, data_json))
+        else:  
+            converted_data = toTuple(np_shape_rank, data_json)
+        data_json = converted_data
+    arr = numpy.array(data_json, dtype=data_dtype)
+    # raise an exception of the array shape doesn't match the selection shape
+    # allow if the array is a scalar and the selection shape is one element,
+    # numpy is ok with this
+    if arr.size != npoints:
+        msg = "Input data doesn't match selection number of elements"
+        msg += " Expected {}, but received: {}".format(npoints, arr.size)
+        raise ValueError(msg)
+    if arr.shape != data_shape:
+        arr = arr.reshape(data_shape)  # reshape to match selection
+
+    return arr
+
+
 def readtime_dtype(basetype, names):
     """ Make a NumPy dtype appropriate for reading """
 
@@ -767,14 +817,20 @@ class Dataset(HLObject):
                         # each element must be a tuple, but the JSON decoder
                         # gives us a list instead.
                         self.log.info("json response")
+
                         data = rsp['value']
-                        if len(mtype) > 1 and type(data) in (list, tuple):
-                            converted_data = []
-                            for i in range(len(data)):
-                                converted_data.append(self.toTuple(data[i]))
-                            data = converted_data
-                        input_arr = np.asarray(data, dtype=mtype)
-                        page_arr = input_arr.reshape(page_mshape)
+                        self.log.debug(data)
+
+                        vlen_base = check_dtype(vlen=mtype)
+
+                        page_arr = jsonToArray(page_mshape, mtype, data)
+                        if vlen_base is not None and len(arr.shape) > 0:
+                            self.log.debug("convert list elements to ndarrays, dtype: {}".format(vlen_base))
+                            # convert list elements to ndarrays
+                            nelements = numpy.product(page_mshape)
+                            arr_1d = page_arr.reshape((nelements,))
+                            for i in range(nelements):
+                                arr_1d[i] = numpy.array(arr_1d[i], dtype=vlen_base)
 
                     # get the slices to copy into the target array
                     slices = []
@@ -1048,6 +1104,7 @@ class Dataset(HLObject):
         # For h5pyd, do extra check and convert type on client side for efficiency
         vlen = check_dtype(vlen=self.dtype)
         if vlen is not None and vlen not in (bytes, six.text_type):
+            self.log.debug("converting ndarray for vlen data")
             try:
                 val = numpy.asarray(val, dtype=vlen)
             except ValueError:
@@ -1197,13 +1254,15 @@ class Dataset(HLObject):
                 data = val.tobytes()
                 data = base64.b64encode(data)
                 data = data.decode("ascii")
+                self.log.debug("data: {}".format(data))
                 body['value_base64'] = data
                 self.log.debug("writing base64 data, {} bytes".format(len(data)))
         else:
             if type(val) is not list:
                 val = val.tolist()
             val = _decode(val)
-            self.log.debug("writing json data, {} bytes".format(len(val)))
+            self.log.debug("writing json data, {} elements".format(len(val)))
+            self.log.debug("data: {}".format(val))
             body['value'] = val
 
         if selection.select_type != sel.H5S_SELECT_ALL:

@@ -16,6 +16,7 @@ import posixpath
 import os
 import json
 import base64
+import numpy as np
 import logging
 import logging.handlers
 from collections import (
@@ -25,6 +26,8 @@ import six
 from .objectid import GroupID
 from .h5type import Reference
 
+numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
+numpy_float_types = (np.float16, np.float32, np.float64)
 
 class FakeLock():
     def __init__(self):
@@ -97,6 +100,15 @@ def _decode(item, encoding="ascii"):
             ret_val = {}
             for k in dict:
                 ret_val[k] = _decode(item[k], encoding)
+        elif type(item) is np.ndarray:
+            x = item.tolist()
+            ret_val = []
+            for x in item:
+                ret_val.append(_decode(x, encoding))
+        elif type(item) in numpy_integer_types:
+            ret_val = int(item)
+        elif type(item) in numpy_float_types:
+            ret_val = float(item)
         else:
             ret_val = item
         return ret_val
