@@ -17,15 +17,13 @@ from copy import copy
 import sys
 import time
 import base64
-import numpy as np
+import numpy 
 
 import six
 from six.moves import xrange
 
-import numpy
-
 #from . import base
-from .base import HLObject
+from .base import HLObject, jsonToArray
 from .h5type import Reference, RegionReference
 from .base import phil, _decode
 from .objectid import DatasetID
@@ -37,56 +35,6 @@ from .h5type import getTypeItem, createDataType, check_dtype, special_dtype, get
 
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
 VERBOSE_REFRESH_TIME=1.0  # 1 second
-
-
-
-"""
-Convert a list to a tuple, recursively.
-Example. [[1,2],[3,4]] -> ((1,2),(3,4))
-"""
-# TBD: this was cut & pasted from attrs.py
-def toTuple(rank, data):
-    if type(data) in (list, tuple):
-        if rank > 0:
-            return list(toTuple(rank-1, x) for x in data)
-        else:
-            return tuple(toTuple(rank-1, x) for x in data)
-    else:
-        return data
-
-"""
-Return numpy array from the given json array.
-Note: copied from hsds arrayUti.py
-"""
-# TBD: this was cut & pasted from attrs.py
-def jsonToArray(data_shape, data_dtype, data_json):
-    # need some special conversion for compound types --
-    # each element must be a tuple, but the JSON decoder
-    # gives us a list instead.
-    if len(data_dtype) > 1 and not isinstance(data_json, (list, tuple)):
-        raise TypeError("expected list data for compound data type")
-    npoints = numpy.product(data_shape)
-    if type(data_json) in (list, tuple):
-        np_shape_rank = len(data_shape)
-        converted_data = []
-        if npoints == 1 and len(data_json) == len(data_dtype):
-            converted_data.append(toTuple(0, data_json))
-        else:  
-            converted_data = toTuple(np_shape_rank, data_json)
-        data_json = converted_data
-    arr = numpy.array(data_json, dtype=data_dtype)
-    # raise an exception of the array shape doesn't match the selection shape
-    # allow if the array is a scalar and the selection shape is one element,
-    # numpy is ok with this
-    if arr.size != npoints:
-        msg = "Input data doesn't match selection number of elements"
-        msg += " Expected {}, but received: {}".format(npoints, arr.size)
-        raise ValueError(msg)
-    if arr.shape != data_shape:
-        arr = arr.reshape(data_shape)  # reshape to match selection
-
-    return arr
-
 
 def readtime_dtype(basetype, names):
     """ Make a NumPy dtype appropriate for reading """
@@ -413,7 +361,7 @@ class Dataset(HLObject):
     def fillvalue(self):
         """Fill value for this dataset (0 by default)"""
         dcpl = self.id.dcpl_json
-        arr = np.zeros((), dtype=self._dtype)
+        arr = numpy.zeros((), dtype=self._dtype)
         fill_value = None
         if "fillValue" in dcpl:
             fill_value = dcpl["fillValue"]
@@ -630,7 +578,7 @@ class Dataset(HLObject):
         # === Check for zero-sized datasets =====
         if self._shape is None or numpy.product(self._shape) == 0:
             # These are the only access methods NumPy allows for such objects
-            if args == (Ellipsis,) or args == tuple():
+            if args is (Ellipsis,) or args is tuple():
                 return numpy.empty(self._shape, dtype=new_dtype)
 
         # === Scalar dataspaces =================
@@ -700,6 +648,7 @@ class Dataset(HLObject):
 
         self.log.debug("dataset shape: {}".format(self._shape))
         self.log.debug("mshape: {}".format(mshape))
+        self.log.debug("single_element: {}".format(single_element))
         # Perfom the actual read
         rsp = None
         req = "/datasets/" + self.id.uuid + "/value"
@@ -793,6 +742,7 @@ class Dataset(HLObject):
                     page_mshape[mshape_split_dim] =  1 + (page_stop[split_dim] - page_start[split_dim] - 1) // sel_step[split_dim]
 
                     page_mshape = tuple(page_mshape)
+                    self.log.info("page_mshape: {}".format(page_mshape))
 
                     params["select"] = self._getQueryParam(page_start, page_stop, sel_step)
                     try:
@@ -821,16 +771,8 @@ class Dataset(HLObject):
                         data = rsp['value']
                         self.log.debug(data)
 
-                        vlen_base = check_dtype(vlen=mtype)
-
                         page_arr = jsonToArray(page_mshape, mtype, data)
-                        if vlen_base is not None and len(arr.shape) > 0:
-                            self.log.debug("convert list elements to ndarrays, dtype: {}".format(vlen_base))
-                            # convert list elements to ndarrays
-                            nelements = numpy.product(page_mshape)
-                            arr_1d = page_arr.reshape((nelements,))
-                            for i in range(nelements):
-                                arr_1d[i] = numpy.array(arr_1d[i], dtype=vlen_base)
+                        self.log.debug("jsontoArray returned: {}".format(page_arr))
 
                     # get the slices to copy into the target array
                     slices = []
@@ -897,7 +839,7 @@ class Dataset(HLObject):
             if self.id.id.startswith("d-"):
                 # send points as binary request for HSDS
                 format = "binary"     
-                arr_points = np.asarray(points, dtype='u8')  # must use unsigned 64-bit int
+                arr_points = numpy.asarray(points, dtype='u8')  # must use unsigned 64-bit int
                 body = arr_points.tobytes()
                 self.log.info("point select binary request, num bytes: {}".format(len(body)))
             else:  
@@ -924,7 +866,7 @@ class Dataset(HLObject):
                 if len(data) != selection.mshape[0]:
                     raise IOError("Expected {} elements, but got {}".format(selection.mshape[0], len(data)))
 
-                arr = np.asarray(data, dtype=mtype, order='C')
+                arr = numpy.asarray(data, dtype=mtype, order='C')
 
         else:
             raise ValueError("selection type not supported")
@@ -939,7 +881,7 @@ class Dataset(HLObject):
         elif single_element:
             arr = arr[0]
         elif len(arr.shape) > 1:
-            arr = np.squeeze(arr)  # reduce dimension if there are single dimension entries
+            arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
         return arr
 
     def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None):
@@ -1399,4 +1341,3 @@ class Dataset(HLObject):
             return tuple(self.toTuple(x) for x in data)
         else:
             return data
-

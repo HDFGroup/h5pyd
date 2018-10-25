@@ -23,57 +23,11 @@ import numpy
 import six
 
 from . import base
-from .base import phil, with_phil
+from .base import phil, with_phil, jsonToArray
 from .datatype import Datatype
 from .objectid import GroupID, DatasetID, TypeID
 from .h5type import getTypeItem, createDataType, special_dtype, check_dtype
-
-"""
-Convert a list to a tuple, recursively.
-Example. [[1,2],[3,4]] -> ((1,2),(3,4))
-"""
-def toTuple(rank, data):
-    if type(data) in (list, tuple):
-        if rank > 0:
-            return list(toTuple(rank-1, x) for x in data)
-        else:
-            return tuple(toTuple(rank-1, x) for x in data)
-    else:
-        return data
-
-"""
-Return numpy array from the given json array.
-Note: copied from hsds arrayUti.py
-"""
-def jsonToArray(data_shape, data_dtype, data_json):
-    # need some special conversion for compound types --
-    # each element must be a tuple, but the JSON decoder
-    # gives us a list instead.
-    if len(data_dtype) > 1 and not isinstance(data_json, (list, tuple)):
-        raise TypeError("expected list data for compound data type")
-    npoints = numpy.product(data_shape)
-    if type(data_json) in (list, tuple):
-        np_shape_rank = len(data_shape)
-        converted_data = []
-        if npoints == 1 and len(data_json) == len(data_dtype):
-            converted_data.append(toTuple(0, data_json))
-        else:  
-            converted_data = toTuple(np_shape_rank, data_json)
-        data_json = converted_data
-
-    arr = numpy.array(data_json, dtype=data_dtype)
-    # raise an exception of the array shape doesn't match the selection shape
-    # allow if the array is a scalar and the selection shape is one element,
-    # numpy is ok with this
-    if arr.size != npoints:
-        msg = "Input data doesn't match selection number of elements"
-        msg += " Expected {}, but received: {}".format(npoints, arr.size)
-        raise ValueError(msg)
-    if arr.shape != data_shape:
-        arr = arr.reshape(data_shape)  # reshape to match selection
-
-    return arr
-
+ 
 
 class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
@@ -188,18 +142,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             shape = shape + subshape   # (5, 3)
             dtype = subdtype                # 'f'
 
-        vlen_base = check_dtype(vlen=dtype)
-
-        #arr = numpy.array(value_json, dtype=htype)
         arr = jsonToArray(shape, htype, value_json)
-        vlen_base = check_dtype(vlen=dtype)
-        if vlen_base is not None and len(arr.shape) > 0:
-            # convert list elements to ndarrays
-            nelements = numpy.product(arr.shape)
-            arr_1d = arr.reshape((nelements,))
-            for i in range(nelements):
-                arr_1d[i] = numpy.array(arr_1d[i], dtype=vlen_base)
-
+   
         if len(arr.shape) == 0:
             return arr[()]
         return arr

@@ -24,7 +24,7 @@ from collections import (
 )
 import six
 from .objectid import GroupID
-from .h5type import Reference
+from .h5type import Reference, check_dtype
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
 numpy_float_types = (np.float16, np.float32, np.float64)
@@ -78,7 +78,6 @@ def guess_dtype(data):
         if type(data) == six.text_type:
            return h5t.special_dtype(vlen=six.text_type)
     """
-    # print("guess_dtype")
     return None
 
 def _decode(item, encoding="ascii"):
@@ -127,6 +126,91 @@ def getHeaders(domain, username=None, password=None, headers=None):
             headers['Authorization'] = auth_string
         return headers
 
+
+
+"""
+Convert a list to a tuple, recursively.
+Example. [[1,2],[3,4]] -> ((1,2),(3,4))
+"""
+# TBD: this was cut & pasted from attrs.py
+def toTuple(rank, data):
+    if type(data) in (list, tuple):
+        if rank > 0:
+            return list(toTuple(rank-1, x) for x in data)
+        else:
+            return tuple(toTuple(rank-1, x) for x in data)
+    else:
+        return data
+
+"""
+Copy JSON array into given numpy array
+"""
+def copyToArray(arr, rank, index, data, vlen_base=None):
+  
+    nlen = arr.shape[rank]
+    if len(data) != nlen:
+        raise ValueError("Array len of {} at index: {} doesn't match data length: {}".format(nlen, index, len(data)))
+    for i in range(nlen):
+        index[rank] = i
+        if rank < len(arr.shape) - 1:
+            # recursive call
+            copyToArray(arr, rank+1, index, data[i], vlen_base=vlen_base)
+        else:
+            if vlen_base:         
+                e = np.array(data[i], dtype=vlen_base)
+                arr[tuple(index)] = e.squeeze()
+            else:
+                arr[tuple(index)] = data[i]
+    index[rank] = 0
+
+
+"""
+Return numpy array from the given json array.
+"""
+def jsonToArray(data_shape, data_dtype, data_json):
+    # need some special conversion for compound types --
+    # each element must be a tuple, but the JSON decoder
+    # gives us a list instead.
+
+   
+    if len(data_dtype) > 1 and not isinstance(data_json, (list, tuple)):
+        raise TypeError("expected list data for compound data type")
+
+    vlen_base = check_dtype(vlen=data_dtype)
+    if vlen_base:
+        # for vlen types, convert each element to a ndarray
+        arr = np.zeros(data_shape, dtype=data_dtype)
+        print("init array:", arr)
+        index = []
+        for i in range(len(data_shape)):
+            index.append(0)
+        if data_shape is ():
+            arr[()] = data_json
+        else:
+            copyToArray(arr, 0, index, data_json, vlen_base=vlen_base)
+    else:
+        npoints = np.product(data_shape)
+        if type(data_json) in (list, tuple):
+            np_shape_rank = len(data_shape)
+            converted_data = []
+            if npoints == 1 and len(data_json) == len(data_dtype):
+                converted_data.append(toTuple(0, data_json))
+            else:  
+                converted_data = toTuple(np_shape_rank, data_json)
+            data_json = converted_data
+
+        arr = np.array(data_json, dtype=data_dtype)
+        # raise an exception of the array shape doesn't match the selection shape
+        # allow if the array is a scalar and the selection shape is one element,
+        # numpy is ok with this
+        if arr.size != npoints:
+            msg = "Input data doesn't match selection number of elements"
+            msg += " Expected {}, but received: {}".format(npoints, arr.size)
+            raise ValueError(msg)
+        if arr.shape != data_shape:
+            arr = arr.reshape(data_shape)  # reshape to match selection
+     
+    return arr
 
 
 class LinkCreationPropertyList(object):
