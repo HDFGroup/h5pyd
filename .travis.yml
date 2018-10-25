@@ -13,7 +13,7 @@ env:
 install:
 - sudo apt-get update -qq
 - pip uninstall numpy -y
-- pip install numpy>=1.10.4
+- pip install numpy>=1.14.0
 - pip install requests
 - pip install pytz
 - pip install h5py
@@ -58,4 +58,3 @@ script:
 - echo test2_user ${TEST2_USERNAME}
 - echo test2 password ${TEST2_PASSWORD}
 - python testall.py
- 
