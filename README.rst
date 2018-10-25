@@ -1,7 +1,7 @@
 h5pyd
 =====
 
-.. image:: https://travis-ci.org/HDFGroup/h5pyd.svg?branch=develop
+.. image:: https://travis-ci.org/HDFGroup/h5pyd.svg?branch=master
     :target: https://travis-ci.org/HDFGroup/h5pyd
 
 Python client library for HDF5 REST interface
@@ -75,4 +75,3 @@ Reporting bugs (and general feedback)
 Create new issues at http://github.com/HDFGroup/h5pyd/issues for any problems you find. 
 
 For general questions/feedback, please use the hdf list (hdf-forum@lists.hdfgroup.org).
-
