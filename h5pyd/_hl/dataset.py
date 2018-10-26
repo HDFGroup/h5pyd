@@ -578,9 +578,8 @@ class Dataset(HLObject):
         # === Check for zero-sized datasets =====
         if self._shape is None or numpy.product(self._shape) == 0:
             # These are the only access methods NumPy allows for such objects
-            if args == (Ellipsis,) or args == tuple():
+            if len(args) == 0 or len(args) == 1 and isinstance(args[0], tuple) and args[0] == Ellipsis:
                 return numpy.empty(self._shape, dtype=new_dtype)
-                 
 
         # === Scalar dataspaces =================
 
@@ -620,17 +619,6 @@ class Dataset(HLObject):
                 return arr[()]
 
             return arr
-
-            """
-            data = rsp['value']
-            arr = numpy.ndarray((), dtype=new_dtype)
-            arr[()] = data
-            if len(names) == 1:
-                arr = arr[names[0]]
-            if selection.mshape is None:
-                return arr[()]
-            return arr
-            """
 
         # === Everything else ===================
 
