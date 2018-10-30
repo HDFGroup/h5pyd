@@ -61,6 +61,45 @@ class TestCreateDataset(TestCase):
 
         f.close()
 
+    def test_create_float16_dset(self):
+        filename = self.getFileName("create_simple_dset")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+       
+        nrows = 4
+        ncols = 8
+        dims = (nrows, ncols)
+        dset = f.create_dataset('simple_dset', dims, dtype='f2')
+
+        self.assertEqual(dset.name, "/simple_dset")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 2)
+        self.assertEqual(dset.shape[0], nrows)
+        self.assertEqual(dset.shape[1], ncols)
+        self.assertEqual(str(dset.dtype), 'float16')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 2)
+        self.assertEqual(dset.maxshape[0], nrows)
+        self.assertEqual(dset.maxshape[1], ncols)
+        self.assertEqual(dset[0,0], 0)
+
+        arr = np.zeros((nrows,ncols), dtype="f2")
+        for i in range(nrows):
+            for j in range(ncols):
+                val  = float(i) * 10.0 + float(j)/10.0
+                arr[i,j] = val
+
+        # write entire array to dataset
+        dset[...] = arr
+        
+        arr = dset[...]  # read back
+        val = arr[2,4]   # test one value
+        self.assertTrue(val > 20.4 - 0.01)
+        self.assertTrue(val < 20.4 + 0.01)
+
+
+        f.close()
+
     def test_fillvalue_simple_dset(self):
         filename = self.getFileName("fillvalue_simple_dset")
         print("filename:", filename)
