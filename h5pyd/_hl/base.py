@@ -180,7 +180,6 @@ def jsonToArray(data_shape, data_dtype, data_json):
     if vlen_base:
         # for vlen types, convert each element to a ndarray
         arr = np.zeros(data_shape, dtype=data_dtype)
-        print("init array:", arr)
         index = []
         for i in range(len(data_shape)):
             index.append(0)
