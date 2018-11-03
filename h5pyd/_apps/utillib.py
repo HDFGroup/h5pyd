@@ -382,6 +382,43 @@ def write_dataset(src, tgt, ctx):
         print(msg)
 # write_dataset
 
+def create_links(gsrc, gdes, ctx):
+    # add soft and external links
+    if ctx["verbose"]:
+        print("create_links: {}".format(gsrc.name))
+    for title in gsrc:
+        if ctx["verbose"]:
+            print("got link: {}".format(title))
+        lnk = gsrc.get(title, getlink=True)
+        link_classname = lnk.__class__.__name__
+        if link_classname == "HardLink":
+            logging.debug("Got hardlink: {}".format(title))
+            # TBD: handle the case where multiple hardlinks point to same object
+        elif link_classname == "SoftLink":
+            msg = "creating SoftLink({}) with title: {}".format(lnk.path, title)
+            if ctx["verbose"]:
+                print(msg)
+            logging.info(msg)
+            if is_h5py(gdes):
+                soft_link = h5py.SoftLink(lnk.path)
+            else:
+                soft_link = h5pyd.SoftLink(lnk.path)
+            gdes[title] = soft_link
+        elif link_classname == "ExternalLink":
+            msg = "creating ExternalLink({}, {}) with title: {}".format(lnk.filename, lnk.path, title)
+            if ctx["verbose"]:
+                print(msg)
+            logging.info(msg)
+            if is_h5py(gdes):
+                ext_link = h5py.ExternalLink(lnk.filename, lnk.path)
+            else:
+                ext_link = h5pyd.ExternalLink(lnk.filename, lnk.path)
+            gdes[title] = ext_link
+        else:
+            msg = "Unexpected link type: {}".format(lnk.__class__.__name__)
+            logging.warning(msg)
+            if ctx["verbose"]:
+                print(msg)
 
 
 #----------------------------------------------------------------------------------
@@ -394,37 +431,8 @@ def create_group(gobj, ctx):
     grp = fout.create_group(gobj.name)
  
     # create any soft/external links
-    for title in gobj:
-        lnk = gobj.get(title, getlink=True)
-        link_classname = lnk.__class__.__name__
-        if link_classname == "HardLink":
-            logging.debug("Got hardlink: {}".format(title))
-            # TBD: handle the case where multiple hardlinks point to same object
-        elif link_classname == "SoftLink":
-            msg = "creating SoftLink({}) with title: {}".format(lnk.path, title)
-            if ctx["verbose"]:
-                print(msg)
-            logging.info(msg)
-            if is_h5py(fout):
-                soft_link = h5py.SoftLink(lnk.path)
-            else:
-                soft_link = h5pyd.SoftLink(lnk.path)
-            grp[title] = soft_link
-        elif link_classname == "ExternalLink":
-            msg = "creating ExternalLink({}, {}) with title: {}".format(lnk.filename, lnk.path, title)
-            if ctx["verbose"]:
-                print(msg)
-            logging.info(msg)
-            if is_h5py(fout):
-                ext_link = h5py.ExternalLink(lnk.filename, lnk.path)
-            else:
-                ext_link = h5pyd.ExternalLink(lnk.filename, lnk.path)
-            grp[title] = ext_link
-        else:
-            msg = "Unexpected link type: {}".format(lnk.__class__.__name__)
-            logging.warning(msg)
-            if ctx["verbose"]:
-                print(msg)
+    create_links(gobj, grp, ctx)
+    
 # create_group
 
 #----------------------------------------------------------------------------------
@@ -458,6 +466,9 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None):
     # create any root attributes
     for ga in fin.attrs:
         copy_attribute(fout, ga, fin, ctx)
+
+    # create root soft/external links
+    create_links(fin, fout, ctx)
 
     def object_create_helper(name, obj):
         class_name = obj.__class__.__name__
@@ -510,6 +521,3 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None):
     
     return 0
 # load_file
-    
-  
-
