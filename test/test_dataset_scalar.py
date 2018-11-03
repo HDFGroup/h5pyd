@@ -37,6 +37,7 @@ class TestScalarDataset(TestCase):
         val = dset[()]
         self.assertEqual(val, 42)
         self.assertEqual(dset.shape, ())
+        self.assertEqual(dset.ndim, 0)
 
         dset[...] = 24
         val = dset[()]

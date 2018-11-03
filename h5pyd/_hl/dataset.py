@@ -247,6 +247,11 @@ class Dataset(HLObject):
         return DimensionManager(self)
 
     @property
+    def ndim(self):
+        """Numpy-style attribute giving the number of dimensions"""
+        return len(self._shape)
+
+    @property
     def shape(self):
         """Numpy-style shape tuple giving dataset dimensions"""
         # just return the cached shape value
