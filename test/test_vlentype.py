@@ -176,8 +176,6 @@ class TestVlenTypes(TestCase):
         f.close()
 
     def test_create_vlen_2d_dset(self):
-        if config.get("use_h5py"):
-            return # this test if failing on trave with h5py
         filename = self.getFileName("create_vlen_2d_dset")
         print("filename:", filename)
         f = h5py.File(filename, 'w')

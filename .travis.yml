@@ -9,7 +9,6 @@ python:
 env:
 - H5_DRIVER=h5serv
 - H5_DRIVER=hsds
-- H5_DRIVER=h5py 
 install:
 - sudo apt-get update -qq
 - pip uninstall numpy -y
