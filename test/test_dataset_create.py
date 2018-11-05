@@ -63,9 +63,13 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_create_float16_dset(self):
-        filename = self.getFileName("create_simple_dset")
+        
+        filename = self.getFileName("create_float16_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
+        if not config.get('use_h5py') and isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+            # Float16 not supported with h5serv
+            return
        
         nrows = 4
         ncols = 8
