@@ -24,11 +24,12 @@ import six
 class TestGroup(TestCase):
 
     def test_cache(self):
+        if config.get("use_h5py"):
+            return # use_cache not supported on h5py
         # create main test file
         filename = self.getFileName("create_group_cache")
         print("filename:", filename)
-        if config.get("use_h5py"):
-            return # use_cache not supported on h5py
+        
         f = h5py.File(filename, 'w', use_cache=True)
         self.assertTrue('/' in f)
         r = f['/'] 
