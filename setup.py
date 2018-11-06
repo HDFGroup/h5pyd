@@ -5,7 +5,7 @@ from setuptools import setup
 #   setup.py develop
 # To use a consistent encoding
 # To upload to PyPI:
-# python setup.py register sdist upload
+# twine upload dist/*
 #
 # Tag the release in github!
 #

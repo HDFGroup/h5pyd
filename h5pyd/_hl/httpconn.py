@@ -333,11 +333,10 @@ class HttpConn:
     @property
     def session(self):
         # create a session object to re-use http connection when possible
-        # TBD: Add retry here - see: https://laike9m.com/blog/requests-secret-pool_connections-and-pool_maxsize,89/
         s = requests
-        retries=3
-        backoff_factor=0.3
-        status_forcelist=(500, 502, 504)
+        retries=30
+        backoff_factor=0.1
+        status_forcelist=(500, 502, 503, 504)
         if self._use_session:
             if self._s is None:
                 s = requests.Session()

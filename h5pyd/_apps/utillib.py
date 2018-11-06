@@ -103,8 +103,6 @@ def convert_dtype(srcdt, ctx):
     
     msg = "convert dtype: {}, type: {},".format(srcdt, type(srcdt))
     logging.info(msg)
-    if ctx["verbose"]:
-        print(msg)
      
     if len(srcdt) > 0:
         fields = []
