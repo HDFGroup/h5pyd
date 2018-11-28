@@ -30,7 +30,7 @@ Websites
 Related Projects
 ----------------
 * HDF Server: https://github.com/HDFGroup/h5serv
-* HDF5-JSON: https://github.com/HDFGroup/h5-json
+* HDF5-JSON: https://github.com/HDFGroup/hdf5-json
 * h5py: https://github.com/h5py/h5py 
 
 Installing
