@@ -421,8 +421,14 @@ class Dataset(HLObject):
             rsp_json = self.GET(req)
             if "num_chunks" in rsp_json:
                 self._num_chunks = rsp_json["num_chunks"]
+            else:
+                # not avaailable yet, set to 0
+                self._num_chunks = 0
             if "allocated_size" in rsp_json:
                 self._allocated_size = rsp_json["allocated_size"]
+            else:
+                # not available, set to 0
+                self._allocated_size = 0
             self._verboseUpdated = now
 
     def resize(self, size, axis=None):
