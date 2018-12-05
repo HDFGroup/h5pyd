@@ -126,17 +126,16 @@ class TestFile(TestCase):
 
         self.assertEqual(len(f.keys()), 1)
 
-        if  h5py.__name__ == "h5pyd" and not is_hsds:
+        if  h5py.__name__ == "h5pyd":
             # check properties that are only available for h5pyd
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously
 
-            # TBD: not working for HSDS - restore once content db is onlne
-            self.assertEqual(f.num_chunks, 0)
-            self.assertTrue(f.num_groups >= 0)
+            self.assertEqual(f.num_objects, 2)
+            self.assertTrue(f.num_groups == 2)
             self.assertEqual(f.num_datasets, 0)
             self.assertEqual(f.num_datatypes, 0)
-            self.assertTrue(f.allocated_bytes >= 0)
+            self.assertTrue(f.allocated_bytes == 0)
 
         f.close()
         self.assertEqual(f.id.id, 0)
