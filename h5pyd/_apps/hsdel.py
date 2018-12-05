@@ -66,7 +66,7 @@ def deleteDomain(domain):
 #
 def printUsage():
     print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains".format(cfg["cmd"]))
-    print("example: {} -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/deleteme.h5".format(cfg["cmd"]))
+    print("example: {} -e http://hsdshdflab.hdfgroup.org /hdfgroup/data/test/deleteme.h5".format(cfg["cmd"]))
     sys.exit()
 
 #

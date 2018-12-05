@@ -76,13 +76,10 @@ class TestVlenTypes(TestCase):
         g1.attrs.create("b1", data, shape=(3,),dtype=dtvlen)
 
         vlen_val = g1.attrs["b1"]  # read back attribute
-        print("vlen_val:", vlen_val)
         self.assertTrue(isinstance(vlen_val, np.ndarray))
         self.assertEqual(len(vlen_val), 3)
         for i in range(3):
-            print(i)
             e = vlen_val[i]
-            print("e:", e)
             self.assertTrue(isinstance(e, np.ndarray))
             ref_type = h5py.check_dtype(ref=e.dtype)
             self.assertEqual(ref_type, h5py.Reference)
@@ -201,7 +198,6 @@ class TestVlenTypes(TestCase):
                     alist.append(k)
                 data[i,j] = np.array(alist, dtype="int32")
          
-        print("data:", data)
         # write data
         dset1[...] = data
 
@@ -209,7 +205,6 @@ class TestVlenTypes(TestCase):
         ret_val = dset1[...]
         self.assertTrue(isinstance(ret_val, np.ndarray))
         self.assertEqual(ret_val.shape, (nrows, ncols))
-        print(ret_val[1,2])
         e12 = ret_val[1,2]
         self.assertTrue(isinstance(e12, np.ndarray))
         # py36  attribute[a1]: [array([0, 1, 2], dtype=int32) array([0, 1, 2, 3], dtype=int32)]
@@ -221,7 +216,6 @@ class TestVlenTypes(TestCase):
         e12 = dset1[1,2]
         self.assertTrue(isinstance(e12, np.ndarray))
         self.assertEqual(e12.shape, (6,))
-        print("e12:", e12)
         # py36  attribute[a1]: [array([0, 1, 2], dtype=int32) array([0, 1, 2, 3], dtype=int32)]
         # py27  [(0, 1, 2) (0, 1, 2, 3)]
         self.assertEqual(list(e12), [0,1,2,3,4,5])
@@ -357,6 +351,6 @@ class TestVlenTypes(TestCase):
          
 
 if __name__ == '__main__':
-    loglevel = logging.DEBUG
+    loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

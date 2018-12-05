@@ -2,6 +2,7 @@
 import sys
 import logging
 import time
+from datetime import datetime
 import h5pyd  
 if __name__ == "__main__":
     from config import Config
@@ -24,10 +25,11 @@ def printUsage():
     print("example: {} -e http://data.hdfgroup.org:7253".format(cfg["cmd"]))
     print("")
     print("Options:")
-    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://example.com:8080")
+    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
+    print("     -H | --human-readable :: with -v, print human readable sizes (e.g. 123M)")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     -h | --help    :: This message.")
@@ -53,8 +55,111 @@ def getUpTime(start_time):
     else:
         ret_str =  "{} sec".format(sec)
 
-
     return ret_str
+
+def format_size(n):
+    if n is None or n == ' ':
+        return ' ' * 8
+    symbol = ' '
+    if not cfg["human_readable"]:
+        return str(n)
+    # convert to common storage unit
+    for s in ('B', 'K', 'M', 'G', 'T'):
+        if n < 1024:
+            symbol = s
+            break
+        n /= 1024
+    if symbol == 'B':
+        return "{:}B".format(n)
+    else:
+        return "{:.1f}{}".format(n, symbol)
+
+def getServerInfo(cfg):
+    """ get server state and print """
+    username = cfg["hs_username"]
+    password = cfg["hs_password"]
+    endpoint = cfg["hs_endpoint"]
+    try:
+        info = h5pyd.getServerInfo(username=username, password=password, endpoint=endpoint)
+        print("server name: {}".format(info["name"]))
+        if "state" in info:
+            print("server state: {}".format(info['state']))
+        print("endpoint: {}".format(endpoint))
+        print("username: {}".format(info["username"]))
+        print("password: {}".format(info["password"]))
+        if info['state'] == "READY":
+            home_folder = getHomeFolder(username)
+            if home_folder:
+                print("home: {}".format(home_folder))
+    
+        if "hsds_version" in info:
+            print("server version: {}".format(info["hsds_version"]))
+        elif "h5serv_version" in info:
+            print("server version: {}".format(info["h5serv_version"]))
+        if "start_time" in info:
+            uptime = getUpTime(info["start_time"])
+            print("up: {}".format(uptime))
+        print("h5pyd version: {}".format(h5pyd.version.version))
+        
+        
+    except IOError as ioe:
+        if ioe.errno == 401:
+            print("username/password not valid for username: {}".format(username))
+        else:
+            print("Error: {}".format(ioe))
+
+def getDomainInfo(domain, cfg):
+    """ get info about the domain and print """
+    username = cfg["hs_username"]
+    password = cfg["hs_password"]
+    endpoint = cfg["hs_endpoint"]
+
+    if domain.endswith('/'):
+        is_folder = True
+        obj_class = "Folder"
+    else:
+        is_folder = False
+        obj_class = "Domain"
+   
+    try:
+        if domain.endswith('/'):
+            f = h5pyd.Folder(domain, mode='r', endpoint=endpoint, username=username,
+                   password=password, use_cache=True)
+        else:        
+            f = h5pyd.File(domain, mode='r', endpoint=endpoint, username=username,
+                   password=password, use_cache=True)
+    except IOError as oe:
+        if oe.errno in (404, 410):   # Not Found
+            sys.exit("domain: {} not found".format(domain))
+        elif oe.errno == 401:  # Unauthorized
+            sys.exit("Authorization failure")
+        elif oe.errno == 403:  # Forbidden
+            sys.exit("Not allowed")
+        else:
+            sys.exit("Unexpected error: {}".format(oe))
+        
+    timestamp = datetime.fromtimestamp(int(f.modified))
+
+    if is_folder:
+        print("folder: {}".format(domain))
+        print("    owner:           {}".format(f.owner))
+        print("    last modified:   {}".format(timestamp))
+    else:
+        # report HDF objects (groups, datasets, and named datatypes) vs. allocated chunks
+        num_objects = f.num_groups + f.num_datatypes + f.num_datasets
+        num_chunks = f.num_objects - num_objects
+
+        print("domain: {}".format(domain))
+        print("    owner:           {}".format(f.owner))
+        print("    id:              {}".format(f.id.id))
+        print("    last modified:   {}".format(timestamp))
+        print("    total_size:      {}".format(format_size(f.total_size)))    
+        print("    allocated_bytes: {}".format(format_size(f.allocated_bytes)))
+        print("    num objects:     {}".format(num_objects))
+        print("    num chunks:      {}".format(num_chunks))
+
+
+    f.close()
 
 #
 # Get folder in /home/ that is owned by given user
@@ -96,6 +201,8 @@ def main():
         cfg["cmd"] = "python " + cfg["cmd"]
     cfg["loglevel"] = logging.ERROR
     cfg["logfname"] = None
+    cfg["human_readable"] = False
+    domains = []
 
 
     while argn < len(sys.argv):
@@ -130,50 +237,28 @@ def main():
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = val
             argn += 2
+        elif arg == "-H":
+             cfg["human_readable"] = True
+             argn += 1
         else:
-            printUsage()
+            domains.append(arg)
+            argn += 1
 
     # setup logging
      
     logging.basicConfig(filename=cfg["logfname"], format='%(asctime)s %(message)s', level=cfg["loglevel"])
     logging.debug("set log_level to {}".format(cfg["loglevel"]))
 
-    username = cfg["hs_username"]
-    password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
- 
-    print("endpoint: {}".format(endpoint)) 
     if not endpoint or endpoint[-1] == '/' or endpoint[:4] != "http":
         print("WARNING: endpoint: {} doesn't appear to be valid".format(endpoint))
-    try:
-        info = h5pyd.getServerInfo(username=username, password=password, endpoint=endpoint)
-        print("server name: {}".format(info["name"]))
-        if "state" in info:
-            print("server state: {}".format(info['state']))
-        print("username: {}".format(info["username"]))
-        print("password: {}".format(info["password"]))
-        if info['state'] == "READY":
-            home_folder = getHomeFolder(username)
-            if home_folder:
-                print("home: {}".format(home_folder))
-    
-        if "hsds_version" in info:
-            print("server version: {}".format(info["hsds_version"]))
-        elif "h5serv_version" in info:
-            print("server version: {}".format(info["h5serv_version"]))
-        if "start_time" in info:
-            uptime = getUpTime(info["start_time"])
-            print("up: {}".format(uptime))
-        print("h5pyd version: {}".format(h5pyd.version.version))
-        
-        
-    except IOError as ioe:
-        if ioe.errno == 401:
-            print("username/password not valid for username: {}".format(username))
-        else:
-            print("Error: {}".format(ioe))
+
+    if not domains:
+        getServerInfo(cfg)
+    else:
+        for domain in domains:
+            getDomainInfo(domain, cfg)
+ 
 
 if __name__ == "__main__":
     main()
-
-

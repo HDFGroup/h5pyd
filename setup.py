@@ -40,6 +40,11 @@ setup(name='h5pyd',
            'hsrm = h5pyd._apps.hsdel:main',
            'hsget = h5pyd._apps.hsget:main',
            'hsload = h5pyd._apps.hsload:main',
-           'hsconfigure = h5pyd._apps.hsconfigure:main']
+           'hsconfigure = h5pyd._apps.hsconfigure:main',
+           'hscopy = h5pyd._apps.hscopy:main',
+           'hscp = h5pyd._apps.hscopy:main',
+           'hsmv = h5pyd._apps.hsmv:main',
+           'hsdiff = h5pyd._apps.hsdiff:main'
+           ]
       },
 )  

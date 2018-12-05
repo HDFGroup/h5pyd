@@ -86,7 +86,7 @@ class File(Group):
         return self.id.http_conn.owner
 
     def __init__(self, domain, mode=None, endpoint=None, username=None, password=None,
-        api_key=None, use_session=True, use_cache=False, logger=None, owner=None, **kwds):
+        api_key=None, use_session=True, use_cache=False, logger=None, owner=None, linked_domain=None, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -97,6 +97,8 @@ class File(Group):
             Access mode: 'r', 'r+', 'w', or 'a'
         endpoint
             Server endpoint.   Defaults to "http://localhost:5000"
+        linked_domain
+            Create new domain using the root of the linked domain
         """
     
 
@@ -208,6 +210,8 @@ class File(Group):
                 body = {}
                 if owner:
                     body["owner"] = owner
+                if linked_domain:
+                    body["linked_domain"] = linked_domain
                 rsp = http_conn.PUT(req, body=body)
                 if rsp.status_code != 201:
                     http_conn.close()
@@ -266,8 +270,9 @@ class File(Group):
             # resynch the verbose data
             req = '/?verbose=1'
             rsp_json = self.GET(req)
+            self.log.debug("get verbose info: {}".format(rsp_json))
             props = {}
-            for k in ("num_chunks", "num_datatypes", "num_groups", "num_datasets", "allocated_bytes"):
+            for k in ("num_objects", "num_datatypes", "num_groups", "num_datasets", "allocated_bytes", "total_size"):
                 if k in rsp_json:
                     props[k] = rsp_json[k]
             self._verboseInfo = props
@@ -275,12 +280,12 @@ class File(Group):
         return self._verboseInfo
 
     @property
-    def num_chunks(self):
+    def num_objects(self):
         props = self._getVerboseInfo()
-        num_chunks = 0
-        if "num_chunks" in props:
-            num_chunks = props["num_chunks"]
-        return num_chunks
+        num_objects = 0
+        if "num_objects" in props:
+            num_objects = props["num_objects"]
+        return num_objects
 
     @property
     def num_datatypes(self):
@@ -313,6 +318,14 @@ class File(Group):
         if "allocated_bytes" in props:
             allocated_bytes = props["allocated_bytes"]
         return allocated_bytes
+
+    @property
+    def total_size(self):
+        props = self._getVerboseInfo()
+        total_size = 0
+        if "total_size" in props:
+            total_size = props["total_size"]
+        return total_size
 
 
     # override base implemention of ACL methods to use the domain rather than update root group

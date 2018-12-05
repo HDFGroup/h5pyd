@@ -265,7 +265,7 @@ def visitDomains(domain, depth=1):
         elif cfg["verbose"]:
             # get the number of allocated bytes
             f = getFile(domain)
-            num_bytes = f.allocated_bytes
+            num_bytes = f.total_size
             f.close()
 
         owner = dir.owner
@@ -320,12 +320,12 @@ def getGroupFromDomain(domain):
 #
 def printUsage():
     print("usage: {} [-r] [-v] [-h] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains".format(cfg["cmd"]))
-    print("example: {} -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5".format(cfg["cmd"]))
+    print("example: {} -r -e http://hsdshdflab.hdfgroup.org /shared/tall.h5".format(cfg["cmd"]))
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
     print("     -H | --human-readable :: with -v, print human readable sizes (e.g. 123M)")
-    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://example.com:8080")
+    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -c | --conf <file.cnf>  :: A credential and config file")

@@ -52,7 +52,7 @@ def printUsage():
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
-    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://example.com:8080")
+    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     --logfile <logfile> :: logfile path")
@@ -311,6 +311,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-    
-	

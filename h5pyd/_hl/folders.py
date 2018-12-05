@@ -69,7 +69,6 @@ class Folder():
         username=None, password=None, api_key=None, logger=None, owner=None, **kwds):
         """Create a new Folders object.
 
-
         domain_name
             URI of the domain name to access. E.g.: /org/hdfgroup/folder/
         
@@ -255,8 +254,8 @@ class Folder():
                 return domain
         return None
 
-    def __delitem__(self, name):
-        """ Delete domain. """
+    def delete_item(self, name, keep_root=False):
+        """ dlete domain """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         if self._http_conn.mode == 'r':
@@ -265,9 +264,16 @@ class Folder():
         headers = self._http_conn.getHeaders()
         req = '/'
         params = {"domain": domain}
+        if keep_root:
+            params["keep_root"] = 1
         self._http_conn.DELETE(req, headers=headers, params=params)
         self._subdomains = None # reset the cache list
-        #self.id.unlink(self._e(name))
+
+    def __delitem__(self, name):
+        """ Delete domain. """
+        self.delete_item(name)
+
+       
 
     def __len__(self):
         """ Number of subdomains of this folder """
