@@ -130,8 +130,12 @@ class TestFile(TestCase):
             # check properties that are only available for h5pyd
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously
-
-            self.assertEqual(f.num_objects, 2)
+            if is_hsds:
+                self.assertEqual(f.num_objects, 2)
+            else:
+                # reported as 0 for h5serv
+                self.assertEqual(f.num_objects, 0)
+                
             self.assertTrue(f.num_groups == 2)
             self.assertEqual(f.num_datasets, 0)
             self.assertEqual(f.num_datatypes, 0)
