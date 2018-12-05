@@ -132,11 +132,12 @@ class TestFile(TestCase):
             # data is being updated asynchronously
             if is_hsds:
                 self.assertEqual(f.num_objects, 2)
+                self.assertEqual(f.num_groups, 2)
             else:
                 # reported as 0 for h5serv
                 self.assertEqual(f.num_objects, 0)
-                
-            self.assertTrue(f.num_groups == 2)
+                self.assertEqual(f.num_groups, 0)
+
             self.assertEqual(f.num_datasets, 0)
             self.assertEqual(f.num_datatypes, 0)
             self.assertTrue(f.allocated_bytes == 0)
