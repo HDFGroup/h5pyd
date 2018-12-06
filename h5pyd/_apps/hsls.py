@@ -304,16 +304,6 @@ def visitDomains(domain, depth=1):
     return count
 
 
-#
-# Get Group based on domain path
-#
-def getGroupFromDomain(domain):
-    try:
-        f = getFile(domain)
-        return f['/']
-    except IOError:
-        return None
-
 
 #
 # Usage
@@ -423,7 +413,26 @@ def main():
             print("{} items".format(count))
 
         else:
-            grp = getGroupFromDomain(domain)
+            try:
+                f = getFile(domain)
+            except IOError as ioe:
+                if ioe.errno == 401:
+                    print("Username/Password missing or invalid")
+                    continue
+                if ioe.errno == 403:
+                    print("No permission to read domain: {}".format(domain))
+                    continue
+                elif ioe.errno == 404:
+                    print("Domain {} not found".format(domain))
+                    continue
+                elif ioe.errno == 410:
+                    print("Domain {} has been removed".format(domain))
+                    continue
+                else:
+                    print("Unexpected error: {}".format(ioe))
+                    continue
+        
+            grp = f['/']
             if grp is None:
                 print("{}: No such domain".format(domain))
                 domain += '/'
