@@ -352,6 +352,13 @@ def write_dataset(src, tgt, ctx):
         tgt[()] = x
         return
 
+    fillvalue = None
+    try:    
+        # can trigger a runtime error if fillvalue is undefined
+        fillvalue = src.fillvalue
+    except RuntimeError:
+        pass  # ignore
+
     msg = "iterating over chunks for {}".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
@@ -362,14 +369,20 @@ def write_dataset(src, tgt, ctx):
         logging.debug("src dtype: {}".format(src.dtype))
         logging.debug("des dtype: {}".format(tgt.dtype))
         
-        for s in it:
-            msg = "writing dataset data for slice: {}".format(s)
+        for s in it: 
+            arr = src[s]
+            # don't write arr if it's all zeros (or the fillvalue if defined)
+            empty_arr = np.zeros(arr.shape, dtype=arr.dtype)
+            if fillvalue:
+                empty_arr.fill(fillvalue)
+            if np.array_equal(arr, empty_arr):
+                msg = "skipping chunk for slice: {}".format(str(s))
+            else:
+                msg = "writing dataset data for slice: {}".format(s)
+                tgt[s] = arr
             logging.info(msg)
             if ctx["verbose"]:
                 print(msg)
-            
-            arr = src[s]
-            tgt[s] = arr
     except (IOError, TypeError) as e:
         msg = "ERROR : failed to copy dataset data : {}".format(str(e))
         logging.error(msg)
