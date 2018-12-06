@@ -75,7 +75,7 @@ class TestFile(TestCase):
             self.assertTrue(f.created + 30.0 > now)
             self.assertTrue(f.modified - 30.0 < now)
             self.assertTrue(f.modified + 30.0 > now)
-            self.assertTrie(f.modified >= f.created)
+            self.assertTrue(f.modified >= f.created)
         if is_hsds:
             # owner prop is just for HSDS
             self.assertTrue(len(f.owner) > 0) 
