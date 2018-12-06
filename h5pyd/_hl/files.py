@@ -71,11 +71,6 @@ class File(Group):
         return 0
 
     @property
-    def modified(self):
-        """Last modified time of the domain as a datetime object."""
-        return self.id.http_conn.modified
-
-    @property
     def created(self):
         """Creation time of the domain"""
         return self.id.http_conn.created
@@ -272,12 +267,22 @@ class File(Group):
             rsp_json = self.GET(req)
             self.log.debug("get verbose info: {}".format(rsp_json))
             props = {}
-            for k in ("num_objects", "num_datatypes", "num_groups", "num_datasets", "allocated_bytes", "total_size"):
+            for k in ("num_objects", "num_datatypes", "num_groups", "num_datasets", "allocated_bytes", "total_size", "lastModified"):
                 if k in rsp_json:
                     props[k] = rsp_json[k]
             self._verboseInfo = props
             self._verboseUpdated = now
         return self._verboseInfo
+
+    @property
+    def modified(self):
+        """Last modified time of the domain as a datetime object."""
+        props = self._getVerboseInfo()
+        modified = self.id.http_conn.modified  # timestamp for the domain object
+        # update with latest time of any domain object (if available)
+        if "lastModified" in props:
+            modified = props["lastModified"]
+        return modified
 
     @property
     def num_objects(self):
