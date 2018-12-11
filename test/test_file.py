@@ -83,8 +83,14 @@ class TestFile(TestCase):
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
+
+        # flush any pending changes - this would be called by f.close() internally, 
+        # but try here to confirm it can be called explicitly
+        f.flush()  
+
         f.close()
         self.assertEqual(f.id.id, 0)
+
         # re-open as read-write
         f = h5py.File(filename, 'w')
         self.assertTrue(f.id.id is not None)
@@ -141,6 +147,8 @@ class TestFile(TestCase):
             self.assertEqual(f.num_datasets, 0)
             self.assertEqual(f.num_datatypes, 0)
             self.assertTrue(f.allocated_bytes == 0)
+
+        
 
         f.close()
         self.assertEqual(f.id.id, 0)

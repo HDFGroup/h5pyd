@@ -358,18 +358,36 @@ class File(Group):
         req = '/acls/' + acl['userName']
         self.PUT(req, body=perm)
 
+   
+
+    def flush(self):
+        """  Tells the service to complete any pending updates to permanent storage
+        """
+        self.log.debug("flush")
+        if  self._id.id.startswith("g-"):
+            # Currently flush only works with HSDS
+            self.log.debug("sending PUT flush request")
+            req = '/'
+            body = {"flush": 1}
+            self.PUT(req, body=body)
+
     def close(self):
         """ Clears reference to remote resource.
         """
         # this will close the socket of the http_conn singleton
+
+        self.log.debug(f"close, mode: {self.mode}")
+        # do a PUT flush if this file is writable and the server is HSDS
+        if  self.mode == "r+" and self._id.id.startswith("g-"):
+            # Currently flush only works with HSDS
+            self.log.debug("sending PUT flush request")
+            req = '/'
+            body = {"flush": 1}
+            self.PUT(req, body=body)
+
         if self._id._http_conn:
             self._id._http_conn.close()
         self._id.close()
-
-    def flush(self):
-        """ For h5py compatibility, doesn't currently do anything in h5pyd.
-        """
-        pass
 
     def __enter__(self):
         return self
