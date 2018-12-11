@@ -334,7 +334,7 @@ class HttpConn:
     def session(self):
         # create a session object to re-use http connection when possible
         s = requests
-        retries=30
+        retries=3
         backoff_factor=0.1
         status_forcelist=(500, 502, 503, 504)
         if self._use_session:
