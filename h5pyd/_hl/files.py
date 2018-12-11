@@ -376,7 +376,7 @@ class File(Group):
         """
         # this will close the socket of the http_conn singleton
 
-        self.log.debug(f"close, mode: {self.mode}")
+        self.log.debug("close, mode: {}".format(self.mode))
         # do a PUT flush if this file is writable and the server is HSDS
         if  self.mode == "r+" and self._id.id.startswith("g-"):
             # Currently flush only works with HSDS
