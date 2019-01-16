@@ -81,6 +81,8 @@ def is_regionreference(val):
 
 def has_reference(dtype):
     has_ref = False
+    if not isinstance(dtype, np.dtype):
+        return False
     if len(dtype) > 0:
         for name in dtype.fields:
             item = dtype.fields[name]
