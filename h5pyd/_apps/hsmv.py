@@ -115,7 +115,6 @@ def deleteDomain(domain, keep_root=False):
         parent_domain += '/'
     try:
         hparent = getFolder(parent_domain, mode='a')
-        print("opening folder: {} with mode: 'a'".format(parent_domain))
     except IOError as oe:
         if oe.errno == 404:   # Not Found
             sys.exit("Parent domain: {} not found".format(parent_domain))

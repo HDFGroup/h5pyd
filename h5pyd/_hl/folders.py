@@ -255,7 +255,7 @@ class Folder():
         return None
 
     def delete_item(self, name, keep_root=False):
-        """ dlete domain """
+        """ delete domain """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         if self._http_conn.mode == 'r':

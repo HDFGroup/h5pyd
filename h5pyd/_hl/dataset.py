@@ -960,9 +960,11 @@ class Dataset(HLObject):
             selection = sel.select(self, selection_arg)
 
             sel_param = selection.getQueryParam()
+            self.log.debug("query param: {}".format(sel_param))
             if sel_param:
-                params[sel_param[0]] = sel_param[1]
+                params["select"] = sel_param
             try:
+                self.log.debug("params: {}".format(params))
                 rsp = self.GET(req, params=params)
                 count = len(rsp["value"])
                 self.log.info("got {} rows".format(count))
@@ -979,7 +981,7 @@ class Dataset(HLObject):
                     self.log.info("Got 413, reducing page_size to: {}".format(page_size))
                 else:
                     # otherwise, just raise the exception
-                    self.log.info("Unexpected exception: {} {}".format(ioe.errno, ioe.reason))
+                    self.log.info("Unexpected exception: {}".format(ioe.errno))
                     raise ioe
             if cursor >= stop:
                 self.log.info("completed iteration, returning: {} rows".format(len(data)))
