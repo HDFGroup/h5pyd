@@ -79,6 +79,14 @@ class TestFile(TestCase):
         if is_hsds:
             # owner prop is just for HSDS
             self.assertTrue(len(f.owner) > 0) 
+            version = f.serverver
+             # server version should be of form "n.n.n"
+            n = version.find(".")
+            self.assertTrue(n>=1)
+            limits = f.limits
+            for k in ('min_chunk_size', 'max_chunk_size', 'max_request_size', 'max_chunks_per_request'):
+                self.assertTrue(k in limits)
+
          
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))

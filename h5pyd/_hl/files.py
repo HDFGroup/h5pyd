@@ -66,6 +66,10 @@ class File(Group):
         return ("0.0.1",)
 
     @property
+    def serverver(self):
+        return self._version
+
+    @property
     def userblock_size(self):
         """ User block size (in bytes) """
         return 0
@@ -80,8 +84,12 @@ class File(Group):
         """Username of the owner of the domain"""
         return self.id.http_conn.owner
 
+    @property
+    def limits(self):
+        return self._limits
+
     def __init__(self, domain, mode=None, endpoint=None, username=None, password=None,
-        api_key=None, use_session=True, use_cache=False, logger=None, owner=None, linked_domain=None, **kwds):
+        api_key=None, use_session=True, use_cache=False, logger=None, owner=None, linked_domain=None, retries=3, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -167,7 +175,7 @@ class File(Group):
 
             http_conn =  HttpConn(domain, endpoint=endpoint,
                     username=username, password=password, mode=mode,
-                    api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger)
+                    api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger, retries=retries)
 
             root_json = None
 
@@ -217,7 +225,17 @@ class File(Group):
             if 'root' not in root_json:
                 http_conn.close()
                 raise IOError(404, "Unexpected error")
+
             root_uuid = root_json['root']
+
+            if "limits" in root_json:
+                self._limits = root_json["limits"]
+            else:
+                self._limits = None
+            if "version" in root_json:
+                self._version = root_json["version"]
+            else:
+                self._version = None
 
             if mode == 'a':
                 # for append, verify we have 'update' permission on the domain
