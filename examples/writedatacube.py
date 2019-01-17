@@ -11,8 +11,14 @@
 ##############################################################################
 import sys
 import os
-import h5pyd
+import time
 import numpy as np
+
+USE_H5PY=0
+if USE_H5PY:
+    import h5py
+else:
+    import h5pyd as h5py
 
 
 dims = [16, 16, 16]
@@ -42,7 +48,7 @@ filename += ".h5"
 print("filename:", filename)
 
 
-f = h5pyd.File(filename, "w")   
+f = h5py.File(filename, "w")   
 
 print("create dataset")
 
@@ -53,19 +59,24 @@ print("shape:", dset.shape)
 print("chunks:", dset.chunks)
 print("dset.type:", dset.dtype)
 print("dset.maxshape:", dset.maxshape)
-print("bytes per slice:", dims[0]*dims[1])
+print("bytes per slice: ", dims[0]*dims[1])
+if isinstance(f.id.id, str) and f.limits:
+    print("max_request_size:", f.limits["max_request_size"])
 
 print("writing data...")
 
 for i in range(dims[2]):
+    now = time.time()
     arr = np.zeros((dims[0], dims[1]), dtype=dset.dtype)
-    mid_x= dims[0] // 2
+    mid_x = dims[0] // 2
     mid_y = dims[1] // 2
     arr[mid_x,:] = 22
     arr[:,mid_y] = 44
     dset[:,:,i] = arr
-print("done!")
+    elapse = time.time() - now
+    print("{:.4f}s".format(elapse))
 
+print("closing file...")
 f.close()
 
-
+print("done!")
