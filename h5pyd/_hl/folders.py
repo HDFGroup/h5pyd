@@ -266,7 +266,9 @@ class Folder():
         params = {"domain": domain}
         if keep_root:
             params["keep_root"] = 1
-        self._http_conn.DELETE(req, headers=headers, params=params)
+        rsp = self._http_conn.DELETE(req, headers=headers, params=params)
+        if rsp.status_code != 200:
+            raise IOError(rsp.status_code, rsp.reason)
         self._subdomains = None # reset the cache list
 
     def __delitem__(self, name):
