@@ -31,10 +31,9 @@ class TestTable(TestCase):
         if config.get("use_h5py"):
             return # Table not supported with h5py
         f = h5py.File(filename, "w")
-        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+        if not f.id.id.startswith("g-"):
             return # append not supported with h5serv
         
-
         count = 10
 
         dt = np.dtype([('real', np.float), ('img', np.float)])
@@ -64,7 +63,7 @@ class TestTable(TestCase):
             return # Table not supported with h5py
         f = h5py.File(filename, "w")
 
-        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+        if not f.id.id.startswith("g-"):
             return # append not supported with h5serv
         
         # write entire array
