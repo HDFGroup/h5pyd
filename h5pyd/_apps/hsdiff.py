@@ -337,7 +337,7 @@ def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False)
     def object_diff_helper(name, obj):
         class_name = obj.__class__.__name__
          
-        if class_name == "Dataset":
+        if class_name in ("Dataset", "Table"):
             diff_dataset(obj, ctx)
         elif class_name == "Group":
             diff_group(obj, ctx)

@@ -103,14 +103,19 @@ def dump(name, obj, visited=None):
     class_name = obj.__class__.__name__
     desc = None
     obj_id = None
-    if class_name in ("Dataset", "Group", "Datatype"):
+    if class_name in ("Dataset", "Group", "Datatype", "Table"):
         obj_id = obj.id.id
         if visited and obj_id in visited:
             same_as = visited[obj_id]
             print("{0:24} {1}, same as {2}".format(name, class_name, same_as))
             return
 
-    if class_name == "Dataset":
+    is_dataset = False
+    if class_name in ("Dataset", "Table"):
+        is_dataset = True
+
+
+    if is_dataset:
         desc = getShapeText(obj)
         obj_id = obj.id.id
     elif class_name == "Group":
@@ -130,7 +135,7 @@ def dump(name, obj, visited=None):
     if cfg["verbose"] and obj_id is not None:
         print("    {0:>12}: {1}".format("UUID", obj_id))
 
-    if cfg["verbose"] and class_name == "Dataset" and obj.shape is not None \
+    if cfg["verbose"] and is_dataset and obj.shape is not None \
             and obj.chunks is not None:
         chunk_size = obj.dtype.itemsize
         for chunk_dim in obj.chunks:
@@ -164,7 +169,7 @@ def dump(name, obj, visited=None):
         fstr = "    {0:>12}: {1}"
         print(fstr.format("Type", getTypeStr(obj.dtype)))  # dump out type info
 
-    if cfg["showattrs"] and class_name in ("Dataset", "Group", "Datatype"):
+    if cfg["showattrs"] and class_name in ("Dataset", "Table", "Group", "Datatype"):
         # dump attributes for the object
         for attr_name in obj.attrs:
             attr = obj.attrs[attr_name]

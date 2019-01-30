@@ -22,14 +22,12 @@ import numpy
 import six
 from six.moves import xrange
 
-#from . import base
 from .base import HLObject, jsonToArray
 from .h5type import Reference, RegionReference
-from .base import phil, _decode
+from .base import  _decode
 from .objectid import DatasetID
 from . import filters
 from . import selections as sel
-#from . import selections2 as sel2
 from .datatype import Datatype
 from .h5type import getTypeItem, createDataType, check_dtype, special_dtype, getItemSize
 
@@ -486,11 +484,10 @@ class Dataset(HLObject):
         Use of this method is preferred to len(dset), as Python's built-in
         len() cannot handle values greater then 2**32 on 32-bit systems.
         """
-        with phil:
-            shape = self._shape
-            if shape is None or len(shape) == 0:
-                raise TypeError("Attempt to take len() of scalar dataset")
-            return shape[0]
+        shape = self._shape
+        if shape is None or len(shape) == 0:
+            raise TypeError("Attempt to take len() of scalar dataset")
+        return shape[0]
 
     def __iter__(self):
         """ Iterate over the first axis.  TypeError if scalar.
@@ -498,10 +495,24 @@ class Dataset(HLObject):
         BEWARE: Modifications to the yielded data are *NOT* written to file.
         """
         shape = self._shape
+        # to reduce round trips, grab BUFFER_SIZE items at a time  
+        # TBD: set buffersize based on size of each row
+        BUFFER_SIZE = 1000  
+
+        arr = None
+        self.log.info("__iter__")
         if len(shape) == 0:
             raise TypeError("Can't iterate over a scalar dataset")
         for i in xrange(shape[0]):
-            yield self[i]
+            if i%BUFFER_SIZE == 0:
+                # grab another buffer
+                numrows = BUFFER_SIZE
+                if shape[0] - i < numrows:
+                    numrows = shape[0] - i
+                self.log.debug("get {} iter items".format(numrows))
+                arr = self[i:numrows]
+
+            yield arr[i%BUFFER_SIZE]
 
     def _getQueryParam(self, start, stop, step=None):
         param = ''
@@ -882,131 +893,6 @@ class Dataset(HLObject):
             arr = arr[0]
         elif len(arr.shape) > 1:
             arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
-        return arr
-
-    def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None):
-        """Read rows from compound type dataset using pytable-style condition
-        """
-        names = ()  # todo
-        def readtime_dtype(basetype, names):
-            """ Make a NumPy dtype appropriate for reading """
-
-            if len(names) == 0:  # Not compound, or we want all fields
-                return basetype
-
-            if basetype.names is None:  # Names provided, but not compound
-                raise ValueError("Field names only allowed for compound types")
-
-            for name in names:  # Check all names are legal
-                if not name in basetype.names:
-                    raise ValueError("Field %s does not appear in this type." % name)
-
-            return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
-
-        new_dtype = getattr(self._local, 'astype', None)
-        if new_dtype is not None:
-            new_dtype = readtime_dtype(new_dtype, names)
-        else:
-            # This is necessary because in the case of array types, NumPy
-            # discards the array information at the top level.
-            new_dtype = readtime_dtype(self.dtype, names)
-        # todo - will need the following once we have binary transfers
-        # mtype = h5t.py_create(new_dtype)
-        if len(new_dtype) < 2:
-            raise ValueError("Where method can only be used with compound datatypes")
-        mtype = new_dtype
-
-        # === Check for zero-sized datasets =====
-
-        if self._shape is None or numpy.product(self._shape) == 0 or self._shape == ():
-            raise TypeError("Scalar datasets can not be used with where method")
-        if len(self._shape) > 1:
-            raise TypeError("Multi-dimensional datasets can not be used with where method")
-
-
-        # === Everything else ===================
-
-        # Perform the dataspace selection
-        if start or stop:
-            if not start:
-                start = 0
-            if not stop:
-                stop = self._shape[0]
-        else:
-            start = 0
-            stop = self._shape[0]
-
-        selection_arg = slice(start, stop)
-        selection = sel.select(self, selection_arg)
-
-        if selection.nselect == 0:
-            return numpy.ndarray(selection.mshape, dtype=new_dtype)
-
-        # setup for pagination in case we can't read everthing in one go
-        data = []
-        cursor = start
-        page_size = stop - start
-
-        while True:
-            # Perfom the actual read
-            req = "/datasets/" + self.id.uuid + "/value"
-            params = {}
-            params["query"] = condition
-            self.log.info("req - cursor: {} page_size: {}".format(cursor, page_size))
-            end_row = cursor+page_size
-            if end_row > stop:
-                end_row = stop
-            selection_arg = slice(cursor, end_row)
-            selection = sel.select(self, selection_arg)
-
-            sel_param = selection.getQueryParam()
-            self.log.debug("query param: {}".format(sel_param))
-            if sel_param:
-                params["select"] = sel_param
-            try:
-                self.log.debug("params: {}".format(params))
-                rsp = self.GET(req, params=params)
-                count = len(rsp["value"])
-                self.log.info("got {} rows".format(count))
-                if count > 0:
-                    data.extend(rsp['value'])
-                # advance to next page
-                cursor += page_size
-            except IOError as ioe:
-                if ioe.errno == 413 and page_size > 1024:
-                    # too large a query target, try reducing the page size
-                    # if it is not already relatively small (1024)
-                    page_size //= 2
-                    page_size += 1  # bump up to avoid tiny pages in the last iteration
-                    self.log.info("Got 413, reducing page_size to: {}".format(page_size))
-                else:
-                    # otherwise, just raise the exception
-                    self.log.info("Unexpected exception: {}".format(ioe.errno))
-                    raise ioe
-            if cursor >= stop:
-                self.log.info("completed iteration, returning: {} rows".format(len(data)))
-                break
-
-        # need some special conversion for compound types --
-        # each element must be a tuple, but the JSON decoder
-        # gives us a list instead.
-
-        mshape = (len(data),)
-        if len(mtype) > 1 and type(data) in (list, tuple):
-            converted_data = []
-            for i in range(len(data)):
-                converted_data.append(self.toTuple(data[i]))
-            data = converted_data
-
-        arr = numpy.empty(mshape, dtype=mtype)
-        arr[...] = data
-
-        # Patch up the output for NumPy
-        if len(names) == 1:
-            arr = arr[names[0]]     # Single-field recarray convention
-        if arr.shape == ():
-            arr = numpy.asscalar(arr)
-
         return arr
 
 

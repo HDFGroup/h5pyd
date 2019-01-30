@@ -28,6 +28,7 @@ from ._hl.files import File
 from ._hl.folders import Folder
 from ._hl.group import Group, SoftLink, ExternalLink, UserDefinedLink, HardLink
 from ._hl.dataset import Dataset
+from ._hl.table import Table
 from ._hl.datatype import Datatype
 from ._hl.attrs import AttributeManager
 from ._hl.serverinfo import getServerInfo
@@ -66,4 +67,3 @@ def enable_ipython_completer():
             return ipy_completer.load_ipython_extension()
 
     raise RuntimeError('completer must be enabled in active ipython session')
-
