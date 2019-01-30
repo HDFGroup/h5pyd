@@ -24,13 +24,16 @@ else:
 from common import ut, TestCase
 
 
-class TestDatasetTable(TestCase):
+class TestTable(TestCase):
     def test_create_table(self):
         filename = self.getFileName("create_table_dset")
         print("filename:", filename)
         if config.get("use_h5py"):
             return # Table not supported with h5py
         f = h5py.File(filename, "w")
+        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+            return # append not supported with h5serv
+        
 
         count = 10
 
@@ -61,8 +64,9 @@ class TestDatasetTable(TestCase):
             return # Table not supported with h5py
         f = h5py.File(filename, "w")
 
-        #curl -v --header "Host: create_compound_dset.h5pyd_test.hdfgroup.org" http://127.0.0.1:5000
-
+        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+            return # append not supported with h5serv
+        
         # write entire array
         data = [
             ("EBAY", "20170102", 3023, 3088),
