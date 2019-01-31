@@ -48,8 +48,21 @@ class TestTable(TestCase):
 
         self.assertEqual(table.colnames, ['real', 'img'])
         self.assertEqual(table.nrows, count)
+
+        num_rows = 0
         for row in table:
             self.assertEqual(len(row), 2)
+            num_rows += 1
+        self.assertEqual(num_rows, count)
+
+        # try the same thing using cursor object
+        cursor = table.create_cursor()
+        num_rows = 0
+        for row in cursor:
+            self.assertEqual(len(row), 2)
+            num_rows += 1
+        self.assertEqual(num_rows, count)
+
         arr = table.read(start=5, stop=6)
         self.assertEqual(arr.shape, (1,))
 
@@ -96,11 +109,25 @@ class TestTable(TestCase):
                 # first two columns will come back as bytes, not strs
                 self.assertEqual(row[col], item[col])
          
-        quotes = table.read_where("symbol == b'AAPL'")
+        condition = "symbol == b'AAPL'"
+        quotes = table.read_where(condition)
         self.assertEqual(len(quotes), 4)
         for i in range(4):
             quote = quotes[i]
             self.assertEqual(quote[0], b'AAPL')
+
+        # read up to 2 rows
+        quotes = table.read_where(condition, limit=2)
+        self.assertEqual(len(quotes), 2)
+
+        # use a query cursor
+        cursor = table.create_cursor(condition=condition)
+        num_rows = 0
+        for row in cursor:
+            self.assertEqual(len(row), 4)
+            num_rows += 1
+        self.assertEqual(num_rows, 4)
+
         f.close()
 
 

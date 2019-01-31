@@ -13,6 +13,7 @@
 from __future__ import absolute_import
 import numpy
 import six
+from six.moves import xrange
 from .base import  _decode
 from .dataset import Dataset
 from .objectid import DatasetID
@@ -21,7 +22,54 @@ from .h5type import Reference
 from .h5type import check_dtype
 
 
+class Cursor():
+    """
+      Cursor for retreiving rows from a table
+    """
+    def __init__(self, table, query=None, start=None, stop=None):
+        self._table = table
+        self._query = query
+        if start is None:
+            self._start = 0
+        else:
+            self._start = start
+        if stop is None:
+            self._stop = table.nrows
+        else:
+            self._stop = stop
 
+    def __iter__(self):
+        """ Iterate over the first axis.  TypeError if scalar.
+
+        BEWARE: Modifications to the yielded data are *NOT* written to file.
+        """
+        nrows = self._table.nrows
+        # to reduce round trips, grab BUFFER_SIZE items at a time  
+        # TBD: set buffersize based on size of each row
+        BUFFER_SIZE = 1000  
+
+        arr = None
+        query_complete = False
+
+        for indx in xrange(self._start, self._stop):
+            if indx%BUFFER_SIZE == 0:
+                # grab another buffer
+                read_count = BUFFER_SIZE
+                if nrows - indx < read_count:
+                    read_count = nrows - indx
+                if self._query is None:
+                    
+                    arr = self._table[indx:read_count+indx]
+                else:
+                    # call table to return query result
+                    if query_complete:
+                        arr = None  # nothing more to fetch
+                    else:
+                        arr = self._table.read_where(self._query, start=indx, limit=read_count)
+                        if arr is not None and arr.shape[0] < read_count:
+                            query_complete = True  # we've gotten all the rows
+            if arr is not None and indx%BUFFER_SIZE < arr.shape[0]:
+                yield arr[indx%BUFFER_SIZE]
 
 class Table(Dataset):
 
@@ -76,7 +124,7 @@ class Table(Dataset):
             
 
 
-    def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None):
+    def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None, limit=None):
         """Read rows from table using pytable-style condition
         """
         names = ()  # todo
@@ -148,10 +196,19 @@ class Table(Dataset):
             try:
                 self.log.debug("params: {}".format(params))
                 rsp = self.GET(req, params=params)
-                count = len(rsp["value"])
+                values = rsp["value"]
+                count = len(values)
                 self.log.info("got {} rows".format(count))
                 if count > 0:
-                    data.extend(rsp['value'])
+                    if limit is None or count + len(data) <= limit:
+                        # add in all the data
+                        data.extend(values)
+                    else:
+                        # we've hit the limit for number of rows to return
+                        add_count = limit - len(data)
+                        self.log.debug("adding {} from {} to rrows".format(add_count, count))
+                        data.extend(values[:add_count])
+
                 # advance to next page
                 cursor += page_size
             except IOError as ioe:
@@ -165,7 +222,7 @@ class Table(Dataset):
                     # otherwise, just raise the exception
                     self.log.info("Unexpected exception: {}".format(ioe.errno))
                     raise ioe
-            if cursor >= stop:
+            if cursor >= stop or limit and len(data) == limit:
                 self.log.info("completed iteration, returning: {} rows".format(len(data)))
                 break
 
@@ -190,6 +247,13 @@ class Table(Dataset):
             arr = numpy.asscalar(arr)
 
         return arr
+
+    def create_cursor(self, condition=None,  start=None, stop=None):
+        """Return a cursor for iteration
+        """
+        return Cursor(self, query=condition, start=start, stop=stop)
+
+       
     
     def append(self, rows):
         """ Append rows to end of table 

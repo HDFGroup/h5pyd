@@ -510,7 +510,7 @@ class Dataset(HLObject):
                 if shape[0] - i < numrows:
                     numrows = shape[0] - i
                 self.log.debug("get {} iter items".format(numrows))
-                arr = self[i:numrows]
+                arr = self[i:numrows+i]
 
             yield arr[i%BUFFER_SIZE]
 
