@@ -46,7 +46,7 @@ class Cursor():
         nrows = self._table.nrows
         # to reduce round trips, grab BUFFER_SIZE items at a time  
         # TBD: set buffersize based on size of each row
-        BUFFER_SIZE = 1000  
+        BUFFER_SIZE = 10000  
 
         arr = None
         query_complete = False
