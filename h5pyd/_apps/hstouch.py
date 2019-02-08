@@ -63,20 +63,29 @@ def touchDomain(domain):
     # get handle to parent folder
     parent_domain = op.dirname(domain) 
 
-    if not parent_domain.endswith('/'):
-        parent_domain += '/'
-    try:
-        getFolder(parent_domain)
-    except IOError as oe:
-        #print("errno:", oe.errno)
-        if oe.errno in (404, 410):   # Not Found
-            sys.exit("Parent domain: {} not found".format(parent_domain))
-        elif oe.errno == 401:  # Unauthorized
-            sys.exit("Authorization failure")
-        elif oe.errno == 403:  # Forbidden
-            sys.exit("Not allowed")
-        else:
-            sys.exit("Unexpected error: {}".format(oe))
+    if parent_domain == '/':
+        if cfg["hs_username"] != "admin":
+            sys.exit("Only admin user can create top-level domains")
+        if not make_folder:
+            sys.exit("Only folders can be created as a top-level domain")
+        if len(domain) < 5:
+            sys.exit("Top-level folders must be at least three characters")
+        
+    else:
+        if not parent_domain.endswith('/'):
+            parent_domain += '/'
+        try:
+            getFolder(parent_domain)
+        except IOError as oe:
+            #print("errno:", oe.errno)
+            if oe.errno in (404, 410):   # Not Found
+                sys.exit("Parent domain: {} not found".format(parent_domain))
+            elif oe.errno == 401:  # Unauthorized
+                sys.exit("Authorization failure")
+            elif oe.errno == 403:  # Forbidden
+                sys.exit("Not allowed")
+            else:
+                sys.exit("Unexpected error: {}".format(oe))
     
     hdomain = None
     try:
