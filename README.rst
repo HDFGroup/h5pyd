@@ -34,6 +34,7 @@ Related Projects
 * HDF Server: https://github.com/HDFGroup/h5serv
 * HDF5-JSON: https://github.com/HDFGroup/hdf5-json
 * h5py: https://github.com/h5py/h5py 
+* REST API Documentation: https://github.com/HDFGroup/hdf-rest-api
 
 Installing
 -----------
