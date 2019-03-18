@@ -57,12 +57,12 @@ Testing
 -------
 Setup the following environment variables that inform h5pyd which endpoint and username to use:
 
-* HS_ENDPOINT - "http://127.0.0.1:5000" for h5serv installed locally or appropriate remote endpoint
-* HS_USERNAME - "test_user1" or your preferred useranme 
-* HS_PASSWORD - password for above username - "test" for test_user1 with local h5serv install
-* TEST2_USERNAME - "test_user2" or your preffered username
-* TEST2_PASSWORD - password for abouve username - "test" for test_user2 with local h5serv install
-* H5PYD_TEST_FOLDER - server folder that will be used for generated files.  Use: "h5pyd_test.hdfgroup.org" for local h5serv install.  For HSDS, posix-style paths are also supported, e.g.: /home/bob/h5pyd_test.  For HSDS use hstouch command to create the folder before running the test, e.g.: ``$ hstouch /home/bob/h5pyd_test/``  
+* ``HS_ENDPOINT`` - "http://127.0.0.1:5000" for h5serv installed locally or appropriate remote endpoint
+* ``HS_USERNAME`` - "test_user1" or your preferred username 
+* ``HS_PASSWORD`` - password for above username - "test" for test_user1 with local h5serv install
+* ``TEST2_USERNAME`` - "test_user2" or your preffered username
+* ``TEST2_PASSWORD`` - password for above username - "test" for test_user2 with local h5serv install
+* ``H5PYD_TEST_FOLDER`` - server folder that will be used for generated files.  Use: "h5pyd_test.hdfgroup.org" for local h5serv install.  For HSDS, posix-style paths are also supported, e.g.: /home/bob/h5pyd_test.  For HSDS use hstouch command to create the folder before running the test, e.g.: ``$ hstouch /home/bob/h5pyd_test/``  
 
 Run: ``$python testall.py`` to execute the test suite.
  
