@@ -963,7 +963,8 @@ class Dataset(HLObject):
                     tmp[0] = val
                 val = tmp
 
-        elif isinstance(val, complex) or val.dtype.kind == 'c':
+        elif isinstance(val, complex) or \
+                getattr(getattr(val, 'dtype', None), 'kind', None) == 'c':
             if self.dtype.kind != 'V' or self.dtype.names != ('r', 'i'):
                 raise TypeError(
                     'Wrong dataset dtype for complex number values: %s'
