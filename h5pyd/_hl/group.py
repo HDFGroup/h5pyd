@@ -41,7 +41,7 @@ class Group(HLObject, MutableMappingHDF5):
         if not isinstance(bind, GroupID):
             raise ValueError("%s is not a GroupID" % bind)
         HLObject.__init__(self, bind, **kwargs)
-        self._req_prefix = "/groups/" + self.id.uuid 
+        self._req_prefix = "/groups/" + self.id.uuid
         self._link_db = {}  # cache for links
 
     def create_group(self, h5path):
@@ -55,10 +55,10 @@ class Group(HLObject, MutableMappingHDF5):
         #    raise ValueError("Unable to create link (Name alredy exists)")
         if h5path[-1] == '/':
             raise ValueError("Invalid path for create_group")
-        
+
         parent_uuid = self.id.id
         if h5path[0] == '/':
-            # absolute path         
+            # absolute path
             parent_uuid = self.file.id.id   # uuid of root group
 
         parent_path = op.dirname(h5path)
@@ -71,14 +71,14 @@ class Group(HLObject, MutableMappingHDF5):
                 raise IOError("cannot create subgroup of softlink")
             parent_uuid = link_json["id"]
 
-         
+
         body = {'link': { 'id': parent_uuid,
                           'name': title
                } }
-         
+
         rsp = self.POST('/groups', body=body)
 
-        group_json = rsp 
+        group_json = rsp
         groupId = GroupID(self, group_json)
 
         subGroup = Group(groupId)
@@ -142,21 +142,22 @@ class Group(HLObject, MutableMappingHDF5):
             (T/F) Enable dataset creation timestamps.
         """
 
-        
+
         if self.id.http_conn.mode == 'r':
             raise ValueError("Unable to create dataset (No write intent on file)")
 
         if shape is None and data is None:
             raise TypeError("Either data or shape must be specified")
-            
+
         # Convert data to a C-contiguous ndarray
         if data is not None:
             if dtype is None:
                 dtype = guess_dtype(data)
-            if dtype is None:
-                dtype = numpy.float32
+            # if dtype is None:
+            #     dtype = numpy.float32
             if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
                 data = numpy.asarray(data, order="C", dtype=dtype)
+                dtype = data.dtype
             self.log.info("data dtype: {}".format(data.dtype))
 
         # Validate shape
@@ -168,7 +169,7 @@ class Group(HLObject, MutableMappingHDF5):
             shape = tuple(shape)
         if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
             raise ValueError("Shape tuple is incompatible with data")
-   
+
         dsid = dataset.make_new_dset(self, shape=shape, dtype=dtype, **kwds)
         dset = dataset.Dataset(dsid)
         if data is not None:
@@ -318,7 +319,7 @@ class Group(HLObject, MutableMappingHDF5):
         if h5path[0] == '/':
             #abs path, start with root
             # get root_uuid
-            parent_uuid = self.id.http_conn.root_uuid   
+            parent_uuid = self.id.http_conn.root_uuid
             # make a fake tgt_json to represent 'link' to root group
             tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid }
             if h5path == '/':
@@ -329,9 +330,9 @@ class Group(HLObject, MutableMappingHDF5):
                 # link belonging to this group, see if it's in the cache
                 tgt_json = self._link_db[h5path]
                 parent_uuid = self.id.id
-                 
+
                 return parent_uuid, tgt_json
-                
+
 
         path = h5path.split('/')
 
@@ -340,7 +341,7 @@ class Group(HLObject, MutableMappingHDF5):
                 continue
 
             if not parent_uuid:
-                raise KeyError("Unable to open object (Component not found)") 
+                raise KeyError("Unable to open object (Component not found)")
 
             req = "/groups/" + parent_uuid + "/links/" + name
 
@@ -407,7 +408,7 @@ class Group(HLObject, MutableMappingHDF5):
                     tgt = Dataset(DatasetID(self, dataset_json))
             else:
                 raise IOError("Unexpected Error - collection type: " + link_json['collection'])
-            
+
             return tgt
 
         def isUUID(name):
@@ -428,7 +429,7 @@ class Group(HLObject, MutableMappingHDF5):
 
 
         tgt = None
-        if isinstance(name, h5type.Reference): 
+        if isinstance(name, h5type.Reference):
             tgt = name.objref()  # weak reference to ref object
             if tgt is not None:
                 return tgt  # ref'd object has not been deleted
@@ -595,9 +596,9 @@ class Group(HLObject, MutableMappingHDF5):
             parent_uuid = link_json["id"]
             req = "/groups/" + parent_uuid
             group_json = self.GET(req)
-            tgt = Group(GroupID(self, group_json)) 
-            tgt[basename] = obj   
-             
+            tgt = Group(GroupID(self, group_json))
+            tgt[basename] = obj
+
         elif isinstance(obj, HLObject):
             body = {'id': obj.id.uuid }
             req = "/groups/" + self.id.uuid + "/links/" + name
