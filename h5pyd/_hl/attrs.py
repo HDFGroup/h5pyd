@@ -66,7 +66,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             # "unknown id"
             self._req_prefix = "<unknown>"
 
-
     def _bytesArrayToList(self, data):
         """
         Convert list that may contain bytes type elements to list of string
@@ -106,7 +105,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             out = data
 
         return out
-
 
     @with_phil
     def __getitem__(self, name):
@@ -184,9 +182,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         """
         self._parent.log.info("attrs.create({})".format(name))
 
-
         with phil:
-
             # First, make sure we have a NumPy array.  We leave the data
             # type conversion for HDF5 to perform.
             data = numpy.asarray(data, order='C')
@@ -236,15 +232,15 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                     raise ValueError("Array dtype shape %s is incompatible with data shape %s" % (subshape, shape))
 
                 # New "advertised" shape and dtype
-                shape = shape[0:len(shape)-len(subshape)]
+                shape = shape[0:len(shape) - len(subshape)]
                 dtype = subdtype
 
             # Not an array type; make sure to check the number of elements
             # is compatible, and reshape if needed.
             else:
-
                 if numpy.product(shape) != numpy.product(data.shape):
-                    raise ValueError("Shape of new attribute conflicts with shape of data")
+                    raise ValueError(
+                        "Shape of new attribute conflicts with shape of data")
 
                 if shape != data.shape:
                     data = data.reshape(shape)
@@ -255,8 +251,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             # Make HDF5 datatype and dataspace for the H5A calls
             if use_htype is None:
                 type_json = getTypeItem(dtype)
-                self._parent.log.debug("attrs.create type_json: {}".format(type_json))
-
+                self._parent.log.debug("attrs.create type_json: {}"
+                                       .format(type_json))
 
             # This mess exists because you can't overwrite attributes in HDF5.
             # So we write to a temporary attribute first, and then rename.
@@ -269,8 +265,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 body['value'] = self._bytesArrayToList(data)
             else:
                 # Special case: complex numbers
-                special_dtype = createDataType(type_json)
-                tmp = numpy.empty(shape=data.shape, dtype=special_dtype)
+                special_dt = createDataType(type_json)
+                tmp = numpy.empty(shape=data.shape, dtype=special_dt)
                 tmp['r'] = data.real
                 tmp['i'] = data.imag
                 body['value'] = json.loads(json.dumps(tmp.tolist()))
@@ -283,7 +279,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 self._parent.DELETE(req)
                 # now add again
                 self._parent.PUT(req, body=body)
-
 
     def modify(self, name, value):
         """ Change the value of an attribute while preserving its type.
