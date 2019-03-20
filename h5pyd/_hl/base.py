@@ -146,7 +146,7 @@ def toTuple(rank, data):
 Copy JSON array into given numpy array
 """
 def copyToArray(arr, rank, index, data, vlen_base=None):
-  
+
     nlen = arr.shape[rank]
     if len(data) != nlen:
         raise ValueError("Array len of {} at index: {} doesn't match data length: {}".format(nlen, index, len(data)))
@@ -156,7 +156,7 @@ def copyToArray(arr, rank, index, data, vlen_base=None):
             # recursive call
             copyToArray(arr, rank+1, index, data[i], vlen_base=vlen_base)
         else:
-            if vlen_base:         
+            if vlen_base:
                 e = np.array(data[i], dtype=vlen_base)
                 arr[tuple(index)] = e.squeeze()
             else:
@@ -164,15 +164,37 @@ def copyToArray(arr, rank, index, data, vlen_base=None):
     index[rank] = 0
 
 
-"""
-Return numpy array from the given json array.
-"""
 def jsonToArray(data_shape, data_dtype, data_json):
+    """Return numpy array from the given json array."""
+
     # need some special conversion for compound types --
     # each element must be a tuple, but the JSON decoder
     # gives us a list instead.
 
-   
+    # Special case: complex numbers
+    if (data_dtype.names is not None and
+            data_dtype.names == ('r', 'i') and
+            all(dt.kind == 'f' for dt, off in data_dtype.fields.values()) and
+            data_dtype.fields['r'][0] == data_dtype.fields['i'][0]):
+        itemsize = data_dtype.itemsize
+        if itemsize == 16:
+            cmplx_dtype = np.dtype(np.complex128)
+        elif itemsize == 8:
+            cmplx_dtype = np.dtype(np.complex64)
+        arr = np.empty(shape=data_shape, dtype=cmplx_dtype)
+        if data_shape == ():
+            tmp = np.array(tuple(data_json), dtype=data_dtype)
+            arr.real = tmp['r']
+            arr.imag = tmp['i']
+        else:
+            data = np.array(data_json)
+            tmp = np.empty(shape=data_shape, dtype=data_dtype)
+            for i, n in enumerate(data_dtype.names):
+                tmp[n] = data[:, i]
+            arr.real = tmp['r']
+            arr.imag = tmp['i']
+        return arr
+
     if len(data_dtype) > 1 and not isinstance(data_json, (list, tuple)):
         raise TypeError("expected list data for compound data type")
 
@@ -194,7 +216,7 @@ def jsonToArray(data_shape, data_dtype, data_json):
             converted_data = []
             if npoints == 1 and len(data_json) == len(data_dtype):
                 converted_data.append(toTuple(0, data_json))
-            else:  
+            else:
                 converted_data = toTuple(np_shape_rank, data_json)
             data_json = converted_data
 
@@ -208,7 +230,7 @@ def jsonToArray(data_shape, data_dtype, data_json):
             raise ValueError(msg)
         if arr.shape != data_shape:
             arr = arr.reshape(data_shape)  # reshape to match selection
-     
+
     return arr
 
 

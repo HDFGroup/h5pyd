@@ -21,13 +21,14 @@ from __future__ import absolute_import
 
 import numpy
 import six
+import json
 
 from . import base
 from .base import phil, with_phil, jsonToArray
 from .datatype import Datatype
 from .objectid import GroupID, DatasetID, TypeID
 from .h5type import getTypeItem, createDataType, special_dtype, check_dtype
- 
+
 
 class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
@@ -64,11 +65,12 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         else:
             # "unknown id"
             self._req_prefix = "<unknown>"
-   
-    
+
+
     def _bytesArrayToList(self, data):
         """
-        Convert list that may contain bytes type elements to list of string elements  
+        Convert list that may contain bytes type elements to list of string
+        elements
         """
         if six.PY2:
             text_types = (bytes, str, unicode)
@@ -85,16 +87,16 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 else:
                     is_list = False
             else:
-                is_list = True        
+                is_list = True
         elif isinstance(data, list) or isinstance(data, tuple):
             is_list = True
         else:
             is_list = False
-                
+
         if is_list:
             out = []
             for item in data:
-                out.append(self._bytesArrayToList(item)) # recursive call  
+                out.append(self._bytesArrayToList(item)) # recursive call
         elif isinstance(data, bytes):
             if six.PY3:
                 out = data.decode("utf-8")
@@ -102,7 +104,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 out = data
         else:
             out = data
-                   
+
         return out
 
 
@@ -116,13 +118,13 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             attr_json = self._parent.GET(req)
         except IOError:
             raise KeyError
-        
+
         shape_json = attr_json['shape']
         type_json = attr_json['type']
         if shape_json['class'] == 'H5S_NULL':
             raise IOError("Empty attributes cannot be read")
         value_json = attr_json['value']
-        
+
         dtype = createDataType(type_json)
 
         if 'dims' in shape_json:
@@ -140,10 +142,10 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if dtype.subdtype is not None:
             subdtype, subshape = dtype.subdtype
             shape = shape + subshape   # (5, 3)
-            dtype = subdtype                # 'f'
+            dtype = subdtype           # 'f'
 
         arr = jsonToArray(shape, htype, value_json)
-   
+
         if len(arr.shape) == 0:
             return arr[()]
         return arr
@@ -198,6 +200,16 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             if isinstance(dtype, Datatype):
                 use_htype = dtype.id
                 dtype = dtype.dtype
+
+                # Special case if data are complex numbers
+                if (data.dtype.kind == 'c' and
+                    (dtype.names is None or
+                     dtype.names != ('r', 'i') or
+                     any(dt.kind != 'f' for dt, off in dtype.fields.values()) or
+                     dtype.fields['r'][0] == dtype.fields['i'][0])):
+                    raise TypeError(
+                        'Wrong committed datatype for complex numbers: %s' %
+                        dtype.name)
             elif dtype is None:
                 if data.dtype.kind == 'U':
                     # use vlen for unicode strings
@@ -244,8 +256,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             if use_htype is None:
                 type_json = getTypeItem(dtype)
                 self._parent.log.debug("attrs.create type_json: {}".format(type_json))
-               
- 
+
+
             # This mess exists because you can't overwrite attributes in HDF5.
             # So we write to a temporary attribute first, and then rename.
 
@@ -253,7 +265,15 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             body = {}
             body['type'] = type_json
             body['shape'] = shape
-            body['value'] = self._bytesArrayToList(data) 
+            if data.dtype.kind != 'c':
+                body['value'] = self._bytesArrayToList(data)
+            else:
+                # Special case: complex numbers
+                special_dtype = createDataType(type_json)
+                tmp = numpy.empty(shape=data.shape, dtype=special_dtype)
+                tmp['r'] = data.real
+                tmp['i'] = data.imag
+                body['value'] = json.loads(json.dumps(tmp.tolist()))
 
             try:
                 self._parent.PUT(req, body=body)
@@ -320,7 +340,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             attrlist = []
             for attr in attributes:
                 attrlist.append(attr['name'])
-            
+
         for name in attrlist:
             yield name
 
