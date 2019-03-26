@@ -12,6 +12,7 @@
 import sys
 import os
 import time
+import logging
 import numpy as np
 
 USE_H5PY=0
@@ -20,6 +21,8 @@ if USE_H5PY:
 else:
     import h5pyd as h5py
 
+loglevel = logging.DEBUG
+logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
 
 dims = [16, 16, 16]
 

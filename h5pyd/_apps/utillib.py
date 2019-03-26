@@ -298,8 +298,89 @@ def create_dataset(dobj, ctx):
     except RuntimeError:
         pass  # ignore
     chunks=None
-    if dobj.chunks:
+     
+    if ctx["storeinfo"]:
+        storeinfo = ctx["storeinfo"]
+        if dobj.name  not in storeinfo:
+            logging.warn("Path {} not found in storeinfo, skipping dataset load".format(dobj.name))
+            return
+        dset_info = storeinfo[dobj.name]
+        if "byteStreams" not in dset_info:
+            logging.error("Expected to find 'byteStreams' key in storeinfo")
+            return
+        byteStreams = dset_info["byteStreams"]
+        num_chunks = len(byteStreams)
+        if num_chunks == 0:
+            logging.info("No chunks found for {}".format(dobj.name))
+            return 
+        logging.info("using storeinfo to assign chunks for {} chunks".format(num_chunks))
+        rank = len(dobj.shape)
+
+        chunks = {}  # pass a map to create_dataset
+        if num_chunks == 1:
+            byteStream = byteStreams[0]
+            chunks["class"] = 'H5D_CONTIGUOUS_REF'
+            chunks["file_uri"] = ctx["s3path"]
+            chunks["offset"] = byteStream["file_offset"]
+            # TBD - check the size is not too large
+            chunks["size"] = byteStream["size"]
+            logging.info("using chunk layout: {}".format(chunks))
+            
+        elif num_chunks < 100:
+            # construct map of chunks
+            chunk_map = {}
+            for item in byteStreams:
+                index = item["index"]
+                if rank  <= 1:
+                    chunk_key = str(index)
+                else:
+                    chunk_key = ""
+                    for dim in range(rank):
+                        chunk_key += str(index[dim])
+                        if dim < rank - 1:
+                            chunk_key += "_"
+                chunk_map[chunk_key] = (item["file_offset"], item["size"])
+                
+            chunks["class"] = 'H5D_CHUNKED_REF'
+            chunks["file_uri"] = ctx["s3path"]
+            chunks["dims"] = dobj.chunks
+            chunks["chunks"] = chunk_map
+            logging.info("using chunk layout: {}".format(chunks))
+
+        else:
+            # create anonymous dataset to hold chunk info
+            dt = np.dtype([('offset', np.int64), ('size', np.int32)])
+            
+            chunkinfo_arr_dims = []
+            for dim in range(rank):
+                chunkinfo_arr_dims.append(int(np.ceil(dobj.shape[dim] / dobj.chunks[dim])))
+            chunkinfo_arr_dims = tuple(chunkinfo_arr_dims)
+            chunkinfo_arr = np.zeros(np.prod(chunkinfo_arr_dims), dtype=dt)
+            for item in byteStreams:
+                index = item["index"]
+                offset = 0
+                stride = 1
+                if rank == 1:
+                    offset = index 
+                else:
+                    for i in range(rank):
+                        offset += index[rank - i - 1] * stride
+                        stride *= chunkinfo_arr_dims[rank - i - 1]
+                chunkinfo_arr[offset] = (item["file_offset"], item["size"])
+            anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
+            anon_dset[...] = chunkinfo_arr  
+            logging.debug("anon_dset: {}".format(anon_dset))
+            chunks["class"] = 'H5D_CHUNKED_REF_INDIRECT'
+            chunks["file_uri"] = ctx["s3path"]
+            chunks["dims"] = dobj.chunks
+            chunks["chunk_table"] = anon_dset.id.id
+            logging.info("using chunk layout: {}".format(chunks))
+
+
+    # use the source object layout if we are not using reference mapping            
+    if chunks is None and dobj.chunks:
         chunks = tuple(dobj.chunks)
+
     try:
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
         compression_filter = dobj.compression
@@ -461,7 +542,7 @@ def create_datatype(obj, ctx):
 # create_datatype
       
 #----------------------------------------------------------------------------------
-def load_file(fin, fout, verbose=False, nodata=False, deflate=None):
+def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None, storeinfo=None):
     logging.info("input file: {}".format(fin.filename))   
     logging.info("output file: {}".format(fout.filename))
      
@@ -474,8 +555,10 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None):
     ctx["verbose"] = verbose
     ctx["nodata"] = nodata
     ctx["deflate"] = deflate
-    
+    ctx["s3path"] = s3path
+    ctx["storeinfo"] = storeinfo
 
+    
     # create any root attributes
     for ga in fin.attrs:
         copy_attribute(fout, ga, fin, ctx)
@@ -498,8 +581,11 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None):
     def object_copy_helper(name, obj):
         class_name = obj.__class__.__name__
         if class_name == "Dataset":
-            tgt = fout[obj.name]
-            write_dataset(obj, tgt, ctx)
+            if ctx["storeinfo"]:
+                logging.info("skip datacopy for s3 reference")
+            else:
+                tgt = fout[obj.name]
+                write_dataset(obj, tgt, ctx)
         elif class_name == "Group":
             logging.debug("skip copy for group: {}".format(obj.name))
         elif class_name == "Datatype":

@@ -11,6 +11,7 @@
 ##############################################################################
 
 import sys
+import json
 import logging
 import os
 import os.path as op
@@ -98,6 +99,8 @@ def usage():
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --nodata :: Do not upload dataset data")
+    print("     --s3path :: S3Path that holds a copy of sourcefile")
+    print("     --storeinfo :: JSON file containing output of store_info utilitity")
     print("     -4 :: Force ipv4 for any file staging (doesn\'t set hsds loading net)")
     print("     -6 :: Force ipv6 (see -4)")
     print("     -h | --help    :: This message.")
@@ -119,6 +122,8 @@ def main():
     verbose = False
     nodata = False
     deflate = None
+    s3path = None
+    storeinfo = None
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
@@ -142,6 +147,26 @@ def main():
         if arg in ("-v", "--verbose"):
             verbose = True
             argn += 1
+        elif arg == "--s3path":
+            if not val.startswith("s3://"):
+                print("invalid s3path")
+                usage()
+                sys.exit(-1)
+            s3path = val
+            argn += 2
+        elif arg == "--storeinfo":
+            storeinfo = None
+            # val should be a valid filename
+            if not op.isfile(val):
+                print("Can't open storeinfo file")
+                usage()
+                sys.exit(-1)
+            # try reading the JSON contents
+            storeinfo = None
+            with open(val) as f:
+                storeinfo = json.load(f)
+            argn += 2
+  
         elif arg == "--nodata":
             nodata = True
             argn += 1
@@ -243,6 +268,10 @@ def main():
             else:
                 istmp = False
 
+            if storeinfo and src_file not in storeinfo:
+                logging.error("Can't find {} in storeinfo json".format(src_file))
+                sys.exit(1)
+
             tgt = domain
             if tgt[-1] == '/':
                 # folder destination
@@ -270,9 +299,9 @@ def main():
                     logging.error("Error creating file {}: {}".format(tgt, ioe))
                 sys.exit(1)
 
-
+            
             # do the actual load
-            load_file(fin, fout, verbose=verbose, nodata=nodata, deflate=deflate)
+            load_file(fin, fout, verbose=verbose, nodata=nodata, deflate=deflate, s3path=s3path, storeinfo=storeinfo[src_file])
 
             # cleanup if needed
             if istmp:

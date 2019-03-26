@@ -556,6 +556,7 @@ class HLObject(CommonStateObject):
         else:
             # assume JSON
             rsp_json = json.loads(rsp.text)
+            self.log.debug("rsp_json: {}".format(rsp_json))
             return rsp_json
 
 

@@ -104,7 +104,7 @@ def make_new_dset(parent, shape=None, dtype=None,
     body['shape'] = shape
 
     # Validate chunk shape
-    if chunks is not None:
+    if chunks is not None and not isinstance(chunks, dict):
          errmsg = "Chunk shape must not be greater than data shape in any dimension. "\
                   "{} is not compatible with {}".format(chunks, shape)
          if len(chunks) != len(shape):
@@ -116,6 +116,12 @@ def make_new_dset(parent, shape=None, dtype=None,
              else:
                  if shape[i] < chunks[i]:
                      raise ValueError(errmsg)
+
+    layout = None
+    if chunks is not None and isinstance(chunks, dict):
+        # use the given chunk layout
+        layout = chunks
+        chunks = None
 
     if isinstance(dtype, Datatype):
         # Named types are used as-is
@@ -158,7 +164,7 @@ def make_new_dset(parent, shape=None, dtype=None,
         compression = 'gzip'
 
     dcpl = filters.generate_dcpl(shape, dtype, chunks, compression, compression_opts,
-                     shuffle, fletcher32, maxshape, scaleoffset)
+                     shuffle, fletcher32, maxshape, scaleoffset, layout)
 
     if fillvalue is not None:
         # is it compatible with the array type?
@@ -167,6 +173,11 @@ def make_new_dset(parent, shape=None, dtype=None,
             fillvalue_list = fillvalue.tolist()
             fillvalue_list = _decode(fillvalue_list) # convert any byte strings to unicode
             dcpl["fillValue"] = fillvalue_list
+
+    if chunks and isinstance(chunks, dict):
+        dcpl["layout"] = chunks
+        print("using layout:", chunks)
+
     body['creationProperties'] = dcpl
 
     """

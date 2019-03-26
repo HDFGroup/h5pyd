@@ -301,7 +301,12 @@ def diff_dataset(src, ctx):
             logging.debug(msg)
                   
             arr_src = src[s]
+            msg = "got src array {}".format(arr_src.shape})
+            logging.debug(msg)
             arr_tgt = tgt[s]
+            msg = "got src array {}".format(arr_src.shape})
+            logging.debug(msg)
+
             if hash(arr_src.tostring()) != hash(arr_tgt.tostring()):
                 msg = "values for dataset {} differ for slice: {}".format(src.name, s)
                 logging.info(msg)
