@@ -17,7 +17,7 @@ from copy import copy
 import sys
 import time
 import base64
-import numpy 
+import numpy
 
 import six
 from six.moves import xrange
@@ -32,10 +32,24 @@ from .datatype import Datatype
 from .h5type import getTypeItem, createDataType, check_dtype, special_dtype, getItemSize
 
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
-VERBOSE_REFRESH_TIME=1.0  # 1 second
+VERBOSE_REFRESH_TIME = 1.0  # 1 second
+
 
 def readtime_dtype(basetype, names):
     """ Make a NumPy dtype appropriate for reading """
+    # Check if basetype is the special case for storing complex numbers
+    if (basetype.names is not None and
+            basetype.names == ('r', 'i') and
+            all(dt.kind == 'f' for dt, off in basetype.fields.values()) and
+            basetype.fields['r'][0] == basetype.fields['i'][0]):
+        itemsize = basetype.itemsize
+        if itemsize == 16:
+            return numpy.dtype(numpy.complex128)
+        elif itemsize == 8:
+            return numpy.dtype(numpy.complex64)
+        else:
+            TypeError(
+                'Unsupported dtype for complex numbers: %s' % basetype)
 
     if len(names) == 0:  # Not compound, or we want all fields
         return basetype
@@ -44,13 +58,13 @@ def readtime_dtype(basetype, names):
         raise ValueError("Field names only allowed for compound types")
 
     for name in names:  # Check all names are legal
-        if not name in basetype.names:
+        if name not in basetype.names:
             raise ValueError("Field %s does not appear in this type." % name)
 
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
 
 
-
+def setSliceQueryParam(params, dims, sel):
     """
     Helper method - set query parameter for given shape + selection
 
@@ -61,7 +75,6 @@ def readtime_dtype(basetype, names):
                 start and end: n:m
                 start, end, and stride: n:m:s
     """
-def setSliceQueryParam(params, dims, sel):
     # pass dimensions, and selection as query params
     rank = len(dims)
     start = list(sel.start)
@@ -82,9 +95,9 @@ def setSliceQueryParam(params, dims, sel):
         params["select"] = sel_param
 
 
-def make_new_dset(parent, shape=None, dtype=None, 
-                 chunks=None, compression=None, shuffle=None,
-                    fletcher32=None, maxshape=None, compression_opts=None,
+def make_new_dset(parent, shape=None, dtype=None,
+                  chunks=None, compression=None, shuffle=None,
+                  fletcher32=None, maxshape=None, compression_opts=None,
                   fillvalue=None, scaleoffset=None, track_times=None):
     """ Return a new low-level dataset identifier
 
@@ -92,8 +105,8 @@ def make_new_dset(parent, shape=None, dtype=None,
     """
 
     # fill in fields for the body of the POST request as we got
-    body = { }
-    
+    body = {}
+
     # Validate shape
     if shape is None:
         raise TypeError("shape must be specified")
@@ -216,7 +229,7 @@ def make_new_dset(parent, shape=None, dtype=None,
     if "layout" in rsp:
         json_rep['layout'] = rsp['layout']
 
-    dset_id = DatasetID(parent, json_rep) 
+    dset_id = DatasetID(parent, json_rep)
 
     return dset_id
 
@@ -380,7 +393,7 @@ class Dataset(HLObject):
         if "fillValue" in dcpl:
             fill_value = dcpl["fillValue"]
             arr[()] = fill_value
-         
+
         return arr[()]
 
     @property
@@ -395,7 +408,6 @@ class Dataset(HLObject):
         self._getVerboseInfo()
         return self._allocated_size
 
-
     def __init__(self, bind):
         """ Create a new Dataset object by binding to a low-level DatasetID.
         """
@@ -407,9 +419,9 @@ class Dataset(HLObject):
         self._dcpl = self.id.dcpl_json
         self._filters = filters.get_filters(self._dcpl)
 
-        self._local = None #local()
-        # make a numpy dtype out of the type json
+        self._local = None  # local()
 
+        # make a numpy dtype out of the type json
         self._dtype = createDataType(self.id.type_json)
         self._item_size = getItemSize(self.id.type_json)
 
@@ -506,9 +518,9 @@ class Dataset(HLObject):
         BEWARE: Modifications to the yielded data are *NOT* written to file.
         """
         shape = self._shape
-        # to reduce round trips, grab BUFFER_SIZE items at a time  
+        # to reduce round trips, grab BUFFER_SIZE items at a time
         # TBD: set buffersize based on size of each row
-        BUFFER_SIZE = 1000  
+        BUFFER_SIZE = 1000
 
         arr = None
         self.log.info("__iter__")
@@ -536,11 +548,10 @@ class Dataset(HLObject):
         for i in range(rank):
             field = "{}:{}:{}".format(start[i], stop[i], step[i])
             param += field
-            if i != rank-1:
+            if i != (rank - 1):
                 param += ','
         param += ']'
         return param
-
 
     def __getitem__(self, args):
         """ Read a slice from the HDF5 dataset.
@@ -582,7 +593,7 @@ class Dataset(HLObject):
             self.log.debug("new_dtype: {}".format(new_dtype))
         if new_dtype.kind == 'S' and check_dtype(ref=self.dtype):
             new_dtype = special_dtype(ref=Reference)
-        
+
         mtype = new_dtype
 
 
@@ -860,11 +871,11 @@ class Dataset(HLObject):
 
             if self.id.id.startswith("d-"):
                 # send points as binary request for HSDS
-                format = "binary"     
+                format = "binary"
                 arr_points = numpy.asarray(points, dtype='u8')  # must use unsigned 64-bit int
                 body = arr_points.tobytes()
                 self.log.info("point select binary request, num bytes: {}".format(len(body)))
-            else:  
+            else:
                 if delistify:
                     self.log.info("delistifying point selection")
                     # convert to int if needed
@@ -905,7 +916,6 @@ class Dataset(HLObject):
         elif len(arr.shape) > 1:
             arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
         return arr
-
 
     def __setitem__(self, args, val):
         """ Write to the HDF5 dataset from a Numpy array.
@@ -964,6 +974,19 @@ class Dataset(HLObject):
                     tmp[0] = val
                 val = tmp
 
+        elif isinstance(val, complex) or \
+                getattr(getattr(val, 'dtype', None), 'kind', None) == 'c':
+            if self.dtype.kind != 'V' or self.dtype.names != ('r', 'i'):
+                raise TypeError(
+                    'Wrong dataset dtype for complex number values: %s'
+                    % self.dtype.fields)
+            if isinstance(val, complex):
+                val = numpy.asarray(val, dtype=type(val))
+            tmp = numpy.empty(shape=val.shape, dtype=self.dtype)
+            tmp['r'] = val.real
+            tmp['i'] = val.imag
+            val = tmp
+
         elif self.dtype.kind == "O" or \
           (self.dtype.kind == 'V' and \
           (not isinstance(val, numpy.ndarray) or val.dtype.kind != 'V') and \
@@ -984,6 +1007,7 @@ class Dataset(HLObject):
             if cast_compound:
                 val = val.astype(numpy.dtype([(names[0], dtype)]))
                 # val = val.reshape(val.shape[:len(val.shape) - len(dtype.shape)])
+
         elif isinstance(val, numpy.ndarray):
             # convert array if needed
             # TBD - need to handle cases where the type shape is different
@@ -1046,13 +1070,13 @@ class Dataset(HLObject):
         mshape = val.shape
         self.log.debug("mshape: {}".format(mshape))
         self.log.debug("data dtype: {}".format(val.dtype))
-        
+
         # Perform the dataspace selection
         selection = sel.select(self, args)
         self.log.debug("selection.mshape: {}".format(selection.mshape))
         if selection.nselect == 0:
             return
-        
+
         # Broadcast scalars if necessary.
         if (mshape == () and selection.mshape != None and selection.mshape != ()):
             self.log.debug("broadcast scalar")
