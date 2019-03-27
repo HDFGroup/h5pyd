@@ -300,7 +300,10 @@ def main():
 
             
             # do the actual load
-            load_file(fin, fout, verbose=verbose, nodata=nodata, deflate=deflate, s3path=s3path, storeinfo=storeinfo[src_file])
+            storeinfo_file = None
+            if storeinfo and src_file in storeinfo:
+                storeinfo_file = storeinfo[src_file]
+            load_file(fin, fout, verbose=verbose, nodata=nodata, deflate=deflate, s3path=s3path, storeinfo=storeinfo_file)
 
             # cleanup if needed
             if istmp:
