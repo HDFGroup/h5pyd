@@ -229,8 +229,7 @@ def main():
 
     # end arg parsing
     logging.info("username: {}".format(cfg["hs_username"]))
-    logging.info("password: {}".format(cfg["hs_password"]))
-    logging.info("endpoint: {}".format(cfg["hs_password"]))
+    logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
     logging.info("verbose: {}".format(verbose))
 
     if len(src_files) < 2:
