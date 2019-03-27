@@ -316,6 +316,7 @@ def create_dataset(dobj, ctx):
         logging.info("using storeinfo to assign chunks for {} chunks".format(num_chunks))
         rank = len(dobj.shape)
 
+
         chunks = {}  # pass a map to create_dataset
         if num_chunks == 1:
             byteStream = byteStreams[0]
@@ -326,19 +327,21 @@ def create_dataset(dobj, ctx):
             chunks["size"] = byteStream["size"]
             logging.info("using chunk layout: {}".format(chunks))
             
-        elif num_chunks < 100:
+        elif num_chunks < 2:
             # construct map of chunks
+            logging.debug("dobj.chunks: {}".format(dobj.chunks))
             chunk_map = {}
             for item in byteStreams:
-                index = item["index"]
-                if rank  <= 1:
-                    chunk_key = str(index)
-                else:
-                    chunk_key = ""
-                    for dim in range(rank):
-                        chunk_key += str(index[dim])
-                        if dim < rank - 1:
-                            chunk_key += "_"
+                index = item["array_offset"]
+                if not isinstance(index, list) or len(index) != rank:
+                    logging.error("Unexpected array_offset: {} for dataset with rank: {}".format(index, rank))
+                    return 
+                chunk_key = ""
+                for dim in range(rank):
+                    chunk_key += str(index[dim] // dobj.chunks[dim])
+                    if dim < rank - 1:
+                        chunk_key += "_"
+                logging.debug("adding chunk_key: {}".format(chunk_key))
                 chunk_map[chunk_key] = (item["file_offset"], item["size"])
                 
             chunks["class"] = 'H5D_CHUNKED_REF'
@@ -357,19 +360,20 @@ def create_dataset(dobj, ctx):
             chunkinfo_arr_dims = tuple(chunkinfo_arr_dims)
             chunkinfo_arr = np.zeros(np.prod(chunkinfo_arr_dims), dtype=dt)
             for item in byteStreams:
-                index = item["index"]
+                index = item["array_offset"]
+                if not isinstance(index, list) or len(index) != rank:
+                    logging.error("Unexpected array_offset: {} for dataset with rank: {}".format(index, rank))
+                    return 
                 offset = 0
                 stride = 1
-                if rank == 1:
-                    offset = index 
-                else:
-                    for i in range(rank):
-                        offset += index[rank - i - 1] * stride
-                        stride *= chunkinfo_arr_dims[rank - i - 1]
-                chunkinfo_arr[offset] = (item["file_offset"], item["size"])
+                for i in range(rank):
+                    offset += (index[rank - i - 1] // dobj.chunks[dim]) * stride
+                    stride *= chunkinfo_arr_dims[rank - i - 1]
+                    chunkinfo_arr[offset] = (item["file_offset"], item["size"])
             anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
             anon_dset[...] = chunkinfo_arr  
             logging.debug("anon_dset: {}".format(anon_dset))
+            logging.debug("annon_values: {}".format(anon_dset[...]))
             chunks["class"] = 'H5D_CHUNKED_REF_INDIRECT'
             chunks["file_uri"] = ctx["s3path"]
             chunks["dims"] = dobj.chunks
