@@ -327,7 +327,7 @@ def create_dataset(dobj, ctx):
             chunks["size"] = byteStream["size"]
             logging.info("using chunk layout: {}".format(chunks))
             
-        elif num_chunks < 2:
+        elif num_chunks < 1000:
             # construct map of chunks
             logging.debug("dobj.chunks: {}".format(dobj.chunks))
             chunk_map = {}
@@ -373,7 +373,6 @@ def create_dataset(dobj, ctx):
                     dim = rank - i - 1
                     offset += (index[dim] // dobj.chunks[dim]) * stride
                     stride *= chunkinfo_arr_dims[dim]
-                    logging.debug("offset: {}  stride: {}".format(offset, stride))
                     chunkinfo_arr[offset] = (item["file_offset"], item["size"])
             anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
             anon_dset[...] = chunkinfo_arr  
