@@ -352,23 +352,28 @@ def create_dataset(dobj, ctx):
 
         else:
             # create anonymous dataset to hold chunk info
+            logging.debug("dobj.chunks: {}".format(dobj.chunks))
             dt = np.dtype([('offset', np.int64), ('size', np.int32)])
             
             chunkinfo_arr_dims = []
             for dim in range(rank):
                 chunkinfo_arr_dims.append(int(np.ceil(dobj.shape[dim] / dobj.chunks[dim])))
             chunkinfo_arr_dims = tuple(chunkinfo_arr_dims)
+            logging.debug("creating chunkinfo array of shape: {}".format(chunkinfo_arr_dims))
             chunkinfo_arr = np.zeros(np.prod(chunkinfo_arr_dims), dtype=dt)
             for item in byteStreams:
                 index = item["array_offset"]
+                logging.debug("array_offset: {}".format(index))
                 if not isinstance(index, list) or len(index) != rank:
                     logging.error("Unexpected array_offset: {} for dataset with rank: {}".format(index, rank))
                     return 
                 offset = 0
                 stride = 1
                 for i in range(rank):
-                    offset += (index[rank - i - 1] // dobj.chunks[dim]) * stride
-                    stride *= chunkinfo_arr_dims[rank - i - 1]
+                    dim = rank - i - 1
+                    offset += (index[dim] // dobj.chunks[dim]) * stride
+                    stride *= chunkinfo_arr_dims[dim]
+                    logging.debug("offset: {}  stride: {}".format(offset, stride))
                     chunkinfo_arr[offset] = (item["file_offset"], item["size"])
             anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
             anon_dset[...] = chunkinfo_arr  
