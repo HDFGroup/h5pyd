@@ -254,6 +254,12 @@ class TestGroup(TestCase):
         f.close()
 
     def test_link_removal(self):
+
+        def get_count(grp):
+            count = 0
+            for item in grp:
+                count += 1
+            return count
         # create a file for use a link target
         if config.get("use_h5py"):
             # for some reason this test is failing in Travis
@@ -265,11 +271,19 @@ class TestGroup(TestCase):
         g1 = f.create_group("g1")
         dset = g1.create_dataset('ds', (5,7), dtype='f4')
         self.assertEqual(len(g1), 1)
+        self.assertEqual(get_count(g1), 1)
+
         g1_clone = f["g1"]
         self.assertEqual(len(g1_clone), 1)
+        self.assertEqual(get_count(g1_clone), 1)
+
         del g1["ds"]
         self.assertEqual(len(g1), 0)
+        self.assertEqual(get_count(g1), 0)
+
         self.assertEqual(len(g1_clone), 0)
+        self.assertEqual(get_count(g1_clone), 0)
+
       
         f.close()
         
