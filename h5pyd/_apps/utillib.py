@@ -249,7 +249,6 @@ def copy_array(src_arr, ctx):
         tgt_arr_flat = tgt_arr.reshape((count,))
         src_arr_flat = src_arr.reshape((count,))
         for i in range(count):
-            e = src_arr_flat[i]
             element = copy_element(e, src_arr.dtype, tgt_dt, ctx)
             tgt_arr_flat[i] = element
         tgt_arr = tgt_arr_flat.reshape(src_arr.shape)
