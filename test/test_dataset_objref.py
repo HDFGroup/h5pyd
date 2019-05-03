@@ -54,7 +54,6 @@ class TestObjRef(TestCase):
         # get ref to g1/g1.1 from g2
         g11ref = g2[g11_ref]
        
-         
         # create subgroup /g1/g1.1/foo 
         g11ref.create_group("foo")   
         self.assertEqual(len(g11), 1)
@@ -96,29 +95,58 @@ class TestObjRef(TestCase):
             ref_values = [g11_ref, d1_ref]
             g1.attrs.create("a1", ref_values, dtype=dt)
 
+            # pass a single ref to attribute create
+            obj = f[g11_ref]
+            g1.attrs.create("b1", g11_ref, dtype=dt)
+
             # read back the attribute
             attr =g1.attrs["a1"]
             self.assertEqual(attr.shape, (2,))
             ref = h5py.check_dtype(ref=attr.dtype)
             self.assertEqual(ref, h5py.Reference)
-            a_ref = attr[0]
-            obj = f[a_ref]
+            a0_ref = attr[0]
+            obj = f[a0_ref]
             if not config.get("use_h5py"):
                 self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
             self.assertEqual(obj.name, "/g1/g1.1")
-            b_ref = attr[1]
-            obj = f[b_ref]
+            a1_ref = attr[1]
+            obj = f[a1_ref]
             if not config.get("use_h5py"):
                 self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
             self.assertEqual(obj.name, "/g2/d1")
+        f.close()
 
-    
+    def test_delete(self):
+        filename = self.getFileName("objref_delete_test")
+        print(filename)
+        f = h5py.File(filename, 'w')
+        self.assertTrue(f.id.id is not None)
+        self.assertTrue('/' in f)
+        r = f['/']
+        is_h5serv = False
+        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+            is_h5serv = True  # h5serv doesn't have support for objref datasets yet
+
+        # create a dataset
+        dset = f.create_dataset('dset', data=[1,2,3])
+        dset_ref = dset.ref
+
+        if not is_h5serv:
+            f.attrs["dset_ref"] = dset_ref
+            del f['dset']
+            try:
+                obj = f[dset_ref]
+                print("This should be an exception:", obj.name)
+                if config.get("use_h5py"):
+                    # TBD - HSDS is not triggering this exception since the object
+                    # is not being deleted.
+                    self.assertTrue(False)
+            except ValueError:
+                pass # expected
+
 
         f.close()
 
+
 if __name__ == '__main__':
     ut.main()
-
-
-
-

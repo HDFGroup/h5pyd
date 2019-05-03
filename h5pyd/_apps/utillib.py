@@ -218,6 +218,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                 v = copy_element(e, src_vlen_dt, tgt_vlen_dt, ctx)
                 out = np.array(v, dtype=tgt_dt)
             else:
+                
                 out = np.zeros(val.shape, dtype=tgt_dt)
                 for i in range(len(out)):
                     e = val[i]
@@ -248,7 +249,8 @@ def copy_array(src_arr, ctx):
         tgt_arr_flat = tgt_arr.reshape((count,))
         src_arr_flat = src_arr.reshape((count,))
         for i in range(count):
-            element = copy_element(src_arr_flat[i], src_arr.dtype, tgt_dt, ctx)
+            e = src_arr_flat[i]
+            element = copy_element(e, src_arr.dtype, tgt_dt, ctx)
             tgt_arr_flat[i] = element
         tgt_arr = tgt_arr_flat.reshape(src_arr.shape)
     else:
@@ -264,14 +266,19 @@ def copy_attribute(desobj, name, srcobj, ctx):
     if ctx["verbose"]:
         print(msg)
     
+    tgtarr = None
+    data = srcobj.attrs[name]
+    src_dt = None
     try:
-        srcarr = srcobj.attrs[name]
-        if isinstance(srcarr, np.ndarray):
-            tgtarr = copy_array(srcarr, ctx)
-            desobj.attrs.create(name, tgtarr)
-        else:
-            # scalars are just read as the native type
-            desobj.attrs.create(name, srcarr)
+        src_dt = data.dtype
+    except AttributeError:
+        pass # auto convert to numpy array
+    # First, make sure we have a NumPy array.  
+    srcarr = np.asarray(data, order='C', dtype=src_dt)
+    tgtarr = copy_array(srcarr, ctx)
+    try:
+        desobj.attrs.create(name, tgtarr)
+
     except (IOError, TypeError) as e:
         msg = "ERROR: failed to create attribute {} of object {} -- {}".format(name, desobj.name, str(e))
         logging.error(msg)

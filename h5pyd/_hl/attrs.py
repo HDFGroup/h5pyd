@@ -27,7 +27,7 @@ from . import base
 from .base import phil, with_phil, jsonToArray
 from .datatype import Datatype
 from .objectid import GroupID, DatasetID, TypeID
-from .h5type import getTypeItem, createDataType, special_dtype, check_dtype
+from .h5type import getTypeItem, createDataType, special_dtype, check_dtype, Reference
 
 
 class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
@@ -141,7 +141,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             subdtype, subshape = dtype.subdtype
             shape = shape + subshape   # (5, 3)
             dtype = subdtype           # 'f'
-
+        
         arr = jsonToArray(shape, htype, value_json)
 
         if len(arr.shape) == 0:
@@ -185,7 +185,9 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         with phil:
             # First, make sure we have a NumPy array.  We leave the data
             # type conversion for HDF5 to perform.
-            data = numpy.asarray(data, order='C')
+            if isinstance(data, Reference):
+                dtype = special_dtype(ref=Reference)
+            data = numpy.asarray(data, dtype=dtype, order='C')
 
             if shape is None:
                 shape = data.shape

@@ -158,7 +158,10 @@ def copyToArray(arr, rank, index, data, vlen_base=None):
         else:
             if vlen_base:
                 e = np.array(data[i], dtype=vlen_base)
-                arr[tuple(index)] = e.squeeze()
+                if len(e.shape) > 1:
+                    # squeeze dimensions, but don't convert a 1-d to 0-d
+                    e = e.squeeze()  
+                arr[tuple(index)] = e  
             else:
                 arr[tuple(index)] = data[i]
     index[rank] = 0
