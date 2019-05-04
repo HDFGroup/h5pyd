@@ -249,6 +249,7 @@ def copy_array(src_arr, ctx):
         tgt_arr_flat = tgt_arr.reshape((count,))
         src_arr_flat = src_arr.reshape((count,))
         for i in range(count):
+            e = src_arr_flat[i]
             element = copy_element(e, src_arr.dtype, tgt_dt, ctx)
             tgt_arr_flat[i] = element
         tgt_arr = tgt_arr_flat.reshape(src_arr.shape)
@@ -284,6 +285,37 @@ def copy_attribute(desobj, name, srcobj, ctx):
         print(msg)
     
 # copy_attribute
+
+def use_storeinfo(dobj, ctx):
+    """ determine if we should reference data stored in existing HDF5 file
+    """
+    if not ctx["storeinfo"]:
+        return False
+    storeinfo = ctx["storeinfo"]
+    if dobj.name  not in storeinfo:
+        msg = "Path {} not found in storeinfo, loading dataset directly".format(dobj.name)
+        logging.warn(msg)
+        if ctx["verbose"]:
+            print(msg) 
+        return False
+        
+    dset_info = storeinfo[dobj.name]
+    if "byteStreams" not in dset_info:
+        msg = "Expected to find 'byteStreams' key in storeinfo for {}".format(dobj.name)
+        logging.error(msg)
+        print(msg)
+        return False
+
+    byteStreams = dset_info["byteStreams"]
+    num_chunks = len(byteStreams)
+    if num_chunks == 0:
+        msg = "No chunks found for {}, loading datset directly".format(dobj.name)
+        logging.info(msg)
+        if ctx["verbose"]:
+            print(msg) 
+        return False
+    return True 
+
       
 #----------------------------------------------------------------------------------
 def create_dataset(dobj, ctx):
@@ -304,27 +336,23 @@ def create_dataset(dobj, ctx):
     except RuntimeError:
         pass  # ignore
     chunks=None
-     
-    if ctx["storeinfo"]:
+
+    can_use_storeinfo = use_storeinfo(dobj, ctx)
+    if can_use_storeinfo:
         storeinfo = ctx["storeinfo"]
-        if dobj.name  not in storeinfo:
-            logging.warn("Path {} not found in storeinfo, skipping dataset load".format(dobj.name))
-            return
         dset_info = storeinfo[dobj.name]
-        if "byteStreams" not in dset_info:
-            logging.error("Expected to find 'byteStreams' key in storeinfo")
-            return
         byteStreams = dset_info["byteStreams"]
         num_chunks = len(byteStreams)
-        if num_chunks == 0:
-            logging.info("No chunks found for {}".format(dobj.name))
-            return 
         logging.info("using storeinfo to assign chunks for {} chunks".format(num_chunks))
         rank = len(dobj.shape)
 
-
         chunks = {}  # pass a map to create_dataset
-        if num_chunks == 1:
+        if num_chunks < 1:
+            # this should be caught by use_storeinfo function
+            msg = "unexpected value for num_chunks"
+            logging.error(msg)
+            print(msg)
+        elif num_chunks == 1:
             byteStream = byteStreams[0]
             chunks["class"] = 'H5D_CONTIGUOUS_REF'
             chunks["file_uri"] = ctx["s3path"]
