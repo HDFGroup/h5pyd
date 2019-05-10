@@ -344,7 +344,12 @@ def create_dataset(dobj, ctx):
         byteStreams = dset_info["byteStreams"]
         num_chunks = len(byteStreams)
         logging.info("using storeinfo to assign chunks for {} chunks".format(num_chunks))
-        rank = len(dobj.shape)
+        dset_dims = dobj.shape
+        logging.debug("dset_dims: {}".format(dset_dims))
+        rank = len(dset_dims)
+        chunk_dims = dobj.chunks
+        logging.debug("chunk_dims: {}".format(chunk_dims))
+
 
         chunks = {}  # pass a map to create_dataset
         if num_chunks < 1:
@@ -363,7 +368,6 @@ def create_dataset(dobj, ctx):
             
         elif num_chunks < 1000:
             # construct map of chunks
-            logging.debug("dobj.chunks: {}".format(dobj.chunks))
             chunk_map = {}
             for item in byteStreams:
                 index = item["array_offset"]
@@ -372,11 +376,13 @@ def create_dataset(dobj, ctx):
                     return 
                 chunk_key = ""
                 for dim in range(rank):
-                    chunk_key += str(index[dim] // dobj.chunks[dim])
+                    chunk_key += str(index[dim] // chunk_dims[dim])
                     if dim < rank - 1:
                         chunk_key += "_"
                 logging.debug("adding chunk_key: {}".format(chunk_key))
-                chunk_map[chunk_key] = (item["file_offset"], item["size"])
+                chunk_offset = item["file_offset"]
+                chunk_size = item["size"]
+                chunk_map[chunk_key] = (chunk_offset, chunk_size)
                 
             chunks["class"] = 'H5D_CHUNKED_REF'
             chunks["file_uri"] = ctx["s3path"]
@@ -386,12 +392,11 @@ def create_dataset(dobj, ctx):
 
         else:
             # create anonymous dataset to hold chunk info
-            logging.debug("dobj.chunks: {}".format(dobj.chunks))
             dt = np.dtype([('offset', np.int64), ('size', np.int32)])
             
             chunkinfo_arr_dims = []
             for dim in range(rank):
-                chunkinfo_arr_dims.append(int(np.ceil(dobj.shape[dim] / dobj.chunks[dim])))
+                chunkinfo_arr_dims.append(int(np.ceil(dset_dims[dim] / chunk_dims[dim])))
             chunkinfo_arr_dims = tuple(chunkinfo_arr_dims)
             logging.debug("creating chunkinfo array of shape: {}".format(chunkinfo_arr_dims))
             chunkinfo_arr = np.zeros(np.prod(chunkinfo_arr_dims), dtype=dt)
@@ -405,9 +410,11 @@ def create_dataset(dobj, ctx):
                 stride = 1
                 for i in range(rank):
                     dim = rank - i - 1
-                    offset += (index[dim] // dobj.chunks[dim]) * stride
+                    offset += (index[dim] // chunk_dims[dim]) * stride
                     stride *= chunkinfo_arr_dims[dim]
-                    chunkinfo_arr[offset] = (item["file_offset"], item["size"])
+                    chunk_offset = item["file_offset"]
+                    chunk_size = item["size"]
+                chunkinfo_arr[offset] = (chunk_offset, chunk_size)
             anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
             anon_dset[...] = chunkinfo_arr  
             logging.debug("anon_dset: {}".format(anon_dset))
