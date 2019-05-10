@@ -416,11 +416,11 @@ class Group(HLObject, MutableMappingHDF5):
             # There are some additional checks we could add to reduce false positives
             # (like checking for hyphens in the right places)
             if isinstance(name, six.string_types) and len(name) >= 38:
-                if name.startswith("groups/"):
+                if name.startswith("groups/") or name.startswith("g-"):
                     return True
-                elif name.startswith("datatypes/"):
+                elif name.startswith("datatypes/") or name.startswith("t-"):
                     return True
-                elif name.startswith("datasets/"):
+                elif name.startswith("datasets/") or name.startswith("d-"):
                     return True
                 else:
                     return False
