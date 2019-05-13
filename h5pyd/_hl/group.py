@@ -807,7 +807,7 @@ class Group(HLObject, MutableMappingHDF5):
         >>> list_of_names = []
         >>> f.visit(list_of_names.append)
         """
-        self.visititems(func)
+        return self.visititems(func)
         """
         with phil:
             def proxy(name):
@@ -843,6 +843,7 @@ class Group(HLObject, MutableMappingHDF5):
         visited[self.id.uuid] = True
         tovisit = collections.OrderedDict()
         tovisit[self.id.uuid] = self
+        retval = None
 
         if six.PY3:
             nargs = func.__code__.co_argcount
@@ -890,7 +891,8 @@ class Group(HLObject, MutableMappingHDF5):
                         if retval is not None:
                             # caller indicates to end iteration
                             break
-
+        
+        return retval
         """
         with phil:
             def proxy(name):
