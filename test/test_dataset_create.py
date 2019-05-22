@@ -60,6 +60,10 @@ class TestCreateDataset(TestCase):
                 self.assertEqual(dset.num_chunks, 0)
                 self.assertEqual(dset.allocated_size, 0)
 
+        # try with chunk=True
+        dset_chunked = f.create_dataset('chunked_dset', dims, dtype='f4', chunks=True)
+        self.assertTrue(dset_chunked.chunks)
+
         f.close()
 
     def test_create_float16_dset(self):
