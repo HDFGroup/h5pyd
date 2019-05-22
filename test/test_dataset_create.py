@@ -62,8 +62,12 @@ class TestCreateDataset(TestCase):
 
         # try with chunk=True
         dset_chunked = f.create_dataset('chunked_dset', dims, dtype='f4', chunks=True)
-        self.assertTrue(dset_chunked.chunks)
-
+        if not config.get('use_h5py') and isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+            # hsds always returns chunks
+            self.assertTrue(dset_chunked.chunks)
+        else:
+            self.assertTrue(dset_chunked.chunks is None)
+        
         f.close()
 
     def test_create_float16_dset(self):
