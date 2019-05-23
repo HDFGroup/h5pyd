@@ -47,7 +47,6 @@ class DimensionProxy(base.CommonStateObject):
                 'shape': {
                     'class': 'H5S_SIMPLE',
                     'dims': [rank]
-
                 },
                 'type': {
                     'class': 'H5T_STRING',
@@ -179,7 +178,6 @@ class DimensionProxy(base.CommonStateObject):
 
         req = dscale.attrs._req_prefix + 'REFERENCE_LIST'
 
-
         try:
             old_reflist = dscale.GET(req)
         except IOError:
@@ -214,7 +212,6 @@ class DimensionProxy(base.CommonStateObject):
         new_reflist = {}
         new_reflist["type"] = old_reflist["type"]
         new_reflist["shape"] = old_reflist["shape"]
-
         if "value" in old_reflist:
             reflist_value = old_reflist["value"]
             if reflist_value is None:
@@ -223,7 +220,6 @@ class DimensionProxy(base.CommonStateObject):
             reflist_value = []
         reflist_value.append(['datasets/' + dset.id.id, self._dimension])
         new_reflist["value"] = reflist_value
-
         new_reflist["shape"]["dims"] = [len(reflist_value), ]
 
         # Update the REFERENCE_LIST attribute of the dimension scale
@@ -254,7 +250,6 @@ class DimensionProxy(base.CommonStateObject):
         with phil:
             old_reflist = dscale.GET(req)
             if "value" in old_reflist and len(old_reflist["value"]) > 0:
-
                 new_refs = list()
 
                 remove = ['datasets/' + dset.id.id, self._dimension]
@@ -403,37 +398,3 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
                 dset.PUT(req_name, body=name_attr, replace=True)
             except Exception:
                 dset.DELETE(req_class)
-
-        # REFERENCE_LIST attribute
-        req = dset.attrs._req_prefix + 'REFERENCE_LIST'
-        
-        reflist = {
-            'creationProperties': {
-                'nameCharEncoding': 'H5T_CSET_ASCII'
-            },
-            'shape': {
-                'class': 'H5S_NULL'
-            },
-            'type': {
-                'class': 'H5T_COMPOUND',
-                    'fields': [
-                        {
-                            'name': 'dataset',
-                            'type': {
-                                'base': 'H5T_STD_REF_OBJ',
-                                'class': 'H5T_REFERENCE'
-                            }
-                        },
-                        {
-                            'name': 'index',
-                            'type': {
-                                'base': 'H5T_STD_I32LE',
-                                'class': 'H5T_INTEGER'
-                            }
-                        }
-                    ]
-                } 
-            }
-        # Update the REFERENCE_LIST attribute of the dimension scale
-        with phil:
-            dset.PUT(req, body=reflist, replace=True)
