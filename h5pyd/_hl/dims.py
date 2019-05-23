@@ -46,7 +46,8 @@ class DimensionProxy(base.CommonStateObject):
             labels = {
                 'shape': {
                     'class': 'H5S_SIMPLE',
-                    'dims': [rank] 
+                    'dims': [rank]
+
                 },
                 'type': {
                     'class': 'H5T_STRING',
@@ -177,10 +178,43 @@ class DimensionProxy(base.CommonStateObject):
         dset.PUT(req, body=dimlist, replace=True)
 
         req = dscale.attrs._req_prefix + 'REFERENCE_LIST'
-        
-        old_reflist = dscale.GET(req)
+
+
+        try:
+            old_reflist = dscale.GET(req)
+        except IOError:
+            old_reflist = {
+                'creationProperties': {
+                    'nameCharEncoding': 'H5T_CSET_ASCII'
+                },
+                'shape': {
+                    'class': 'H5S_SIMPLE'
+                },
+                'type': {
+                    'class': 'H5T_COMPOUND',
+                    'fields': [
+                        {
+                            'name': 'dataset',
+                            'type': {
+                                'base': 'H5T_STD_REF_OBJ',
+                                'class': 'H5T_REFERENCE'
+                            }
+                        },
+                        {
+                            'name': 'index',
+                            'type': {
+                                'base': 'H5T_STD_I32LE',
+                                'class': 'H5T_INTEGER'
+                            }
+                        }
+                    ]
+                }
+            }
+
         new_reflist = {}
         new_reflist["type"] = old_reflist["type"]
+        new_reflist["shape"] = old_reflist["shape"]
+
         if "value" in old_reflist:
             reflist_value = old_reflist["value"]
             if reflist_value is None:
@@ -189,8 +223,9 @@ class DimensionProxy(base.CommonStateObject):
             reflist_value = []
         reflist_value.append(['datasets/' + dset.id.id, self._dimension])
         new_reflist["value"] = reflist_value
-        new_reflist["shape"] = [len(reflist_value),]
-         
+
+        new_reflist["shape"]["dims"] = [len(reflist_value), ]
+
         # Update the REFERENCE_LIST attribute of the dimension scale
         with phil:
             dscale.PUT(req, body=new_reflist, replace=True)
@@ -219,9 +254,9 @@ class DimensionProxy(base.CommonStateObject):
         with phil:
             old_reflist = dscale.GET(req)
             if "value" in old_reflist and len(old_reflist["value"]) > 0:
-                old_refs = old_reflist["value"]
+
                 new_refs = list()
-            
+
                 remove = ['datasets/' + dset.id.id, self._dimension]
                 for el in old_reflist['value']:
                     if remove[0] != el[0] and remove[1] != el[1]:
@@ -231,10 +266,15 @@ class DimensionProxy(base.CommonStateObject):
                 new_reflist["type"] = old_reflist["type"]
                 if len(new_refs) > 0:
                     new_reflist["value"] = new_refs
-                    new_reflist["shape"] = [len(new_refs),]
+                    new_reflist["shape"] = [len(new_refs), ]
+                    dscale.PUT(req, body=new_reflist, replace=True)
                 else:
-                    new_reflist["shape"] = 'H5S_NULL'
-                dscale.PUT(req, body=new_reflist, replace=True)
+                    # Remove REFERENCE_LIST attribute if this dimension scale is
+                    # not attached to any dataset
+                    try:
+                        dscale.DELETE(req)
+                    except OSError:
+                        pass
 
     def items(self):
         ''' Get a list of (name, Dataset) pairs with all scales on this
@@ -316,7 +356,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
 
         Provide the dataset and a name for the scale.
         '''
-         
+
         # CLASS attribute with the value 'DIMENSION_SCALE'
         class_attr = {
             'creationProperties': {

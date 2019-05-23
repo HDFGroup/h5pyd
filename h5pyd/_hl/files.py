@@ -66,14 +66,13 @@ class File(Group):
         return ("0.0.1",)
 
     @property
+    def serverver(self):
+        return self._version
+
+    @property
     def userblock_size(self):
         """ User block size (in bytes) """
         return 0
-
-    @property
-    def modified(self):
-        """Last modified time of the domain as a datetime object."""
-        return self.id.http_conn.modified
 
     @property
     def created(self):
@@ -85,8 +84,12 @@ class File(Group):
         """Username of the owner of the domain"""
         return self.id.http_conn.owner
 
+    @property
+    def limits(self):
+        return self._limits
+
     def __init__(self, domain, mode=None, endpoint=None, username=None, password=None,
-        api_key=None, use_session=True, use_cache=False, logger=None, **kwds):
+        api_key=None, use_session=True, use_cache=False, logger=None, owner=None, linked_domain=None, retries=3, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -97,6 +100,8 @@ class File(Group):
             Access mode: 'r', 'r+', 'w', or 'a'
         endpoint
             Server endpoint.   Defaults to "http://localhost:5000"
+        linked_domain
+            Create new domain using the root of the linked domain
         """
     
 
@@ -170,7 +175,7 @@ class File(Group):
 
             http_conn =  HttpConn(domain, endpoint=endpoint,
                     username=username, password=password, mode=mode,
-                    api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger)
+                    api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger, retries=retries)
 
             root_json = None
 
@@ -205,7 +210,12 @@ class File(Group):
                 if mode not in ('w', 'a', 'x'):
                     http_conn.close()
                     raise IOError(404, "File not found")
-                rsp = http_conn.PUT(req)
+                body = {}
+                if owner:
+                    body["owner"] = owner
+                if linked_domain:
+                    body["linked_domain"] = linked_domain
+                rsp = http_conn.PUT(req, body=body)
                 if rsp.status_code != 201:
                     http_conn.close()
                     raise IOError(rsp.status_code, rsp.reason)
@@ -215,7 +225,17 @@ class File(Group):
             if 'root' not in root_json:
                 http_conn.close()
                 raise IOError(404, "Unexpected error")
+
             root_uuid = root_json['root']
+
+            if "limits" in root_json:
+                self._limits = root_json["limits"]
+            else:
+                self._limits = None
+            if "version" in root_json:
+                self._version = root_json["version"]
+            else:
+                self._version = None
 
             if mode == 'a':
                 # for append, verify we have 'update' permission on the domain
@@ -263,8 +283,9 @@ class File(Group):
             # resynch the verbose data
             req = '/?verbose=1'
             rsp_json = self.GET(req)
+            self.log.debug("get verbose info: {}".format(rsp_json))
             props = {}
-            for k in ("num_chunks", "num_datatypes", "num_groups", "num_datasets", "allocated_bytes"):
+            for k in ("num_objects", "num_datatypes", "num_groups", "num_datasets", "allocated_bytes", "total_size", "lastModified"):
                 if k in rsp_json:
                     props[k] = rsp_json[k]
             self._verboseInfo = props
@@ -272,12 +293,22 @@ class File(Group):
         return self._verboseInfo
 
     @property
-    def num_chunks(self):
+    def modified(self):
+        """Last modified time of the domain as a datetime object."""
         props = self._getVerboseInfo()
-        num_chunks = 0
-        if "num_chunks" in props:
-            num_chunks = props["num_chunks"]
-        return num_chunks
+        modified = self.id.http_conn.modified  # timestamp for the domain object
+        # update with latest time of any domain object (if available)
+        if "lastModified" in props:
+            modified = props["lastModified"]
+        return modified
+
+    @property
+    def num_objects(self):
+        props = self._getVerboseInfo()
+        num_objects = 0
+        if "num_objects" in props:
+            num_objects = props["num_objects"]
+        return num_objects
 
     @property
     def num_datatypes(self):
@@ -311,6 +342,14 @@ class File(Group):
             allocated_bytes = props["allocated_bytes"]
         return allocated_bytes
 
+    @property
+    def total_size(self):
+        props = self._getVerboseInfo()
+        total_size = 0
+        if "total_size" in props:
+            total_size = props["total_size"]
+        return total_size
+
 
     # override base implemention of ACL methods to use the domain rather than update root group
     def getACL(self, username):
@@ -337,18 +376,36 @@ class File(Group):
         req = '/acls/' + acl['userName']
         self.PUT(req, body=perm)
 
+   
+
+    def flush(self):
+        """  Tells the service to complete any pending updates to permanent storage
+        """
+        self.log.debug("flush")
+        if  self._id.id.startswith("g-"):
+            # Currently flush only works with HSDS
+            self.log.debug("sending PUT flush request")
+            req = '/'
+            body = {"flush": 1}
+            self.PUT(req, body=body)
+
     def close(self):
         """ Clears reference to remote resource.
         """
         # this will close the socket of the http_conn singleton
+
+        self.log.debug("close, mode: {}".format(self.mode))
+        # do a PUT flush if this file is writable and the server is HSDS
+        if  self.mode == "r+" and self._id.id.startswith("g-"):
+            # Currently flush only works with HSDS
+            self.log.debug("sending PUT flush request")
+            req = '/'
+            body = {"flush": 1}
+            self.PUT(req, body=body)
+
         if self._id._http_conn:
             self._id._http_conn.close()
         self._id.close()
-
-    def flush(self):
-        """ For h5py compatibility, doesn't currently do anything in h5pyd.
-        """
-        pass
 
     def __enter__(self):
         return self

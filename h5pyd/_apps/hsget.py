@@ -41,7 +41,7 @@ def usage():
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
-    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://example.com:8080")
+    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
@@ -61,7 +61,7 @@ def print_config_example():
     print("# default")
     print("hs_username = <username>")
     print("hs_password = <passwd>")
-    print("hs_endpoint = https://hdfgroup.org:7258")
+    print("hs_endpoint = http://hsdshdflab.hdfgroup.org")
 #print_config_example
 
 #----------------------------------------------------------------------------------
@@ -208,4 +208,3 @@ def main():
 #__main__
 if __name__ == "__main__":
     main()
-

@@ -26,7 +26,10 @@ def createFolder(domain):
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
     #print("getFolder", domain)
-    dir = h5py.Folder(domain, mode='x', endpoint=endpoint, username=username, password=password)
+    owner = None
+    if "hs_owner" in cfg:
+        owner=cfg["hs_owner"]
+    dir = h5py.Folder(domain, mode='x', endpoint=endpoint, username=username, password=password, owner=owner)
     return dir
 
 def getFile(domain):
@@ -42,7 +45,10 @@ def createFile(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
-    fh = h5py.File(domain, mode='x', endpoint=endpoint, username=username, password=password)
+    owner = None
+    if "hs_owner" in cfg:
+        owner=cfg["hs_owner"]
+    fh = h5py.File(domain, mode='x', endpoint=endpoint, username=username, password=password, owner=owner)
     return fh
 
 
@@ -57,23 +63,29 @@ def touchDomain(domain):
     # get handle to parent folder
     parent_domain = op.dirname(domain) 
 
-    if len(parent_domain) < 2:
-        sys.exit("can't create top-level domain")
-
-    if not parent_domain.endswith('/'):
-        parent_domain += '/'
-    try:
-        getFolder(parent_domain)
-    except IOError as oe:
-        #print("errno:", oe.errno)
-        if oe.errno in (404, 410):   # Not Found
-            sys.exit("Parent domain: {} not found".format(parent_domain))
-        elif oe.errno == 401:  # Unauthorized
-            sys.exit("Authorization failure")
-        elif oe.errno == 403:  # Forbidden
-            sys.exit("Not allowed")
-        else:
-            sys.exit("Unexpected error: {}".format(oe))
+    if parent_domain == '/':
+        if cfg["hs_username"] != "admin":
+            sys.exit("Only admin user can create top-level domains")
+        if not make_folder:
+            sys.exit("Only folders can be created as a top-level domain")
+        if len(domain) < 5:
+            sys.exit("Top-level folders must be at least three characters")
+        
+    else:
+        if not parent_domain.endswith('/'):
+            parent_domain += '/'
+        try:
+            getFolder(parent_domain)
+        except IOError as oe:
+            #print("errno:", oe.errno)
+            if oe.errno in (404, 410):   # Not Found
+                sys.exit("Parent domain: {} not found".format(parent_domain))
+            elif oe.errno == 401:  # Unauthorized
+                sys.exit("Authorization failure")
+            elif oe.errno == 403:  # Forbidden
+                sys.exit("Not allowed")
+            else:
+                sys.exit("Unexpected error: {}".format(oe))
     
     hdomain = None
     try:
@@ -121,8 +133,8 @@ def touchDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains".format(cfg["cmd"]))
-    print("example: {} -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/emptydomain.h5".format(cfg["cmd"]))
+    print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [-o owner] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains".format(cfg["cmd"]))
+    print("example: {} -e  http://hsdshdflab.hdfgroup.org  /home/myfolder/emptydomain.h5".format(cfg["cmd"]))
     sys.exit()
 
 #
@@ -171,6 +183,9 @@ def main():
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = sys.argv[argn+1]
             argn += 2
+        elif arg in ("-o", "--owner"):
+            cfg["hs_owner"] = sys.argv[argn+1]
+            argn += 2
         elif arg[0] == '-':
             printUsage()
         else:
@@ -193,7 +208,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
-     
-
-

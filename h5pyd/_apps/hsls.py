@@ -13,8 +13,9 @@ else:
 #
 # Print objects in a domain in the style of the hsls utilitiy
 #
- 
+
 cfg = Config()
+
 
 def intToStr(n):
     if cfg["human_readable"]:
@@ -23,13 +24,14 @@ def intToStr(n):
         s = "{}".format(n)
     return s
 
+
 def format_size(n):
     if n is None or n == ' ':
-        return ' '*8
+        return ' ' * 8
     symbol = ' '
     if not cfg["human_readable"]:
         return str(n)
-    # convert to common storage unit    
+    # convert to common storage unit
     for s in ('B', 'K', 'M', 'G', 'T'):
         if n < 1024:
             symbol = s
@@ -39,6 +41,7 @@ def format_size(n):
         return "{:7}B".format(n)
     else:
         return "{:7.1f}{}".format(n, symbol)
+
 
 def getShapeText(dset):
     shape_text = "Scalar"
@@ -64,21 +67,22 @@ def getShapeText(dset):
         shape_text += "}"
     return shape_text
 
+
 def visititems(name, grp, visited):
     for k in grp:
         item = grp.get(k, getlink=True)
         class_name = item.__class__.__name__
         item_name = op.join(name, k)
         if class_name == "HardLink":
-            # follow hardlinks    
+            # follow hardlinks
             try:
-                item = grp.get(k)         
+                item = grp.get(k)
                 dump(item_name, item, visited=visited)
             except IOError:
                 # object deleted but hardlink left?
                 desc = "{Missing hardlink object}"
                 print("{0:24} {1} {2}".format(item_name, class_name, desc))
-            
+
         elif class_name == "SoftLink":
             desc = '{' + item.path + '}'
             print("{0:24} {1} {2}".format(item_name, class_name, desc))
@@ -89,72 +93,83 @@ def visititems(name, grp, visited):
             desc = '{Unknown Link Type}'
             print("{0:24} {1} {2}".format(item_name, class_name, desc))
 
+
 def getTypeStr(dt):
     # TBD: convert dt to more HDF5-like representation
     return str(dt)
+
 
 def dump(name, obj, visited=None):
     class_name = obj.__class__.__name__
     desc = None
     obj_id = None
-    if class_name in ("Dataset", "Group", "Datatype"):
+    if class_name in ("Dataset", "Group", "Datatype", "Table"):
         obj_id = obj.id.id
         if visited and obj_id in visited:
             same_as = visited[obj_id]
             print("{0:24} {1}, same as {2}".format(name, class_name, same_as))
             return
 
-    if class_name == "Dataset":
+    is_dataset = False
+    if class_name in ("Dataset", "Table"):
+        is_dataset = True
+
+
+    if is_dataset:
         desc = getShapeText(obj)
         obj_id = obj.id.id
-        
-
     elif class_name == "Group":
         obj_id = obj.id.id
     elif class_name == "Datatype":
         obj_id = obj.id.id
     elif class_name == "SoftLink":
-        desc =  '{' + obj.path + '}'
+        desc = '{' + obj.path + '}'
     elif class_name == "ExternalLink":
         desc = '{' + obj.filename + '//' + obj.path + '}'
+
     if desc is None:
         print("{0:24} {1}".format(name, class_name))
     else:
         print("{0:24} {1} {2}".format(name, class_name, desc))
+
     if cfg["verbose"] and obj_id is not None:
         print("    {0:>12}: {1}".format("UUID", obj_id))
-    if cfg["verbose"] and class_name == "Dataset" and obj.shape is not None and obj.chunks is not None:
+
+    if cfg["verbose"] and is_dataset and obj.shape is not None \
+            and obj.chunks is not None:
         chunk_size = obj.dtype.itemsize
         for chunk_dim in obj.chunks:
             chunk_size *= chunk_dim
         dset_size = obj.dtype.itemsize
         for dim_extent in obj.shape:
             dset_size *= dim_extent
-        
+
         num_chunks = obj.num_chunks
         allocated_size = obj.allocated_size
-        if num_chunks is not None and allocated_size is not None:    
+        if num_chunks is not None and allocated_size is not None:
             fstr = "    {0:>12}: {1} {2} bytes, {3} allocated chunks"
-            print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size), intToStr(num_chunks)))
+            print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size),
+                              intToStr(num_chunks)))
             if allocated_size > 0:
-                utilization = dset_size / allocated_size   
+                utilization = dset_size / allocated_size
                 fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes, {3:.2f}% utilization"
-                print(fstr.format("Storage", intToStr(dset_size), intToStr(allocated_size), utilization*100.0))
+                print(fstr.format("Storage", intToStr(dset_size),
+                                  intToStr(allocated_size),
+                                  utilization * 100.0))
             else:
                 fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes"
-                print(fstr.format("Storage", intToStr(dset_size), intToStr(allocated_size)))
-            
+                print(fstr.format("Storage", intToStr(dset_size),
+                                  intToStr(allocated_size)))
+
         else:
             # verbose info not available, just show the chunk layout
             fstr = "    {0:>12}: {1} {2} bytes"
             print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size)))
-        
+
         fstr = "    {0:>12}: {1}"
         print(fstr.format("Type", getTypeStr(obj.dtype)))  # dump out type info
-    
-        
 
-    if cfg["showattrs"] and class_name in ("Dataset", "Group", "Datatype"):
+    if cfg["showattrs"] and class_name in ("Dataset", "Table", "Group", "Datatype"):
         # dump attributes for the object
         for attr_name in obj.attrs:
             attr = obj.attrs[attr_name]
@@ -164,7 +179,7 @@ def dump(name, obj, visited=None):
             else:
                 rank = 0  # scalar data
             if rank > 1:
-                val = "["*rank + el + "]"*rank
+                val = "[" * rank + el + "]" * rank
                 print("   attr: {0:24} {1}".format(attr_name, val))
             elif rank == 1 and attr.shape[0] > 1:
                 val = "[{},{}]".format(attr[0], el)
@@ -173,9 +188,10 @@ def dump(name, obj, visited=None):
                 print("   attr: {0:24} {1}".format(attr_name, attr))
 
     if visited is not None and obj_id is not None:
-        visited[obj_id] = name 
+        visited[obj_id] = name
     if class_name == "Group" and visited is not None:
         visititems(name, obj, visited)
+
 
 def dumpACL(acl):
     perms = ""
@@ -205,49 +221,44 @@ def dumpACL(acl):
         perms += '-'
     print("    acl: {0:24} {1}".format(acl["userName"], perms))
 
+
 def dumpAcls(obj):
     try:
-        default_acl = obj.getACL("default")
-        dumpACL(default_acl)
+        acls = obj.getACLs()
     except IOError:
         print("read ACLs is not permitted")
         return
 
-    try:
-        acls = obj.getACLs()
-     
-        for acl in acls:
-            if acl["userName"] == "default":
-                continue
-            dumpACL(acl)
-    except IOError:
-        # if requesting user does not permission to read non-default acl,
-        # just ignore
-        pass 
+    for acl in acls:
+        dumpACL(acl)
+
 
 def getFolder(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
-    dir = h5py.Folder(domain, endpoint=endpoint, username=username, password=password)
+    dir = h5py.Folder(domain, endpoint=endpoint, username=username,
+                      password=password)
     return dir
+
 
 def getFile(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
-    fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username, password=password, use_cache=True)
+    fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username,
+                   password=password, use_cache=True)
     return fh
 
 
 def visitDomains(domain, depth=1):
     if depth == 0:
         return 0
-     
+
     count = 0
     if domain[-1] == '/':
         domain = domain[:-1]  # strip off trailing slash
-    
+
     try:
         dir = getFolder(domain + '/')
         dir_class = "domain"
@@ -259,9 +270,9 @@ def visitDomains(domain, depth=1):
         elif cfg["verbose"]:
             # get the number of allocated bytes
             f = getFile(domain)
-            num_bytes = f.allocated_bytes
+            num_bytes = f.total_size
             f.close()
-        
+
         owner = dir.owner
         if owner is None:
             owner = ""
@@ -269,51 +280,47 @@ def visitDomains(domain, depth=1):
             timestamp = ""
         else:
             timestamp = datetime.fromtimestamp(int(dir.modified))
- 
-        print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes), dir_class, timestamp, display_name))
-         
+
+        print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
+                                              dir_class, timestamp,
+                                              display_name))
+
         count += 1
         if cfg["showacls"]:
             dumpAcls(dir)
         if dir.is_folder:
             for name in dir:
                 # recurse for items in folder
-                n = visitDomains(domain + '/' + name, depth=(depth-1))
+                n = visitDomains(domain + '/' + name, depth=(depth - 1))
                 count += n
-                    
+
     except IOError as oe:
-        if oe.errno in (404, 410):
-            # TBD: recently creating domains may not be immediately visible to the service
-            # Once the flush operation is implemented, this should be an issue for h5pyd apps
+        if oe.errno in (403, 404, 410):
+            # TBD: recently created domains may not be immediately visible to
+            # the service Once the flush operation is implemented, this should
+            # be an issue for h5pyd apps
+            #
+            # Also, ignore domains for which we don't have permsssions (403)
             pass
         else:
             print("error getting domain:", domain)
             sys.exit(str(oe))
-             
 
     return count
-            
-#
-# Get Group based on domain path
-#
-def getGroupFromDomain(domain):
-    try:
-        f = getFile(domain)
-        return f['/']
-    except IOError:
-        return None
+
+
 
 #
 # Usage
 #
 def printUsage():
     print("usage: {} [-r] [-v] [-h] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] domains".format(cfg["cmd"]))
-    print("example: {} -r -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/tall.h5".format(cfg["cmd"]))
+    print("example: {} -r -e http://hsdshdflab.hdfgroup.org /shared/tall.h5".format(cfg["cmd"]))
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
     print("     -H | --human-readable :: with -v, print human readable sizes (e.g. 123M)")
-    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://example.com:8080")
+    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
@@ -324,6 +331,7 @@ def printUsage():
     print("     -h | --help    :: This message.")
     sys.exit()
 
+
 #
 # Main
 #
@@ -332,7 +340,7 @@ def main():
     argn = 1
     depth = 2
     loglevel = logging.ERROR
-    logfname=None
+    logfname = None
     cfg["verbose"] = False
     cfg["showacls"] = False
     cfg["showattrs"] = False
@@ -345,7 +353,7 @@ def main():
         arg = sys.argv[argn]
         val = None
         if len(sys.argv) > argn + 1:
-            val = sys.argv[argn+1]
+            val = sys.argv[argn + 1]
         if arg in ("-r", "--recursive"):
             depth = -1
             argn += 1
@@ -366,7 +374,7 @@ def main():
             elif val == "ERROR":
                 loglevel = logging.ERROR
             else:
-                printUsage()  
+                printUsage()
             argn += 2
         elif arg == '--logfile':
             logfname = val
@@ -395,10 +403,10 @@ def main():
             argn += 1
 
     # setup logging
-    logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
+    logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s',
+                        level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
- 
- 
+
     if len(domains) == 0:
         # add top-level domain
         domains.append("/")
@@ -408,17 +416,39 @@ def main():
             # given a folder path
             count = visitDomains(domain, depth=depth)
             print("{} items".format(count))
+
         else:
-         
-            grp = getGroupFromDomain(domain)
+            try:
+                f = getFile(domain)
+            except IOError as ioe:
+                if ioe.errno == 401:
+                    print("Username/Password missing or invalid")
+                    continue
+                if ioe.errno == 403:
+                    print("No permission to read domain: {}".format(domain))
+                    continue
+                elif ioe.errno == 404:
+                    print("Domain {} not found".format(domain))
+                    continue
+                elif ioe.errno == 410:
+                    print("Domain {} has been removed".format(domain))
+                    continue
+                else:
+                    print("Unexpected error: {}".format(ioe))
+                    continue
+        
+            grp = f['/']
             if grp is None:
                 print("{}: No such domain".format(domain))
+                domain += '/'
+                count = visitDomains(domain, depth=depth)
+                print("{} items".format(count))
                 continue
             dump('/', grp)
-    
+
             if depth < 0:
                 # recursive
-                visited = {} # dict of id to h5path
+                visited = {}  # dict of id to h5path
                 visited[grp.id.id] = '/'
                 visititems('/', grp, visited)
             else:
@@ -435,6 +465,7 @@ def main():
             if cfg["showacls"]:
                 dumpAcls(grp)
             grp.file.close()
+
 
 if __name__ == "__main__":
     main()

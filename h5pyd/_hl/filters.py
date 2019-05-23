@@ -75,7 +75,7 @@ def _gen_filter_tuples():
 decode, encode = _gen_filter_tuples()
 
 def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
-                  shuffle, fletcher32, maxshape, scaleoffset):
+                  shuffle, fletcher32, maxshape, scaleoffset, layout):
     """ Generate a dataset creation property list.
 
     Undocumented and subject to change without warning.
@@ -169,14 +169,16 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
     # End argument validation
 
     if (chunks is True) or \
-    (chunks is None and any((shuffle, fletcher32, compression, maxshape,
+    (chunks is None and layout is not None and any((shuffle, fletcher32, compression, maxshape,
                              scaleoffset is not None))):
         chunks = guess_chunk(shape, maxshape, dtype.itemsize)
 
     if maxshape is True:
         maxshape = (None,)*len(shape)
 
-    if chunks is not None:
+    if layout is not None:
+        plist['layout'] = layout
+    elif chunks is not None:
         #plist.set_chunk(chunks)
         # set layout key
         layout = { 'class': 'H5D_CHUNKED'}
@@ -361,11 +363,3 @@ def guess_chunk(shape, maxshape, typesize):
         idx += 1
 
     return tuple(int(x) for x in chunks)
-
-
-
-
-
-
-
-

@@ -33,7 +33,7 @@ def getACL(f, username="default"):
         elif ioe.errno == 401:
             print("username/password needs to be provided")
             sys.exit(1)
-        elif ioe.errno == 404:
+        elif ioe.errno == 404 or not ioe.errno:
             return None
         else:
             print("unexpected error: {}".format(ioe))
@@ -52,7 +52,7 @@ def printUsage():
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
-    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://example.com:8080")
+    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     --logfile <logfile> :: logfile path")
@@ -66,8 +66,8 @@ def printUsage():
     print("examples...")
     print("list acls: {} /home/jill/myfile.h5".format(cfg["cmd"]))
     print("list ted's acl (if any): {} /home/jill/myfile.h5  ted".format(cfg["cmd"]))
-    print("add/update acl to give ted read & update permissions: {} +ru /home/jill/myfile.h5 ted".format(cfg["cmd"]))
-    print("remove all permissions except read for jill: {} -cudep /home/jill/myfile.h5 jill".format(cfg["cmd"]))
+    print("add/update acl to give ted read & update permissions: {} /home/jill/myfile.h5 +ru ted".format(cfg["cmd"]))
+    print("remove all permissions except read for jill: {} /home/jill/myfile.h5 -cudep jill".format(cfg["cmd"]))
     print("")
     sys.exit()
 
@@ -227,9 +227,20 @@ def main():
 
     # update/add ACL if permission flags have been set
     if perm:
-        default_acl = getACL(f)  
-        logging.info("default acl:", default_acl)
-        update_names = usernames.copy()
+        default_acl = {'updateACL': False, 
+                       'delete': False, 
+                       'create': False, 
+                       'read': False, 
+                       'update': False, 
+                       'readACL': False,
+                       'userName': 'default'
+                       } 
+        # note: list.copy not supported in py2.7, copy by hand for now
+        # update_names = usernames.copy()
+        update_names = []
+        for username in usernames:
+            update_names.append(username)
+
         if not update_names:
             update_names.append("default")
          
@@ -300,6 +311,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-    
-	

@@ -524,6 +524,6 @@ class Test3DFloat(TestCase):
 
 
 if __name__ == '__main__':
-    loglevel = logging.DEBUG
+    loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

@@ -22,9 +22,9 @@ if six.PY3:
     unicode = str
 
 def is_reference(val):
-    try: 
+    try:
         if  val.__class__.__name__ == "Reference":
-            return True 
+            return True
     except AttributeError:
         pass # ignore
     try:
@@ -32,13 +32,13 @@ def is_reference(val):
             return True
     except AttributeError:
         pass # ignore
-    
+
     return False
 
 def is_regionreference(val):
-    try: 
+    try:
         if  val.__class__.__name__ == "RegionReference":
-            return True 
+            return True
     except AttributeError:
         pass # ignore
     try:
@@ -46,9 +46,9 @@ def is_regionreference(val):
             return True
     except AttributeError:
         pass # ignore
-    
+
     return False
- 
+
 
 class Reference():
 
@@ -75,7 +75,7 @@ class Reference():
         if not isinstance(self._id.id, str):
             raise TypeError("Expected string id")
         item = None
-        
+
         if self._id.objtype_code == 'd':
             item = "datasets/" + self._id.id
         elif self._id.objtype_code == 'g':
@@ -251,14 +251,12 @@ def getTypeResponse(typeItem):
     return response
 
 
-
-"""
-    Return type info.
-          For primitive types, return string with typename
-          For compound types return array of dictionary items
-"""
-
 def getTypeItem(dt):
+    """
+        Return type info.
+              For primitive types, return string with typename
+              For compound types return array of dictionary items
+    """
 
     predefined_int_types = {
         'int8':    'H5T_STD_I8',
@@ -271,6 +269,7 @@ def getTypeItem(dt):
         'uint64':  'H5T_STD_U64'
     }
     predefined_float_types = {
+        'float16': 'H5T_IEEE_F16',
         'float32': 'H5T_IEEE_F32',
         'float64': 'H5T_IEEE_F64'
     }
@@ -282,7 +281,7 @@ def getTypeItem(dt):
         type_info['class'] = 'H5T_COMPOUND'
         fields = []
         for name in names:
-            field = { 'name': name }
+            field = {'name': name}
             field['type'] = getTypeItem(dt[name])
             fields.append(field)
             type_info['fields'] = fields
@@ -325,9 +324,9 @@ def getTypeItem(dt):
             type_info['class'] = 'H5T_REFERENCE'
 
             # use type name to support cases we're passed and h5py.h5r.Reference or RegionReference
-            if is_reference(ref_check):  
+            if is_reference(ref_check):
                 type_info['base'] = 'H5T_STD_REF_OBJ'  # objref
-            elif is_regionreference(ref_check):  
+            elif is_regionreference(ref_check):
                 type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
             else:
                 raise TypeError("unexpected reference type: {}".format(ref_check))
@@ -346,7 +345,7 @@ def getTypeItem(dt):
 
             if is_reference(ref_check):
                 type_info['base'] = 'H5T_STD_REF_OBJ'  # objref
-            elif is_regionreference(ref_check):  
+            elif is_regionreference(ref_check):
                 type_info['base'] = 'H5T_STD_REF_DSETREG'  # region ref
             else:
                 raise TypeError("unexpected reference type")
@@ -372,7 +371,7 @@ def getTypeItem(dt):
         mapping =  {
             "FALSE": 0,
             "TRUE": 1
-        }      
+        }
         type_info['class'] = 'H5T_ENUM'
         type_info['mapping'] = mapping
         base_info = { "class": "H5T_INTEGER" }
@@ -385,7 +384,7 @@ def getTypeItem(dt):
         if dt.byteorder == '>':
             byteorder = 'BE'
         if dt.name in predefined_float_types:
-            #maps to one of the HDF5 predefined types
+            # maps to one of the HDF5 predefined types
             type_info['base'] = predefined_float_types[dt.base.name] + byteorder
         else:
             raise TypeError("Unexpected floating point type: " + dt.name)
@@ -420,10 +419,27 @@ def getTypeItem(dt):
 
             type_info['base'] = predefined_int_types[base_name] + byteorder
 
+    elif dt.kind == 'c':
+        type_info['class'] = 'H5T_COMPOUND'
+        if dt.name == 'complex64':
+            base_type = 'H5T_IEEE_F32'
+        elif dt.name == 'complex128':
+            base_type = 'H5T_IEEE_F64'
+        else:
+            raise TypeError('Unexpected complex type: ' + dt.name)
+        byteorder = 'LE'
+        if dt.byteorder == '>':
+            byteorder = 'BE'
+        type_info['fields'] = [{'name': 'r',
+                                'type': {'class': 'H5T_FLOAT',
+                                         'base': base_type + byteorder}},
+                               {'name': 'i',
+                                'type': {'class': 'H5T_FLOAT',
+                                         'base': base_type + byteorder}}]
+
     else:
         # unexpected kind
         raise TypeError("unexpected dtype kind: " + dt.kind)
-
 
     return type_info
 
@@ -534,6 +550,7 @@ def getNumpyTypename(hdf5TypeName, typeClass=None):
           'H5T_STD_U64': 'u8'
     }
     predefined_float_types = {
+          'H5T_IEEE_F16': 'f2',
           'H5T_IEEE_F32': 'f4',
           'H5T_IEEE_F64': 'f8'
     }
@@ -602,7 +619,8 @@ def createBaseDataType(typeItem):
 
         if typeItem['length'] == 'H5T_VARIABLE':
             if dims:
-                raise TypeError("ArrayType is not supported for variable len types")
+                raise TypeError(
+                    "ArrayType is not supported for variable len types")
             if typeItem['charSet'] == 'H5T_CSET_ASCII':
                 dtRet = special_dtype(vlen=bytes)
             elif typeItem['charSet'] == 'H5T_CSET_UTF8':
@@ -653,9 +671,9 @@ def createBaseDataType(typeItem):
         metadata = None
         if baseType.metadata:
             metadata = dict(baseType.metadata)
-            dtRet = np.dtype(dims+baseType.str, metadata=metadata)      
+            dtRet = np.dtype(dims+baseType.str, metadata=metadata)
         else:
-            dtRet =  np.dtype(dims+baseType.str) 
+            dtRet =  np.dtype(dims+baseType.str)
 
         return dtRet  # return predefined type
     elif typeClass == 'H5T_REFERENCE':
@@ -685,7 +703,7 @@ def createBaseDataType(typeItem):
             # convert to numpy boolean type
             dtRet = np.dtype("bool")
         else:
-            # not a boolean enum, use h5py special dtype 
+            # not a boolean enum, use h5py special dtype
             dtRet = special_dtype(enum=(dt, mapping))
 
     else:
@@ -723,7 +741,6 @@ def createDataType(typeItem):
             raise KeyError("no 'field' elements provided")
         subtypes = []
         for field in fields:
-
             if type(field) != dict:
                 raise TypeError("Expected dictionary type for field")
             if 'name' not in field:
@@ -749,4 +766,3 @@ def createDataType(typeItem):
     else:
         dtRet = createBaseDataType(typeItem)  # create non-compound dt
     return dtRet
-

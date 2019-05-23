@@ -54,7 +54,20 @@ def deleteDomain(domain):
         sys.exit("domain: {} not found".format(domain))
 
     # delete the domain
-    del hparent[base_name]
+    try:
+        del hparent[base_name]
+    except IOError as oe:
+        if oe.errno == 404:   # Not Found
+            # should have caught this in the base_name check...
+            sys.exit("domain: {} not found".format(parent_domain))
+        elif oe.errno == 401:  # Unauthorized
+            sys.exit("Authorization failure")
+        elif oe.errno == 403:  # Forbidden
+            sys.exit("Not allowed")
+        elif oe.errno == 409 and domain.endswith('/'):  # Conflict
+            sys.exit("folder has sub-items")
+        else:
+            sys.exit("Unexpected error: {}".format(oe))
     if cfg["verbose"]:
         if domain.endswith('/'):
             print("Folder: {} deleted".format(domain))
@@ -66,7 +79,7 @@ def deleteDomain(domain):
 #
 def printUsage():
     print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains".format(cfg["cmd"]))
-    print("example: {} -e http://data.hdfgroup.org:7253 /hdfgroup/data/test/deleteme.h5".format(cfg["cmd"]))
+    print("example: {} -e http://hsdshdflab.hdfgroup.org /hdfgroup/data/test/deleteme.h5".format(cfg["cmd"]))
     sys.exit()
 
 #

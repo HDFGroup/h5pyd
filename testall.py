@@ -23,14 +23,15 @@ tests = ('test_attribute',
          'test_dataset_objref',
          'test_dataset_getitem',
          'test_dataset_pointselect',
-         'test_dataset_query',
          'test_dataset_scalar',
          'test_dataset_setitem',
+         'test_table',
          'test_file',
          'test_group',
          'test_vlentype',
          'test_dimscale',
          'test_folder',
+         'test_complex_numbers'
          # 'test_visit')
          )
 

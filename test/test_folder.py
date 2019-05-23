@@ -10,6 +10,7 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 
+import logging
 import config
 
 if config.get("use_h5py"):
@@ -85,10 +86,12 @@ class TestFolders(TestCase):
             #'class': 'domain', 
             #'name': '/org/hdfgroup/h5pyd_test/bool_dset', 
             #'lastModified': 1496729517.2346532
-            self.assertTrue("lastModified" in item)
-            self.assertTrue("created" in item)
+            #self.assertTrue("created" in item)
             self.assertTrue("owner" in item)
             self.assertTrue("class" in item)
+            if "root" in item:
+                # non-folder objects will have last modified time
+                self.assertTrue("lastModified" in item)
 
             i += 1
         self.assertTrue(test_domain_found)
@@ -139,7 +142,6 @@ class TestFolders(TestCase):
 
         
         filepath = self.getPathFromDomain(test_domain)
-        print(filepath)
         f = h5py.File(filepath, mode='a')  
         self.assertTrue(f.id.id is not None)
         if config.get("use_h5py"):
@@ -170,4 +172,6 @@ class TestFolders(TestCase):
      
               
 if __name__ == '__main__':
+    loglevel = logging.ERROR
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

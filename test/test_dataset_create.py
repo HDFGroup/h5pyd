@@ -11,7 +11,6 @@
 ##############################################################################
 import logging
 import numpy as np
-import math
 
 import config
 
@@ -22,7 +21,6 @@ else:
 
 from common import ut, TestCase
 from datetime import datetime
-import six
 
 
 class TestCreateDataset(TestCase):
@@ -37,6 +35,7 @@ class TestCreateDataset(TestCase):
         self.assertEqual(dset.name, "/simple_dset")
         self.assertTrue(isinstance(dset.shape, tuple))
         self.assertEqual(len(dset.shape), 2)
+        self.assertEqual(dset.ndim, 2)
         self.assertEqual(dset.shape[0], 40)
         self.assertEqual(dset.shape[1], 80)
         self.assertEqual(str(dset.dtype), 'float32')
@@ -56,9 +55,61 @@ class TestCreateDataset(TestCase):
 
         if h5py.__name__ == "h5pyd":
             # test h5pyd extensions
-            print("test h5pyd extensions")
-            self.assertEqual(dset.num_chunks, None)
-            self.assertEqual(dset.allocated_size, None)
+            if not config.get('use_h5py') and isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+                print("test h5pyd extensions")
+                self.assertEqual(dset.num_chunks, 0)
+                self.assertEqual(dset.allocated_size, 0)
+
+        # try with chunk=True
+        dset_chunked = f.create_dataset('chunked_dset', dims, dtype='f4', chunks=True)
+        if not config.get('use_h5py') and isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+            # hsds always returns chunks
+            self.assertTrue(dset_chunked.chunks)
+        else:
+            self.assertTrue(dset_chunked.chunks is None)
+        
+        f.close()
+
+    def test_create_float16_dset(self):
+        
+        filename = self.getFileName("create_float16_dset")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+        if not config.get('use_h5py') and isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+            # Float16 not supported with h5serv
+            return
+       
+        nrows = 4
+        ncols = 8
+        dims = (nrows, ncols)
+        dset = f.create_dataset('simple_dset', dims, dtype='f2')
+
+        self.assertEqual(dset.name, "/simple_dset")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 2)
+        self.assertEqual(dset.shape[0], nrows)
+        self.assertEqual(dset.shape[1], ncols)
+        self.assertEqual(str(dset.dtype), 'float16')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 2)
+        self.assertEqual(dset.maxshape[0], nrows)
+        self.assertEqual(dset.maxshape[1], ncols)
+        self.assertEqual(dset[0,0], 0)
+
+        arr = np.zeros((nrows,ncols), dtype="f2")
+        for i in range(nrows):
+            for j in range(ncols):
+                val  = float(i) * 10.0 + float(j)/10.0
+                arr[i,j] = val
+
+        # write entire array to dataset
+        dset[...] = arr
+        
+        arr = dset[...]  # read back
+        val = arr[2,4]   # test one value
+        self.assertTrue(val > 20.4 - 0.01)
+        self.assertTrue(val < 20.4 + 0.01)
+
 
         f.close()
 
@@ -87,7 +138,6 @@ class TestCreateDataset(TestCase):
         filename = self.getFileName("fillvalue_char_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-        is_h5serv = False
         if not config.get('use_h5py') and isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             # the following is failing on h5serv
             f.close()
@@ -129,6 +179,7 @@ class TestCreateDataset(TestCase):
         self.assertEqual(dset.name, "/simple_1d_dset")
         self.assertTrue(isinstance(dset.shape, tuple))
         self.assertEqual(len(dset.shape), 1)
+        self.assertEqual(dset.ndim, 1)
         self.assertEqual(dset.shape[0], 10)
         self.assertEqual(str(dset.dtype), 'uint32')
         self.assertTrue(isinstance(dset.maxshape, tuple))
@@ -178,108 +229,7 @@ class TestCreateDataset(TestCase):
         
         f.close()
 
-    def test_variable_len_str_dset(self):
-        filename = self.getFileName("variable_len_str_dset")
-        print("filename:", filename)
-        f = h5py.File(filename, "w")
-        is_hsds = False
-        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-            is_hsds = True  
-
-        dims = (10,)
-        dt = h5py.special_dtype(vlen=bytes)
-        dset = f.create_dataset('variable_len_str_dset', dims, dtype=dt)
-
-        self.assertEqual(dset.name, "/variable_len_str_dset")
-        self.assertTrue(isinstance(dset.shape, tuple))
-        self.assertEqual(len(dset.shape), 1)
-        self.assertEqual(dset.shape[0], 10)
-        self.assertEqual(str(dset.dtype), 'object')
-        self.assertTrue(isinstance(dset.maxshape, tuple))
-        self.assertEqual(len(dset.maxshape), 1)
-        self.assertEqual(dset.maxshape[0], 10)
-        if config.get('use_h5py'):
-            self.assertEqual(dset.fillvalue, None)
-        else:
-            self.assertEqual(dset.fillvalue, 0)
-
-        # TBD: h5serv and hsds returning different values for null strings
-        if config.get('use_h5py'):
-            self.assertEqual(dset[0], b'')
-        elif is_hsds:
-            self.assertEqual(dset[0], 0)
-        else:
-            self.assertEqual(dset[0], '')
-        
-        words = (b"one", b"two", b"three", b"four", b"five", b"six", b"seven", b"eight", b"nine", b"ten")
-        dset[:] = words
-        vals = dset[:]  # read back
-        
-        self.assertTrue("vlen" in vals.dtype.metadata)
-            
-        for i in range(10):
-            # TBD: h5serv and HSDS are returning unicode values 
-            if six.PY3 and not config.get('use_h5py'):
-                for i in range(10):
-                    self.assertEqual(vals[i].encode('ascii'), words[i])
-            else:
-                self.assertEqual(vals[i], words[i])
-
-        f.close()
-
-    def test_variable_len_unicode_dset(self):
-        filename = self.getFileName("variable_len_unicode_dset")
-        print("filename:", filename)
-        f = h5py.File(filename, "w")
-        is_hsds = False
-        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-            is_hsds = True  
-
-        dims = (10,)
-        if six.PY2:
-            dt = h5py.special_dtype(vlen=unicode)
-        else:
-            dt = h5py.special_dtype(vlen=str)
-
-        dset = f.create_dataset('variable_len_unicode_dset', dims, dtype=dt)
-
-        self.assertEqual(dset.name, "/variable_len_unicode_dset")
-        self.assertTrue(isinstance(dset.shape, tuple))
-        self.assertEqual(len(dset.shape), 1)
-        self.assertEqual(dset.shape[0], 10)
-        self.assertEqual(str(dset.dtype), 'object')
-        self.assertTrue(isinstance(dset.maxshape, tuple))
-        self.assertEqual(len(dset.maxshape), 1)
-        self.assertEqual(dset.maxshape[0], 10)
-        if config.get('use_h5py'):
-            self.assertEqual(dset.fillvalue, None)
-        else:
-            self.assertEqual(dset.fillvalue, 0)
-
-        # TBD: h5serv and hsds returning different values for null strings
-        if config.get('use_h5py'):
-            self.assertEqual(dset[0], '')
-        elif is_hsds:
-            self.assertEqual(dset[0], 0)
-        else:
-            self.assertEqual(dset[0], '')
-        
-        
-        words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94", u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
-        dset[:] = words
-        vals = dset[:]  # read back
-        
-        self.assertTrue("vlen" in vals.dtype.metadata)
-            
-        for i in range(10):
-            # TBD: h5serv and HSDS are returning unicode values 
-            if six.PY3 and not config.get('use_h5py'):
-                for i in range(10):
-                    self.assertEqual(vals[i], words[i])
-            else:
-                self.assertEqual(vals[i], words[i])
-
-        f.close()
+    
 
     def test_create_dset_by_path(self):
         filename = self.getFileName("create_dset_by_path")

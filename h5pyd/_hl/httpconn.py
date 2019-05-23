@@ -16,10 +16,13 @@ import os
 import base64
 import requests
 from requests import ConnectionError
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 import json
 import logging
 
 MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
+
 
 class CacheResponse(object):
     """ Wrap a json response in a Requests.Response looking class.
@@ -51,11 +54,12 @@ class HttpConn:
     TBD: Should refactor these to a common base class
     """
     def __init__(self, domain_name, endpoint=None, username=None, password=None,
-            api_key=None, mode='a', use_session=True, use_cache=False, logger=None, **kwds):
+            api_key=None, mode='a', use_session=True, use_cache=False, logger=None, retries=3, **kwds):
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
         self._use_session = use_session
+        self._retries = retries
         if use_cache:
             self._cache = {}
         else:
@@ -330,12 +334,27 @@ class HttpConn:
     @property
     def session(self):
         # create a session object to re-use http connection when possible
-        # TBD: Add retry here - see: https://laike9m.com/blog/requests-secret-pool_connections-and-pool_maxsize,89/
         s = requests
+        retries=self._retries
+        backoff_factor=0.1
+        status_forcelist=(500, 502, 503, 504)
         if self._use_session:
             if self._s is None:
-                self._s = requests.Session()
-            s = self._s
+                s = requests.Session()
+            
+                retry = Retry(
+                    total=retries,
+                    read=retries,
+                    connect=retries,
+                    backoff_factor=backoff_factor,
+                    status_forcelist=status_forcelist
+                )
+                adapter = HTTPAdapter(max_retries=retry)
+                s.mount('http://', adapter)
+                s.mount('https://', adapter)
+                self._s = s
+            else:
+                s = self._s
         return s
 
     def close(self):

@@ -17,10 +17,12 @@ import os.path as op
 import numpy
 import collections
 
-from .base import HLObject, MutableMappingHDF5, phil, guess_dtype
+from .base import HLObject, MutableMappingHDF5, guess_dtype
 from .objectid import TypeID, GroupID, DatasetID
 from . import dataset
 from .dataset import Dataset
+from . import table
+from .table import Table
 from .datatype import Datatype
 from . import h5type
 
@@ -36,12 +38,11 @@ class Group(HLObject, MutableMappingHDF5):
         """ Create a new Group object by binding to a low-level GroupID.
         """
 
-        with phil:
-            if not isinstance(bind, GroupID):
-                raise ValueError("%s is not a GroupID" % bind)
-            HLObject.__init__(self, bind, **kwargs)
-            self._req_prefix = "/groups/" + self.id.uuid 
-            self._link_db = {}  # cache for links
+        if not isinstance(bind, GroupID):
+            raise ValueError("%s is not a GroupID" % bind)
+        HLObject.__init__(self, bind, **kwargs)
+        self._req_prefix = "/groups/" + self.id.uuid
+        self._link_db = {}  # cache for links
 
     def create_group(self, h5path):
         """ Create and return a new subgroup.
@@ -54,10 +55,10 @@ class Group(HLObject, MutableMappingHDF5):
         #    raise ValueError("Unable to create link (Name alredy exists)")
         if h5path[-1] == '/':
             raise ValueError("Invalid path for create_group")
-        
+
         parent_uuid = self.id.id
         if h5path[0] == '/':
-            # absolute path         
+            # absolute path
             parent_uuid = self.file.id.id   # uuid of root group
 
         parent_path = op.dirname(h5path)
@@ -70,14 +71,14 @@ class Group(HLObject, MutableMappingHDF5):
                 raise IOError("cannot create subgroup of softlink")
             parent_uuid = link_json["id"]
 
-         
+
         body = {'link': { 'id': parent_uuid,
                           'name': title
                } }
-         
+
         rsp = self.POST('/groups', body=body)
 
-        group_json = rsp 
+        group_json = rsp
         groupId = GroupID(self, group_json)
 
         subGroup = Group(groupId)
@@ -141,72 +142,121 @@ class Group(HLObject, MutableMappingHDF5):
             (T/F) Enable dataset creation timestamps.
         """
 
-        
+
         if self.id.http_conn.mode == 'r':
             raise ValueError("Unable to create dataset (No write intent on file)")
 
-        with phil:
-            if shape is None and data is None:
+        if shape is None and data is None:
+            raise TypeError("Either data or shape must be specified")
+
+        # Convert data to a C-contiguous ndarray
+        if data is not None:
+            if dtype is None:
+                dtype = guess_dtype(data)
+            # if dtype is None:
+            #     dtype = numpy.float32
+            if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
+                data = numpy.asarray(data, order="C", dtype=dtype)
+                dtype = data.dtype
+            self.log.info("data dtype: {}".format(data.dtype))
+
+        # Validate shape
+        if shape is None:
+            if data is None:
                 raise TypeError("Either data or shape must be specified")
-            
-            # Convert data to a C-contiguous ndarray
-            if data is not None:
-                if dtype is None:
-                    dtype = guess_dtype(data)
-                if dtype is None:
-                    dtype = numpy.float32
-                if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
-                    data = numpy.asarray(data, order="C", dtype=dtype)
-                self.log.info("data dtype: {}".format(data.dtype))
+            shape = data.shape
+        else:
+            shape = tuple(shape)
+        if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
+            raise ValueError("Shape tuple is incompatible with data")
 
-            # Validate shape
-            if shape is None:
-                if data is None:
-                    raise TypeError("Either data or shape must be specified")
-                shape = data.shape
-            else:
-                shape = tuple(shape)
-            if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
-                raise ValueError("Shape tuple is incompatible with data")
-   
-            dsid = dataset.make_new_dset(self, shape=shape, dtype=dtype, **kwds)
-            dset = dataset.Dataset(dsid)
-            if data is not None:
-                self.log.info("initialize data")
-                dset[...] = data
+        dsid = dataset.make_new_dset(self, shape=shape, dtype=dtype, **kwds)
+        dset = dataset.Dataset(dsid)
+        if data is not None:
+            self.log.info("initialize data")
+            dset[...] = data
 
-            if name is not None:
-                items = name.split('/')
-                path = []
-                for item in items:
-                    if len(item) > 0:
-                        path.append(item)  # just get non-empty strings
+        if name is not None:
+            items = name.split('/')
+            path = []
+            for item in items:
+                if len(item) > 0:
+                    path.append(item)  # just get non-empty strings
 
-                grp = self
+            grp = self
 
-                if len(path) == 0:
-                    # no name, just return anonymous dataset
-                    return dset
+            if len(path) == 0:
+                # no name, just return anonymous dataset
+                return dset
 
-                dset_link = path[-1]
-                dset._name = self._name
-                if dset._name[-1] != '/':
-                    dset._name += '/'
-                if len(path) > 1:
-                    grp_path = path[:-1]
-                    # create any grps along the path that don't already exist
-                    for item in grp_path:
-                        if item not in grp:
-                            grp = grp.create_group(item)
-                        else:
-                            grp = grp[item]
+            dset_link = path[-1]
+            dset._name = self._name
+            if dset._name[-1] != '/':
+                dset._name += '/'
+            if len(path) > 1:
+                grp_path = path[:-1]
+                # create any grps along the path that don't already exist
+                for item in grp_path:
+                    if item not in grp:
+                        grp = grp.create_group(item)
+                    else:
+                        grp = grp[item]
 
-                        dset._name = dset._name + item + '/'
+                    dset._name = dset._name + item + '/'
 
-                dset._name += dset_link
-                grp[dset_link] = dset
+            dset._name += dset_link
+            grp[dset_link] = dset
 
-            return dset
+        return dset
+
+    def create_table(self, name, numrows=None, dtype=None, data=None, **kwds):
+        """ Create a new Table - a one dimensional HDF5 Dataset with a compound type
+
+        name
+            Name of the dataset (absolute or relative).  Provide None to make
+            an anonymous dataset.
+        shape
+            Dataset shape.  Use "()" for scalar datasets.  Required if "data"
+            isn't provided.
+        dtype
+            Numpy dtype or string.  If omitted, dtype('f') will be used.
+            Required if "data" isn't provided; otherwise, overrides data
+            array's dtype.
+        data
+            Provide data to initialize the dataset.  If used, you can omit
+            shape and dtype arguments.
+
+        Keyword-only arguments:
+        """
+        # Convert data to a C-contiguous ndarray
+        shape = None
+        if data is not None:
+            if dtype is None:
+                dtype = guess_dtype(data)
+            if dtype is None:
+                dtype = numpy.float32
+            if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
+                data = numpy.asarray(data, order="C", dtype=dtype)
+            self.log.info("data dtype: {}".format(data.dtype))
+            if len(data.shape) != 1:
+                ValueError("Table must be one-dimensional")
+            if numrows and numrows != data.shape[0]:
+                ValueError("Data does not match numrows value")
+            shape = data.shape
+        elif numrows:
+            shape = [numrows,]
+        else:
+            shape = [0,]
+
+        if dtype is None:
+            ValueError("dtype must be specified or data provided")
+        if len(dtype) < 1:
+            ValueError("dtype must be compound")
+        kwds["maxshape"] = (0,)
+        dset = self.create_dataset(name, shape=shape, dtype=dtype, data=data, **kwds)
+        obj = table.Table(dset.id)
+        return obj
+
 
     def require_dataset(self, name, shape, dtype, exact=False, **kwds):
         """ Open a dataset, creating it if it doesn't exist.
@@ -222,24 +272,23 @@ class Group(HLObject, MutableMappingHDF5):
         shape or dtype don't match according to the above rules.
         """
 
-        with phil:
-            if not name in self:
-                return self.create_dataset(name, *(shape, dtype), **kwds)
+        if not name in self:
+            return self.create_dataset(name, *(shape, dtype), **kwds)
 
-            dset = self[name]
-            if not isinstance(dset, Dataset):
-                raise TypeError("Incompatible object (%s) already exists" % dset.__class__.__name__)
+        dset = self[name]
+        if not isinstance(dset, Dataset):
+            raise TypeError("Incompatible object (%s) already exists" % dset.__class__.__name__)
 
-            if not shape == dset.shape:
-                raise TypeError("Shapes do not match (existing %s vs new %s)" % (dset.shape, shape))
+        if not shape == dset.shape:
+            raise TypeError("Shapes do not match (existing %s vs new %s)" % (dset.shape, shape))
 
-            if exact:
-                if not dtype == dset.dtype:
-                    raise TypeError("Datatypes do not exactly match (existing %s vs new %s)" % (dset.dtype, dtype))
-            elif not numpy.can_cast(dtype, dset.dtype):
-                raise TypeError("Datatypes cannot be safely cast (existing %s vs new %s)" % (dset.dtype, dtype))
+        if exact:
+            if not dtype == dset.dtype:
+                raise TypeError("Datatypes do not exactly match (existing %s vs new %s)" % (dset.dtype, dtype))
+        elif not numpy.can_cast(dtype, dset.dtype):
+            raise TypeError("Datatypes cannot be safely cast (existing %s vs new %s)" % (dset.dtype, dtype))
 
-            return dset
+        return dset
 
     def require_group(self, name):
         """ Return a group, creating it if it doesn't exist.
@@ -248,13 +297,12 @@ class Group(HLObject, MutableMappingHDF5):
         isn't a group.
         """
 
-        with phil:
-            if not name in self:
-                return self.create_group(name)
-            grp = self[name]
-            if not isinstance(grp, Group):
-                raise TypeError("Incompatible object (%s) already exists" % grp.__class__.__name__)
-            return grp
+        if not name in self:
+            return self.create_group(name)
+        grp = self[name]
+        if not isinstance(grp, Group):
+            raise TypeError("Incompatible object (%s) already exists" % grp.__class__.__name__)
+        return grp
 
     def get_link_json(self, h5path):
         """ Return parent_uuid and json description of link for given path """
@@ -271,7 +319,7 @@ class Group(HLObject, MutableMappingHDF5):
         if h5path[0] == '/':
             #abs path, start with root
             # get root_uuid
-            parent_uuid = self.id.http_conn.root_uuid   
+            parent_uuid = self.id.http_conn.root_uuid
             # make a fake tgt_json to represent 'link' to root group
             tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid }
             if h5path == '/':
@@ -282,9 +330,9 @@ class Group(HLObject, MutableMappingHDF5):
                 # link belonging to this group, see if it's in the cache
                 tgt_json = self._link_db[h5path]
                 parent_uuid = self.id.id
-                 
+
                 return parent_uuid, tgt_json
-                
+
 
         path = h5path.split('/')
 
@@ -293,7 +341,7 @@ class Group(HLObject, MutableMappingHDF5):
                 continue
 
             if not parent_uuid:
-                raise KeyError("Unable to open object (Component not found)") 
+                raise KeyError("Unable to open object (Component not found)")
 
             req = "/groups/" + parent_uuid + "/links/" + name
 
@@ -351,10 +399,16 @@ class Group(HLObject, MutableMappingHDF5):
             elif collection_type == 'datasets' or uuid.startswith("d-"):
                 req = "/datasets/" + uuid
                 dataset_json = self.GET(req)
-                tgt = Dataset(DatasetID(self, dataset_json))
+                # create a Table if the daset is one dimensional and compound
+                shape_json = dataset_json["shape"]
+                dtype_json = dataset_json["type"]
+                if "dims" in shape_json and len(shape_json["dims"]) == 1 and dtype_json["class"] == 'H5T_COMPOUND':
+                    tgt = Table(DatasetID(self, dataset_json))
+                else:
+                    tgt = Dataset(DatasetID(self, dataset_json))
             else:
                 raise IOError("Unexpected Error - collection type: " + link_json['collection'])
-            
+
             return tgt
 
         def isUUID(name):
@@ -362,11 +416,11 @@ class Group(HLObject, MutableMappingHDF5):
             # There are some additional checks we could add to reduce false positives
             # (like checking for hyphens in the right places)
             if isinstance(name, six.string_types) and len(name) >= 38:
-                if name.startswith("groups/"):
+                if name.startswith("groups/") or name.startswith("g-"):
                     return True
-                elif name.startswith("datatypes/"):
+                elif name.startswith("datatypes/") or name.startswith("t-"):
                     return True
-                elif name.startswith("datasets/"):
+                elif name.startswith("datasets/") or name.startswith("d-"):
                     return True
                 else:
                     return False
@@ -375,7 +429,7 @@ class Group(HLObject, MutableMappingHDF5):
 
 
         tgt = None
-        if isinstance(name, h5type.Reference): 
+        if isinstance(name, h5type.Reference):
             tgt = name.objref()  # weak reference to ref object
             if tgt is not None:
                 return tgt  # ref'd object has not been deleted
@@ -464,47 +518,46 @@ class Group(HLObject, MutableMappingHDF5):
         ...     print '"foo" is a soft link!'
         """
 
-        with phil:
-            if not (getclass or getlink):
-                try:
-                    return self[name]
-                except KeyError:
-                    return default
-
-            if not name in self:
+        if not (getclass or getlink):
+            try:
+                return self[name]
+            except KeyError:
                 return default
 
-            elif getclass and not getlink:
-                obj = self.__getitem__(name)
-                if obj is None:
-                    return None
-                if obj.id.__class__ is GroupID:
-                    return Group
-                elif obj.id.__class__ is DatasetID:
-                    return Dataset
-                elif obj.id.__class__ is TypeID:
-                    return Datatype
-                else:
-                    raise TypeError("Unknown object type")
+        if not name in self:
+            return default
 
-            elif getlink:
-                parent_uuid, link_json = self.get_link_json(name)
-                typecode = link_json['class']
+        elif getclass and not getlink:
+            obj = self.__getitem__(name)
+            if obj is None:
+                return None
+            if obj.id.__class__ is GroupID:
+                return Group
+            elif obj.id.__class__ is DatasetID:
+                return Dataset
+            elif obj.id.__class__ is TypeID:
+                return Datatype
+            else:
+                raise TypeError("Unknown object type")
 
-                if typecode == 'H5L_TYPE_SOFT':
-                    if getclass:
-                        return SoftLink
+        elif getlink:
+            parent_uuid, link_json = self.get_link_json(name)
+            typecode = link_json['class']
 
-                    return SoftLink(link_json['h5path'])
-                elif typecode == 'H5L_TYPE_EXTERNAL':
-                    if getclass:
-                        return ExternalLink
+            if typecode == 'H5L_TYPE_SOFT':
+                if getclass:
+                    return SoftLink
 
-                    return ExternalLink(link_json['h5domain'], link_json['h5path'])
-                elif typecode == 'H5L_TYPE_HARD':
-                    return HardLink if getclass else HardLink()
-                else:
-                    raise TypeError("Unknown link type")
+                return SoftLink(link_json['h5path'])
+            elif typecode == 'H5L_TYPE_EXTERNAL':
+                if getclass:
+                    return ExternalLink
+
+                return ExternalLink(link_json['h5domain'], link_json['h5path'])
+            elif typecode == 'H5L_TYPE_HARD':
+                return HardLink if getclass else HardLink()
+            else:
+                raise TypeError("Unknown link type")
 
     def __setitem__(self, name, obj):
         """ Add an object to the group.  The name must not already be in use.
@@ -543,9 +596,9 @@ class Group(HLObject, MutableMappingHDF5):
             parent_uuid = link_json["id"]
             req = "/groups/" + parent_uuid
             group_json = self.GET(req)
-            tgt = Group(GroupID(self, group_json)) 
-            tgt[basename] = obj   
-             
+            tgt = Group(GroupID(self, group_json))
+            tgt[basename] = obj
+
         elif isinstance(obj, HLObject):
             body = {'id': obj.id.uuid }
             req = "/groups/" + self.id.uuid + "/links/" + name
@@ -754,7 +807,7 @@ class Group(HLObject, MutableMappingHDF5):
         >>> list_of_names = []
         >>> f.visit(list_of_names.append)
         """
-        self.visititems(func)
+        return self.visititems(func)
         """
         with phil:
             def proxy(name):
@@ -790,6 +843,7 @@ class Group(HLObject, MutableMappingHDF5):
         visited[self.id.uuid] = True
         tovisit = collections.OrderedDict()
         tovisit[self.id.uuid] = self
+        retval = None
 
         if six.PY3:
             nargs = func.__code__.co_argcount
@@ -837,7 +891,8 @@ class Group(HLObject, MutableMappingHDF5):
                         if retval is not None:
                             # caller indicates to end iteration
                             break
-
+        
+        return retval
         """
         with phil:
             def proxy(name):

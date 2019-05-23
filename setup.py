@@ -5,7 +5,7 @@ from setuptools import setup
 #   setup.py develop
 # To use a consistent encoding
 # To upload to PyPI:
-# python setup.py register sdist upload
+# twine upload dist/*
 #
 # Tag the release in github!
 #
@@ -19,7 +19,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='h5pyd',
-      version='0.2.8',
+      version='0.4.0',
       description='h5py compatible client lib for HDF REST API',
       long_description=long_description,
       url='http://github.com/HDFGroup/h5pyd',
@@ -40,6 +40,11 @@ setup(name='h5pyd',
            'hsrm = h5pyd._apps.hsdel:main',
            'hsget = h5pyd._apps.hsget:main',
            'hsload = h5pyd._apps.hsload:main',
-           'hsconfigure = h5pyd._apps.hsconfigure:main']
+           'hsconfigure = h5pyd._apps.hsconfigure:main',
+           'hscopy = h5pyd._apps.hscopy:main',
+           'hscp = h5pyd._apps.hscopy:main',
+           'hsmv = h5pyd._apps.hsmv:main',
+           'hsdiff = h5pyd._apps.hsdiff:main'
+           ]
       },
 )  
