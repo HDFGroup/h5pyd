@@ -37,7 +37,9 @@ class File(Group):
         # hdf5 complains that a file identifier is an invalid location for an
         # attribute. Instead of self, pass the root group to AttributeManager:
         from . import attrs
-        return attrs.AttributeManager(self['/'])
+        #parent_obj = {"id": self.id.uuid}
+        #return attrs.AttributeManager(self['/'])
+        return attrs.AttributeManager(self)
 
     @property
     def filename(self):
@@ -89,7 +91,7 @@ class File(Group):
         return self._limits
 
     def __init__(self, domain, mode=None, endpoint=None, username=None, password=None,
-        api_key=None, use_session=True, use_cache=False, logger=None, owner=None, linked_domain=None, retries=3, **kwds):
+        api_key=None, use_session=True, use_cache=True, logger=None, owner=None, linked_domain=None, retries=3, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -103,7 +105,6 @@ class File(Group):
         linked_domain
             Create new domain using the root of the linked domain
         """
-    
 
         groupid = None
         # if we're passed a GroupId as domain, just initialize the file object
@@ -181,8 +182,12 @@ class File(Group):
 
             # try to do a GET from the domain
             req = "/"
+            params = {}
+            if use_cache and mode == 'r':
+                params["getobjs"] = "T"
+                params["include_attrs"] = "T"
 
-            rsp = http_conn.GET(req)
+            rsp = http_conn.GET(req, params=params)
 
             if rsp.status_code == 200:
                 root_json = json.loads(rsp.text)
@@ -257,15 +262,24 @@ class File(Group):
             if mode in ('w', 'w-', 'x', 'a'):
                 http_conn._mode = 'r+'
 
-            # get the group json for the root group
-            req = "/groups/" + root_uuid
+            group_json = None
+            # do we already have the group_json?
+            if "domain_objs" in root_json and mode == 'r':
+                objdb = root_json["domain_objs"]
+                http_conn._objdb = objdb
+                if root_uuid in objdb:
+                    group_json = objdb[root_uuid]
 
-            rsp = http_conn.GET(req)
+            if not group_json:
+                # get the group json for the root group
+                req = "/groups/" + root_uuid
 
-            if rsp.status_code != 200:
-                http_conn.close()
-                raise IOError(rsp.status_code, "Unexpected Error")
-            group_json = json.loads(rsp.text)
+                rsp = http_conn.GET(req)
+
+                if rsp.status_code != 200:
+                    http_conn.close()
+                    raise IOError(rsp.status_code, "Unexpected Error")
+                group_json = json.loads(rsp.text)
 
             groupid = GroupID(None, group_json, http_conn=http_conn)
         # end else

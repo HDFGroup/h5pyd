@@ -44,6 +44,128 @@ class Group(HLObject, MutableMappingHDF5):
         self._req_prefix = "/groups/" + self.id.uuid
         self._link_db = {}  # cache for links
 
+    
+    def _get_link_json(self, h5path):
+        """ Return parent_uuid and json description of link for given path """
+        self.log.debug("__get_link_json({})".format(h5path))
+        parent_uuid = self.id.uuid
+        tgt_json = None
+        if isinstance(h5path, bytes):
+            h5path = h5path.decode('utf-8')
+        if h5path.find('/') == -1:
+            in_group = True   # link owned by this group
+        else:
+            in_group = False  # may belong to some other group
+
+
+        if h5path[0] == '/':
+            #abs path, start with root
+            # get root_uuid
+            parent_uuid = self.id.http_conn.root_uuid
+            # make a fake tgt_json to represent 'link' to root group
+            tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid }
+            if h5path == '/':
+                # asking for the root, just return the root link
+                return parent_uuid, tgt_json
+        else:
+            if in_group and h5path in self._link_db:
+                # link belonging to this group, see if it's in the cache
+                tgt_json = self._link_db[h5path]
+                parent_uuid = self.id.id
+
+                return parent_uuid, tgt_json
+
+
+        path = h5path.split('/')
+
+        objdb = self.id._http_conn.getObjDb()
+
+        if objdb:
+            # _objdb is meta-data pulled from the domain on open.
+            # see if we can extract the link json from there
+            self.log.debug("searching objdb for {}".format(h5path))
+            group_uuid = parent_uuid
+
+            for name in path:
+                if not name:
+                    continue
+                if group_uuid not in objdb:
+                    self.log.warn("objdb search: {} not found in objdb".format(group_uuid))
+                    tgt_json = None
+                    break
+                group_json = objdb[group_uuid]
+                group_links = group_json["links"]
+                if name not in group_links:
+                    self.log.debug("objdb search: {} not found".format(name))
+                    tgt_json = None
+                    break
+                tgt_json = group_links[name]
+                if tgt_json['class'] != 'H5L_TYPE_HARD':
+                    # use server side look ups for non-hardlink paths
+                    self.log.debug("objdb search: non-hardlink")
+                    tgt_json = None
+                    break
+                group_uuid = tgt_json["id"]
+
+            if tgt_json:
+                # mix in a "collection key for compatibilty wtth server GET links request"
+                if group_uuid.startswith("g-"):
+                    tgt_json['collection'] = "groups"
+                elif group_uuid.startswith("d-"):
+                    tgt_json['collection'] = "datasets"
+                elif group_uuid.startswith("t-"):
+                    tgt_json["collection"] = "datatypes"
+                else:
+                    self.log.warn("unexpected objid: {}".format(group_uuid))
+
+                return group_uuid, tgt_json
+            else:
+                 raise KeyError("Unable to open object (Component not found)")
+
+
+        for name in path:
+            if not name:
+                continue
+
+            if not parent_uuid:
+                raise KeyError("Unable to open object (Component not found)")
+
+            req = "/groups/" + parent_uuid + "/links/" + name
+
+            try:
+                rsp_json = self.GET(req)
+            except IOError:
+                raise KeyError("Unable to open object (Component not found)")
+
+            if "link" not in rsp_json:
+                raise IOError("Unexpected Error")
+            tgt_json = rsp_json['link']
+
+            if in_group:
+                # add to db to speed up future requests
+                self._link_db[name] = tgt_json
+
+            if tgt_json['class'] == 'H5L_TYPE_HARD':
+                if tgt_json['collection'] == 'groups':
+                    parent_uuid = tgt_json['id']
+                else:
+                    parent_uuid = None
+
+        return parent_uuid, tgt_json
+
+    def _get_objdb_links(self):
+        """ Return the links json from the objdb if present.
+        """
+        objdb = self.id.http_conn.getObjDb()
+        if not objdb:
+            return None
+        if self.id.id not in objdb:
+            self.log.warn("{} not found in objdb".format(self.id.id))
+            return None
+        group_json = objdb[self.id.id]
+        return group_json["links"]
+
+
     def create_group(self, h5path):
         """ Create and return a new subgroup.
 
@@ -65,7 +187,7 @@ class Group(HLObject, MutableMappingHDF5):
         title = op.basename(h5path)
 
         if parent_path:
-            parent_uuid, link_json = self.get_link_json(parent_path)
+            parent_uuid, link_json = self._get_link_json(parent_path)
             if link_json["class"] != 'H5L_TYPE_HARD':
                 # TBD: get the referenced object for softlink?
                 raise IOError("cannot create subgroup of softlink")
@@ -304,76 +426,20 @@ class Group(HLObject, MutableMappingHDF5):
             raise TypeError("Incompatible object (%s) already exists" % grp.__class__.__name__)
         return grp
 
-    def get_link_json(self, h5path):
-        """ Return parent_uuid and json description of link for given path """
-        parent_uuid = self.id.uuid
-        tgt_json = None
-        if isinstance(h5path, bytes):
-            h5path = h5path.decode('utf-8')
-        if h5path.find('/') == -1:
-            in_group = True   # link owned by this group
-        else:
-            in_group = False  # may belong to some other group
-
-
-        if h5path[0] == '/':
-            #abs path, start with root
-            # get root_uuid
-            parent_uuid = self.id.http_conn.root_uuid
-            # make a fake tgt_json to represent 'link' to root group
-            tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid }
-            if h5path == '/':
-                # asking for the root, just return the root link
-                return parent_uuid, tgt_json
-        else:
-            if in_group and h5path in self._link_db:
-                # link belonging to this group, see if it's in the cache
-                tgt_json = self._link_db[h5path]
-                parent_uuid = self.id.id
-
-                return parent_uuid, tgt_json
-
-
-        path = h5path.split('/')
-
-        for name in path:
-            if not name:
-                continue
-
-            if not parent_uuid:
-                raise KeyError("Unable to open object (Component not found)")
-
-            req = "/groups/" + parent_uuid + "/links/" + name
-
-            try:
-                rsp_json = self.GET(req)
-            except IOError:
-                raise KeyError("Unable to open object (Component not found)")
-
-            if "link" not in rsp_json:
-                raise IOError("Unexpected Error")
-            tgt_json = rsp_json['link']
-
-            if in_group:
-                # add to db to speed up future requests
-                self._link_db[name] = tgt_json
-
-            if tgt_json['class'] == 'H5L_TYPE_HARD':
-                if tgt_json['collection'] == 'groups':
-                    parent_uuid = tgt_json['id']
-                else:
-                    parent_uuid = None
-
-        return parent_uuid, tgt_json
 
     def __getitem__(self, name):
         """ Open an object in the file """
         # convert bytes to str for PY3
         if isinstance(name, bytes):
             name = name.decode('utf-8')
+        self.log.debug("group.__getitem__({})".format(name))
 
         def getObjByUuid(uuid, collection_type=None):
             """ Utility method to get an obj based on collection type and uuid """
+            self.log.debug("getObjByUuid({})".format(uuid))
+            collection_type = None
+            obj_json = None
+            # need to do somee hacky code for h5serv vs hsds compatibility
             # trim off any collection prefix from the input
             if uuid.startswith("groups/"):
                 uuid = uuid[len("groups/"):]
@@ -386,28 +452,43 @@ class Group(HLObject, MutableMappingHDF5):
             elif uuid.startswith("datatypes/"):
                 uuid = uuid[len("datatypes/"):]
                 if collection_type is None:
-                    collection_type = 'datasets'
-
-            if collection_type == 'groups' or uuid.startswith("g-"):
-                req = "/groups/" + uuid
-                group_json = self.GET(req)
-                tgt = Group(GroupID(self, group_json))
-            elif collection_type == 'datatypes' or uuid.startswith("t-"):
-                req = "/datatypes/" + uuid
-                datatype_json = self.GET(req)
-                tgt = Datatype(TypeID(self, datatype_json))
-            elif collection_type == 'datasets' or uuid.startswith("d-"):
-                req = "/datasets/" + uuid
-                dataset_json = self.GET(req)
-                # create a Table if the daset is one dimensional and compound
-                shape_json = dataset_json["shape"]
-                dtype_json = dataset_json["type"]
-                if "dims" in shape_json and len(shape_json["dims"]) == 1 and dtype_json["class"] == 'H5T_COMPOUND':
-                    tgt = Table(DatasetID(self, dataset_json))
+                    collection_type = 'datatypes'
+            if collection_type is None:
+                if uuid.startswith("g-"):
+                    collection_type = "groups"
+                elif uuid.startswith("t-"):
+                    collection_type = "datatypes"
+                elif uuid.startswith("d-"):
+                    collection_type = "datasets"
                 else:
-                    tgt = Dataset(DatasetID(self, dataset_json))
+                    raise IOError("Unexpected uuid: {}".format(uuid))
+            objdb = self.id.http_conn.getObjDb()
+            if objdb:
+                # we should be able to construct an object from objdb json
+                if uuid in objdb:
+                    obj_json = objdb[uuid]
+                else:
+                    raise IOError("expected to find {} in objdb".format(uuid))
             else:
-                raise IOError("Unexpected Error - collection type: " + link_json['collection'])
+                # will need to get JSON from server 
+                req = "/" + collection_type + "/" + uuid
+                # make server request
+                obj_json = self.GET(req)
+
+            if collection_type == 'groups':
+                tgt = Group(GroupID(self, obj_json))
+            elif collection_type == 'datatypes':
+                tgt = Datatype(TypeID(self, obj_json))
+            elif collection_type == 'datasets':
+                # create a Table if the daset is one dimensional and compound
+                shape_json = obj_json["shape"]
+                dtype_json = obj_json["type"]
+                if "dims" in shape_json and len(shape_json["dims"]) == 1 and dtype_json["class"] == 'H5T_COMPOUND':
+                    tgt = Table(DatasetID(self, obj_json))
+                else:
+                    tgt = Dataset(DatasetID(self, obj_json))
+            else:
+                raise IOError("Unexpecrted collection_type: {}".format(collection_type))
 
             return tgt
 
@@ -448,14 +529,14 @@ class Group(HLObject, MutableMappingHDF5):
             return tgt
 
 
-        parent_uuid, link_json = self.get_link_json(name)
+        parent_uuid, link_json = self._get_link_json(name)
         link_class = link_json['class']
 
         if link_class == 'H5L_TYPE_HARD':
             tgt = getObjByUuid(link_json['id'], collection_type=link_json['collection'])
         elif link_class == 'H5L_TYPE_SOFT':
             h5path = link_json['h5path']
-            soft_parent_uuid, soft_json = self.get_link_json(h5path)
+            soft_parent_uuid, soft_json = self._get_link_json(h5path)
             tgt = getObjByUuid(soft_json['id'], collection_type=soft_json['collection'])
 
         elif link_class == 'H5L_TYPE_EXTERNAL':
@@ -541,7 +622,7 @@ class Group(HLObject, MutableMappingHDF5):
                 raise TypeError("Unknown object type")
 
         elif getlink:
-            parent_uuid, link_json = self.get_link_json(name)
+            parent_uuid, link_json = self._get_link_json(name)
             typecode = link_json['class']
 
             if typecode == 'H5L_TYPE_SOFT':
@@ -588,7 +669,7 @@ class Group(HLObject, MutableMappingHDF5):
             basename = op.basename(name)
             if not basename:
                 raise KeyError("Group path can not end with '/'")
-            parent_uuid, link_json = self.get_link_json(parent_path)
+            parent_uuid, link_json = self._get_link_json(parent_path)
             if parent_uuid is None:
                 raise KeyError("group path: {} not found".format(parent_path))
             if link_json["class"] != 'H5L_TYPE_HARD':
@@ -650,39 +731,45 @@ class Group(HLObject, MutableMappingHDF5):
         if name.find('/') == -1 and name in self._link_db:
             # remove from link cache
             del self._link_db[name]
-        #self.id.unlink(self._e(name))
 
     def __len__(self):
         """ Number of members attached to this group """
+        links_json = self._get_objdb_links()
+        # we can avoid a server request and just count the links in the obj json
+        if links_json:
+            return len(links_json)
+
         req = "/groups/" + self.id.uuid
         rsp_json = self.GET(req)
         return rsp_json['linkCount']
-        #return self.id.get_num_objs()
 
     def __iter__(self):
         """ Iterate over member names """
-        req = "/groups/" + self.id.uuid + "/links"
-        rsp_json = self.GET(req)
-        links = rsp_json['links']
+        links = self. _get_objdb_links()
 
-        # reset the link cache
-        self._link_db = {}
-        for link in links:
-            name = link["title"]
-            self._link_db[name] = link
+        if links is None:
+            req = "/groups/" + self.id.uuid + "/links"
+            rsp_json = self.GET(req)
+            links = rsp_json['links']
 
-        for x in links:
-            yield x['title']
-        """
-        for x in self.id.__iter__():
-            yield self._d(x)
-        """
+            # reset the link cache
+            self._link_db = {}
+            for link in links:
+                name = link["title"]
+                self._link_db[name] = link
+
+            for x in links:
+                yield x['title']
+        else:
+            for name in links:
+                yield name
+       
 
     def __contains__(self, name):
         """ Test if a member name exists """
         found = False
         try:
-            self.get_link_json(name)
+            self._get_link_json(name)
             found = True
         except KeyError:
             pass  # not found

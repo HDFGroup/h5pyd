@@ -54,7 +54,7 @@ class HttpConn:
     TBD: Should refactor these to a common base class
     """
     def __init__(self, domain_name, endpoint=None, username=None, password=None,
-            api_key=None, mode='a', use_session=True, use_cache=False, logger=None, retries=3, **kwds):
+            api_key=None, mode='a', use_session=True, use_cache=True, logger=None, retries=3, **kwds):
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
@@ -62,13 +62,16 @@ class HttpConn:
         self._retries = retries
         if use_cache:
             self._cache = {}
+            self._objdb = {}
         else:
             self._cache = None
+            self._objdb = None
         self._logger = logger
         if logger is None:
             self.log = logging
         else:
             self.log = logging.getLogger(logger)
+        self.log.debug("HttpCon.init(omaion: {} use_session: {} use_cache: {} retries: {})".format(domain_name, use_session, use_cache, retries))
         if endpoint is None:
             if "HS_ENDPOINT" in os.environ:
                 endpoint = os.environ["HS_ENDPOINT"]
@@ -136,11 +139,21 @@ class HttpConn:
                 return False
         return True
 
+    def getObjDb(self):
+        return self._objdb
+
+
     def GET(self, req, format="json", params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         #if self._domain is None:
         #    raise IOError("no domain defined")
+
+        #print("GET: ", req)
+        #if self._objdb:
+        #    
+        #    raise IOError("test extra GET")
+        
         rsp = None
 
         if not headers:
@@ -152,12 +165,16 @@ class HttpConn:
             params["domain"] = self._domain
         if self._api_key:
             params["api_key"] = self._api_key
+        #print("GET: {} [{}]".format(req, params["domain"]))
 
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
 
         if self._cache is not None and format == "json" and params["domain"] == self._domain:
+
+            self.log.debug("httpcon - checking cache")
             if req in self._cache:
+                self.log.debug("httpcon - returning cache result")
                 rsp = self._cache[req]
                 return rsp
 
@@ -176,17 +193,30 @@ class HttpConn:
         if rsp.status_code == 200 and self._cache is not None:
             rsp_headers = rsp.headers
             content_length = 0
+            self.log.debug("conent_length: {}".format(content_length))
             if "Content-Length" in rsp_headers:
                 try:
                     content_length = int(rsp_headers['Content-Length'])
                 except ValueError:
                     content_length = MAX_CACHE_ITEM_SIZE + 1
+            content_type = None
+            if "Content-Type" in rsp_headers:
+                content_type = rsp_headers['Content-Type']
+            self.log.debug("content_type: {}".format(content_type))
 
-            if rsp_headers['Content-Type'] == 'application/json' and content_length < MAX_CACHE_ITEM_SIZE:
+
+            if content_type.startswith('application/json') and content_length < MAX_CACHE_ITEM_SIZE:
 
                 # add to our _cache
                 cache_rsp = CacheResponse(rsp)
+                self.log.debug("adding {} to cache".format(req))
                 self._cache[req] = cache_rsp
+
+            #if rsp.status_code == 200 and req == '/':  # and self._domain_json is None:
+            #    self._domain_json = json.loads(rsp.text)
+            #    self.log.info("got domain json: {}".format(self._domain_json))
+
+
         return rsp
 
     def PUT(self, req, body=None, format="json", params=None, headers=None):

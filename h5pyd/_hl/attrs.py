@@ -65,6 +65,17 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         else:
             # "unknown id"
             self._req_prefix = "<unknown>"
+        objdb = self._parent.id.http_conn.getObjDb()
+        if objdb:
+            # _objdb is meta-data pulled from the domain on open.
+            # see if we can extract the link json from there
+            objid = self._parent.id.uuid
+            if objid not in objdb:
+                raise IOError("Expected to find {} in objdb".format(objid))
+            obj_json = objdb[objid]
+            self._objdb_attributes = obj_json["attributes"]
+        else:
+            self._objdb_attributes = None
 
     def _bytesArrayToList(self, data):
         """
@@ -110,12 +121,19 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     def __getitem__(self, name):
         """ Read the value of an attribute.
         """
-        #attr = h5a.open(self._id, self._e(name))
-        req = self._req_prefix + name
-        try:
-            attr_json = self._parent.GET(req)
-        except IOError:
-            raise KeyError
+        if six.PY3 and isinstance(name, bytes):
+            name = name.decode("utf-8")
+        
+        if self._objdb_attributes is not None:
+            if name not in self._objdb_attributes:
+                raise KeyError
+            attr_json = self._objdb_attributes[name]
+        else:
+            req = self._req_prefix + name
+            try:
+                attr_json = self._parent.GET(req)
+            except IOError:
+                raise KeyError
 
         shape_json = attr_json['shape']
         type_json = attr_json['type']
@@ -315,31 +333,40 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     @with_phil
     def __len__(self):
         """ Number of attributes attached to the object. """
-        # I expect we will not have more than 2**32 attributes
-        req = self._req_prefix
-
-        # backup over the '/attributes/' part of the req
-        req = req[:-(len('/attributes/'))]
-        rsp = self._parent.GET(req)  # get parent obj
-        count = rsp['attributeCount']
+        
+        if self._objdb_attributes is not None:
+            count = len(self._objdb_attributes)
+        else:
+            # make a server requests
+            req = self._req_prefix
+            # backup over the '/attributes/' part of the req
+            req = req[:-(len('/attributes/'))]
+            rsp = self._parent.GET(req)  # get parent obj
+            count = rsp['attributeCount']
         # return h5a.get_num_attrs(self._id)
         return count
 
     def __iter__(self):
         """ Iterate over the names of attributes. """
-        req = self._req_prefix
-        # backup over the trailing slash in req
-        req = req[:-1]
-        rsp = self._parent.GET(req)
-        attributes = rsp['attributes']
-        with phil:
+        if self._objdb_attributes is not None:
 
+            for name in self._objdb_attributes:
+                yield name
+
+        else:       
+            # make server request
+            req = self._req_prefix
+            # backup over the trailing slash in req
+            req = req[:-1]
+            rsp = self._parent.GET(req)
+            attributes = rsp['attributes']
+        
             attrlist = []
             for attr in attributes:
                 attrlist.append(attr['name'])
 
-        for name in attrlist:
-            yield name
+            for name in attrlist:
+                yield name
 
     @with_phil
     def __contains__(self, name):
@@ -347,12 +374,17 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         exists = True
         if six.PY3 and isinstance(name, bytes):
             name = name.decode("utf-8")
-        req = self._req_prefix + name
-        try:
-            self._parent.GET(req)
-        except IOError:
-            #todo - verify this is a 404 response
-            exists = False
+
+        if self._objdb_attributes is not None:
+            exists = name in self._objdb_attributes
+        else:
+            # make server request
+            req = self._req_prefix + name
+            try:
+                self._parent.GET(req)
+            except IOError:
+                #todo - verify this is a 404 response
+                exists = False
         return exists
 
         #return h5a.exists(self._id, self._e(name))
