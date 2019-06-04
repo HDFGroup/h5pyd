@@ -437,7 +437,6 @@ class Group(HLObject, MutableMappingHDF5):
         def getObjByUuid(uuid, collection_type=None):
             """ Utility method to get an obj based on collection type and uuid """
             self.log.debug("getObjByUuid({})".format(uuid))
-            collection_type = None
             obj_json = None
             # need to do somee hacky code for h5serv vs hsds compatibility
             # trim off any collection prefix from the input
