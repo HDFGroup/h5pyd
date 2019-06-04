@@ -143,16 +143,15 @@ class HttpConn:
         return self._objdb
 
 
-    def GET(self, req, format="json", params=None, headers=None):
+    def GET(self, req, format="json", params=None, headers=None, use_cache=True):
         if self._endpoint is None:
             raise IOError("object not initialized")
         #if self._domain is None:
         #    raise IOError("no domain defined")
 
-        #print("GET: ", req)
-        #if self._objdb:
-        #    
-        #    raise IOError("test extra GET")
+        if self._objdb:
+            pass
+            #raise IOError("test extra GET")
         
         rsp = None
 
@@ -170,7 +169,7 @@ class HttpConn:
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
 
-        if self._cache is not None and format == "json" and params["domain"] == self._domain:
+        if self._cache is not None and use_cache and format == "json" and params["domain"] == self._domain:
 
             self.log.debug("httpcon - checking cache")
             if req in self._cache:
@@ -204,17 +203,15 @@ class HttpConn:
                 content_type = rsp_headers['Content-Type']
             self.log.debug("content_type: {}".format(content_type))
 
-
             if content_type.startswith('application/json') and content_length < MAX_CACHE_ITEM_SIZE:
-
                 # add to our _cache
                 cache_rsp = CacheResponse(rsp)
                 self.log.debug("adding {} to cache".format(req))
                 self._cache[req] = cache_rsp
 
-            #if rsp.status_code == 200 and req == '/':  # and self._domain_json is None:
-            #    self._domain_json = json.loads(rsp.text)
-            #    self.log.info("got domain json: {}".format(self._domain_json))
+            if rsp.status_code == 200 and req == '/':  # and self._domain_json is None:
+                self._domain_json = json.loads(rsp.text)
+                self.log.info("got domain json: {}".format(self._domain_json))
 
 
         return rsp
@@ -225,7 +222,7 @@ class HttpConn:
         if self._domain is None:
             raise IOError("no domain defined")
         if self._cache is not None:
-            # domain deletin, invalidate everything in cache
+            # update invalidate everything in cache
             self._cache = {}
         if params:
             self.log.info("PUT params: {}".format(params))
@@ -240,8 +237,6 @@ class HttpConn:
         # verify the file was open for modification
         if self._mode == 'r':
             raise IOError("Unable to create group (No write intent on file)")
-
-        req = self._endpoint + req
 
         # try to do a PUT to the domain
 
@@ -261,11 +256,15 @@ class HttpConn:
             auth = None
         try:
             s = self.session
-            rsp = s.put(req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
+            rsp = s.put(self._endpoint + req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))
             raise IOError("Connection Error")
+
+        if rsp.status_code == 201 and req == '/': 
+            self.log.info("clearning domain_json cache")
+            self._domain_json = None
 
         return rsp
 
@@ -275,6 +274,8 @@ class HttpConn:
         if self._domain is None:
             raise IOError("no domain defined")
         if self._cache is not None:
+            # invalidate cache for updates
+            # TBD: handle special case for point selection since that doesn't modify anything
             self._cache = {}
 
         if params is None:
@@ -293,7 +294,6 @@ class HttpConn:
             raise IOError("Unable perform request (No write intent on file)")
 
         # try to do a POST to the domain
-        req = self._endpoint + req
 
         if not headers:
             headers = self.getHeaders()
@@ -315,7 +315,7 @@ class HttpConn:
             auth = None
         try:
             s = self.session
-            rsp = s.post(req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
+            rsp = s.post(self._endpoint + req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
         except ConnectionError as ce:
             self.log.warn("connection error: ", ce)
             raise IOError(str(ce))
@@ -341,7 +341,6 @@ class HttpConn:
             raise IOError("Unable perform request (No write intent on file)")
 
         # try to do a DELETE of the resource
-        req = self._endpoint + req
 
         if not headers:
             headers = self.getHeaders()
@@ -353,11 +352,15 @@ class HttpConn:
             auth = None
         try:
             s = self.session
-            rsp = s.delete(req, headers=headers, params=params, auth=auth, verify=self.verifyCert())
+            rsp = s.delete(self._endpoint + req, headers=headers, params=params, auth=auth, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))
             raise IOError("Connection Error")
+
+        if rsp.status_code == 200 and req == '/': 
+            self.log.info("clearning domain_json cache")
+            self._domain_json = None
 
         return rsp
 

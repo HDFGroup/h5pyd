@@ -9,72 +9,59 @@
 # distribution tree.  If you do not have access to this file, you may        #
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
+import logging
+import config
+if config.get("use_h5py"):
+    import h5py
+else:
+    import h5pyd as h5py
+from common import ut, TestCase
 
-import h5pyd as h5py
+visit_names = []
+obj_ids = []
 
 def visit_item(name):
-    print("visit:", name)
+    visit_names.append(name)
     return None
 
-def find_g1_2(name):
-    print("visit:", name)
-    if name.endswith("g1.2"):
-        return True  # stop iteration
-
-
-def visit_item_obj(name, obj):
-    print("visit:", name, obj.id.id)
+def find_g1_1(name):
+    if name.endswith("g1.1"):
+        return "found g1.1"  # stop iteration
     return None
 
-print("version:", h5py.version.version)
 
-f = h5py.File("tall.test.hdfgroup.org", "r")
-
-# print("filename,", f.filename)
-print("name:", f.name)
-print("id:", f.id.id)
-
-g2 = f['g2']
-
-print("g2 uuid:", g2.id.id)
-print("g2 name:", g2.name)
-print("g2 num elements:", len(g2))
-print("g2: iter..")
-for x in g2:
-    print(x)
-
-print("xyz in g2", ('xyz' in g2))
-print("dset2.1 in g2", ('dset2.1' in g2))
-
-dset21 = g2['dset2.1']
-print("dset21 uuid:", dset21.id.id)
-print("dset21 name:", dset21.name)
-print("dset21 dims:", dset21.shape)
-print("dset21 type:", dset21.dtype)
-
-dset111 = f['/g1/g1.1/dset1.1.1']
-print("dset111 uuid:", dset111.id.id)
-print("dset111 name:", dset111.name)
-print("dset111 dims:", dset111.shape)
-print("dset111 type:", dset111.dtype)
-print("dset111 len:", len(dset111))
+class TestVisit(TestCase):
+    def test_visit(self):
+        filename = self.getFileName("test_visit")
+        print("filename:", filename)
+        
+        f = h5py.File(filename, 'w')
+        f.create_group("g1")
+        self.assertTrue("g1" in f)
+        f.create_group("g2")
+        self.assertTrue("g2" in f)
+        f.create_group("g1/g1.1")
+        self.assertTrue("g1/g1.1" in f)
+        f.create_dataset('g1/g1.1/dset', data=42, dtype='i4')
+        f["/g1/soft"] = h5py.SoftLink('/g2')
+        f.close()
+        
+        
+        # re-open as read-only
+        f = h5py.File(filename, 'r')
+        f.visit(visit_item)
+        self.assertEqual(len(visit_names), 4)
+        h5paths = ("g1", 'g2', "g1/g1.1", "g1/g1.1/dset")
+        for h5path in h5paths:
+            self.assertTrue(h5path in visit_names)
+        ret = f.visit(find_g1_1)
+        self.assertEqual(ret, "found g1.1")
+                
+        f.close()
 
 
-attr1 = dset111.attrs['attr1']
-print("attr1:", attr1)
-print("num attrs of dset1.1.1:", len(dset111.attrs))
-print("attr keys:", dset111.attrs.keys())
 
-for attr in dset111.attrs:
-    print("name:", attr)
-
-print("visit...")
-f.visit(visit_item)
-
-print("visititems...")
-f.visititems(visit_item_obj)
-
-print("search g1.2:")
-f.visit(find_g1_2)
-
-
+if __name__ == '__main__':
+    loglevel = logging.ERROR
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
+    ut.main()

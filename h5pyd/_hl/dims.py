@@ -12,6 +12,7 @@
 
 from __future__ import absolute_import
 import six
+import json
 from . import base
 from .base import phil, with_phil
 from .dataset import Dataset
@@ -21,16 +22,68 @@ from .objectid import DatasetID
 class DimensionProxy(base.CommonStateObject):
     '''Represents an HDF5 'dimension'.'''
 
+    def _getAttributeJson(self, attr_name, objid=None):
+        """ Helper function to get attribute json if present
+        """
+        if not objid:
+            objid = self._id.id
+        objdb = self._id.http_conn.getObjDb()
+        if objdb:
+            # objdb present, get JSON for this dataset    
+            if objid not in objdb:
+                msg = "Error: expected {} to be in objdb".format(objid)
+                raise IOError(msg)
+            dset_json = objdb[objid]
+            attrs_json = dset_json["attributes"]
+            if  attr_name not in attrs_json:
+                return None
+            return attrs_json[attr_name]
+        # no objdb
+        req = "/datasets/" + objid + "/attributes/" + attr_name
+        rsp = self._id.http_conn.GET(req)
+        if rsp.status_code == 200:
+            attr_json = json.loads(rsp.text)
+            return attr_json
+        else:
+            return None
+
+    def _getDatasetJson(self, objid):
+        """ Helper function to get dataset json by id
+        """
+        
+        objdb = self._id.http_conn.getObjDb()
+        if objdb:
+            # objdb present, get JSON for this dataset    
+            if objid not in objdb:
+                msg = "Error: expected {} to be in objdb".format(objid)
+                raise IOError(msg)
+            dset_json = objdb[objid]
+            return dset_json
+             
+        # no objdb, make server request
+        req = "/datasets/" + objid 
+        rsp = self._id.http_conn.GET(req)
+        if rsp.status_code == 200:
+            dset_json = json.loads(rsp.text)
+        return dset_json
+
     @property
     @with_phil
     def label(self):
-        ''' Get or set the dimension scale label '''
-        dset = Dataset(self._id)
-        try:
-            labels = dset.GET(dset.attrs._req_prefix + 'DIMENSION_LABELS')
-            return labels['value'][self._dimension]
-        except (IOError, IndexError):
+        ''' Get the dimension scale label '''
+        labels_json = self._getAttributeJson('DIMENSION_LABELS')
+         
+        if not labels_json:
             return ''
+        
+        label_values = labels_json["value"]
+
+        if self._dimension >= len(label_values):
+            # label get request out of range
+            return ''
+        
+        return label_values[self._dimension]
+        
 
     @label.setter
     @with_phil
@@ -78,42 +131,61 @@ class DimensionProxy(base.CommonStateObject):
             yield k
 
     @with_phil
-    def __len__(self):
-        dset = Dataset(self._id)
-        try:
-            dimlist = dset.GET(dset.attrs._req_prefix + 'DIMENSION_LIST')
-        except IOError:
+    def __len__(self):        
+        dimlist_json = self._getAttributeJson('DIMENSION_LIST')
+        if not dimlist_json:
             return 0
-        return len(dimlist['value'][self._dimension])
+        dimlist_values = dimlist_json['value']
+        if self._dimension >= len(dimlist_values):
+            # dimension scale len request out of range
+            return 0
+        return len(dimlist_values[self._dimension])
 
     @with_phil
     def __getitem__(self, item):
-        dset = Dataset(self._id)
-        with phil:
-            dimlist = dset.GET(dset.attrs._req_prefix + 'DIMENSION_LIST')
 
-            if isinstance(item, int):
-                dscale_req = dimlist['value'][self._dimension][item]
-                dscale_json = dset.GET('/' + dscale_req)
-                return Dataset(DatasetID(parent=None, item=dscale_json,
-                                         http_conn=self._id.http_conn))
-
+        dimlist_attr_json = self._getAttributeJson('DIMENSION_LIST')
+        dimlist_attr_values = []
+        if dimlist_attr_json:
+            dimlist_attr_values = dimlist_attr_json["value"]
+         
+        if self._dimension >= len(dimlist_attr_values):
+            # dimension scale len request out of range")
+            return None
+        dimlist_values = dimlist_attr_values[self._dimension]
+        dset_scale_id = None
+        if isinstance(item, int):
+            if item >= len(dimlist_values):
+                # no dimension scale
+                raise IndexError("No dimension scale found for index: {}".format(item))
+            ref_id = dimlist_values[item]
+            if ref_id and not ref_id.startswith("datasets/"):
+                msg = "unexpected ref_id: {}".format(ref_id)
+                raise IOError(msg)
             else:
-                # The assumtion here is that the item argument is the name of a
-                # dimension scale attached to this dimension.
-                item = str(item).encode('ascii')
+                dset_scale_id =  ref_id[len("datasets/"):]
+        else:
+            # Iterate through the dimension scales finding one with the
+            # correct name
+            for ref_id in dimlist_values:
+                if not ref_id:
+                    continue
+                if not ref_id.startswith("datasets/"):
+                    msg = "unexpected ref_id: {}".format(ref_id)
+                    raise IOError(msg)
+                    continue
+                dset_id =  ref_id[len("datasets/"):]
+                attr_json = self._getAttributeJson('NAME', objid=dset_id)
+                if attr_json["value"] == item:
+                    # found it!
+                    dset_scale_id = dset_id
+                    break
+        if not dset_scale_id:
+            raise KeyError('No dimension scale with name"{}" found'.format(item))
+        dscale_json = self._getDatasetJson(dset_scale_id)
+        dscale = Dataset(DatasetID(parent=None, item=dscale_json, http_conn=self._id.http_conn))
+        return dscale
 
-                # Iterate through the dimension scales finding one with the
-                # correct name
-                dscales = dimlist['value'][self._dimension]
-                for d in dscales:
-                    dscale_json = dset.GET('/' + d)
-                    dscale = Dataset(DatasetID(parent=None, item=dscale_json,
-                                               http_conn=self._id.http_conn))
-                    if dscale.attrs['NAME'] == item:
-                        return dscale
-                    raise KeyError('No dimension scale with name"{}" found'
-                                   .format(item))
 
     def attach_scale(self, dscale):
         ''' Attach a scale to this dimension.
@@ -275,18 +347,15 @@ class DimensionProxy(base.CommonStateObject):
         ''' Get a list of (name, Dataset) pairs with all scales on this
         dimension.
         '''
-        dset = Dataset(self._id)
-        with phil:
-            scales = []
-            try:
-                dimlist = dset.GET(dset.attrs._req_prefix + 'DIMENSION_LIST')
-            except IOError:
-                return scales
-            for d in dimlist['value'][self._dimension]:
-                dscale_json = dset.GET('/' + d)
-                dscale = Dataset(DatasetID(parent=None, item=dscale_json,
-                                           http_conn=self._id.http_conn))
-                scales.append((dscale.attrs['NAME'], dscale))
+        scales = []
+        num_scales = self.__len__()
+        for i in range(num_scales):
+            dscale = self.__getitem__(i)
+            name_attr_json = self._getAttributeJson('NAME', objid=dscale.id.id)
+            dscale_name = ''
+            if name_attr_json:
+                dscale_name = name_attr_json['value']
+            scales.append((dscale_name, dscale))
         return scales
 
     def keys(self):

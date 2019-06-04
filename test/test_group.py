@@ -10,6 +10,7 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 import config
+import logging
 if config.get("use_h5py"):
     import h5py
 else:
@@ -23,27 +24,6 @@ import six
 
 class TestGroup(TestCase):
 
-    def test_cache(self):
-        if config.get("use_h5py"):
-            return # use_cache not supported on h5py
-        # create main test file
-        filename = self.getFileName("create_group_cache")
-        print("filename:", filename)
-        
-        f = h5py.File(filename, 'w', use_cache=True)
-        self.assertTrue('/' in f)
-        r = f['/'] 
-        self.assertEqual(len(r), 0)
-        self.assertTrue(isinstance(r, h5py.Group))
-        self.assertTrue(r.name, '/')
-        self.assertEqual(len(r.attrs.keys()), 0)
-        self.assertFalse('g1' in r)
-         
-        g1 = r.create_group('g1')
-        self.assertEqual(len(r), 1)
-        file = g1.file
-        f.close()
-
     def test_create(self):
         # create main test file
         filename = self.getFileName("create_group")
@@ -54,6 +34,7 @@ class TestGroup(TestCase):
             is_hsds = True  # HSDS has different permission defaults
         self.assertTrue('/' in f)
         r = f['/'] 
+
         self.assertEqual(len(r), 0)
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertTrue(r.name, '/')
@@ -291,4 +272,6 @@ class TestGroup(TestCase):
         
 
 if __name__ == '__main__':
+    loglevel = logging.ERROR
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

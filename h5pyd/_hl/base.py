@@ -447,17 +447,6 @@ class ACL(object):
 
 class HLObject(CommonStateObject):
 
-    """
-        Base class for high-level interface objects.
-        self._name = name
-            self._id = root_json['root']
-            self._mode = mode
-            self._created = root_json['created']
-            self._modified = root_json['lastModified']
-            self._endpoint = endpoint
-
-    """
-
     @property
     def file(self):
         """ Return a File instance associated with this object """
@@ -476,6 +465,65 @@ class HLObject(CommonStateObject):
 
         return File(groupid)
 
+    def _getNameFromObjDb(self):
+        objdb = self._id._http_conn.getObjDb()
+        
+        if not objdb:
+            return None
+
+        root_uuid = self._id.http_conn.root_uuid
+        objid = self._id.uuid
+        self.log.debug("_getNameFromObjDb: find name for: {}".format(objid))
+        objids = set()
+        objids.add(objid)
+        h5path = ""
+        while not h5path.startswith("/"):
+            found_link = False
+            for id in objdb:
+                if id == objid:
+                    self.log.debug("_getNameFromObjDb - skipping id {} - obj cannot link to itself".format(id))
+                    continue
+                self.log.debug("_getNameFromObjDb - searching id: {}".format(id))
+                if not id.startswith("g-"):
+                    continue  # not a group, so no links
+                if id in objids:
+                    continue  # we've been here already
+                obj = objdb[id]
+                links = obj["links"]
+                for title in links:
+                    self.log.debug("_getNameFromObjDb - looking at linK: {}".format(title))
+                    link = links[title]
+                    if link["class"] != 'H5L_TYPE_HARD':
+                        self.log.debug("_getNameFromObjDb - skipping link type: {}".foramt(link['class']))
+                        continue
+                    if link["id"] == objid:
+                        # found a link to our target
+                        found_link = True
+                        if not h5path:
+                            h5path = title
+                        else:
+                            h5path = title + '/' + h5path
+                        self.log.debug("_getNameFromObjDb - update h5path: {}".format(h5path))
+                        objids.add(id)
+                        if id == root_uuid:
+                            h5path = '/' + h5path  # we got to root
+                            self.log.debug("_getNameFromObjDb - found root")
+                        else:
+                            objid = id
+                            self.log.debug("_getNameFromObjDb - now looking for link to: {}".format(objid))
+                        break
+            if not found_link:
+                self.log.info("_getNameFromObjDb - could not find link")
+                break
+        if h5path.startswith("/"):
+            # found path to obj
+            self.log.debug("_getNameFromObjDb - returning: {}".format(h5path))
+            return h5path
+        else:
+            self.log.debug("_getNameFromObjDb - could not find path")
+            return None
+                
+
     @property
     def name(self):
         """ Return the full name of this object.  None if anonymous. """
@@ -483,24 +531,28 @@ class HLObject(CommonStateObject):
             obj_name = self._name
         except AttributeError:
             # name hasn't been assigned yet
-            obj_name = None
-            # query the server for the name
-            req = None
-            if self._id.id.startswith("g-"):
-                req = "/groups/" + self._id.id
-            elif self._id.id.startswith("d-"):
-                req = "/datasets/" + self._id.id
-            elif self._id.id.startswith("t-"):
-                req = "/datatypes/" + self._id
-            if req:
-                params=params = {"getalias": 1}
-                self.log.info("sending get allias request for id: {}".format(self._id.id))
-                obj_json = self.GET(req, params)
-                if "alias" in obj_json:
-                    alias = obj_json["alias"]
-                    if len(alias) > 0:
-                        obj_name = alias[0]
-                        self._name = obj_name
+            obj_name = self._getNameFromObjDb() # pull from the objdb if present
+            if obj_name:
+                self._name = obj_name  # save this
+            if not obj_name:
+                # query the server for the name
+                self.log.debug("querying server for name to: {}".format(self._id.id))
+                req = None
+                if self._id.id.startswith("g-"):
+                    req = "/groups/" + self._id.id
+                elif self._id.id.startswith("d-"):
+                    req = "/datasets/" + self._id.id
+                elif self._id.id.startswith("t-"):
+                    req = "/datatypes/" + self._id
+                if req:
+                    params=params = {"getalias": 1}
+                    self.log.info("sending get alias request for id: {}".format(self._id.id))
+                    obj_json = self.GET(req, params, use_cache=False)
+                    if "alias" in obj_json:
+                        alias = obj_json["alias"]
+                        if len(alias) > 0:
+                            obj_name = alias[0]
+                            self._name = obj_name
 
 
         return obj_name
@@ -566,11 +618,11 @@ class HLObject(CommonStateObject):
         return True
 
 
-    def GET(self, req, params=None, format="json"):
+    def GET(self, req, params=None, use_cache=True, format="json"):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
 
-        rsp = self.id._http_conn.GET(req, params=params, format=format)
+        rsp = self.id._http_conn.GET(req, params=params, format=format, use_cache=use_cache)
         if rsp.status_code != 200:
             self.log.info("Got response: {}".format(rsp.status_code))
             raise IOError(rsp.status_code, rsp.reason)

@@ -745,7 +745,7 @@ class Group(HLObject, MutableMappingHDF5):
 
     def __iter__(self):
         """ Iterate over member names """
-        links = self. _get_objdb_links()
+        links = self._get_objdb_links()
 
         if links is None:
             req = "/groups/" + self.id.uuid + "/links"
@@ -940,18 +940,37 @@ class Group(HLObject, MutableMappingHDF5):
         while len(tovisit) > 0:
             (parent_uuid, parent) = tovisit.popitem(last=True)
             if parent.name != '/':
+                h5path = parent.name
+                if h5path[0] == '/':
+                    h5path = h5path[1:]
                 if nargs == 1:
-                    retval = func(parent.name)
+                    retval = func(h5path)
                 else:
-                    retval = func(parent.name, parent)
+                    retval = func(h5path, parent)
                 if retval is not None:
                     # caller indicates to end iteration
                     break
             visited[self.id.uuid] = True
             if parent.id.__class__ is GroupID:
-                req = "/groups/" + parent.id.uuid + "/links"
-                rsp_json = self.GET(req)
-                links = rsp_json['links']
+                # get group links
+                objdb = self.id._http_conn.getObjDb()
+                if objdb:
+                    # should be able to retrieve from cache obj
+                    if parent.id.uuid not in objdb:
+                        raise IOError("expected to find id {} in objdb".format(parent.id.uuid))
+                    group_json = objdb[parent.id.uuid]
+                    # make this look like the server respoonse
+                    links_json = group_json["links"]
+                    links = []
+                    for k in links_json:
+                        item = links_json[k]
+                        item['title'] = k
+                        links.append(item)
+                else: 
+                    # request from server
+                    req = "/groups/" + parent.id.uuid + "/links"
+                    rsp_json = self.GET(req)
+                    links = rsp_json['links']
                 for link in links:
                     obj = None
                     if link['class'] == 'H5L_TYPE_SOFT':
@@ -971,6 +990,9 @@ class Group(HLObject, MutableMappingHDF5):
                     if obj is not None:
                         # call user func directly for non-hardlinks
                         link_name = parent.name + '/' + link['title']
+                        if link_name[0] == '/':
+                            # don't include the first slash
+                            link_name = link_name[1:]
                         if nargs == 1:
                             retval = func(link_name)
                         else:

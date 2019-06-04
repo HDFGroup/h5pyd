@@ -12,7 +12,9 @@
 
 import numpy as np
 import six
+import logging
 import config
+
 
 if config.get("use_h5py"):
     import h5py
@@ -51,6 +53,9 @@ class TestAttribute(TestCase):
 
         # try replacing 'a1'
         g1.attrs['a1'] = 24
+
+        n = g1.attrs['a1']
+        self.assertEqual(n, 24)
 
         self.assertEqual(len(g1.attrs), 2)
         
@@ -121,15 +126,9 @@ class TestAttribute(TestCase):
 
         # close file
         f.close()
-
-
-
-
-         
+   
 
 if __name__ == '__main__':
+    loglevel = logging.ERROR
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()
-
-
-
-

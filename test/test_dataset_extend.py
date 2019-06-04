@@ -10,6 +10,7 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 
+import logging
 import numpy as np
 import math
 
@@ -66,4 +67,6 @@ class TestExtendDataset(TestCase):
 
 
 if __name__ == '__main__':
+    loglevel = logging.ERROR
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

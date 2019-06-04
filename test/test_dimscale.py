@@ -19,6 +19,7 @@ import logging
 
 if config.get("use_h5py"):
     import h5py
+    print("using h5py")
 else:
     import h5pyd as h5py
 
@@ -111,12 +112,8 @@ class TestDimensionScale(TestCase):
         for s in dset.dims[2].items():
             self.assertIsInstance(s, tuple)
             self.assertIsInstance(s[1], h5py.Dataset)
-            if config.get("use_h5py"):
-                self.assertIsInstance(s[0], six.string_types)
-                self.assertEqual(s[0], 'Simulation Z (Vertical) axis')
-            else:
-                self.assertIsInstance(s[0], six.binary_type)
-                self.assertEqual(s[0], b'Simulation Z (Vertical) axis')
+            self.assertIsInstance(s[0], six.string_types)
+            self.assertEqual(s[0], 'Simulation Z (Vertical) axis')
 
         self.assertIsInstance(dset.dims[0][0], h5py.Dataset)
         self.assertIsInstance(dset.dims[0]['Simulation X (North) axis'],
@@ -140,8 +137,33 @@ class TestDimensionScale(TestCase):
 
         f.close()
 
+        # try opening file in read mode
+        f = h5py.File(filename, 'r')
+        dset = f['/temperatures']
+        self.assertTrue(len(dset.dims), 3)
+        labels = ('x', 'y', 'z')
+        for i in range(3):
+            dimscale = dset.dims[i]
+            self.assertTrue(dimscale.label, labels[i])
+            if i == 1:
+                self.assertEqual(len(dimscale), 0)
+            else:
+                self.assertEqual(len(dimscale), 1)
+                scale = dimscale[0]
+                self.assertTrue(scale.name.endswith(labels[i]))
+                self.assertEqual(scale.shape, (10,))
+        for s in dset.dims[2].items():
+            self.assertIsInstance(s, tuple)
+            self.assertIsInstance(s[1], h5py.Dataset)
+            self.assertIsInstance(s[0], six.string_types)
+            self.assertEqual(s[0], 'Simulation Z (Vertical) axis')
+
+
+        f.close()
+
+
 
 if __name__ == '__main__':
-    loglevel = logging.WARN
+    loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

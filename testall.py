@@ -31,8 +31,8 @@ tests = ('test_attribute',
          'test_vlentype',
          'test_dimscale',
          'test_folder',
-         'test_complex_numbers'
-         # 'test_visit')
+         'test_complex_numbers',
+         'test_visit'
          )
 
 #
