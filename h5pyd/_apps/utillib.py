@@ -432,19 +432,33 @@ def create_dataset(dobj, ctx):
 
     try:
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
-        compression_filter = dobj.compression
-        compression_opts = dobj.compression_opts
-        if deflate is not None and compression_filter is None:
-            compression_filter = "gzip"
-            compression_opts = deflate
-            if ctx["verbose"]:
-                print("applying gzip filter with level: {}".format(deflate))
+        if len(dobj.shape) == 0:
+            # don't use compression/chunks for scalar datasets
+            compression_filter = None
+            compression_opts = None
+            chunks = None
+            shuffle=None
+            fletcher32 = None
+            maxshape = None
+            scaleoffset = None
+        else:
+            compression_filter = dobj.compression
+            compression_opts = dobj.compression_opts
+            if deflate is not None and compression_filter is None:
+                compression_filter = "gzip"
+                compression_opts = deflate
+                if ctx["verbose"]:
+                    print("applying gzip filter with level: {}".format(deflate))
+            shuffle=dobj.shuffle
+            fletcher32=dobj.fletcher32
+            maxshape=dobj.maxshape
+            scaleoffset = dobj.scaleoffset
 
         dset = fout.create_dataset( dobj.name, shape=dobj.shape, dtype=tgt_dtype, chunks=chunks, \
-                compression=compression_filter, shuffle=dobj.shuffle, \
-                fletcher32=dobj.fletcher32, maxshape=dobj.maxshape, \
+                compression=compression_filter, shuffle=shuffle, \
+                fletcher32=fletcher32, maxshape=maxshape, \
                 compression_opts=compression_opts, fillvalue=fillvalue, \
-                scaleoffset=dobj.scaleoffset)
+                scaleoffset=scaleoffset)
         msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))  
         logging.info(msg)
         if ctx["verbose"]:
