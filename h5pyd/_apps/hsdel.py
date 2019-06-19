@@ -17,7 +17,8 @@ def getFolder(domain, mode='r'):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
-    dir = h5py.Folder(domain, mode=mode, endpoint=endpoint, username=username, password=password)
+    bucket = cfg["hs_bucket"]
+    dir = h5py.Folder(domain, mode=mode, endpoint=endpoint, username=username, password=password, bucket=bucket)
     return dir
  
    
@@ -78,7 +79,7 @@ def deleteDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains".format(cfg["cmd"]))
+    print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] [--bucket <bucket_name>] domains".format(cfg["cmd"]))
     print("example: {} -e http://hsdshdflab.hdfgroup.org /hdfgroup/data/test/deleteme.h5".format(cfg["cmd"]))
     sys.exit()
 
@@ -111,6 +112,9 @@ def main():
             argn += 2
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = val
+            argn += 2
+        elif arg in ("-b", "--bucket"):
+            cfg["hs_bucket"] = val
             argn += 2
         elif arg in ("-v", "--verbose"):
             cfg["verbose"] = True

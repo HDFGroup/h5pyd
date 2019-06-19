@@ -237,8 +237,9 @@ def getFolder(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    bucket   = cfg["hs_bucket"]
     dir = h5py.Folder(domain, endpoint=endpoint, username=username,
-                      password=password)
+                      password=password, bucket=bucket)
     return dir
 
 
@@ -246,8 +247,9 @@ def getFile(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
     fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username,
-                   password=password, use_cache=True)
+                   password=password, bucket=bucket, use_cache=True)
     return fh
 
 
@@ -328,6 +330,7 @@ def printUsage():
     print("     --showattrs :: print attributes")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
+    print("     --bucket <bucket_name> :: Storage bucket")
     print("     -h | --help    :: This message.")
     sys.exit()
 
@@ -395,6 +398,9 @@ def main():
             argn += 2
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = val
+            argn += 2
+        elif arg in ("-b", "--bucket"):
+            cfg["hs_bucket"] = val
             argn += 2
         elif arg[0] == '-':
             printUsage()

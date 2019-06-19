@@ -66,7 +66,7 @@ class Folder():
         
 
     def __init__(self, domain_name, mode=None, endpoint=None, 
-        username=None, password=None, api_key=None, logger=None, owner=None, **kwds):
+        username=None, password=None, bucket=None, api_key=None, logger=None, owner=None, **kwds):
         """Create a new Folders object.
 
         domain_name
@@ -104,6 +104,9 @@ class Folder():
         if password is None and "hs_password" in cfg:
             password = cfg["hs_password"]
 
+        if bucket is None and "hs_bucket" in cfg:
+            bucket = cfg["hs_bucket"]
+
         if len(domain_name) <= 1:
             self._domain = None
         else:
@@ -117,7 +120,7 @@ class Folder():
                 api_key = cfg["hs_api_key"]
 
         self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, 
-            password=password, api_key=api_key, mode=mode, logger=logger)
+            password=password, bucket=bucket, api_key=api_key, mode=mode, logger=logger)
         self.log = self._http_conn.logging
 
         domain_json = None

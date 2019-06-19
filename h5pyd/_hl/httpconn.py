@@ -53,7 +53,7 @@ class HttpConn:
     Some utility methods based on equivalents in base class.
     TBD: Should refactor these to a common base class
     """
-    def __init__(self, domain_name, endpoint=None, username=None, password=None,
+    def __init__(self, domain_name, endpoint=None, username=None, password=None, bucket=None,
             api_key=None, mode='a', use_session=True, use_cache=True, logger=None, retries=3, **kwds):
         self._domain = domain_name
         self._mode = mode
@@ -100,6 +100,13 @@ class HttpConn:
             password = None
         self._password = password
 
+        if bucket is None:
+            if "HS_BUCKET" in os.environ:
+                bucket = os.environ["HS_BUCKET"]  
+            if isinstance(bucket, str) and (not bucket or bucket.upper() == "NONE"):
+                bucket = None      
+        self._bucket = bucket
+
         if api_key is None and "HS_API_KEY" in os.environ:
             api_key = os.environ["HS_API_KEY"]
         if isinstance(api_key, str) and (not api_key or api_key.upper() == "NONE"):
@@ -109,16 +116,13 @@ class HttpConn:
         self._s = None  # Sessions
 
 
-    def getHeaders(self, domain=None, username=None, password=None, headers=None):
+    def getHeaders(self, username=None, password=None, headers=None):
         if headers is None:
             headers = {}
-        if domain is None:
-            domain = self._domain
         if username is None:
             username = self._username
         if password is None:
             password = self._password
-        #headers['host'] = domain
         if username is not None and password is not None:
             auth_string = username + ':' + password
             auth_string = auth_string.encode('utf-8')
@@ -162,9 +166,11 @@ class HttpConn:
             params = {}
         if "domain" not in params:
             params["domain"] = self._domain
+        if "bucket" not in params and self._bucket:
+            params["bucket"] = self._bucket
         if self._api_key:
             params["api_key"] = self._api_key
-        #print("GET: {} [{}]".format(req, params["domain"]))
+        #print("GET: {} [{}] bucket: {}".format(req, params["domain"], self._bucket))
 
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
@@ -231,6 +237,8 @@ class HttpConn:
 
         if "domain" not in params:
             params["domain"] = self._domain
+        if "bucket" not in params and self._bucket:
+            params["bucket"] = self._bucket
         if self._api_key:
             params["api_key"] = self._api_key
          
@@ -282,6 +290,8 @@ class HttpConn:
             params = {}
         if "domain" not in params:
             params["domain"] = self._domain
+        if "bucket" not in params and self._bucket:
+            params["bucket"] = self._bucket
         if self._api_key:
             params["api_key"] = self._api_key
 
@@ -333,6 +343,8 @@ class HttpConn:
             params = {}
         if "domain" not in params:
             params["domain"] = self._domain
+        if "bucket" not in params and self._bucket:
+            params["bucket"] = self._bucket
         if self._api_key:
             params["api_key"] = self._api_key
 

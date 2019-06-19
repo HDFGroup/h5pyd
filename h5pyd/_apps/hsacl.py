@@ -57,6 +57,7 @@ def printUsage():
     print("     -p | --password <password> :: Password credential")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
+    print("     --bucket <bucket_name> :: Storage bucket")
     print("     -h | --help    :: This message.")
     print("Arguments:")
     print(" domain :: Domain or Folder to be updated")
@@ -135,6 +136,9 @@ def main():
         elif domain is None and arg in ("-p", "--password"):
             cfg["hs_password"] = val
             argn += 2
+        elif arg in ("-b", "--bucket"):
+            cfg["hs_bucket"] = val
+            argn += 2
         elif domain is None and arg[0] in ('-', '+'):
             print("No domain given")
             printUsage()
@@ -211,9 +215,9 @@ def main():
     # open the domain or folder
     try:
         if domain[-1] == '/':
-            f = h5pyd.Folder(domain, mode=mode, endpoint=cfg["hs_endpoint"], username=cfg["hs_username"], password=cfg["hs_password"])
+            f = h5pyd.Folder(domain, mode=mode, endpoint=cfg["hs_endpoint"], username=cfg["hs_username"], password=cfg["hs_password"], bucket=cfg["hs_bucket"])
         else:
-            f = h5pyd.File(domain, mode=mode, endpoint=cfg["hs_endpoint"], username=cfg["hs_username"], password=cfg["hs_password"])
+            f = h5pyd.File(domain, mode=mode, endpoint=cfg["hs_endpoint"], username=cfg["hs_username"], password=cfg["hs_password"], bucket=cfg["hs_bucket"])
     except IOError as ioe:
         if ioe.errno in (404, 410):
             print("domain not found")

@@ -54,6 +54,7 @@ def usage():
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
+    print("     --bucket <bucket_name> :: Storage bucket")
     print("     -h | --help    :: This message.")
     print("")
 #end print_usage
@@ -72,8 +73,9 @@ def getFolder(domain, mode="r"):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
     dir = h5pyd.Folder(domain, endpoint=endpoint, username=username,
-                      password=password, mode=mode)
+                      password=password, bucket=bucket, mode=mode)
     return dir
 
 
@@ -81,8 +83,9 @@ def getFile(domain, mode="r"):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
     fh = h5pyd.File(domain, mode='r', endpoint=endpoint, username=username,
-                   password=password, use_cache=True)
+                   password=password, bucket=bucket, use_cache=True)
     return fh
 
 def createFile(domain, linked_domain=None):
@@ -90,10 +93,11 @@ def createFile(domain, linked_domain=None):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
     owner = None
     if "hs_owner" in cfg:
         owner=cfg["hs_owner"]
-    fh = h5pyd.File(domain, mode='x', endpoint=endpoint, username=username, password=password, owner=owner, linked_domain=linked_domain)
+    fh = h5pyd.File(domain, mode='x', endpoint=endpoint, username=username, password=password, bucket=bucket, owner=owner, linked_domain=linked_domain)
     return fh
 
  
@@ -192,6 +196,9 @@ def main():
             argn += 2
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = val
+            argn += 2
+        elif arg in ("-b", "--bucket"):
+            cfg["hs_bucket"] = val
             argn += 2
         elif arg == '--cnf-eg':
             print_config_example()

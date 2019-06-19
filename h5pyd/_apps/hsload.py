@@ -98,6 +98,8 @@ def usage():
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
+
+    print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not upload dataset data")
     print("     --s3path :: S3Path that holds a copy of sourcefile")
     print("     --storeinfo :: JSON file containing output of store_info utilitity")
@@ -186,6 +188,9 @@ def main():
             argn += 2
         elif arg == '--logfile':
             logfname = val
+            argn += 2
+        elif arg in ("-b", "--bucket"):
+            cfg["hs_bucket"] = val
             argn += 2
         elif arg == '-4':
             ipvfam = 4
@@ -276,6 +281,7 @@ def main():
                 # folder destination
                 tgt = tgt + op.basename(src_file)
 
+           
             # get a handle to input file
             try:
                 fin = h5py.File(src_file, mode='r')
@@ -288,7 +294,9 @@ def main():
                 username = cfg["hs_username"]
                 password = cfg["hs_password"]
                 endpoint = cfg["hs_endpoint"]
-                fout = h5pyd.File(tgt, 'x', endpoint=endpoint, username=username, password=password)
+                bucket = cfg["hs_bucket"]
+                
+                fout = h5pyd.File(tgt, 'x', endpoint=endpoint, username=username, password=password, bucket=bucket)
             except IOError as ioe:
                 if ioe.errno == 404:
                     logging.error("Domain: {} not found".format(tgt))

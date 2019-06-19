@@ -48,6 +48,7 @@ def usage():
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
+    print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not download dataset data")
     print("     -4 :: Force ipv4 for any file staging (doesn\'t set hsds loading net)")
     print("     -6 :: Force ipv6 (see -4)")
@@ -79,6 +80,7 @@ def main():
     endpoint=cfg["hs_endpoint"]
     username=cfg["hs_username"]
     password=cfg["hs_password"]
+    bucket = cfg["hs_bucket"]
     logfname=None
     ipvfam=None
     
@@ -119,6 +121,9 @@ def main():
         elif arg == '--logfile':
             logfname = val
             argn += 2     
+        elif arg in ("-b", "--bucket"):
+            bucket = val
+            argn += 2
         elif arg == '-4':
             ipvfam = 4
         elif arg == '-6':
@@ -177,7 +182,7 @@ def main():
 
     # get a handle to input domain
     try:
-        fin = h5pyd.File(src_domain, mode='r', endpoint=endpoint, username=username, password=password, use_cache=True)
+        fin = h5pyd.File(src_domain, mode='r', endpoint=endpoint, username=username, password=password, bucket=bucket, use_cache=True)
     except IOError as ioe:
         if ioe.errno == 403:
             logging.error("No read access to domain: {}".format(src_domain))
@@ -197,7 +202,7 @@ def main():
         sys.exit(1)
 
     try: 
-        load_file(fin, fout, verbose=verbose, nodata=nodata)  
+        load_file(fin, fout)  
         msg = "Domain {} downloaded to file: {}".format(src_domain, des_file)
         logging.info(msg)
         if verbose:

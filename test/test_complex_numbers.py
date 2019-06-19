@@ -35,7 +35,6 @@ class TestComplexNumbers(TestCase):
         dt = np.dtype('complex64')
         with h5py.File(filename, 'w') as f:
             dset = f.create_dataset('complex', shape=(count,), dtype=dt)
-            print(dset.dtype)
             if not config.get('use_h5py'):
                 # only h5pyd is setting up field names?
                 self.assertEqual(dset.dtype.names, ('r', 'i'))

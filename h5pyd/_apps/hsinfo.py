@@ -21,17 +21,19 @@ cfg = Config()
 # Usage
 #
 def printUsage():
-    print("usage: {} [-h] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-c oonf_file] [-e endpoint] [-u username] [-p password]".format(cfg["cmd"]))
+    print("usage: {} [-h] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-c oonf_file] [-e endpoint] [-u username] [-p password] [-b bucket] [domain]".format(cfg["cmd"]))
     print("example: {} -e http://data.hdfgroup.org:7253".format(cfg["cmd"]))
     print("")
     print("Options:")
     print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
+    print("     -b | --bucket <bucket> :: bucket name")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print("     -H | --human-readable :: with -v, print human readable sizes (e.g. 123M)")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
+    print("     --bucket <bucket_name> :: Storage bucket")
     print("     -h | --help    :: This message.")
     sys.exit()
 #
@@ -113,6 +115,7 @@ def getDomainInfo(domain, cfg):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
 
     if domain.endswith('/'):
         is_folder = True
@@ -124,10 +127,10 @@ def getDomainInfo(domain, cfg):
     try:
         if domain.endswith('/'):
             f = h5pyd.Folder(domain, mode='r', endpoint=endpoint, username=username,
-                   password=password, use_cache=True)
+                   password=password, bucket=bucket, use_cache=True)
         else:        
             f = h5pyd.File(domain, mode='r', endpoint=endpoint, username=username,
-                   password=password, use_cache=True)
+                   password=password, bucket=bucket, use_cache=True)
     except IOError as oe:
         if oe.errno in (404, 410):   # Not Found
             sys.exit("domain: {} not found".format(domain))
@@ -236,6 +239,9 @@ def main():
             argn += 2
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = val
+            argn += 2
+        elif arg in ("-b", "--bucket"):
+            cfg["hs_bucket"] = val
             argn += 2
         elif arg == "-H":
              cfg["human_readable"] = True

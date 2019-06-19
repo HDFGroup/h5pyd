@@ -301,10 +301,10 @@ def diff_dataset(src, ctx):
             logging.debug(msg)
                   
             arr_src = src[s]
-            msg = "got src array {}".format(arr_src.shape})
+            msg = "got src array {}".format(arr_src.shape)
             logging.debug(msg)
             arr_tgt = tgt[s]
-            msg = "got src array {}".format(arr_src.shape})
+            msg = "got tgt array {}".format(arr_tgt.shape)
             logging.debug(msg)
 
             if hash(arr_src.tostring()) != hash(arr_tgt.tostring()):
@@ -378,12 +378,14 @@ def usage():
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
+    print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not compare dataset data")
     print("     --noattr :: Don not compare attributes")
     print("     --quiet :: Do not produce output")
     print("     -h | --help    :: This message.")
     print("")
 #end print_usage
+
 
 #----------------------------------------------------------------------------------
 def print_config_example():
@@ -450,6 +452,9 @@ def main():
         elif arg == '--logfile':
             logfname = val
             argn += 2
+        elif arg in ("-b", "--bucket"):
+            cfg["hs_bucket"] = val
+            argn += 2
         elif arg in ("-h", "--help"):
             usage()
             sys.exit(0)
@@ -502,7 +507,7 @@ def main():
     logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
 
     try:
-
+        
         # get a handle to input file
         try:
             fin = h5py.File(file_path, mode='r')
@@ -515,7 +520,8 @@ def main():
             username = cfg["hs_username"]
             password = cfg["hs_password"]
             endpoint = cfg["hs_endpoint"]
-            fout = h5pyd.File(domain_path, 'r', endpoint=endpoint, username=username, password=password)
+            bucket = cfg["hs_bucket"]
+            fout = h5pyd.File(domain_path, 'r', endpoint=endpoint, username=username, password=password, bucket=bucket)
         except IOError as ioe:
             if ioe.errno == 404:
                 logging.error("domain: {} not found".format(domain_path))

@@ -90,7 +90,7 @@ class File(Group):
     def limits(self):
         return self._limits
 
-    def __init__(self, domain, mode=None, endpoint=None, username=None, password=None,
+    def __init__(self, domain, mode=None, endpoint=None, username=None, password=None, bucket=None,
         api_key=None, use_session=True, use_cache=True, logger=None, owner=None, linked_domain=None, retries=3, **kwds):
         """Create a new file object.
 
@@ -146,7 +146,6 @@ class File(Group):
                     else:  # hdf5://
                         domain = domain[(len(protocol)-1):]
                         
-
             if domain.find('/') > 0:
                 raise IOError(400, "relative paths or not valid")
 
@@ -167,6 +166,12 @@ class File(Group):
                     password = os.environ["H5SERV_PASSWORD"]
                 elif "hs_password" in cfg:
                     password = cfg["hs_password"]
+            
+            if bucket is None:
+                if "HS_BUCKET" in os.environ:
+                    bucket = os.environ["HS_BUCKET"]
+                elif "hs_bucket" in cfg:
+                    bucket = cfg["hs_bucket"]
 
             if api_key is None:
                 if "HS_API_KEY" in os.environ:
@@ -175,7 +180,7 @@ class File(Group):
                     api_key = cfg["hs_api_key"]
 
             http_conn =  HttpConn(domain, endpoint=endpoint,
-                    username=username, password=password, mode=mode,
+                    username=username, password=password, bucket=bucket, mode=mode,
                     api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger, retries=retries)
 
             root_json = None
@@ -186,6 +191,9 @@ class File(Group):
             if use_cache and mode == 'r':
                 params["getobjs"] = "T"
                 params["include_attrs"] = "T"
+            if bucket:
+                params["bucket"] = bucket
+            
 
             rsp = http_conn.GET(req, params=params)
 
@@ -201,7 +209,7 @@ class File(Group):
                 raise IOError(409, "domain already exists")
             if rsp.status_code == 200 and mode == 'w':
                 # delete existing domain
-                rsp = http_conn.DELETE(req)
+                rsp = http_conn.DELETE(req, params=params)
                 if rsp.status_code != 200:
                     # failed to delete
                     http_conn.close()

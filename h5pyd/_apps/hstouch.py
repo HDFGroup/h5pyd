@@ -17,27 +17,30 @@ def getFolder(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
     #print("getFolder", domain)
-    dir = h5py.Folder(domain, endpoint=endpoint, username=username, password=password)
+    dir = h5py.Folder(domain, endpoint=endpoint, username=username, password=password, bucket=bucket)
     return dir
 
 def createFolder(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
     #print("getFolder", domain)
     owner = None
     if "hs_owner" in cfg:
         owner=cfg["hs_owner"]
-    dir = h5py.Folder(domain, mode='x', endpoint=endpoint, username=username, password=password, owner=owner)
+    dir = h5py.Folder(domain, mode='x', endpoint=endpoint, username=username, password=password, bucket=bucket, owner=owner)
     return dir
 
 def getFile(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
     #print("getFile", domain)
-    fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username, password=password)
+    fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username, password=password, bucket=bucket)
     return fh
 
 def createFile(domain):
@@ -45,10 +48,11 @@ def createFile(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
     owner = None
     if "hs_owner" in cfg:
         owner=cfg["hs_owner"]
-    fh = h5py.File(domain, mode='x', endpoint=endpoint, username=username, password=password, owner=owner)
+    fh = h5py.File(domain, mode='x', endpoint=endpoint, username=username, password=password, bucket=bucket, owner=owner)
     return fh
 
 
@@ -133,7 +137,7 @@ def touchDomain(domain):
 # Usage
 #
 def printUsage():
-    print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [-o owner] [--loglevel debug|info|warning|error] [--logfile <logfile>] domains".format(cfg["cmd"]))
+    print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [-o owner] [--loglevel debug|info|warning|error] [--logfile <logfile>] [--bucket <bucket_name>] domains".format(cfg["cmd"]))
     print("example: {} -e  http://hsdshdflab.hdfgroup.org  /home/myfolder/emptydomain.h5".format(cfg["cmd"]))
     sys.exit()
 
@@ -182,6 +186,9 @@ def main():
             argn += 2
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = sys.argv[argn+1]
+            argn += 2
+        elif arg in ("-b", "--bucket"):
+            cfg["hs_bucket"] = val
             argn += 2
         elif arg in ("-o", "--owner"):
             cfg["hs_owner"] = sys.argv[argn+1]

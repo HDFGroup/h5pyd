@@ -55,6 +55,7 @@ def usage():
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
+    print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not upload dataset data")
     print("     -h | --help    :: This message.")
     print("")
@@ -129,6 +130,9 @@ def main():
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = val
             argn += 2
+        elif arg in ("-b", "--bucket"):
+            cfg["hs_bucket"] = val
+            argn += 2
         elif arg == '--cnf-eg':
             print_config_example()
             sys.exit(0)
@@ -184,20 +188,21 @@ def main():
     logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
 
     try:
-
+        username = cfg["hs_username"]
+        password = cfg["hs_password"]
+        endpoint = cfg["hs_endpoint"]
+        bucket = cfg["hs_bucket"]
         # get a handle to input file
         try:
-            fin = h5pyd.File(src_domain, mode='r')
+            fin = h5pyd.File(src_domain, mode='r', endpoint=endpoint, username=username, password=password, bucket=bucket)
         except IOError as ioe:
             logging.error("Error opening file {}: {}".format(src_domain, ioe))
             sys.exit(1)
 
         # create the output domain
         try:
-            username = cfg["hs_username"]
-            password = cfg["hs_password"]
-            endpoint = cfg["hs_endpoint"]
-            fout = h5pyd.File(des_domain, 'x', endpoint=endpoint, username=username, password=password)
+            
+            fout = h5pyd.File(des_domain, 'x', endpoint=endpoint, username=username, password=password, bucket=bucket)
         except IOError as ioe:
             if ioe.errno == 403:
                 logging.error("No write access to domain: {}".format(des_domain))
