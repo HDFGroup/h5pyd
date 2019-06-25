@@ -366,7 +366,7 @@ def create_dataset(dobj, ctx):
             chunks["size"] = byteStream["size"]
             logging.info("using chunk layout: {}".format(chunks))
             
-        elif num_chunks < 1000:
+        elif num_chunks < 10:
             # construct map of chunks
             chunk_map = {}
             for item in byteStreams:
