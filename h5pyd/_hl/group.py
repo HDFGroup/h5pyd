@@ -178,38 +178,73 @@ class Group(HLObject, MutableMappingHDF5):
         if h5path[-1] == '/':
             raise ValueError("Invalid path for create_group")
 
-        parent_uuid = self.id.id
+      
         if h5path[0] == '/':
             # absolute path
             parent_uuid = self.file.id.id   # uuid of root group
+            parent_name = "/"
+        else:
+            parent_uuid = self.id.id
+            parent_name = self._name
 
-        parent_path = op.dirname(h5path)
-        title = op.basename(h5path)
-
-        if parent_path:
-            parent_uuid, link_json = self._get_link_json(parent_path)
-            if link_json["class"] != 'H5L_TYPE_HARD':
-                # TBD: get the referenced object for softlink?
-                raise IOError("cannot create subgroup of softlink")
-            parent_uuid = link_json["id"]
+        self.log.info("create_group: {}".format(h5path))
 
 
-        body = {'link': { 'id': parent_uuid,
-                          'name': title
-               } }
+        links = h5path.split('/')
+        sub_group = None  # the object we'll return
+        for link in links:
+            if not link:
+                continue  # skip 
+            self.log.debug("create_group - iterate for link: {}".format(link))
+            create_group = False
+            req = "/groups/" + parent_uuid + "/links/" + link
+            
+            try:
+                rsp_json = self.GET(req)
+            except IOError as ioe:
+                self.log.debug("Got ioe: {}".format(ioe))
+                create_group = True
 
-        rsp = self.POST('/groups', body=body)
+            if create_group:
+                link_json = {'id': parent_uuid, 'name': link}
+                body = {'link':  link_json }
+                self.log.debug("create group with body: {}".format(body))
+                rsp = self.POST('/groups', body=body)
 
-        group_json = rsp
-        groupId = GroupID(self, group_json)
-
-        subGroup = Group(groupId)
-        if self._name:
-            if self._name[-1] == '/':
-                subGroup._name = self._name + title
+                group_json = rsp
+                groupId = GroupID(self, group_json)
+                sub_group = Group(groupId)
+                if parent_name:
+                    if parent_name[-1] == '/':
+                        parent_name = parent_name + link
+                    else:
+                        parent_name = parent_name + '/' + link
+                    self.log.debug("create group - parent name: {}".format(parent_name))
+                    sub_group._name = parent_name
+                parent_uuid = sub_group.id.id
             else:
-                subGroup._name = self._name + '/' + title
-        return subGroup
+                # sub-group already exsits
+                self.log.debug("create group - found subgroup: {}".format(link))
+                if "link" not in rsp_json:
+                    raise IOError("Unexpected Error")
+                link_json = rsp_json["link"]
+                if link_json["class"] != 'H5L_TYPE_HARD':
+                    # TBD: get the referenced object for softlink?
+                    raise IOError("cannot create subgroup of softlink")
+                parent_uuid = link_json["id"]
+                if parent_name:
+                    if parent_name[-1] == '/':
+                        parent_name = parent_name + link_json["title"]
+                    else:
+                        parent_name = parent_name + '/' + link_json["title"]
+                    self.log.debug("create group - parent name: {}".format(parent_name))
+
+
+        if sub_group is None:
+            # didn't actually create anything
+            raise ValueError("name already exists")
+        return sub_group
+                
 
     def create_dataset(self, name, shape=None, dtype=None, data=None, **kwds):
         """ Create a new HDF5 dataset

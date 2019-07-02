@@ -182,6 +182,34 @@ class TestGroup(TestCase):
          
         f.close()
 
+    def test_nested_create(self):
+        filename = self.getFileName("create_nested_group")
+        print("filename:", filename)
+        f = h5py.File(filename, 'w')
+        is_hsds = False
+        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+            is_hsds = True  # HSDS has different permission defaults
+        self.assertTrue('/' in f)
+        r = f['/'] 
+        self.assertEqual(len(r), 0)
+
+        # create multiple groups in a path
+        r.create_group("/g1/g1.1")
+        for link in r:
+            print(link)
+        self.assertEqual(len(r), 1)
+        self.assertTrue("g1" in r)
+        g1 = r["g1"]
+        self.assertTrue("g1.1" in g1)
+
+        # same think, but with relative path
+        g1.create_group("g1.2/g1.2.1/g1.2.1.1")
+        self.assertEqual(len(g1), 2)
+        self.assertTrue("g1.2" in g1)
+
+        f.close()
+
+
     def test_external_links(self):
         # create a file for use a link target
         if config.get("use_h5py"):
