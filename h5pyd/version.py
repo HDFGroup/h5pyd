@@ -30,8 +30,8 @@ version_tuple = (
     )
 )
 
-api_version_tuple = (0, 4, 2)
-api_version = "0.4.2"
+api_version_tuple = (0, 4, 3)
+api_version = "0.4.3"
 
 __doc__ = """\
 This is h5pyd **%s**
