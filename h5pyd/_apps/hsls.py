@@ -109,6 +109,8 @@ def dump(name, obj, visited=None):
             same_as = visited[obj_id]
             print("{0:24} {1}, same as {2}".format(name, class_name, same_as))
             return
+    else:
+        raise TypeError(f"unexpected classname: {class_name}")
 
     is_dataset = False
     if class_name in ("Dataset", "Table"):
@@ -463,7 +465,7 @@ def main():
                     if item.__class__.__name__ == "HardLink":
                         # follow hardlinks
                         try:
-                            item = grp.get(k)
+                            item = grp[k]
                         except IOError:
                             # object deleted?  Just dump link info
                             pass

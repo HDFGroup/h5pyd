@@ -100,23 +100,26 @@ class Group(HLObject, MutableMappingHDF5):
                     tgt_json = None
                     break
                 tgt_json = group_links[name]
+
                 if tgt_json['class'] != 'H5L_TYPE_HARD':
                     # use server side look ups for non-hardlink paths
+                    group_uuid = None
                     self.log.debug("objdb search: non-hardlink")
-                    tgt_json = None
-                    break
-                group_uuid = tgt_json["id"]
+                    #tgt_json = None
+                    #break
+                else:
+                    group_uuid = tgt_json["id"]
 
             if tgt_json:
-                # mix in a "collection key for compatibilty wtth server GET links request"
-                if group_uuid.startswith("g-"):
+                # mix in a "collection key for compatibilty wtth server GET links request
+                if group_uuid and group_uuid.startswith("g-"):
                     tgt_json['collection'] = "groups"
-                elif group_uuid.startswith("d-"):
+                elif group_uuid and group_uuid.startswith("d-"):
                     tgt_json['collection'] = "datasets"
-                elif group_uuid.startswith("t-"):
+                elif group_uuid and group_uuid.startswith("t-"):
                     tgt_json["collection"] = "datatypes"
                 else:
-                    self.log.warn("unexpected objid: {}".format(group_uuid))
+                    self.log.debug("no collection for non hardlink")
 
                 return group_uuid, tgt_json
             else:
@@ -777,6 +780,21 @@ class Group(HLObject, MutableMappingHDF5):
         rsp_json = self.GET(req)
         return rsp_json['linkCount']
 
+    def _get_links(self):
+        links = self._get_objdb_links()
+
+        if links is None:
+            req = "/groups/" + self.id.uuid + "/links"
+            rsp_json = self.GET(req)
+            links = rsp_json['links']
+
+            # reset the link cache
+            self._link_db = {}
+            for link in links:
+                name = link["title"]
+                self._link_db[name] = link
+        return links
+
     def __iter__(self):
         """ Iterate over member names """
         links = self._get_objdb_links()
@@ -803,11 +821,12 @@ class Group(HLObject, MutableMappingHDF5):
         """ Test if a member name exists """
         found = False
         try:
-            self._get_link_json(name)
+            link_json = self._get_link_json(name)
             found = True
         except KeyError:
             pass  # not found
         return found
+
 
     def copy(self, source, dest, name=None,
              shallow=False, expand_soft=False, expand_external=False,

@@ -21,7 +21,6 @@ from datetime import datetime
 import os.path
 import six
 
-
 class TestGroup(TestCase):
 
     def test_create(self):
@@ -108,6 +107,7 @@ class TestGroup(TestCase):
 
         # create a softlink
         r['mysoftlink'] = h5py.SoftLink('/g1/g1.1')
+        self.assertTrue("mysoftlink" in r)
         self.assertEqual(len(r), 5)
         self.assertEqual(len(g1), 1)
         self.assertEqual(len(g1_1), 0)
@@ -174,6 +174,9 @@ class TestGroup(TestCase):
         # try creating a link with a space in the name
         r["a space"] = g2
         self.assertEqual(len(r), 5) 
+
+        # re-create softlink
+        r['mysoftlink'] = h5py.SoftLink('/g1/g1.1')
          
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":
@@ -181,6 +184,26 @@ class TestGroup(TestCase):
             #self.assertEqual(g1.modified.tzname(), six.u('UTC'))
          
         f.close()
+
+        # re-open file in read-only mode
+        f = h5py.File(filename, 'r')
+        self.assertEqual(len(f), 6)
+        for name in ("g1", "g2", "g4", "g1.1", "a space", "mysoftlink"):
+            self.assertTrue(name in f)
+        self.assertTrue("/g1/g1.1" in f)
+        g1_1 = f["/g1/g1.1"]
+        linkee_class = r.get('mysoftlink', getclass=True)
+        self.assertEqual(linkee_class, h5py.Group)
+        link_class = r.get('mysoftlink', getclass=True, getlink=True)
+        self.assertEqual(link_class, h5py.SoftLink)
+        softlink = r.get('mysoftlink', getlink=True)
+        self.assertEqual(softlink.path, '/g1/g1.1')
+        linked_obj = f["mysoftlink"]
+        self.assertEqual(linked_obj.id, g1_1.id)
+        f.close()
+
+        
+
 
     def test_nested_create(self):
         filename = self.getFileName("create_nested_group")
@@ -195,8 +218,6 @@ class TestGroup(TestCase):
 
         # create multiple groups in a path
         r.create_group("/g1/g1.1")
-        for link in r:
-            print(link)
         self.assertEqual(len(r), 1)
         self.assertTrue("g1" in r)
         g1 = r["g1"]
