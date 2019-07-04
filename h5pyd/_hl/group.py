@@ -780,21 +780,6 @@ class Group(HLObject, MutableMappingHDF5):
         rsp_json = self.GET(req)
         return rsp_json['linkCount']
 
-    def _get_links(self):
-        links = self._get_objdb_links()
-
-        if links is None:
-            req = "/groups/" + self.id.uuid + "/links"
-            rsp_json = self.GET(req)
-            links = rsp_json['links']
-
-            # reset the link cache
-            self._link_db = {}
-            for link in links:
-                name = link["title"]
-                self._link_db[name] = link
-        return links
-
     def __iter__(self):
         """ Iterate over member names """
         links = self._get_objdb_links()
