@@ -165,7 +165,10 @@ class DatasetID(ObjectID):
 
     @property
     def dcpl_json(self):
-        dcpl = self._obj_json['creationProperties']
+        if 'creationProperties' in self._obj_json:
+            dcpl = self._obj_json['creationProperties']
+        else:
+            dcpl = {}
         return dcpl
 
     @property
