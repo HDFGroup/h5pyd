@@ -288,13 +288,32 @@ def visitDomains(domain, depth=1):
         print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
                                               dir_class, timestamp,
                                               display_name))
-
         count += 1
         if cfg["showacls"]:
             dumpAcls(dir)
-        if dir.is_folder:
-            for name in dir:
-                # recurse for items in folder
+        for name in dir:
+            item = dir[name]
+            owner = item["owner"]
+            full_path = domain + '/' + name
+           
+            num_bytes = " "
+            if cfg["verbose"] and "total_size" in item:
+                num_bytes = item["total_size"]
+            else:
+                 num_bytes = " "
+            dir_class = item["class"]
+            if item["lastModified"] is None:
+                timestamp = ""
+            else:
+                timestamp = datetime.fromtimestamp(int(item["lastModified"]))
+    
+            print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
+                                              dir_class, timestamp,
+                                              full_path))
+            count += 1
+
+            if dir_class == "folder":
+                # recurse for folders
                 n = visitDomains(domain + '/' + name, depth=(depth - 1))
                 count += n
 
@@ -343,7 +362,7 @@ def printUsage():
 def main():
     domains = []
     argn = 1
-    depth = 2
+    depth = 1
     loglevel = logging.ERROR
     logfname = None
     cfg["verbose"] = False
