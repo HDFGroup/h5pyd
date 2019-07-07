@@ -112,6 +112,7 @@ class Folder():
         else:
             self._domain = domain_name[:-1]
         self._subdomains = None
+        self._subdomain_marker = None
 
         if api_key is None:
             if "HS_API_KEY" in os.environ:
@@ -218,14 +219,21 @@ class Folder():
 
 
     def _getSubdomains(self):
+        BATCH_SIZE = 100
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
+        if self._subdomains is not None and not self._subdomain_marker:
+            # we've got all the subdomains, return 0 to indicate none were fetched
+            return 0
         req = '/domains'
         if self._domain is None:
             params = {"domain": '/'}
         else:
             params = {"domain": self._domain + '/'}
         params["verbose"] = 1  # to get lastModified
+        params["Limit"] = BATCH_SIZE  # get 100 at a time
+        if self._subdomain_marker:
+            params["Marker"] = self._subdomain_marker
         rsp = self._http_conn.GET(req, params=params)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
@@ -233,9 +241,18 @@ class Folder():
         if "domains" not in rsp_json:
             raise IOError(500, "Unexpected Error")
         domains = rsp_json["domains"]
-        #self.log.debug("domains: {}".format(domains))
-        
-        return domains
+        count = len(domains)
+        if self._subdomains is None:
+            # setting to an empty list signifies we've done at least one request
+            self._subdomains = []
+        # append to what we have
+        self._subdomains.extend(domains)
+        if len(domains) == BATCH_SIZE:
+            # save the marker for the next batch
+            self._subdomain_marker = domains[-1]["name"]
+        else:
+            self._subdomain_marker = None  # we got all the domains
+        return count
 
 
     def close(self):
@@ -250,11 +267,16 @@ class Folder():
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         if self._subdomains is None:
-            self._subdomains = self._getSubdomains()
-        domains = self._subdomains
-        for domain in domains:
-            if op.basename(domain["name"]) == name:
-                return domain
+            self._getSubdomains()
+        while True:
+            domains = self._subdomains
+            for domain in domains:
+                if op.basename(domain["name"]) == name:
+                    return domain
+            # see if we can fetch more domains
+            count = self._getSubdomains()
+            if count == 0:
+                break  
         return None
 
     def delete_item(self, name, keep_root=False):
@@ -273,27 +295,37 @@ class Folder():
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
         self._subdomains = None # reset the cache list
+        self._subdomain_marker = None
 
     def __delitem__(self, name):
         """ Delete domain. """
         self.delete_item(name)
 
-       
-
     def __len__(self):
         """ Number of subdomains of this folder """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
-        domains = self._getSubdomains()
-        return len(domains)
+        count = 1
+        while count > 0:
+            # keep grabbing subdomains till there are no more to fetch
+            count = self._getSubdomains()
+        return len(self._subdomains)
          
 
     def __iter__(self):
         """ Iterate over subdomain names """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
-        domains = self._getSubdomains()
-        for domain in domains:
+        self._getSubdomains()
+        index = 0
+        while True:
+            if len(self._subdomains) == index:
+                # get more if we can
+                count = self._getSubdomains()
+                if count == 0:
+                    break
+            domain = self._subdomains[index]
+            index += 1
             yield op.basename(domain['name'])
          
 
@@ -301,14 +333,22 @@ class Folder():
         """ Test if a member name exists """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
-        domains = self._getSubdomains()
+        self._getSubdomains()
+        index = 0
         found = False
-        for domain in domains:
+        while True:
+            if len(self._subdomains) == index:
+                # get more if we can
+                count = self._getSubdomains()
+                if count == 0:
+                    break
+            domain = self._subdomains[index]
+            index += 1
             if op.basename(domain['name']) == name:
                 found = True
                 break
-        
         return found
+ 
 
     def __enter__(self):
         return self
