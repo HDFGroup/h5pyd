@@ -167,9 +167,6 @@ class TestFolders(TestCase):
                 found = True
         dir.close()
         self.assertTrue(found)
-
-
-     
               
 if __name__ == '__main__':
     loglevel = logging.ERROR

@@ -240,8 +240,9 @@ def getFolder(domain):
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
     bucket   = cfg["hs_bucket"]
+    pattern = cfg["pattern"] 
     dir = h5py.Folder(domain, endpoint=endpoint, username=username,
-                      password=password, bucket=bucket)
+                      password=password, bucket=bucket, pattern=pattern)
     return dir
 
 
@@ -349,6 +350,7 @@ def printUsage():
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print("     --showacls :: print domain ACLs")
     print("     --showattrs :: print attributes")
+    print("     --pattern  :: <regex>  :: list domains that match the given regex")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --bucket <bucket_name> :: Storage bucket")
@@ -369,6 +371,7 @@ def main():
     cfg["showacls"] = False
     cfg["showattrs"] = False
     cfg["human_readable"] = False
+    cfg["pattern"] = None
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
@@ -423,6 +426,10 @@ def main():
         elif arg in ("-b", "--bucket"):
             cfg["hs_bucket"] = val
             argn += 2
+        elif arg == "--pattern":
+            cfg["pattern"] = val
+            argn += 2
+        
         elif arg[0] == '-':
             printUsage()
         else:
