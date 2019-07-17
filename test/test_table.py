@@ -128,6 +128,23 @@ class TestTable(TestCase):
             num_rows += 1
         self.assertEqual(num_rows, 4)
 
+        # try modifying specific rows
+        update_val = {"open": 123}
+        indices = table.update_where(condition, update_val)
+        self.assertEqual(len(indices), 4)
+        self.assertEqual(list(indices), [1,4,7,10])
+
+        row = tuple(table[4])
+        self.assertEqual(row, (b'AAPL', b'20170103', 123, 3034))
+
+        # try modifying just one value
+        update_val = {'close': 999}
+        indices = table.update_where(condition, update_val, limit=1)
+        self.assertEqual(len(indices), 1)
+        self.assertEqual(list(indices), [1])
+
+
+
         f.close()
 
 

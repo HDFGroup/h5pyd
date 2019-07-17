@@ -154,8 +154,6 @@ class Table(Dataset):
         # mtype = h5t.py_create(new_dtype)
         mtype = new_dtype
 
-     
-
         # Perform the dataspace selection
         if start or stop:
             if not start:
@@ -245,6 +243,47 @@ class Table(Dataset):
             arr = arr[names[0]]     # Single-field recarray convention
         if arr.shape == ():
             arr = numpy.asscalar(arr)
+
+        return arr
+
+    
+    def update_where(self, condition, value, start=None, stop=None, step=None, limit=None):
+        """Modify rows in table using pytable-style condition
+        """
+        if not isinstance(value, dict):
+            raise ValueError("expected value to be a dict")
+
+        # Perform the dataspace selection
+        if start or stop:
+            if not start:
+                start = 0
+            if not stop:
+                stop = self._shape[0]
+        else:
+            start = 0
+            stop = self._shape[0]
+
+        selection_arg = slice(start, stop)
+        selection = sel.select(self, selection_arg)
+        sel_param = selection.getQueryParam()
+        params = {}
+        params["query"] = condition
+        if limit:
+            params["Limit"] = limit
+        self.log.debug("query param: {}".format(sel_param))
+        if sel_param:
+            params["select"] = sel_param
+
+        req = "/datasets/" + self.id.uuid + "/value"
+       
+        rsp = self.PUT(req, body=value, format="json", params=params)
+        indices = rsp["index"]  
+
+        arr = None
+        if indices:
+            arr = numpy.array(indices)
+            
+ 
 
         return arr
 
