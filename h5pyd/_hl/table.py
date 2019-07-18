@@ -277,13 +277,12 @@ class Table(Dataset):
         req = "/datasets/" + self.id.uuid + "/value"
        
         rsp = self.PUT(req, body=value, format="json", params=params)
-        indices = rsp["index"]  
-
+        indices = None
         arr = None
-        if indices:
-            arr = numpy.array(indices)
-            
- 
+        if "index" in rsp:
+            indices = rsp["index"]  
+            if indices:
+                arr = numpy.array(indices)
 
         return arr
 
