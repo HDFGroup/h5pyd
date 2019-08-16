@@ -65,7 +65,7 @@ class Folder():
             return False
         
 
-    def __init__(self, domain_name, pattern=None, mode=None, endpoint=None, 
+    def __init__(self, domain_name, pattern=None, query=None, mode=None, endpoint=None, 
         username=None, password=None, bucket=None, api_key=None, logger=None, owner=None, **kwds):
         """Create a new Folders object.
 
@@ -91,6 +91,7 @@ class Folder():
             raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
 
         self._pattern = pattern
+        self._query = query
 
         if mode is None:
             mode = 'r'
@@ -236,6 +237,8 @@ class Folder():
         params["Limit"] = BATCH_SIZE  # get 100 at a time
         if self._pattern:
             params["pattern"] = self._pattern
+        if self._query:
+            params["query"] = self._query
         if self._subdomain_marker:
             params["Marker"] = self._subdomain_marker
         rsp = self._http_conn.GET(req, params=params)

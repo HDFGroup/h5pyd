@@ -241,8 +241,9 @@ def getFolder(domain):
     endpoint = cfg["hs_endpoint"]
     bucket   = cfg["hs_bucket"]
     pattern = cfg["pattern"] 
+    query = cfg["query"]
     dir = h5py.Folder(domain, endpoint=endpoint, username=username,
-                      password=password, bucket=bucket, pattern=pattern)
+                      password=password, bucket=bucket, pattern=pattern, query=query)
     return dir
 
 
@@ -351,6 +352,7 @@ def printUsage():
     print("     --showacls :: print domain ACLs")
     print("     --showattrs :: print attributes")
     print("     --pattern  :: <regex>  :: list domains that match the given regex")
+    print("     --query :: <query> list domains where the attributes of the root group match the given query string")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --bucket <bucket_name> :: Storage bucket")
@@ -372,6 +374,7 @@ def main():
     cfg["showattrs"] = False
     cfg["human_readable"] = False
     cfg["pattern"] = None
+    cfg["query"] = None
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
@@ -428,6 +431,9 @@ def main():
             argn += 2
         elif arg == "--pattern":
             cfg["pattern"] = val
+            argn += 2
+        elif arg == "--query":
+            cfg["query"] = val
             argn += 2
         
         elif arg[0] == '-':
