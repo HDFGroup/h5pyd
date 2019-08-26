@@ -96,6 +96,8 @@ def getServerInfo(cfg):
     
         if "hsds_version" in info:
             print("server version: {}".format(info["hsds_version"]))
+        if "node_count" in info:
+            print("node count: {}".format(info["node_count"]))
         elif "h5serv_version" in info:
             print("server version: {}".format(info["h5serv_version"]))
         if "start_time" in info:
