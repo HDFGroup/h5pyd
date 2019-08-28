@@ -234,7 +234,8 @@ class Folder():
         else:
             params = {"domain": self._domain + '/'}
         params["verbose"] = 1  # to get lastModified
-        params["Limit"] = BATCH_SIZE  # get 100 at a time
+        if not self._query:
+            params["Limit"] = BATCH_SIZE  # get 100 at a time
         if self._pattern:
             params["pattern"] = self._pattern
         if self._query:
