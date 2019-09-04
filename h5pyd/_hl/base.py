@@ -290,7 +290,7 @@ def getElementSize(e, dt):
                 raise ValueError("Unexpected value: {}".format(e))
         elif isinstance(e, bytes):
             count = len(e) + 4
-        elif isinstance(e, str):
+        elif isinstance(e, str) or (six.PY2 and isinstance(e, unicode)):
             count = len(e.encode('utf-8')) + 4
         elif isinstance(e, np.ndarray):
             nElements = np.prod(e.shape)
@@ -306,6 +306,7 @@ def getElementSize(e, dt):
             #print("got list for e:", e)
             count = len(e) * vlen.itemsize + 4  # +4 for byte count
         else:
+
             raise TypeError("unexpected type: {}".format(type(e)))
     return count
 

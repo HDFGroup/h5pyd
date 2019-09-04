@@ -278,13 +278,7 @@ class TestVlenTypes(TestCase):
         else:
             self.assertEqual(dset.fillvalue, 0)
 
-        # TBD: h5serv and hsds returning different values for null strings
-        if config.get('use_h5py') or True:
-            self.assertEqual(dset[0], b'')
-        else:
-            # TBD: HSDS is converteing null values to '0's
-            self.assertEqual(dset[0], b'0') 
-         
+        self.assertEqual(dset[0], b'')
         
         words = (b"one", b"two", b"three", b"four", b"five", b"six", b"seven", b"eight", b"nine", b"ten")
         dset[:] = words
