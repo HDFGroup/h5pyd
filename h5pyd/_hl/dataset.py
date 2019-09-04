@@ -22,7 +22,7 @@ import numpy
 import six
 from six.moves import xrange
 
-from .base import HLObject, jsonToArray
+from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes
 from .h5type import Reference, RegionReference
 from .base import  _decode
 from .objectid import DatasetID
@@ -193,7 +193,7 @@ def make_new_dset(parent, shape=None, dtype=None,
 
     if chunks and isinstance(chunks, dict):
         dcpl["layout"] = chunks
-        print("using layout:", chunks)
+        #print("using layout:", chunks)
 
     body['creationProperties'] = dcpl
 
@@ -644,6 +644,7 @@ class Dataset(HLObject):
                 # got binary response
                 self.log.info("got binary response for scalar selection")
                 arr = numpy.frombuffer(rsp, dtype=new_dtype)
+                #arr = bytesToArray(rsp, new_dtype, self._shape)
                 if not self.dtype.shape:
                     self.log.debug("reshape arr to: {}".format(self._shape))
                     arr = numpy.reshape(arr, self._shape)
@@ -796,7 +797,8 @@ class Dataset(HLObject):
                     if type(rsp) is bytes:
                         # got binary response
                         self.log.info("binary response, {} bytes".format(len(rsp)))
-                        arr1d = numpy.frombuffer(rsp, dtype=mtype)
+                        #arr1d = numpy.frombuffer(rsp, dtype=mtype)
+                        arr1d = bytesToArray(rsp, mtype, page_mshape)
                         page_arr = numpy.reshape(arr1d, page_mshape)
                     else:
                         # got JSON response
@@ -929,11 +931,11 @@ class Dataset(HLObject):
         match.
         """
         self.log.info("Dataset __setitem__, args: {}".format(args))
-        if self._item_size != "H5T_VARIABLE":
-            use_base64 = True   # may need to set this to false below for some types
-        else:
-            use_base64 = False  # never use for variable length types
-            self.log.debug("Using JSON since type is variable length")
+        #if self._item_size != "H5T_VARIABLE":
+        use_base64 = True   # may need to set this to false below for some types
+        #else:
+        #    use_base64 = False  # never use for variable length types
+        #    self.log.debug("Using JSON since type is variable length")
 
         args = args if isinstance(args, tuple) else (args,)
 
@@ -1115,7 +1117,8 @@ class Dataset(HLObject):
             if self.id.uuid.startswith("d-"):
                 # server is HSDS, use binary data, use param values for selection
                 format = "binary"
-                body = val.tobytes()
+                #body = val.tobytes()
+                body = arrayToBytes(val)
                 self.log.debug("writing binary data, {} bytes".format(len(body)))
             else:
                 # h5serv, base64 encode, body json for selection

@@ -136,19 +136,20 @@ class TestVlenTypes(TestCase):
         g1_3.attrs["name"] = 'g1_3'
 
         # create a dataset that is a VLEN int32
-        dtvlen = h5py.special_dtype(vlen=np.dtype('int32'))
+        dtvlen = h5py.special_dtype(vlen=np.dtype('uint16'))
         
         dset1 = f.create_dataset("dset1", shape=(2,), dtype=dtvlen)
         
         # create numpy object array
         e0 = np.array([0,1,2])
         e1 = np.array([0,1,2,3])
-        data = np.array([e0, e1], dtype=object)
+        data = np.array([e0, e1], dtype=dtvlen)
 
         # write data
         dset1[...] = data
 
         # read back data
+        e = dset1[0]
         ret_val = dset1[...]
         self.assertTrue(isinstance(ret_val, np.ndarray))
         self.assertEqual(len(ret_val), 2)
@@ -156,9 +157,9 @@ class TestVlenTypes(TestCase):
         # py36  attribute[a1]: [array([0, 1, 2], dtype=int32) array([0, 1, 2, 3], dtype=int32)]
         # py27  [(0, 1, 2) (0, 1, 2, 3)]
         self.assertEqual(list(ret_val[0]), [0,1,2])
-        self.assertEqual(ret_val[0].dtype, np.dtype('int32'))
+        self.assertEqual(ret_val[0].dtype, np.dtype('uint16'))
         self.assertTrue(isinstance(ret_val[1], np.ndarray))
-        self.assertEqual(ret_val[1].dtype, np.dtype('int32'))
+        self.assertEqual(ret_val[1].dtype, np.dtype('uint16'))
 
         self.assertEqual(list(ret_val[1]), [0,1,2,3])
 
@@ -190,7 +191,7 @@ class TestVlenTypes(TestCase):
         dset1 = f.create_dataset("dset1", shape=(nrows,ncols), dtype=dtvlen)
         
         # create numpy object array
-        data = np.zeros((nrows,ncols), dtype=object)
+        data = np.zeros((nrows,ncols), dtype=dtvlen)
         for i in range(nrows):
             for j in range(ncols):
                 alist = []
@@ -278,7 +279,7 @@ class TestVlenTypes(TestCase):
             self.assertEqual(dset.fillvalue, 0)
 
         # TBD: h5serv and hsds returning different values for null strings
-        if config.get('use_h5py'):
+        if config.get('use_h5py') or True:
             self.assertEqual(dset[0], b'')
         else:
             # TBD: HSDS is converteing null values to '0's
