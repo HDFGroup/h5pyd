@@ -368,7 +368,7 @@ def copyElement(e, dt, buffer, offset):
             count = np.int32(len(e))
             offset = copyBuffer(count.tobytes(), buffer, offset)
             offset = copyBuffer(e, buffer, offset)
-        elif isinstance(e, str):
+        elif isinstance(e, str) or (six.PY2 and isinstance(e, unicode)):
             text = e.encode('utf-8')
             count = np.int32(len(text))
             offset = copyBuffer(count.tobytes(), buffer, offset)
@@ -455,7 +455,7 @@ def readElement(buffer, offset, arr, index, dt):
 
                 if vlen is bytes:
                     arr[index] = bytes(e_buffer)
-                elif vlen is str:
+                elif vlen is str or (six.PY2 and vlen is unicode):
                     s = e_buffer.decode("utf-8")
                     arr[index] = s
                 else:
