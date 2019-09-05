@@ -434,7 +434,10 @@ def readElement(buffer, offset, arr, index, dt):
         count = dt.itemsize
         e_buffer = buffer[offset:(offset+count)]
         offset += count
-        arr[index] = np.frombuffer(bytes(e_buffer), dtype=dt)
+        if dt.kind == 'S':
+            arr[index] = e_buffer
+        else:
+            arr[index] = np.frombuffer(bytes(e_buffer), dtype=dt)
     else:
         # variable length element
         vlen = dt.metadata["vlen"]
