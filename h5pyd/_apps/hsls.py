@@ -152,8 +152,8 @@ def dump(name, obj, visited=None):
             fstr = "    {0:>12}: {1} {2} bytes, {3} allocated chunks"
             print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size),
                               intToStr(num_chunks)))
-            if allocated_size > 0:
-                utilization = dset_size / allocated_size
+            if dset_size > 0:
+                utilization = allocated_size / dset_size
                 fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes, {3:.2f}% utilization"
                 print(fstr.format("Storage", intToStr(dset_size),
                                   intToStr(allocated_size),
