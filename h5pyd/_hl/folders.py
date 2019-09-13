@@ -123,8 +123,15 @@ class Folder():
             elif "hs_api_key" in cfg:
                 api_key = cfg["hs_api_key"]
 
+        kwargs = {}
+        if "HS_SUPPORT_AUTH_REDIRECT" in os.environ:
+            kwargs['support_auth_redirect'] = os.environ["HS_SUPPORT_AUTH_REDIRECT"]
+        elif 'hs_support_auth_redirect' in cfg:
+            kwargs['support_auth_redirect'] = cfg['hs_support_auth_redirect']
+
         self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, 
-            password=password, bucket=bucket, api_key=api_key, mode=mode, logger=logger)
+            password=password, bucket=bucket, api_key=api_key, mode=mode, logger=logger,
+            **kwargs)
         self.log = self._http_conn.logging
 
         domain_json = None

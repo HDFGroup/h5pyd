@@ -20,8 +20,22 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import json
 import logging
+from distutils.util import strtobool
+
 
 MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
+
+
+class SessionWithRedirectAuth(requests.Session):
+    """ Overload Session to be used with a load balancer
+        using a HTTP redirect to a Service Node
+
+        Note:
+        - this was only tested with Basic Authentication
+    """
+
+    def should_strip_auth(self, old_url, new_url):
+        return False
 
 
 class CacheResponse(object):
@@ -112,6 +126,8 @@ class HttpConn:
         if isinstance(api_key, str) and (not api_key or api_key.upper() == "NONE"):
             api_key = None
         self._api_key = api_key
+
+        self._support_auth_redirect = strtobool(kwds.get('support_auth_redirect', "0"))
 
         self._s = None  # Sessions
 
@@ -385,8 +401,11 @@ class HttpConn:
         status_forcelist=(500, 502, 503, 504)
         if self._use_session:
             if self._s is None:
-                s = requests.Session()
-            
+                if self._support_auth_redirect:
+                    s = SessionWithRedirectAuth()
+                else:
+                    s = requests.Session()
+
                 retry = Retry(
                     total=retries,
                     read=retries,

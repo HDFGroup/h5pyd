@@ -179,9 +179,16 @@ class File(Group):
                 elif "hs_api_key" in cfg:
                     api_key = cfg["hs_api_key"]
 
+            kwargs = {}
+            if "HS_SUPPORT_AUTH_REDIRECT" in os.environ:
+                kwargs['support_auth_redirect'] = os.environ["HS_SUPPORT_AUTH_REDIRECT"]
+            elif 'hs_support_auth_redirect' in cfg:
+                kwargs['support_auth_redirect'] = cfg['hs_support_auth_redirect']
+
             http_conn =  HttpConn(domain, endpoint=endpoint,
                     username=username, password=password, bucket=bucket, mode=mode,
-                    api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger, retries=retries)
+                    api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger, retries=retries,
+                    **kwargs)
 
             root_json = None
 
