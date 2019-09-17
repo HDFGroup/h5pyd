@@ -90,7 +90,7 @@ def getServerInfo(cfg):
         print("username: {}".format(info["username"]))
         print("password: {}".format(info["password"]))
         if info['state'] == "READY":
-            home_folder = getHomeFolder(username)
+            home_folder = getHomeFolder(username, endpoint)
             if home_folder:
                 print("home: {}".format(home_folder))
     
@@ -169,10 +169,10 @@ def getDomainInfo(domain, cfg):
 #
 # Get folder in /home/ that is owned by given user
 #
-def getHomeFolder(username):
+def getHomeFolder(username, endpoint):
     if not username:
         return None
-    dir = h5pyd.Folder('/home/')  # get folder object for root
+    dir = h5pyd.Folder('/home/', endpoint=endpoint)  # get folder object for root
     homefolder = None
     for name in dir:
         # we should come across the given domain
@@ -181,7 +181,7 @@ def getHomeFolder(username):
             # e.g. folder: "/home/bob/" for username "bob@acme.com"
             path = '/home/' + name + '/'
             try:
-                f = h5pyd.Folder(path)
+                f = h5pyd.Folder(path, endpoint=endpoint)
             except IOError as ioe:
                 print("got ioe:", ioe)
                 continue
