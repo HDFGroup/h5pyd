@@ -242,8 +242,9 @@ def getFolder(domain):
     bucket   = cfg["hs_bucket"]
     pattern = cfg["pattern"] 
     query = cfg["query"]
+    batch_size = 100  # use smaller batchsize for interactively listing of large collections
     dir = h5py.Folder(domain, endpoint=endpoint, username=username,
-                      password=password, bucket=bucket, pattern=pattern, query=query)
+                      password=password, bucket=bucket, pattern=pattern, query=query, batch_size=batch_size)
     return dir
 
 

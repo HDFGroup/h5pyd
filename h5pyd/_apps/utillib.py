@@ -491,7 +491,7 @@ def write_dataset(src, tgt, ctx):
     if len(src.shape) == 0:
         # scalar dataset
         x = src[()]
-        msg = "writing: {} for scalar dataset: {}".format(x, src.name)
+        msg = "writing for scalar dataset: {}".format(src.name)
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)

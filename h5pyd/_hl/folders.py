@@ -66,7 +66,7 @@ class Folder():
         
 
     def __init__(self, domain_name, pattern=None, query=None, mode=None, endpoint=None, 
-        username=None, password=None, bucket=None, api_key=None, logger=None, owner=None, **kwds):
+        username=None, password=None, bucket=None, api_key=None, logger=None, owner=None, batch_size=1000, **kwds):
         """Create a new Folders object.
 
         domain_name
@@ -116,6 +116,7 @@ class Folder():
             self._domain = domain_name[:-1]
         self._subdomains = None
         self._subdomain_marker = None
+        self._batch_size = batch_size
 
         if api_key is None:
             if "HS_API_KEY" in os.environ:
@@ -222,7 +223,6 @@ class Folder():
 
 
     def _getSubdomains(self):
-        BATCH_SIZE = 100
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         if self._subdomains is not None and not self._subdomain_marker:
@@ -235,7 +235,7 @@ class Folder():
             params = {"domain": self._domain + '/'}
         params["verbose"] = 1  # to get lastModified
         if not self._query:
-            params["Limit"] = BATCH_SIZE  # get 100 at a time
+            params["Limit"] = self._batch_size  # get 100 at a time
         if self._pattern:
             params["pattern"] = self._pattern
         if self._query:
@@ -255,7 +255,7 @@ class Folder():
             self._subdomains = []
         # append to what we have
         self._subdomains.extend(domains)
-        if len(domains) == BATCH_SIZE:
+        if len(domains) == self._batch_size:
             # save the marker for the next batch
             self._subdomain_marker = domains[-1]["name"]
         else:
