@@ -118,7 +118,7 @@ class File(Group):
                     "Invalid mode; must be one of r, r+, w, w-, x, a")
 
             if mode is None:
-                mode = 'a'
+                mode = 'r'
 
             cfg = Config() # pulls in state from a .hscfg file (if found).
 
