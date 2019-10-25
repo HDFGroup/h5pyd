@@ -16,6 +16,7 @@ import sys
 
 tests = ('test_attribute',
          'test_committedtype',
+         'test_complex_numbers',
          'test_dataset_compound',
          'test_dataset_create',
          'test_dataset_extend',
@@ -25,14 +26,13 @@ tests = ('test_attribute',
          'test_dataset_pointselect',
          'test_dataset_scalar',
          'test_dataset_setitem',
-         'test_table',
-         'test_file',
-         'test_group',
-         'test_vlentype',
          'test_dimscale',
+         'test_file',
          'test_folder',
-         'test_complex_numbers',
-         'test_visit'
+         'test_group',
+         'test_table',
+         'test_visit',
+         'test_vlentype'
          )
 
 #
