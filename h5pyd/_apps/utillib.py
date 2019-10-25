@@ -632,7 +632,7 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None,
     def object_create_helper(name, obj):
         class_name = obj.__class__.__name__
 
-        if class_name == "Dataset":
+        if class_name in ("Dataset", "Table"):
             create_dataset(obj, ctx)
         elif class_name == "Group":
             create_group(obj, ctx)
@@ -643,7 +643,7 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None,
 
     def object_copy_helper(name, obj):
         class_name = obj.__class__.__name__
-        if class_name == "Dataset":
+        if class_name in ("Dataset", "Table"):
             if ctx["storeinfo"]:
                 logging.info("skip datacopy for s3 reference")
             else:
