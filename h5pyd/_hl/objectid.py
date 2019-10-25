@@ -193,7 +193,7 @@ class DatasetID(ObjectID):
 
         if layout and layout['class'] in  ('H5D_CHUNKED', 'H5D_CHUNKED_REF', 'H5D_CHUNKED_REF_INDIRECT'):
                 chunks = layout['dims']
-       
+
         return chunks
 
     def __init__(self, parent, item, **kwds):

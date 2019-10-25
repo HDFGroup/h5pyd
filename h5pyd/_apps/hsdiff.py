@@ -34,7 +34,7 @@ def diff_attrs(src, tgt, ctx):
     """ compare attributes of src and tgt """
     msg = "checking attributes of {}".format(src.name)
     logging.debug(msg)
-    
+
     if len(src.attrs) != len(tgt.attrs):
         msg = "<{}> have a different number of attribute from <{}>".format(src.name, tgt.name)
         logging.info(msg)
@@ -47,7 +47,7 @@ def diff_attrs(src, tgt, ctx):
         msg = "checking attribute {} of {}".format(name, src.name)
         logging.debug(msg)
         if ctx["verbose"]:
-            print(msg) 
+            print(msg)
         if name not in tgt.attrs:
             msg = "<{}>  has attribute {} not found in <{}>".format(src.name, name, tgt.name)
             logging.info(msg)
@@ -84,7 +84,7 @@ def diff_attrs(src, tgt, ctx):
             # returned as int or string, just compare values
             msg = "<{}>  has attribute {} different than <{}>".format(src.name, name, tgt.name)
             logging.info(msg)
-       
+
             if not ctx["quiet"]:
                 print(msg)
             ctx["differences"] += 1
@@ -100,8 +100,8 @@ def diff_group(src, ctx):
     msg = "checking group <{}>".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
-        print(msg) 
-    
+        print(msg)
+
     fout = ctx["fout"]
 
     if src.name not in fout:
@@ -111,7 +111,7 @@ def diff_group(src, ctx):
             print(msg)
         ctx["differences"] += 1
         return False
-    
+
     tgt = fout[src.name]
 
     # printed when there is a difference
@@ -140,9 +140,9 @@ def diff_group(src, ctx):
             return False
 
         lnk_src = src.get(title, getlink=True)
-        lnk_src_type = lnk_src.__class__.__name__ 
+        lnk_src_type = lnk_src.__class__.__name__
         lnk_tgt = tgt.get(title, getlink=True)
-        lnk_tgt_type = lnk_tgt.__class__.__name__ 
+        lnk_tgt_type = lnk_tgt.__class__.__name__
         if lnk_src_type != lnk_tgt_type:
             msg = "<{}> group has link {} of different type than found in <{}>".format(src.name, title, tgt.name)
             logging.info(msg)
@@ -152,7 +152,7 @@ def diff_group(src, ctx):
                 print(output)
             ctx["differences"] += 1
             return False
-        
+
         if lnk_src_type == "HardLink":
             logging.debug("Got hardlink: {}".format(title))
             # TBD: handle the case where multiple hardlinks point to same object
@@ -211,8 +211,8 @@ def diff_datatype(src, ctx):
     msg = "checking datatype <{}>".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
-        print(msg) 
-    
+        print(msg)
+
     fout = ctx["fout"]
 
     if src.name not in fout:
@@ -245,8 +245,8 @@ def diff_dataset(src, ctx):
     msg = "checking dataset <{}>".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
-        print(msg) 
-    
+        print(msg)
+
     fout = ctx["fout"]
 
     if src.name not in fout:
@@ -276,7 +276,7 @@ def diff_dataset(src, ctx):
         if not ctx["quiet"]:
             print(output)
         ctx["differences"] += 1
-        
+
         return False
 
     if tgt.dtype != src.dtype:
@@ -295,11 +295,11 @@ def diff_dataset(src, ctx):
 
     try:
         it = ChunkIterator(src)
-        
+
         for s in it:
             msg = "checking dataset data for slice: {}".format(s)
             logging.debug(msg)
-                  
+
             arr_src = src[s]
             msg = "got src array {}".format(arr_src.shape)
             logging.debug(msg)
@@ -325,7 +325,7 @@ def diff_dataset(src, ctx):
     else:
         result = True
     return result
-        
+
 
 
 def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False):
@@ -336,12 +336,12 @@ def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False)
     ctx["nodata"] = nodata
     ctx["noattr"] = noattr
     ctx["quiet"] = quiet
-    ctx["differences"] = 0   
+    ctx["differences"] = 0
 
 
     def object_diff_helper(name, obj):
         class_name = obj.__class__.__name__
-         
+
         if class_name in ("Dataset", "Table"):
             diff_dataset(obj, ctx)
         elif class_name == "Group":
@@ -507,7 +507,7 @@ def main():
     logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
 
     try:
-        
+
         # get a handle to input file
         try:
             fin = h5py.File(file_path, mode='r')
@@ -536,9 +536,9 @@ def main():
         if quiet:
             verbose = False
         rc = diff_file(fin, fout, verbose=verbose, nodata=nodata, noattr=noattr, quiet=quiet)
-        
+
         if not quiet and rc > 0:
-            print("{} differences found".format(rc)) 
+            print("{} differences found".format(rc))
 
         logging.info("diff_file done")
 

@@ -24,23 +24,23 @@ from common import ut, TestCase
 
 class TestFolders(TestCase):
 
-     
+
     def test_list(self):
         #loglevel = logging.DEBUG
         #logging.basicConfig( format='%(asctime)s %(message)s', level=loglevel)
-        test_domain = self.getFileName("folder_test")  
+        test_domain = self.getFileName("folder_test")
 
-        
+
         filepath = self.getPathFromDomain(test_domain)
         print(filepath)
         # create test file if not present.
         # on first run, this may take a minute before it is visible as a folder item
-        f = h5py.File(filepath, mode='a')  
+        f = h5py.File(filepath, mode='a')
         if config.get("use_h5py"):
             # Folders not supported for h5py
             f.close()
             return
-        
+
         self.assertTrue(f.id.id is not None)
         if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             # HSDS currently supports folders, but h5serv does not
@@ -48,16 +48,16 @@ class TestFolders(TestCase):
             return
         f.close()
 
-        folder_name = op.dirname(filepath)  + '/'  
-         
+        folder_name = op.dirname(filepath)  + '/'
+
         dir = h5py.Folder(folder_name)  # get folder object
-         
+
         self.assertEqual(dir.domain, folder_name)
         self.assertTrue(dir.modified)
-        self.assertTrue(dir.created) 
+        self.assertTrue(dir.created)
         self.assertEqual(str(dir), folder_name)
         self.assertEqual(dir.owner, self.test_user1["name"])
-        
+
         dir_parent = dir.parent
         self.assertEqual(dir_parent[:-1], op.dirname(folder_name[:-1]))
 
@@ -69,22 +69,22 @@ class TestFolders(TestCase):
 
         dir_acls = dir.getACLs()
         self.assertTrue(isinstance(dir_acls, list))
-  
+
         count = len(dir)
         self.assertTrue(count > 1)
-           
+
         test_domain_found = False
-        
+
         i = 0
         for name in dir:
-            if name == op.basename(test_domain):   
+            if name == op.basename(test_domain):
                 self.assertFalse(test_domain_found)
                 test_domain_found = True
             item = dir[name]
-            #'owner': 'test_user1', 
-            #'created': 1496729517.2346532, 
-            #'class': 'domain', 
-            #'name': '/org/hdfgroup/h5pyd_test/bool_dset', 
+            #'owner': 'test_user1',
+            #'created': 1496729517.2346532,
+            #'class': 'domain',
+            #'name': '/org/hdfgroup/h5pyd_test/bool_dset',
             #'lastModified': 1496729517.2346532
             #self.assertTrue("created" in item)
             self.assertTrue("owner" in item)
@@ -105,15 +105,15 @@ class TestFolders(TestCase):
         for name in f:
             self.assertTrue(False)  # unexpected
         f.close()
-         
+
 
     def test_create_folder(self):
-        empty = self.getFileName("empty")  
+        empty = self.getFileName("empty")
         empty_path = self.getPathFromDomain(empty)
 
         print("empty_path", empty_path)
 
-        f = h5py.File(empty_path, mode='a')  
+        f = h5py.File(empty_path, mode='a')
         self.assertTrue(f.id.id is not None)
         if config.get("use_h5py"):
             # Folders not supported for h5py
@@ -126,7 +126,7 @@ class TestFolders(TestCase):
             return
         f.close()
 
-        folder_test = self.getFileName("create_folder_test")  
+        folder_test = self.getFileName("create_folder_test")
         folder_path = self.getPathFromDomain(folder_test) + '/'
 
         dir = h5py.Folder(folder_path, mode='w')  # create a new folder
@@ -135,14 +135,14 @@ class TestFolders(TestCase):
         dir = h5py.Folder(folder_path)
         self.assertTrue(dir.is_folder)
         dir.close()
-        
+
 
     def test_root_folder(self):
-        test_domain = self.getFileName("folder_test")  
+        test_domain = self.getFileName("folder_test")
 
-        
+
         filepath = self.getPathFromDomain(test_domain)
-        f = h5py.File(filepath, mode='a')  
+        f = h5py.File(filepath, mode='a')
         self.assertTrue(f.id.id is not None)
         if config.get("use_h5py"):
             # Folders not supported for h5py
@@ -156,7 +156,7 @@ class TestFolders(TestCase):
 
         path_components = filepath.split('/')
         top_level_domain = path_components[1]
-        
+
         dir = h5py.Folder('/')  # get folder object for root
         found = False
         self.assertTrue(len(dir) > 0)
@@ -167,7 +167,7 @@ class TestFolders(TestCase):
                 found = True
         dir.close()
         self.assertTrue(found)
-              
+
 if __name__ == '__main__':
     loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)

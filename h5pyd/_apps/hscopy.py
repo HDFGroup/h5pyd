@@ -30,7 +30,7 @@ if __name__ == "__main__":
 else:
     from .config import Config
     from .utillib import load_file
- 
+
 
 cfg = Config()
 
@@ -201,7 +201,7 @@ def main():
 
         # create the output domain
         try:
-            
+
             fout = h5pyd.File(des_domain, 'x', endpoint=endpoint, username=username, password=password, bucket=bucket)
         except IOError as ioe:
             if ioe.errno == 403:

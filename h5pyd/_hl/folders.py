@@ -20,8 +20,8 @@ import json
 import logging
 from .httpconn import HttpConn
 from .config import Config
- 
- 
+
+
 class Folder():
 
     """
@@ -57,30 +57,30 @@ class Folder():
 
     @property
     def is_folder(self):
-        """ is this a proper folder (i.e. domain without root group), 
+        """ is this a proper folder (i.e. domain without root group),
             or a domain """
         if self._obj_class == "folder":
             return True
         else:
             return False
-        
 
-    def __init__(self, domain_name, pattern=None, query=None, mode=None, endpoint=None, 
+
+    def __init__(self, domain_name, pattern=None, query=None, mode=None, endpoint=None,
         username=None, password=None, bucket=None, api_key=None, logger=None, owner=None, batch_size=1000, **kwds):
         """Create a new Folders object.
 
         domain_name
             URI of the domain name to access. E.g.: /org/hdfgroup/folder/
-        
+
         endpoint
             Server endpoint.   Defaults to "http://localhost:5000"
         """
 
         self.log = logging.getLogger("h5pyd")
 
-        if len(domain_name) == 0: 
+        if len(domain_name) == 0:
             raise ValueError("Invalid folder name")
-        
+
         if domain_name[0] != '/':
             raise ValueError("Folder name must start with '/'")
 
@@ -97,13 +97,13 @@ class Folder():
             mode = 'r'
 
         cfg = Config()  # pulls in state from a .hscfg file (if found).
-        
+
         if endpoint is None and "hs_endpoint" in cfg:
             endpoint = cfg["hs_endpoint"]
 
         if username is None and "hs_username" in cfg:
             username = cfg["hs_username"]
-              
+
         if password is None and "hs_password" in cfg:
             password = cfg["hs_password"]
 
@@ -124,7 +124,7 @@ class Folder():
             elif "hs_api_key" in cfg:
                 api_key = cfg["hs_api_key"]
 
-        self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username, 
+        self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username,
             password=password, bucket=bucket, api_key=api_key, mode=mode, logger=logger)
         self.log = self._http_conn.logging
 
@@ -137,7 +137,7 @@ class Folder():
             req = "/domains"
         else:
             req = '/'
-                        
+
         rsp = self._http_conn.GET(req)
 
         if rsp.status_code in (404, 410) and mode in ('w', 'w-', 'x'):
@@ -145,9 +145,9 @@ class Folder():
             body = {"folder": True}
             if owner:
                 body["owner"] = owner
-            rsp = self._http_conn.PUT(req, body=body)  
+            rsp = self._http_conn.PUT(req, body=body)
             if rsp.status_code != 201:
-                self._http_conn.close() 
+                self._http_conn.close()
                 raise IOError(rsp.status_code, rsp.reason)
         elif rsp.status_code != 200:
             # folder must exist
@@ -164,9 +164,9 @@ class Folder():
             self._obj_class = domain_json["class"]
         elif "root" in domain_json:
             # open with Folder but actually has a root group
-            self._obj_class = "domain" 
+            self._obj_class = "domain"
         else:
-            self._obj_class = "folder" 
+            self._obj_class = "folder"
         self._name = domain_name
         if "created" in domain_json:
             self._created = domain_json['created']
@@ -200,7 +200,7 @@ class Folder():
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
         rsp_json = json.loads(rsp.text)
-        acls_json = rsp_json["acls"] 
+        acls_json = rsp_json["acls"]
         return acls_json
 
     def putACL(self, acl):
@@ -215,7 +215,7 @@ class Folder():
             if k not in acl:
                 raise IOError(404, "Missing ACL field: {}".format(k))
             perm[k] = acl[k]
-         
+
         req = '/acls/' + acl['userName']
         rsp = self._http_conn.PUT(req, body=perm)
         if rsp.status_code != 201:
@@ -284,7 +284,7 @@ class Folder():
             # see if we can fetch more domains
             count = self._getSubdomains()
             if count == 0:
-                break  
+                break
         return None
 
     def delete_item(self, name, keep_root=False):
@@ -318,7 +318,7 @@ class Folder():
             # keep grabbing subdomains till there are no more to fetch
             count = self._getSubdomains()
         return len(self._subdomains)
-         
+
 
     def __iter__(self):
         """ Iterate over subdomain names """
@@ -335,7 +335,7 @@ class Folder():
             domain = self._subdomains[index]
             index += 1
             yield op.basename(domain['name'])
-         
+
 
     def __contains__(self, name):
         """ Test if a member name exists """
@@ -356,7 +356,7 @@ class Folder():
                 found = True
                 break
         return found
- 
+
 
     def __enter__(self):
         return self
@@ -365,9 +365,9 @@ class Folder():
         pass
 
     def __repr__(self):
-        
+
         r = six.u(self._domain + '/')
-             
+
         if six.PY3:
             return r
         return r.encode('utf8')

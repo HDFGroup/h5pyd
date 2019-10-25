@@ -25,7 +25,7 @@ class TestObjRef(TestCase):
     def test_create(self):
         filename = self.getFileName("objref_test")
         print(filename)
-        
+
         f = h5py.File(filename, 'w')
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
@@ -43,7 +43,7 @@ class TestObjRef(TestCase):
         g11 = g1.create_group('g1.1')
 
         # get ref to g1/g1.1
-        g11_ref = g11.ref    
+        g11_ref = g11.ref
         self.assertTrue(isinstance(g11_ref, h5py.Reference))
         self.assertEqual(g11.name, "/g1/g1.1")
 
@@ -51,15 +51,15 @@ class TestObjRef(TestCase):
         r.create_group('g2')
         self.assertEqual(len(r), 2)
         g2 = r['g2']
-    
+
         # get ref to g1/g1.1 from g2
         g11ref = g2[g11_ref]
-       
-        # create subgroup /g1/g1.1/foo 
-        g11ref.create_group("foo")   
+
+        # create subgroup /g1/g1.1/foo
+        g11ref.create_group("foo")
         self.assertEqual(len(g11), 1)
         self.assertTrue("foo" in g11)
-        
+
         # create datset /g2/d1
         d1 = g2.create_dataset('d1', (10,), dtype='i8')
 
@@ -70,7 +70,7 @@ class TestObjRef(TestCase):
         ref = h5py.check_dtype(ref=dt)
         self.assertEqual(ref, h5py.Reference)
 
-        
+
         if is_h5serv:
             return  # ref types not supported in h5serv
 
@@ -81,13 +81,13 @@ class TestObjRef(TestCase):
 
         dset[0] = g11_ref
         dset[1] = d1_ref
-           
+
         a_ref = dset[0]
         obj = f[a_ref]
         if not config.get("use_h5py"):
             self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
         self.assertEqual(obj.name, "/g1/g1.1")
-             
+
         b_ref = dset[1]
         obj = f[b_ref]
         if not config.get("use_h5py"):
@@ -118,7 +118,7 @@ class TestObjRef(TestCase):
             self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
         self.assertEqual(obj.name, "/g2/d1")
         f.close()
-        
+
 
         # try opening in read-mode
         f = h5py.File(filename, 'r')
@@ -133,7 +133,7 @@ class TestObjRef(TestCase):
         obj = f[a0_ref]
         if not config.get("use_h5py"):
             self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
-   
+
         self.assertEqual(obj.name, "/g1/g1.1")
         a1_ref = attr[1]
         obj = f[a1_ref]

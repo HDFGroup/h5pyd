@@ -12,15 +12,15 @@
 
 import sys
 import logging
-    
+
 try:
-    import h5py 
-    import h5pyd 
+    import h5py
+    import h5pyd
     import numpy as np
 except ImportError as e:
-    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e)) 
+    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
     sys.exit(1)
- 
+
 if __name__ == "utillib":
     from chunkiter import ChunkIterator
 else:
@@ -47,9 +47,9 @@ def dump_dtype(dt):
                 out = str(dt)
     return out
 
-  
+
 def is_h5py(obj):
-    # Return True if objref is a h5py object and False is not 
+    # Return True if objref is a h5py object and False is not
     if isinstance(obj, object) and isinstance(obj.id.id, int):
         return True
     else:
@@ -58,25 +58,25 @@ def is_h5py(obj):
 def is_reference(val):
     try:
         if isinstance(val, object) and val.__class__.__name__ == "Reference":
-            return True 
+            return True
         elif isinstance(val, type) and val.__name__ == "Reference":
             return True
     except AttributeError as ae:
         msg = "is_reference for {} error: {}".format(val, ae)
         logging.error(msg)
-     
+
     return False
 
 def is_regionreference(val):
     try:
         if isinstance(val, object) and val.__class__.__name__ == "RegionReference":
-            return True 
+            return True
         elif isinstance(val, type) and val.__name__ == "RegionReference":
             return True
     except AttributeError as ae:
         msg = "is_reference for {} error: {}".format(val, ae)
         logging.error(msg)
-     
+
     return False
 
 def has_reference(dtype):
@@ -99,13 +99,13 @@ def has_reference(dtype):
 
 
 def convert_dtype(srcdt, ctx):
-    """ Return a dtype based on input dtype, converting any Reference types from 
+    """ Return a dtype based on input dtype, converting any Reference types from
     h5py style to h5pyd and vice-versa.
     """
-    
+
     msg = "convert dtype: {}, type: {},".format(srcdt, type(srcdt))
     logging.info(msg)
-     
+
     if len(srcdt) > 0:
         fields = []
         for name in srcdt.fields:
@@ -149,7 +149,7 @@ def convert_dtype(srcdt, ctx):
 #----------------------------------------------------------------------------------
 def copy_element(val, src_dt, tgt_dt, ctx):
     logging.debug("copy_element, val: " + str(val) + " val type: " + str(type(val)) + "src_dt: " + dump_dtype(src_dt) + " tgt_dt: " + dump_dtype(tgt_dt))
-     
+
     fin = ctx["fin"]
     fout = ctx["fout"]
     out = None
@@ -174,7 +174,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                 out = h5py.Reference()  # null h5py ref
             else:
                 out = '' # h5pyd refs are strings
-             
+
             if ref:
                 try:
                     fin_obj = fin[val]
@@ -197,8 +197,8 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                         out = fout_obj.ref
                     else:
                         out = str(fout_obj.ref) # convert to string for JSON serialization
-            
-            
+
+
         elif is_regionreference(ref):
             out = "tbd"
         else:
@@ -218,7 +218,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                 v = copy_element(e, src_vlen_dt, tgt_vlen_dt, ctx)
                 out = np.array(v, dtype=tgt_dt)
             else:
-                
+
                 out = np.zeros(val.shape, dtype=tgt_dt)
                 for i in range(len(out)):
                     e = val[i]
@@ -265,7 +265,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
     logging.debug(msg)
     if ctx["verbose"]:
         print(msg)
-    
+
     tgtarr = None
     data = srcobj.attrs[name]
     src_dt = None
@@ -273,7 +273,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
         src_dt = data.dtype
     except AttributeError:
         pass # auto convert to numpy array
-    # First, make sure we have a NumPy array.  
+    # First, make sure we have a NumPy array.
     srcarr = np.asarray(data, order='C', dtype=src_dt)
     tgtarr = copy_array(srcarr, ctx)
     try:
@@ -283,7 +283,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
         msg = "ERROR: failed to create attribute {} of object {} -- {}".format(name, desobj.name, str(e))
         logging.error(msg)
         print(msg)
-    
+
 # copy_attribute
 
 def use_storeinfo(dobj, ctx):
@@ -296,9 +296,9 @@ def use_storeinfo(dobj, ctx):
         msg = "Path {} not found in storeinfo, loading dataset directly".format(dobj.name)
         logging.warn(msg)
         if ctx["verbose"]:
-            print(msg) 
+            print(msg)
         return False
-        
+
     dset_info = storeinfo[dobj.name]
     if "byteStreams" not in dset_info:
         msg = "Expected to find 'byteStreams' key in storeinfo for {}".format(dobj.name)
@@ -312,11 +312,11 @@ def use_storeinfo(dobj, ctx):
         msg = "No chunks found for {}, loading datset directly".format(dobj.name)
         logging.info(msg)
         if ctx["verbose"]:
-            print(msg) 
+            print(msg)
         return False
-    return True 
+    return True
 
-      
+
 #----------------------------------------------------------------------------------
 def create_dataset(dobj, ctx):
     """ create a dataset using the properties of the passed in h5py dataset.
@@ -325,12 +325,12 @@ def create_dataset(dobj, ctx):
     msg = "creating dataset {}, shape: {}, type: {}".format(dobj.name, dobj.shape, dobj.dtype)
     logging.info(msg)
     if ctx["verbose"]:
-        print(msg) 
+        print(msg)
     fout = ctx["fout"]
     deflate = ctx["deflate"]
-       
+
     fillvalue = None
-    try:    
+    try:
         # can trigger a runtime error if fillvalue is undefined
         fillvalue = dobj.fillvalue
     except RuntimeError:
@@ -365,7 +365,7 @@ def create_dataset(dobj, ctx):
             # TBD - check the size is not too large
             chunks["size"] = byteStream["size"]
             logging.info("using chunk layout: {}".format(chunks))
-            
+
         elif num_chunks < 10:
             # construct map of chunks
             chunk_map = {}
@@ -373,7 +373,7 @@ def create_dataset(dobj, ctx):
                 index = item["array_offset"]
                 if not isinstance(index, list) or len(index) != rank:
                     logging.error("Unexpected array_offset: {} for dataset with rank: {}".format(index, rank))
-                    return 
+                    return
                 chunk_key = ""
                 for dim in range(rank):
                     chunk_key += str(index[dim] // chunk_dims[dim])
@@ -383,7 +383,7 @@ def create_dataset(dobj, ctx):
                 chunk_offset = item["file_offset"]
                 chunk_size = item["size"]
                 chunk_map[chunk_key] = (chunk_offset, chunk_size)
-                
+
             chunks["class"] = 'H5D_CHUNKED_REF'
             chunks["file_uri"] = ctx["s3path"]
             chunks["dims"] = dobj.chunks
@@ -393,7 +393,7 @@ def create_dataset(dobj, ctx):
         else:
             # create anonymous dataset to hold chunk info
             dt = np.dtype([('offset', np.int64), ('size', np.int32)])
-            
+
             chunkinfo_arr_dims = []
             for dim in range(rank):
                 chunkinfo_arr_dims.append(int(np.ceil(dset_dims[dim] / chunk_dims[dim])))
@@ -405,7 +405,7 @@ def create_dataset(dobj, ctx):
                 logging.debug("array_offset: {}".format(index))
                 if not isinstance(index, list) or len(index) != rank:
                     logging.error("Unexpected array_offset: {} for dataset with rank: {}".format(index, rank))
-                    return 
+                    return
                 offset = 0
                 stride = 1
                 for i in range(rank):
@@ -416,7 +416,7 @@ def create_dataset(dobj, ctx):
                     chunk_size = item["size"]
                 chunkinfo_arr[offset] = (chunk_offset, chunk_size)
             anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
-            anon_dset[...] = chunkinfo_arr  
+            anon_dset[...] = chunkinfo_arr
             logging.debug("anon_dset: {}".format(anon_dset))
             logging.debug("annon_values: {}".format(anon_dset[...]))
             chunks["class"] = 'H5D_CHUNKED_REF_INDIRECT'
@@ -426,7 +426,7 @@ def create_dataset(dobj, ctx):
             logging.info("using chunk layout: {}".format(chunks))
 
 
-    # use the source object layout if we are not using reference mapping            
+    # use the source object layout if we are not using reference mapping
     if chunks is None and dobj.chunks:
         chunks = tuple(dobj.chunks)
 
@@ -459,7 +459,7 @@ def create_dataset(dobj, ctx):
                 fletcher32=fletcher32, maxshape=maxshape, \
                 compression_opts=compression_opts, fillvalue=fillvalue, \
                 scaleoffset=scaleoffset)
-        msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))  
+        msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
@@ -468,7 +468,7 @@ def create_dataset(dobj, ctx):
         logging.error(msg)
         print(msg)
         return
-    
+
 # create_dataset
 
 #----------------------------------------------------------------------------------
@@ -478,7 +478,7 @@ def write_dataset(src, tgt, ctx):
     msg = "write_dataset src: {} to tgt: {}, shape: {}, type: {}".format(src.name, tgt.name, src.shape, src.dtype)
     logging.info(msg)
     if ctx["verbose"]:
-        print(msg) 
+        print(msg)
 
     if src.shape is None:
         # null space dataset
@@ -486,7 +486,7 @@ def write_dataset(src, tgt, ctx):
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
-        return  # no data 
+        return  # no data
 
     if len(src.shape) == 0:
         # scalar dataset
@@ -499,7 +499,7 @@ def write_dataset(src, tgt, ctx):
         return
 
     fillvalue = None
-    try:    
+    try:
         # can trigger a runtime error if fillvalue is undefined
         fillvalue = src.fillvalue
     except RuntimeError:
@@ -514,8 +514,8 @@ def write_dataset(src, tgt, ctx):
 
         logging.debug("src dtype: {}".format(src.dtype))
         logging.debug("des dtype: {}".format(tgt.dtype))
-        
-        for s in it: 
+
+        for s in it:
             arr = src[s]
             # don't write arr if it's all zeros (or the fillvalue if defined)
             empty_arr = np.zeros(arr.shape, dtype=arr.dtype)
@@ -586,10 +586,10 @@ def create_group(gobj, ctx):
         print(msg)
     fout = ctx["fout"]
     grp = fout.create_group(gobj.name)
- 
+
     # create any soft/external links
     create_links(gobj, grp, ctx)
-    
+
 # create_group
 
 #----------------------------------------------------------------------------------
@@ -601,15 +601,15 @@ def create_datatype(obj, ctx):
     fout = ctx["fout"]
     fout[obj.name] = obj.dtype
 
-     
+
 # create_datatype
-      
+
 #----------------------------------------------------------------------------------
 def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None, storeinfo=None):
-    logging.info("input file: {}".format(fin.filename))   
+    logging.info("input file: {}".format(fin.filename))
     logging.info("output file: {}".format(fout.filename))
-     
-    # it would be nice to make a class out of these functions, but that 
+
+    # it would be nice to make a class out of these functions, but that
     # makes it heard to use visititems iterator.
     # instead, create a context object to pass arround common state
     ctx = {}
@@ -621,7 +621,7 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None,
     ctx["s3path"] = s3path
     ctx["storeinfo"] = storeinfo
 
-    
+
     # create any root attributes
     for ga in fin.attrs:
         copy_attribute(fout, ga, fin, ctx)
@@ -631,7 +631,7 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None,
 
     def object_create_helper(name, obj):
         class_name = obj.__class__.__name__
-         
+
         if class_name == "Dataset":
             create_dataset(obj, ctx)
         elif class_name == "Group":
@@ -640,7 +640,7 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None,
             create_datatype(obj, ctx)
         else:
             logging.error("no handler for object class: {}".format(type(obj)))
-    
+
     def object_copy_helper(name, obj):
         class_name = obj.__class__.__name__
         if class_name == "Dataset":
@@ -670,16 +670,16 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None,
     if not nodata:
         # copy dataset data
         fin.visititems(object_copy_helper)
-        
-    # Fully flush the h5py handle.  
-    fout.close() 
-      
+
+    # Fully flush the h5py handle.
+    fout.close()
+
     # close up the source domain, see reason(s) for this below
-    fin.close() 
+    fin.close()
     msg="load_file complete"
     logging.info(msg)
     if verbose:
         print(msg)
-    
+
     return 0
 # load_file

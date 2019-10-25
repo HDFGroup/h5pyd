@@ -10,9 +10,9 @@ else:
 #
 # Delete domain
 #
- 
+
 cfg = Config()
- 
+
 def getFolder(domain, mode='r'):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -20,8 +20,8 @@ def getFolder(domain, mode='r'):
     bucket = cfg["hs_bucket"]
     dir = h5py.Folder(domain, mode=mode, endpoint=endpoint, username=username, password=password, bucket=bucket)
     return dir
- 
-   
+
+
 def deleteDomain(domain):
 
     # get handle to parent folder
@@ -48,9 +48,9 @@ def deleteDomain(domain):
             sys.exit("Not allowed")
         else:
             sys.exit("Unexpected error: {}".format(oe))
-    
+
     if base_name not in hparent:
-        # note - this may happen if the domain was recently created and not 
+        # note - this may happen if the domain was recently created and not
         # yet synced to S3
         sys.exit("domain: {} not found".format(domain))
 
@@ -74,7 +74,7 @@ def deleteDomain(domain):
             print("Folder: {} deleted".format(domain))
         else:
             print("Domain: {} deleted".format(domain))
-      
+
 #
 # Usage
 #
@@ -101,7 +101,7 @@ def main():
         val = None
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1]
-    
+
         if arg in ("-h", "--help"):
             printUsage()
         elif arg in ("-e", "--endpoint"):
@@ -130,7 +130,7 @@ def main():
             elif val == "ERROR":
                 loglevel = logging.ERROR
             else:
-                printUsage()  
+                printUsage()
             argn += 2
         elif arg == '--logfile':
             logfname = val
@@ -140,7 +140,7 @@ def main():
         else:
             domains.append(arg)
             argn += 1
- 
+
     if len(domains) == 0:
         # need a domain
         printUsage()
@@ -152,7 +152,7 @@ def main():
     for domain in domains:
         if not domain.startswith('/'):
             sys.exit("domain: {} must start with a slash".format(domain))
-         
+
         deleteDomain(domain)
 
 

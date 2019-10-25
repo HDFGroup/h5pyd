@@ -69,18 +69,18 @@ class TestCreateDataset(TestCase):
         else:
             # h5serv not reporting chunks
             self.assertTrue(dset_chunked.chunks is None)
-        
+
         f.close()
 
     def test_create_float16_dset(self):
-        
+
         filename = self.getFileName("create_float16_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
         if not config.get('use_h5py') and isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             # Float16 not supported with h5serv
             return
-       
+
         nrows = 4
         ncols = 8
         dims = (nrows, ncols)
@@ -106,7 +106,7 @@ class TestCreateDataset(TestCase):
 
         # write entire array to dataset
         dset[...] = arr
-        
+
         arr = dset[...]  # read back
         val = arr[2,4]   # test one value
         self.assertTrue(val > 20.4 - 0.01)
@@ -144,7 +144,7 @@ class TestCreateDataset(TestCase):
             # the following is failing on h5serv
             f.close()
             return
-    
+
         dims = (6, 3)
         dtype = np.dtype("S1")
         fillvalue = b'X'
@@ -165,7 +165,7 @@ class TestCreateDataset(TestCase):
         self.assertEqual(dset.fillvalue, b'X')
         self.assertEqual(dset[0,0], b'a')
         self.assertEqual(dset[5,2], b'z')
-        
+
 
         f.close()
 
@@ -190,7 +190,7 @@ class TestCreateDataset(TestCase):
         self.assertEqual(dset.fillvalue, 0)
 
         self.assertEqual(dset[0], 0)
-        
+
         dset[:] = np.ones((10,), dtype='uint32')
         vals = dset[:]  # read back
         for i in range(10):
@@ -222,16 +222,14 @@ class TestCreateDataset(TestCase):
         self.assertEqual(dset.fillvalue, b'')
 
         self.assertEqual(dset[0], b'')
-        
+
         words = (b"one", b"two", b"three", b"four", b"five", b"six", b"seven", b"eight", b"nine", b"ten")
         dset[:] = words
         vals = dset[:]  # read back
         for i in range(10):
             self.assertEqual(vals[i], words[i])
-        
-        f.close()
 
-    
+        f.close()
 
     def test_create_dset_by_path(self):
         filename = self.getFileName("create_dset_by_path")
@@ -374,8 +372,8 @@ class TestCreateDataset(TestCase):
         self.assertEqual(dset.fillvalue, 0)
 
         self.assertEqual(dset[0], False)
-        
-        
+
+
         vals = dset[:]  # read back
         for i in range(10):
             self.assertEqual(vals[i], False)
@@ -393,7 +391,7 @@ class TestCreateDataset(TestCase):
                 self.assertEqual(vals[i], True)
             else:
                 self.assertEqual(vals[i], False)
-           
+
         f.close()
 
 

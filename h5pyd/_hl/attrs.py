@@ -123,7 +123,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         """
         if six.PY3 and isinstance(name, bytes):
             name = name.decode("utf-8")
-        
+
         if self._objdb_attributes is not None:
             if name not in self._objdb_attributes:
                 raise KeyError
@@ -159,7 +159,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             subdtype, subshape = dtype.subdtype
             shape = shape + subshape   # (5, 3)
             dtype = subdtype           # 'f'
-        
+
         arr = jsonToArray(shape, htype, value_json)
 
         if len(arr.shape) == 0:
@@ -333,7 +333,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     @with_phil
     def __len__(self):
         """ Number of attributes attached to the object. """
-        
+
         if self._objdb_attributes is not None:
             count = len(self._objdb_attributes)
         else:
@@ -353,14 +353,14 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             for name in self._objdb_attributes:
                 yield name
 
-        else:       
+        else:
             # make server request
             req = self._req_prefix
             # backup over the trailing slash in req
             req = req[:-1]
             rsp = self._parent.GET(req)
             attributes = rsp['attributes']
-        
+
             attrlist = []
             for attr in attributes:
                 attrlist.append(attr['name'])

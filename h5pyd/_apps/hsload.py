@@ -168,7 +168,7 @@ def main():
             with open(val) as f:
                 storeinfo = json.load(f)
             argn += 2
-  
+
         elif arg == "--nodata":
             nodata = True
             argn += 1
@@ -281,7 +281,7 @@ def main():
                 # folder destination
                 tgt = tgt + op.basename(src_file)
 
-           
+
             # get a handle to input file
             try:
                 fin = h5py.File(src_file, mode='r')
@@ -295,7 +295,7 @@ def main():
                 password = cfg["hs_password"]
                 endpoint = cfg["hs_endpoint"]
                 bucket = cfg["hs_bucket"]
-                
+
                 fout = h5pyd.File(tgt, 'x', endpoint=endpoint, username=username, password=password, bucket=bucket)
             except IOError as ioe:
                 if ioe.errno == 404:
@@ -306,7 +306,7 @@ def main():
                     logging.error("Error creating file {}: {}".format(tgt, ioe))
                 sys.exit(1)
 
-            
+
             # do the actual load
             storeinfo_file = None
             if storeinfo and src_file in storeinfo:

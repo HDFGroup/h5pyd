@@ -102,9 +102,9 @@ class HttpConn:
 
         if bucket is None:
             if "HS_BUCKET" in os.environ:
-                bucket = os.environ["HS_BUCKET"]  
+                bucket = os.environ["HS_BUCKET"]
             if isinstance(bucket, str) and (not bucket or bucket.upper() == "NONE"):
-                bucket = None      
+                bucket = None
         self._bucket = bucket
 
         if api_key is None and "HS_API_KEY" in os.environ:
@@ -156,7 +156,7 @@ class HttpConn:
         if self._objdb:
             pass
             #raise IOError("test extra GET")
-        
+
         rsp = None
 
         if not headers:
@@ -241,7 +241,7 @@ class HttpConn:
             params["bucket"] = self._bucket
         if self._api_key:
             params["api_key"] = self._api_key
-         
+
         # verify the file was open for modification
         if self._mode == 'r':
             raise IOError("Unable to create group (No write intent on file)")
@@ -270,7 +270,7 @@ class HttpConn:
             self.log.error("connection error: {}".format(ce))
             raise IOError("Connection Error")
 
-        if rsp.status_code == 201 and req == '/': 
+        if rsp.status_code == 201 and req == '/':
             self.log.info("clearning domain_json cache")
             self._domain_json = None
 
@@ -315,7 +315,7 @@ class HttpConn:
             # binary write
             data = body
         else:
-            data = json.dumps(body)   
+            data = json.dumps(body)
 
         self.log.info("POST: " + req)
 
@@ -348,7 +348,7 @@ class HttpConn:
         if self._api_key:
             params["api_key"] = self._api_key
 
-        # verify we have write intent  
+        # verify we have write intent
         if self._mode == 'r':
             raise IOError("Unable perform request (No write intent on file)")
 
@@ -370,7 +370,7 @@ class HttpConn:
             self.log.error("connection error: {}".format(ce))
             raise IOError("Connection Error")
 
-        if rsp.status_code == 200 and req == '/': 
+        if rsp.status_code == 200 and req == '/':
             self.log.info("clearning domain_json cache")
             self._domain_json = None
 
@@ -386,7 +386,7 @@ class HttpConn:
         if self._use_session:
             if self._s is None:
                 s = requests.Session()
-            
+
                 retry = Retry(
                     total=retries,
                     read=retries,

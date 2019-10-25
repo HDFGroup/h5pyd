@@ -19,7 +19,7 @@ try:
 except ImportError as e:
     sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
     sys.exit(1)
- 
+
 
 if __name__ == "__main__":
     from config import Config
@@ -100,8 +100,8 @@ def createFile(domain, linked_domain=None):
     fh = h5pyd.File(domain, mode='x', endpoint=endpoint, username=username, password=password, bucket=bucket, owner=owner, linked_domain=linked_domain)
     return fh
 
- 
-   
+
+
 def deleteDomain(domain, keep_root=False):
 
     # get handle to parent folder
@@ -128,9 +128,9 @@ def deleteDomain(domain, keep_root=False):
             sys.exit("Not allowed")
         else:
             sys.exit("Unexpected error: {}".format(oe))
-    
+
     if base_name not in hparent:
-        # note - this may happen if the domain was recently created and not 
+        # note - this may happen if the domain was recently created and not
         # yet synced to S3
         sys.exit("domain: {} not found".format(domain))
 
@@ -233,12 +233,12 @@ def main():
 
     if src_domain[-1] == '/':
         print("folder can not be used for src domain")
-        
+
     if des_domain[-1] == '/':
         # add on the filename from source to folder path
         des_domain += op.basename(src_domain)
 
-    
+
     logging.info("source domain: {}".format(src_domain))
     logging.info("target domain: {}".format(des_domain))
 

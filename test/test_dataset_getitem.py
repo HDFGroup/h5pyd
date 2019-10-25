@@ -130,7 +130,7 @@ class TestEmpty(TestCase):
         with self.assertRaises(ValueError):
             self.dset['field']
         """
- 
+
 class TestScalarFloat(TestCase):
 
     def setUp(self):
@@ -250,13 +250,13 @@ class TestScalarCompound(TestCase):
     # failed with earlier h5py versions
     def test_fieldnames(self):
         """ field name -> bare value """
-        
+
         #TBD: fix when field access is supported in h5serv/hsds
         if config.get("use_h5py"):
             out = self.dset['a']
             self.assertIsInstance(out, np.float32)
             self.assertEqual(out, self.dset['a'])
-         
+
 
 
 class TestScalarArray(TestCase):
@@ -448,7 +448,7 @@ class Test1DFloat(TestCase):
     def test_indexlist_empty(self):
         if not config.get('use_h5py'):
             self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
-         
+
 
     # FIXME: NumPy has IndexError
     def test_indexlist_outofrange(self):

@@ -29,7 +29,7 @@ class DimensionProxy(base.CommonStateObject):
             objid = self._id.id
         objdb = self._id.http_conn.getObjDb()
         if objdb:
-            # objdb present, get JSON for this dataset    
+            # objdb present, get JSON for this dataset
             if objid not in objdb:
                 msg = "Error: expected {} to be in objdb".format(objid)
                 raise IOError(msg)
@@ -50,18 +50,18 @@ class DimensionProxy(base.CommonStateObject):
     def _getDatasetJson(self, objid):
         """ Helper function to get dataset json by id
         """
-        
+
         objdb = self._id.http_conn.getObjDb()
         if objdb:
-            # objdb present, get JSON for this dataset    
+            # objdb present, get JSON for this dataset
             if objid not in objdb:
                 msg = "Error: expected {} to be in objdb".format(objid)
                 raise IOError(msg)
             dset_json = objdb[objid]
             return dset_json
-             
+
         # no objdb, make server request
-        req = "/datasets/" + objid 
+        req = "/datasets/" + objid
         rsp = self._id.http_conn.GET(req)
         if rsp.status_code == 200:
             dset_json = json.loads(rsp.text)
@@ -72,18 +72,18 @@ class DimensionProxy(base.CommonStateObject):
     def label(self):
         ''' Get the dimension scale label '''
         labels_json = self._getAttributeJson('DIMENSION_LABELS')
-         
+
         if not labels_json:
             return ''
-        
+
         label_values = labels_json["value"]
 
         if self._dimension >= len(label_values):
             # label get request out of range
             return ''
-        
+
         return label_values[self._dimension]
-        
+
 
     @label.setter
     @with_phil
@@ -131,7 +131,7 @@ class DimensionProxy(base.CommonStateObject):
             yield k
 
     @with_phil
-    def __len__(self):        
+    def __len__(self):
         dimlist_json = self._getAttributeJson('DIMENSION_LIST')
         if not dimlist_json:
             return 0
@@ -148,7 +148,7 @@ class DimensionProxy(base.CommonStateObject):
         dimlist_attr_values = []
         if dimlist_attr_json:
             dimlist_attr_values = dimlist_attr_json["value"]
-         
+
         if self._dimension >= len(dimlist_attr_values):
             # dimension scale len request out of range")
             return None

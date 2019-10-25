@@ -240,7 +240,7 @@ def getFolder(domain):
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
     bucket   = cfg["hs_bucket"]
-    pattern = cfg["pattern"] 
+    pattern = cfg["pattern"]
     query = cfg["query"]
     batch_size = 100  # use smaller batchsize for interactively listing of large collections
     dir = h5py.Folder(domain, endpoint=endpoint, username=username,
@@ -298,7 +298,7 @@ def visitDomains(domain, depth=1):
             item = dir[name]
             owner = item["owner"]
             full_path = domain + '/' + name
-           
+
             num_bytes = " "
             if cfg["verbose"] and "total_size" in item:
                 num_bytes = item["total_size"]
@@ -309,7 +309,7 @@ def visitDomains(domain, depth=1):
                 timestamp = ""
             else:
                 timestamp = datetime.fromtimestamp(int(item["lastModified"]))
-    
+
             print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
                                               dir_class, timestamp,
                                               full_path))
@@ -436,7 +436,7 @@ def main():
         elif arg == "--query":
             cfg["query"] = val
             argn += 2
-        
+
         elif arg[0] == '-':
             printUsage()
         else:
@@ -477,7 +477,7 @@ def main():
                 else:
                     print("Unexpected error: {}".format(ioe))
                     continue
-        
+
             grp = f['/']
             if grp is None:
                 print("{}: No such domain".format(domain))

@@ -175,8 +175,8 @@ def copyToArray(arr, rank, index, data, vlen_base=None):
                 e = np.array(data[i], dtype=vlen_base)
                 if len(e.shape) > 1:
                     # squeeze dimensions, but don't convert a 1-d to 0-d
-                    e = e.squeeze()  
-                arr[tuple(index)] = e  
+                    e = e.squeeze()
+                arr[tuple(index)] = e
             else:
                 arr[tuple(index)] = data[i]
     index[rank] = 0
@@ -332,7 +332,7 @@ Copy to buffer at given offset
 def copyBuffer(src, des, offset):
     for i in range(len(src)):
         des[i+offset] = src[i]
-         
+
     return offset + len(src)
 
 """
@@ -343,7 +343,7 @@ def copyElement(e, dt, buffer, offset):
         for name in dt.names:
             field_dt = dt[name]
             field_val = e[name]
-            offset = copyElement(field_val, field_dt, buffer, offset) 
+            offset = copyElement(field_val, field_dt, buffer, offset)
     elif not dt.metadata or "vlen" not in dt.metadata:
         #print("e no vlen: {} type: {}".format(e, type(e)))
         e_buf = e.tobytes()
@@ -361,7 +361,7 @@ def copyElement(e, dt, buffer, offset):
         if isinstance(e, int):
             if e == 0:
                 # write 4-byte integer 0 to buffer
-                offset = copyBuffer(b'\x00\x00\x00\x00', buffer, offset)  
+                offset = copyBuffer(b'\x00\x00\x00\x00', buffer, offset)
             else:
                 raise ValueError("Unexpected value: {}".format(e))
         elif isinstance(e, bytes):
@@ -383,7 +383,7 @@ def copyElement(e, dt, buffer, offset):
             else:
                 arr1d = e.reshape((nElements,))
                 for item in arr1d:
-                    offset = copyElement(item, dt, buffer, offset)            
+                    offset = copyElement(item, dt, buffer, offset)
 
         elif False and isinstance(e, list) or isinstance(e, tuple):
             count = np.int32(len(e) * vlen.itemsize)
@@ -393,7 +393,7 @@ def copyElement(e, dt, buffer, offset):
             else:
                 arr = np.asarray(e, dtype=vlen)
             offset = copyBuffer(arr.tobytes(), buffer, offset)
-       
+
         else:
             raise TypeError("unexpected type: {}".format(type(e)))
         #print("buffer: {}".format(buffer))
@@ -404,7 +404,7 @@ Get the count value from persisted vlen array
 """
 def getElementCount(buffer, offset):
     count_bytes = bytes(buffer[offset:(offset+4)])
-        
+
     try:
         count = int(np.frombuffer(count_bytes, dtype="<i4"))
     except TypeError as e:
@@ -420,11 +420,11 @@ def getElementCount(buffer, offset):
 
 
 """
-Read element from bytearrray 
+Read element from bytearrray
 """
 def readElement(buffer, offset, arr, index, dt):
     #print("readElement, offset: {}, index: {} dt: {}".format(offset, index, dt))
-    
+
     if len(dt) > 1:
         e = arr[index]
         for name in dt.names:
@@ -442,7 +442,7 @@ def readElement(buffer, offset, arr, index, dt):
         # variable length element
         vlen = dt.metadata["vlen"]
         e = arr[index]
-        
+
         if isinstance(e, np.ndarray):
             nelements = np.prod(dt.shape)
             e.reshape((nelements,))
@@ -466,19 +466,19 @@ def readElement(buffer, offset, arr, index, dt):
                     arr[index] = e
             else:
                 arr[index] = vlen(0)
-        
+
     return offset
 
-             
-""" 
+
+"""
 Return byte representation of numpy array
 """
 def arrayToBytes(arr):
     #print("arrayToBytes: ", arr)
     if not isVlen(arr.dtype):
         # can just return normal numpy bytestream
-        return arr.tobytes()  
-    
+        return arr.tobytes()
+
     nSize = getByteArraySize(arr)
     buffer = bytearray(nSize)
     offset = 0
@@ -496,7 +496,7 @@ def bytesToArray(data, dt, shape):
     nelements = getNumElements(shape)
     if not isVlen(dt):
         # regular numpy from string
-        arr = np.frombuffer(data, dtype=dt)  
+        arr = np.frombuffer(data, dtype=dt)
     else:
         arr = np.zeros((nelements,), dtype=dt)
         offset = 0
@@ -737,7 +737,7 @@ class HLObject(CommonStateObject):
 
     def _getNameFromObjDb(self):
         objdb = self._id._http_conn.getObjDb()
-        
+
         if not objdb:
             return None
 
@@ -792,7 +792,7 @@ class HLObject(CommonStateObject):
         else:
             self.log.debug("_getNameFromObjDb - could not find path")
             return None
-                
+
 
     @property
     def name(self):

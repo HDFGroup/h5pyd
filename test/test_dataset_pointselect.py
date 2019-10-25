@@ -42,7 +42,7 @@ class TestPointSelectDataset(TestCase):
         self.assertEqual(len(pos_vals), 45)
         for value in pos_vals:
             self.assertTrue(value > 0)
-         
+
         f.close()
 
     def test_1d_pointselect(self):
@@ -81,8 +81,8 @@ class TestPointSelectDataset(TestCase):
         else:
             # But this type of selection not working for h5py
             # cf: https://github.com/h5py/h5py/issues/966
-            pts = dset2d[ [ (5,5), (5,10), (5,15) ] ] 
-        
+            pts = dset2d[ [ (5,5), (5,10), (5,15) ] ]
+
         expected_vals =  [5005,5010,5015]
         for i in range(len(expected_vals)):
             self.assertEqual(pts[i],expected_vals[i])
@@ -95,7 +95,7 @@ class TestPointSelectDataset(TestCase):
                 self.assertEqual(pts[0,i], vals[1,i])
                 self.assertEqual(pts[1,i], vals[2,i])
 
-         
+
         f.close()
 
     def test_2d_pointselect_broadcast(self):
@@ -112,7 +112,7 @@ class TestPointSelectDataset(TestCase):
         dset2d[...] = vals
         if config.get("use_h5py"):
             # TODO - not working for h5pyd
-            pts = dset2d[(2,4,7), :] 
+            pts = dset2d[(2,4,7), :]
             self.assertEqual(len(pts),3)
             row1 = pts[0,:]
             self.assertEqual(list(row1), list(range(2000, 2020)))
@@ -120,8 +120,8 @@ class TestPointSelectDataset(TestCase):
             self.assertEqual(list(row2), list(range(4000, 4020)))
             row3 = pts[2,:]
             self.assertEqual(list(row3), list(range(7000, 7020)))
-         
-        
+
+
         f.close()
 
 

@@ -44,7 +44,7 @@ class Group(HLObject, MutableMappingHDF5):
         self._req_prefix = "/groups/" + self.id.uuid
         self._link_db = {}  # cache for links
 
-    
+
     def _get_link_json(self, h5path):
         """ Return parent_uuid and json description of link for given path """
         self.log.debug("__get_link_json({})".format(h5path))
@@ -181,7 +181,7 @@ class Group(HLObject, MutableMappingHDF5):
         if h5path[-1] == '/':
             raise ValueError("Invalid path for create_group")
 
-      
+
         if h5path[0] == '/':
             # absolute path
             parent_uuid = self.file.id.id   # uuid of root group
@@ -197,11 +197,11 @@ class Group(HLObject, MutableMappingHDF5):
         sub_group = None  # the object we'll return
         for link in links:
             if not link:
-                continue  # skip 
+                continue  # skip
             self.log.debug("create_group - iterate for link: {}".format(link))
             create_group = False
             req = "/groups/" + parent_uuid + "/links/" + link
-            
+
             try:
                 rsp_json = self.GET(req)
             except IOError as ioe:
@@ -247,7 +247,7 @@ class Group(HLObject, MutableMappingHDF5):
             # didn't actually create anything
             raise ValueError("name already exists")
         return sub_group
-                
+
 
     def create_dataset(self, name, shape=None, dtype=None, data=None, **kwds):
         """ Create a new HDF5 dataset
@@ -507,7 +507,7 @@ class Group(HLObject, MutableMappingHDF5):
                 else:
                     raise IOError("expected to find {} in objdb".format(uuid))
             else:
-                # will need to get JSON from server 
+                # will need to get JSON from server
                 req = "/" + collection_type + "/" + uuid
                 # make server request
                 obj_json = self.GET(req)
@@ -800,7 +800,7 @@ class Group(HLObject, MutableMappingHDF5):
         else:
             for name in links:
                 yield name
-       
+
 
     def __contains__(self, name):
         """ Test if a member name exists """
@@ -1004,7 +1004,7 @@ class Group(HLObject, MutableMappingHDF5):
                         item = links_json[k]
                         item['title'] = k
                         links.append(item)
-                else: 
+                else:
                     # request from server
                     req = "/groups/" + parent.id.uuid + "/links"
                     rsp_json = self.GET(req)
@@ -1038,7 +1038,7 @@ class Group(HLObject, MutableMappingHDF5):
                         if retval is not None:
                             # caller indicates to end iteration
                             break
-        
+
         return retval
         """
         with phil:

@@ -33,7 +33,7 @@ class TestTable(TestCase):
         f = h5py.File(filename, "w")
         if not f.id.id.startswith("g-"):
             return # append not supported with h5serv
-        
+
         count = 10
 
         dt = np.dtype([('real', np.float), ('img', np.float)])
@@ -66,7 +66,7 @@ class TestTable(TestCase):
         arr = table.read(start=5, stop=6)
         self.assertEqual(arr.shape, (1,))
 
-            
+
         f.close()
 
     def test_query_table(self):
@@ -78,7 +78,7 @@ class TestTable(TestCase):
 
         if not f.id.id.startswith("g-"):
             return # append not supported with h5serv
-        
+
         # write entire array
         data = [
             ("EBAY", "20170102", 3023, 3088),
@@ -93,11 +93,11 @@ class TestTable(TestCase):
             ("EBAY", "20170105", 2973, 2962),
             ("AAPL", "20170105", 2934, 3010),
             ("AMZN", "20170105", 3018, 3086)
-        ] 
-         
+        ]
+
         dt = np.dtype([('symbol', 'S4'), ('date', 'S8'), ('open', 'i4'), ('close', 'i4')])
         table = f.create_table('stock', dtype=dt)
-        
+
         table.append(data)
 
         self.assertEqual(table.nrows, len(data))
@@ -108,7 +108,7 @@ class TestTable(TestCase):
             for col in range(2,3):
                 # first two columns will come back as bytes, not strs
                 self.assertEqual(row[col], item[col])
-         
+
         condition = "symbol == b'AAPL'"
         quotes = table.read_where(condition)
         self.assertEqual(len(quotes), 4)

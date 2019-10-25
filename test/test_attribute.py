@@ -35,11 +35,11 @@ class TestAttribute(TestCase):
         is_hsds = False
         if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
             is_hsds = True  # HSDS has different permission defaults
- 
+
         g1 = f.create_group('g1')
 
         g1.attrs['a1'] = 42
-         
+
         n = g1.attrs['a1']
         self.assertEqual(n, 42)
 
@@ -58,14 +58,14 @@ class TestAttribute(TestCase):
         self.assertEqual(n, 24)
 
         self.assertEqual(len(g1.attrs), 2)
-        
+
         # create an attribute with explict UTF type
         dt = h5py.special_dtype(vlen=str)
         g1.attrs.create('c1', "Hello HDF", dtype=dt)
         self.assertTrue('c1' in g1.attrs)
         value = g1.attrs['c1']
         self.assertEqual(value, "Hello HDF")
-        
+
         # create attribute with as a fixed length string
         g1.attrs.create('d1', np.string_("This is a numpy string"))
         value = g1.attrs['d1']
@@ -99,9 +99,9 @@ class TestAttribute(TestCase):
         else:
             # TBD: why is this different for PY2?
             self.assertEqual(arr.dtype.itemsize, 8)
-            
-         
-    
+
+
+
         # scalar byte values
         g1.attrs['e1'] = "Hello"
         s = g1.attrs['e1']
@@ -113,7 +113,7 @@ class TestAttribute(TestCase):
 
         if is_hsds:
             # following is not working with h5serv
-            g11_ref = g11.ref   # get ref to g1/g1.1       
+            g11_ref = g11.ref   # get ref to g1/g1.1
             self.assertTrue(isinstance(g11_ref, h5py.Reference))
             refdt = h5py.special_dtype(ref=h5py.Reference)  # create ref dtype
             g1.attrs.create('f1', g11_ref, dtype=refdt)     # create attribute with ref to g1.1
@@ -126,7 +126,7 @@ class TestAttribute(TestCase):
 
         # close file
         f.close()
-   
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

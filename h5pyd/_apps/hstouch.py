@@ -10,7 +10,7 @@ else:
 #
 # Create domain or update timestamp if domain already exist
 #
- 
+
 cfg = Config()
 
 def getFolder(domain):
@@ -56,7 +56,7 @@ def createFile(domain):
     return fh
 
 
-   
+
 def touchDomain(domain):
 
     make_folder = False
@@ -65,7 +65,7 @@ def touchDomain(domain):
         domain = domain[:-1]
 
     # get handle to parent folder
-    parent_domain = op.dirname(domain) 
+    parent_domain = op.dirname(domain)
 
     if parent_domain == '/':
         if cfg["hs_username"] != "admin":
@@ -74,7 +74,7 @@ def touchDomain(domain):
             sys.exit("Only folders can be created as a top-level domain")
         if len(domain) < 5:
             sys.exit("Top-level folders must be at least three characters")
-        
+
     else:
         if not parent_domain.endswith('/'):
             parent_domain += '/'
@@ -90,7 +90,7 @@ def touchDomain(domain):
                 sys.exit("Not allowed")
             else:
                 sys.exit("Unexpected error: {}".format(oe))
-    
+
     hdomain = None
     try:
         hdomain = getFile(domain)
@@ -159,7 +159,7 @@ def main():
         val = None
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1]
-    
+
         if arg in ("-h", "--help"):
             printUsage()
         elif arg in ("-v", "--verbose"):
@@ -176,7 +176,7 @@ def main():
             elif val == "ERROR":
                 loglevel = logging.ERROR
             else:
-                printUsage()  
+                printUsage()
             argn += 2
         elif arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = sys.argv[argn+1]
@@ -198,7 +198,7 @@ def main():
         else:
             domains.append(arg)
             argn += 1
- 
+
     if len(domains) == 0:
         # need a domain
         printUsage()
@@ -210,7 +210,7 @@ def main():
     for domain in domains:
         if not domain.startswith('/'):
             sys.exit("domain: {} must start with a slash".format(domain))
-       
+
         touchDomain(domain)
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ import sys
 import logging
 import time
 from datetime import datetime
-import h5pyd  
+import h5pyd
 if __name__ == "__main__":
     from config import Config
 else:
@@ -12,10 +12,10 @@ else:
 #
 # Print objects in a domain in the style of the hsls utilitiy
 #
- 
- 
+
+
 cfg = Config()
- 
+
 
 #
 # Usage
@@ -51,7 +51,7 @@ def getUpTime(start_time):
     if days:
         ret_str = "{} days, {} hours {} min {} sec".format(days, hrs, mins, sec)
     elif hrs:
-        ret_str =  "{} hours {} min {} sec".format(hrs, mins, sec) 
+        ret_str =  "{} hours {} min {} sec".format(hrs, mins, sec)
     elif mins:
         ret_str =  "{} min {} sec".format(mins, sec)
     else:
@@ -93,7 +93,7 @@ def getServerInfo(cfg):
             home_folder = getHomeFolder(username)
             if home_folder:
                 print("home: {}".format(home_folder))
-    
+
         if "hsds_version" in info:
             print("server version: {}".format(info["hsds_version"]))
         if "node_count" in info:
@@ -104,8 +104,8 @@ def getServerInfo(cfg):
             uptime = getUpTime(info["start_time"])
             print("up: {}".format(uptime))
         print("h5pyd version: {}".format(h5pyd.version.version))
-        
-        
+
+
     except IOError as ioe:
         if ioe.errno == 401:
             print("username/password not valid for username: {}".format(username))
@@ -125,12 +125,12 @@ def getDomainInfo(domain, cfg):
     else:
         is_folder = False
         obj_class = "Domain"
-   
+
     try:
         if domain.endswith('/'):
             f = h5pyd.Folder(domain, mode='r', endpoint=endpoint, username=username,
                    password=password, bucket=bucket, use_cache=True)
-        else:        
+        else:
             f = h5pyd.File(domain, mode='r', endpoint=endpoint, username=username,
                    password=password, bucket=bucket, use_cache=True)
     except IOError as oe:
@@ -142,7 +142,7 @@ def getDomainInfo(domain, cfg):
             sys.exit("Not allowed")
         else:
             sys.exit("Unexpected error: {}".format(oe))
-        
+
     timestamp = datetime.fromtimestamp(int(f.modified))
 
     if is_folder:
@@ -158,7 +158,7 @@ def getDomainInfo(domain, cfg):
         print("    owner:           {}".format(f.owner))
         print("    id:              {}".format(f.id.id))
         print("    last modified:   {}".format(timestamp))
-        print("    total_size:      {}".format(format_size(f.total_size)))    
+        print("    total_size:      {}".format(format_size(f.total_size)))
         print("    allocated_bytes: {}".format(format_size(f.allocated_bytes)))
         print("    num objects:     {}".format(num_objects))
         print("    num chunks:      {}".format(num_chunks))
@@ -226,7 +226,7 @@ def main():
             elif val == "ERROR":
                 cfg["loglevel"] = logging.ERROR
             else:
-                printUsage()  
+                printUsage()
             argn += 2
         elif arg == '--logfile':
             cfg["logfname"] = val
@@ -253,7 +253,7 @@ def main():
             argn += 1
 
     # setup logging
-     
+
     logging.basicConfig(filename=cfg["logfname"], format='%(asctime)s %(message)s', level=cfg["loglevel"])
     logging.debug("set log_level to {}".format(cfg["loglevel"]))
 
@@ -266,7 +266,7 @@ def main():
     else:
         for domain in domains:
             getDomainInfo(domain, cfg)
- 
+
 
 if __name__ == "__main__":
     main()

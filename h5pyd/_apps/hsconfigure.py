@@ -43,7 +43,7 @@ def saveConfig(username, password, endpoint, api_key):
             file.write("hs_api_key = {}\n".format(api_key))
         else:
             file.write("hs_api_key = \n")
-   
+
 #
 # Check to see if we can get a response from the server
 #
@@ -60,7 +60,7 @@ def pingServer(username, password, endpoint, api_key):
         state = info["state"]
         if state != "READY":
             print("Server is not ready, please try later")
-            return False  
+            return False
     except IOError as ioe:
         if ioe.errno == 401:
             print("Unauthorized (username/password or api key not valid)")
@@ -108,13 +108,13 @@ def main():
             print("Updated endpoint [{}]:".format(new_endpoint))
             hs_endpoint = new_endpoint
             dirty = True
-         
+
         new_username = get_input("Username [{}]: ".format(hs_username))
         if new_username:
             print("Updated username: [{}]".format(new_username))
             hs_username = new_username
             dirty = True
-        
+
         new_password = get_input("Password [{}]: ".format(hs_password))
         if new_password:
             print("updated password: [{}]".format(new_password))
@@ -126,7 +126,7 @@ def main():
             print("updated api key: [{}]".format(new_api_key))
             hs_api_key = new_api_key
             dirty = True
-        
+
         print("Testing connection...")
         ok = pingServer(hs_username, hs_password, hs_endpoint, hs_api_key)
         if ok:

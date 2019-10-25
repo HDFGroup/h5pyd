@@ -34,7 +34,7 @@ class TestVisit(TestCase):
     def test_visit(self):
         filename = self.getFileName("test_visit")
         print("filename:", filename)
-        
+
         f = h5py.File(filename, 'w')
         f.create_group("g1")
         self.assertTrue("g1" in f)
@@ -45,8 +45,8 @@ class TestVisit(TestCase):
         f.create_dataset('g1/g1.1/dset', data=42, dtype='i4')
         f["/g1/soft"] = h5py.SoftLink('/g2')
         f.close()
-        
-        
+
+
         # re-open as read-only
         f = h5py.File(filename, 'r')
         f.visit(visit_item)
@@ -56,7 +56,7 @@ class TestVisit(TestCase):
             self.assertTrue(h5path in visit_names)
         ret = f.visit(find_g1_1)
         self.assertEqual(ret, "found g1.1")
-                
+
         f.close()
 
 

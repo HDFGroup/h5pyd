@@ -44,9 +44,9 @@ class Cursor():
         BEWARE: Modifications to the yielded data are *NOT* written to file.
         """
         nrows = self._table.nrows
-        # to reduce round trips, grab BUFFER_SIZE items at a time  
+        # to reduce round trips, grab BUFFER_SIZE items at a time
         # TBD: set buffersize based on size of each row
-        BUFFER_SIZE = 10000  
+        BUFFER_SIZE = 10000
 
         arr = None
         query_complete = False
@@ -58,7 +58,7 @@ class Cursor():
                 if nrows - indx < read_count:
                     read_count = nrows - indx
                 if self._query is None:
-                    
+
                     arr = self._table[indx:read_count+indx]
                 else:
                     # call table to return query result
@@ -90,7 +90,7 @@ class Table(Dataset):
         if len(self._shape) > 1:
             raise ValueError("Table must be one-dimensional")
 
-       
+
     @property
     def colnames(self):
         """Numpy-style attribute giving the number of dimensions"""
@@ -121,7 +121,7 @@ class Table(Dataset):
             numpy.copyto(out, arr)
         else:
             return arr
-            
+
 
 
     def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None, limit=None):
@@ -246,7 +246,7 @@ class Table(Dataset):
 
         return arr
 
-    
+
     def update_where(self, condition, value, start=None, stop=None, step=None, limit=None):
         """Modify rows in table using pytable-style condition
         """
@@ -275,12 +275,12 @@ class Table(Dataset):
             params["select"] = sel_param
 
         req = "/datasets/" + self.id.uuid + "/value"
-       
+
         rsp = self.PUT(req, body=value, format="json", params=params)
         indices = None
         arr = None
         if "index" in rsp:
-            indices = rsp["index"]  
+            indices = rsp["index"]
             if indices:
                 arr = numpy.array(indices)
 
@@ -291,10 +291,10 @@ class Table(Dataset):
         """
         return Cursor(self, query=condition, start=start, stop=stop)
 
-       
-    
+
+
     def append(self, rows):
-        """ Append rows to end of table 
+        """ Append rows to end of table
         """
         self.log.info("Table append")
         if not self.id.uuid.startswith("d-"):
@@ -317,7 +317,7 @@ class Table(Dataset):
 
         if isinstance(val, Reference):
             # h5pyd References are just strings
-            val = val.tolist() 
+            val = val.tolist()
 
         # Generally we try to avoid converting the arrays on the Python
         # side.  However, for compound literals this is unavoidable.
@@ -355,7 +355,7 @@ class Table(Dataset):
                 val = tmp
         else:
             val = numpy.asarray(val, order='C', dtype=self.dtype)
-        
+
         self.log.debug("rows shape: {}".format(val.shape))
         self.log.debug("data dtype: {}".format(val.dtype))
 

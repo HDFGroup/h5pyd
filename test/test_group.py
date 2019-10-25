@@ -32,7 +32,7 @@ class TestGroup(TestCase):
         if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
             is_hsds = True  # HSDS has different permission defaults
         self.assertTrue('/' in f)
-        r = f['/'] 
+        r = f['/']
 
         self.assertEqual(len(r), 0)
         self.assertTrue(isinstance(r, h5py.Group))
@@ -53,7 +53,7 @@ class TestGroup(TestCase):
         self.assertEqual(g1_1.name, "/g1/g1.1")
         self.assertEqual(len(r), 1)
         self.assertEqual(len(g1), 1)
-           
+
         r.create_group('g2')
         self.assertEqual(len(r), 2)
         keys = []
@@ -101,7 +101,7 @@ class TestGroup(TestCase):
             self.assertTrue(False)  # shouldn't get here'
         except RuntimeError:
             pass # expected
-        
+
         del r['tmp']
         self.assertEqual(len(r), 4)
 
@@ -152,7 +152,7 @@ class TestGroup(TestCase):
             title = link[0]
             obj = link[1]
             if title == 'myexternallink':
-                self.assertTrue(obj is not None)            
+                self.assertTrue(obj is not None)
                 self.assertEqual(len(obj), 0)
                 self.assertTrue(obj.file.filename != filename)
                 got_external_link = True
@@ -168,21 +168,21 @@ class TestGroup(TestCase):
         # create group using nested path
         g2 = r['g2']
         r['g1/g1.3'] = g2
-         
+
         self.assertEqual(len(r), 4)
-        
+
         # try creating a link with a space in the name
         r["a space"] = g2
-        self.assertEqual(len(r), 5) 
+        self.assertEqual(len(r), 5)
 
         # re-create softlink
         r['mysoftlink'] = h5py.SoftLink('/g1/g1.1')
-         
+
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":
             self.assertTrue(isinstance(g1.modified, datetime))
             #self.assertEqual(g1.modified.tzname(), six.u('UTC'))
-         
+
         f.close()
 
         # re-open file in read-only mode
@@ -202,7 +202,7 @@ class TestGroup(TestCase):
         self.assertEqual(linked_obj.id, g1_1.id)
         f.close()
 
-        
+
 
 
     def test_nested_create(self):
@@ -213,7 +213,7 @@ class TestGroup(TestCase):
         if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
             is_hsds = True  # HSDS has different permission defaults
         self.assertTrue('/' in f)
-        r = f['/'] 
+        r = f['/']
         self.assertEqual(len(r), 0)
 
         # create multiple groups in a path
@@ -245,7 +245,7 @@ class TestGroup(TestCase):
         f = h5py.File(linked_filename, 'w')
         is_hsds = False
         if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-            is_hsds = True  
+            is_hsds = True
         g1 = f.create_group("g1")
         dset = g1.create_dataset('ds', (5,7), dtype='f4')
         dset_id = dset.id.id
@@ -253,7 +253,7 @@ class TestGroup(TestCase):
 
         filename = self.getFileName("external_links")
         print("filename:", filename)
-        
+
         f = h5py.File(filename, 'w')
         f["missing_link"] = h5py.ExternalLink(abs_filepath, "somepath")
         f["abspath_link"] = h5py.ExternalLink(abs_filepath, "/g1/ds")
@@ -263,7 +263,7 @@ class TestGroup(TestCase):
             self.assertTrue(False)
         except KeyError:
             pass # expected
-        
+
         try:
             linked_obj = f["abspath_link"]
             self.assertTrue(linked_obj.name, "/g1/ds")
@@ -280,7 +280,7 @@ class TestGroup(TestCase):
         self.assertEqual(linked_obj.shape, (5, 7))
         if not config.get("use_h5py"):
             self.assertEqual(linked_obj.id.id, dset_id)
-        
+
         f.close()
 
     def test_link_removal(self):
@@ -296,8 +296,8 @@ class TestGroup(TestCase):
             return
         filename = self.getFileName("test_link_removal")
         print(filename)
-         
-        f = h5py.File(filename, 'w') 
+
+        f = h5py.File(filename, 'w')
         g1 = f.create_group("g1")
         dset = g1.create_dataset('ds', (5,7), dtype='f4')
         self.assertEqual(len(g1), 1)
@@ -314,11 +314,11 @@ class TestGroup(TestCase):
         self.assertEqual(len(g1_clone), 0)
         self.assertEqual(get_count(g1_clone), 0)
 
-      
-        f.close()
-        
 
-        
+        f.close()
+
+
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

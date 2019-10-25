@@ -32,7 +32,7 @@ setup(name='h5pyd',
       setup_requires=['pkgconfig', 'six'],
       zip_safe=False,
       entry_points={'console_scripts':
-          ['hsinfo = h5pyd._apps.hsinfo:main', 
+          ['hsinfo = h5pyd._apps.hsinfo:main',
            'hsls = h5pyd._apps.hsls:main',
            'hstouch = h5pyd._apps.hstouch:main',
            'hsacl = h5pyd._apps.hsacl:main',
@@ -47,4 +47,4 @@ setup(name='h5pyd',
            'hsdiff = h5pyd._apps.hsdiff:main'
            ]
       },
-)  
+)

@@ -37,14 +37,14 @@ class TestFancySelectDataset(TestCase):
         for i in range(10):
             vals[i,i] = 1
         dset2d[...] = vals
-        
+
         rows = dset2d[ 5:7, : ]
         self.assertEqual(len(rows), 2)
         row1 = rows[0]
         row2 = rows[1]
         self.assertEqual(row1[5], 1)
         self.assertEqual(row2[6], 1)
-         
+
         f.close()
 
 

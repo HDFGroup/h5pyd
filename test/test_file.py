@@ -14,7 +14,7 @@ import config
 import os
 
 if config.get("use_h5py"):
-    import h5py 
+    import h5py
 else:
     import h5pyd as h5py
 
@@ -44,7 +44,7 @@ class TestFile(TestCase):
             self.assertTrue("endpoint" in info)
             self.assertTrue("username" in info)
             self.assertTrue("password" in info)
-       
+
     def test_create(self):
         filename = self.getFileName("new_file")
         print("filename:", filename)
@@ -78,7 +78,7 @@ class TestFile(TestCase):
             self.assertTrue(f.modified >= f.created)
         if is_hsds:
             # owner prop is just for HSDS
-            self.assertTrue(len(f.owner) > 0) 
+            self.assertTrue(len(f.owner) > 0)
             version = f.serverver
              # server version should be of form "n.n.n"
             n = version.find(".")
@@ -87,14 +87,14 @@ class TestFile(TestCase):
             for k in ('min_chunk_size', 'max_chunk_size', 'max_request_size', 'max_chunks_per_request'):
                 self.assertTrue(k in limits)
 
-         
+
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
 
-        # flush any pending changes - this would be called by f.close() internally, 
+        # flush any pending changes - this would be called by f.close() internally,
         # but try here to confirm it can be called explicitly
-        f.flush()  
+        f.flush()
 
         f.close()
         self.assertEqual(f.id.id, 0)
@@ -110,7 +110,7 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 1)
         f.close()
         self.assertEqual(f.id.id, 0)
-    
+
         # re-open as read-only
         f = h5py.File(filename, 'r')
         self.assertEqual(f.filename, filename)
@@ -133,7 +133,7 @@ class TestFile(TestCase):
             pass
 
         try:
-            f.attrs["foo"] = "bar"  
+            f.attrs["foo"] = "bar"
             self.assertTrue(False)  # expect exception
         except (IOError, OSError):
             pass
@@ -157,7 +157,7 @@ class TestFile(TestCase):
             self.assertEqual(f.num_datatypes, 0)
             self.assertTrue(f.allocated_bytes == 0)
 
-        
+
 
         f.close()
         self.assertEqual(f.id.id, 0)
@@ -193,11 +193,11 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
-        
+
 
     def test_open_notfound(self):
         # verify open of non-existent file throws exception
-   
+
         try:
             filename = self.getFileName("no_file_here")
             print("filename:", filename)
@@ -205,21 +205,21 @@ class TestFile(TestCase):
             self.assertTrue(False) #expect exception
         except IOError:
             pass
-        
+
 
     def test_auth(self):
         if h5py.__name__ == "h5py":
             return  # ACLs are just for h5pyd
-            
-        filename = self.getFileName("file_auth")        
+
+        filename = self.getFileName("file_auth")
         print("filename:", filename)
 
-        f = h5py.File(filename, 'w') 
-        
-       
+        f = h5py.File(filename, 'w')
+
+
         for name in ("g1", "g2", "g1/g1.1"):
             f.create_group(name)
-         
+
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
@@ -229,14 +229,14 @@ class TestFile(TestCase):
         is_hsds = False
         if root_id.startswith("g-"):
             is_hsds = True  # HSDS has different permission defaults
-        
+
         # no explicit ACLs yet
         file_acls = f.getACLs()
         if is_hsds:
             self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl
         else:
             self.assertEqual(len(file_acls), 0)
-        
+
         if is_hsds:
             username = f.owner
         else:
@@ -245,14 +245,14 @@ class TestFile(TestCase):
         file_acl = f.getACL(username)
         # default owner ACL should grant full permissions
         acl_keys = ("create", "read", "update", "delete", "readACL", "updateACL")
-        #self.assertEqual(file_acl["userName"], "default")   
+        #self.assertEqual(file_acl["userName"], "default")
         for k in acl_keys:
             self.assertEqual(file_acl[k], True)
 
         # for h5serv a default acl should be available
         # hsds does not create one initially
 
-       
+
         try:
             default_acl = f.getACL("default")
         except IOError as ioe:
@@ -274,14 +274,14 @@ class TestFile(TestCase):
             f.putACL(default_acl)
         f.close()
 
-        
+
         # ooen with test_user2 should succeed for read mode
         try:
             f = h5py.File(filename, 'r', username=self.test_user2["name"], password=self.test_user2["password"])
             f.close()
         except IOError as ioe:
             self.assertTrue(False)
-        
+
 
         # test_user2 has read access, but opening in write mode should fail
         try:
@@ -297,9 +297,9 @@ class TestFile(TestCase):
             self.assertFalse(is_hsds)  # expected exception
         except IOError as ioe:
             self.assertTrue(is_hsds)
-            self.assertEqual(ioe.errno, 403)  # Forbidden 
-        
-        
+            self.assertEqual(ioe.errno, 403)  # Forbidden
+
+
         f = h5py.File(filename, 'a')  # open for append with original username
         # add an acl for test_user2 that has only read/update access
         user2_acl = copy(default_acl)
@@ -308,7 +308,7 @@ class TestFile(TestCase):
         user2_acl["update"] = True
         user2_acl["readACL"] = True
         f.putACL(user2_acl)
- 
+
         f.close()
 
         # ooen with test_user2 should succeed for read mode
@@ -354,9 +354,9 @@ class TestFile(TestCase):
                 self.assertTrue(f.id.id is not None)
                 self.assertEqual(len(f.keys()), 0)
                 self.assertEqual(f.mode, 'r+')
-                f.close()       
-        
-         
+                f.close()
+
+
 
     def test_close(self):
         filename = self.getFileName("close_file")
@@ -365,8 +365,8 @@ class TestFile(TestCase):
         self.assertTrue(f)
         f.close()
         self.assertFalse(f)
-           
-              
+
+
 if __name__ == '__main__':
     loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)

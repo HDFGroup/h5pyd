@@ -14,11 +14,11 @@ class ChunkIterator:
     """
     Class to iterate through list of chunks given h5py dset
     """
-    def __init__(self, dset):       
+    def __init__(self, dset):
         self._shape = dset.shape
         if dset.chunks is None:
             # treat the dataset as one chunk
-            self._layout = dset.shape 
+            self._layout = dset.shape
         else:
             self._layout = dset.chunks
         self._rank = len(dset.shape)
@@ -26,7 +26,7 @@ class ChunkIterator:
             self._chunk_index = [0,]
         else:
             self._chunk_index = [0,] * self._rank
-         
+
     def __iter__(self):
         return self
 
@@ -43,12 +43,12 @@ class ChunkIterator:
                 raise StopIteration()
             self._chunk_index[0] += 1
             return ()
-        
+
         slices = []
         if self._chunk_index[0] * self._layout[0] >= self._shape[0]:
             # ran past the last chunk, end iteration
             raise StopIteration()
-        
+
         for dim in range(self._rank):
             start = self._chunk_index[dim] * self._layout[dim]
             stop = start + self._layout[dim]
@@ -62,18 +62,18 @@ class ChunkIterator:
         while dim >= 0:
             c = self._layout[dim]
             self._chunk_index[dim] += 1
-            
+
             chunk_end = self._chunk_index[dim] * c
             if chunk_end < self._shape[dim]:
                 # we still have room to extend along this dimensions
                 return get_ret(slices)
-             
+
             if dim > 0:
                 # reset to the start and continue iterating with higher dimension
                 self._chunk_index[dim] = 0
             dim -= 1
         return get_ret(slices)
-        
+
     if six.PY2:
         next = __next__
 

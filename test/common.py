@@ -67,7 +67,7 @@ class TestCase(ut.TestCase):
             endpoint = "http://127.0.0.1:5000"
         return endpoint
     """
-   
+
     @property
     def test_user1(self):
         # HS_USERNAME is the username h5pyd will look up if
@@ -218,7 +218,7 @@ class TestCase(ut.TestCase):
         """
         Get filepath for a test case given a testname
         """
-        
+
         if config.get("use_h5py"):
             if not op.isdir("out"):
                 os.mkdir("out")
@@ -227,7 +227,7 @@ class TestCase(ut.TestCase):
             if "H5PYD_TEST_FOLDER" in os.environ:
                 domain = os.environ["H5PYD_TEST_FOLDER"]
             else:
-                domain = "h5pyd_test.hdfgroup.org"  
+                domain = "h5pyd_test.hdfgroup.org"
             if domain.find('/') > -1:
                 # Use path-style domain naming
                 filename = op.join(domain, basename)
@@ -236,7 +236,7 @@ class TestCase(ut.TestCase):
                 filename = basename + "." + domain
         return filename
 
-    
+
     def getPathFromDomain(self, domain):
         """
         Convert DNS-style domain name to filepath

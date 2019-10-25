@@ -133,7 +133,7 @@ class File(Group):
             #
             #  For http prefixed values, extract the endpont and use the rest as domain path
             for protocol in ("http://", "https://", "hdf5://"):
-                if domain.startswith(protocol):     
+                if domain.startswith(protocol):
                     if protocol.startswith("http"):
                         domain = domain[len(protocol):]
                         # extract the endpoint
@@ -145,7 +145,7 @@ class File(Group):
                         break
                     else:  # hdf5://
                         domain = domain[(len(protocol)-1):]
-                        
+
             if domain.find('/') > 0:
                 raise IOError(400, "relative paths or not valid")
 
@@ -166,7 +166,7 @@ class File(Group):
                     password = os.environ["H5SERV_PASSWORD"]
                 elif "hs_password" in cfg:
                     password = cfg["hs_password"]
-            
+
             if bucket is None:
                 if "HS_BUCKET" in os.environ:
                     bucket = os.environ["HS_BUCKET"]
@@ -193,7 +193,7 @@ class File(Group):
                 params["include_attrs"] = "T"
             if bucket:
                 params["bucket"] = bucket
-            
+
 
             rsp = http_conn.GET(req, params=params)
 
@@ -398,7 +398,7 @@ class File(Group):
         req = '/acls/' + acl['userName']
         self.PUT(req, body=perm)
 
-   
+
 
     def flush(self):
         """  Tells the service to complete any pending updates to permanent storage

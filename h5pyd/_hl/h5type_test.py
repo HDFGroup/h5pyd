@@ -17,7 +17,7 @@ from h5type import check_dtype
 from base import Reference
 import h5type
 import six
- 
+
 
 class H5TypeTest(unittest.TestCase):
     def __init__(self, *args, **kwargs):
@@ -212,7 +212,7 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(dt.name, 'object')
         self.assertEqual(dt.kind, 'O')
         self.assertEqual(check_dtype(vlen=dt), bytes)
-        
+
 
     def testCreateVLenUTF8Type(self):
         typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_UTF8', 'length': 'H5T_VARIABLE' }
@@ -263,7 +263,7 @@ class H5TypeTest(unittest.TestCase):
                  {'name': u'wind',     'type': 'H5T_STD_I16LE'}]
         }
 
-        dt = h5type.createDataType(typeItem)   
+        dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'void80')
         self.assertEqual(dt.kind, 'V')
         self.assertEqual(len(dt.fields), 3)
@@ -312,17 +312,17 @@ class H5TypeTest(unittest.TestCase):
                 }
             ]
         }
-        dt = h5type.createDataType(typeItem)   
+        dt = h5type.createDataType(typeItem)
         self.assertEqual(len(dt.fields), 2)
         self.assertTrue('a' in dt.fields.keys())
         self.assertTrue('b' in dt.fields.keys())
-        
+
     def testRefType(self):
         # todo - special_dtype not implemented
         dt = special_dtype(ref=Reference)
         self.assertEqual(dt.kind, 'S')
         self.assertTrue(dt.metadata['ref'] is Reference)
-            
+
         reftype = check_dtype(ref=dt)
         self.assertTrue(reftype is Reference)
 

@@ -9,7 +9,7 @@
 # distribution tree.  If you do not have access to this file, you may        #
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
- 
+
 import sys
 import logging
 import h5pyd
@@ -21,7 +21,7 @@ else:
 cfg = Config()
 
 #
-# get given ACL, return None if not found   
+# get given ACL, return None if not found
 #
 def getACL(f, username="default"):
     try:
@@ -72,15 +72,15 @@ def printUsage():
     print("")
     sys.exit()
 
- 
-                  
+
+
 def main():
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
     cfg["verbose"] = False
 
-    perm_abvr = {'c':'create', 'r': 'read', 'u': 'update', 'd': 'delete', 'e': 'readACL', 'p':'updateACL'} 
+    perm_abvr = {'c':'create', 'r': 'read', 'u': 'update', 'd': 'delete', 'e': 'readACL', 'p':'updateACL'}
     fields = ('username', 'create', 'read', 'update', 'delete', 'readACL', 'updateACL')
     domain = None
     perm = None
@@ -97,15 +97,15 @@ def main():
     logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
 
-         
-    argn = 1 
+
+    argn = 1
     while argn < len(sys.argv):
         arg = sys.argv[argn]
         val = None
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1]
         logging.debug("arg:", arg, "val:", val)
-        
+
         if domain is None and arg in ("-v", "--verbose"):
             cfg["verbose"] = True
             argn += 1
@@ -120,11 +120,11 @@ def main():
             elif val == "ERROR":
                 loglevel = logging.ERROR
             else:
-                printUsage()  
+                printUsage()
             argn += 2
         elif domain is None and arg == '--logfile':
             logfname = val
-            argn += 2  
+            argn += 2
         elif domain is None and arg in ("-h", "--help"):
             printUsage()
         elif domain is None and arg in ("-e", "--endpoint"):
@@ -173,7 +173,7 @@ def main():
                 printUsage()
             usernames.append(arg)
             argn += 1
-          
+
     logging.info("domain:", domain)
     logging.info("add_list:", add_list)
     logging.info("remove_list:", remove_list)
@@ -182,14 +182,14 @@ def main():
     if len(usernames) == 0 and (add_list or remove_list):
         print("At least one username must be given to add/remove permissions")
         printUsage()
-    
+
     if domain is None:
         print("no domain specified")
-        sys.exit(1)    
-    
-    
+        sys.exit(1)
+
+
     conflicts = list(add_list & remove_list)
-    
+
     if len(conflicts) > 0:
         print("permission: ", conflicts[0], " permission flag set for both add and remove")
         sys.exit(1)
@@ -211,7 +211,7 @@ def main():
             perm_name = perm_abvr[x]
             perm[perm_name] = False
         logging.info("perm:", perm)
-            
+
     # open the domain or folder
     try:
         if domain[-1] == '/':
@@ -231,14 +231,14 @@ def main():
 
     # update/add ACL if permission flags have been set
     if perm:
-        default_acl = {'updateACL': False, 
-                       'delete': False, 
-                       'create': False, 
-                       'read': False, 
-                       'update': False, 
+        default_acl = {'updateACL': False,
+                       'delete': False,
+                       'create': False,
+                       'read': False,
+                       'update': False,
                        'readACL': False,
                        'userName': 'default'
-                       } 
+                       }
         # note: list.copy not supported in py2.7, copy by hand for now
         # update_names = usernames.copy()
         update_names = []
@@ -247,7 +247,7 @@ def main():
 
         if not update_names:
             update_names.append("default")
-         
+
         for username in update_names:
             # get user's ACL if it exist
             acl = getACL(f, username=username)
@@ -257,7 +257,7 @@ def main():
             logging.info("updating acl to: {}".format(acl))
             # mix in any permission changes
             for k in perm:
-                acl[k] = perm[k]    
+                acl[k] = perm[k]
             try:
                 f.putACL(acl)
             except IOError as ioe:
@@ -265,10 +265,10 @@ def main():
                     print("access is not authorized")
                 else:
                     print("Unexpected error:", ioe)
-                sys.exit(1)  
+                sys.exit(1)
     #
     # read the acls
-    # 
+    #
     if len(usernames) == 0:
         # no usernames, dump all ACLs
         try:
@@ -311,7 +311,7 @@ def main():
                     print("Unexpected error:", ioe)
                     sys.exit(1)
 
-    f.close()  
+    f.close()
 
 if __name__ == "__main__":
     main()

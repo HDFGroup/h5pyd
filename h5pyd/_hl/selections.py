@@ -63,10 +63,10 @@ def select(obj, args):
     Indices, slices, ellipses, lists or boolean index arrays
         Returns a FancySelection instance.
     """
-     
+
     if not isinstance(args, tuple):
         args = (args,)
-    
+
     # TBD - handle NULL Space object
 
     if obj.shape == ():
@@ -74,13 +74,13 @@ def select(obj, args):
         sel = ScalarSelection(obj.shape, args)
         return sel
 
-    
+
     #print("select, len(args):", len(args))
     # "Special" indexing objects
     if len(args) == 1:
 
         arg = args[0]
-        
+
         if isinstance(arg, Selection):
             if arg.shape != obj.shape:
                 raise TypeError("Mismatched selection shape")
@@ -108,13 +108,13 @@ def select(obj, args):
                 sel = FancySelection(obj.shape)
                 sel[args]
                 return sel
-    
+
     sel = SimpleSelection(obj.shape)
     sel[args]
     return sel
 
 
- 
+
 
 class Selection(object):
 
@@ -148,7 +148,7 @@ class Selection(object):
 
         shape = tuple(shape)
         self._shape = shape
-        
+
         self._select_type = H5S_SELECT_ALL
 
     @property
@@ -203,8 +203,8 @@ class PointSelection(Selection):
         single boolean array to __getitem__.
     """
     def __init__(self, shape,  *args, **kwds):
-        """ Create a Point selection.   """   
-        Selection.__init__(self, shape, *args, **kwds)  
+        """ Create a Point selection.   """
+        Selection.__init__(self, shape, *args, **kwds)
         self._points = []
 
     @property
@@ -241,7 +241,7 @@ class PointSelection(Selection):
             if len(points.shape) == 1:
                 #points.shape = (1,points.shape[0])
                 pass
-        
+
 
         if self._select_type != H5S_SEL_POINTS:
             op = H5S_SELECT_SET
@@ -289,7 +289,7 @@ class PointSelection(Selection):
         if isinstance(points, list):
             # selection with list of points
             self._perform_list_selection(points, H5S_SELECT_SET)
-            
+
         else:
             # selection with boolean ndarray
         """
@@ -377,7 +377,7 @@ class SimpleSelection(Selection):
         rank = len(self._shape)
         if rank == 0:
             return None
-        
+
         param += "["
         for i in range(rank):
             start = self.start[i]
@@ -718,7 +718,7 @@ def guess_shape(sid):
 
 
 
- 
+
 class ScalarSelection(Selection):
 
     """
@@ -729,9 +729,9 @@ class ScalarSelection(Selection):
     def mshape(self):
         return self._mshape
 
-    
+
     def __init__(self, shape,  *args, **kwds):
-        Selection.__init__(self, shape, *args, **kwds) 
+        Selection.__init__(self, shape, *args, **kwds)
         arg = None
         if len(args) > 0:
             arg = args[0]
@@ -744,9 +744,9 @@ class ScalarSelection(Selection):
         else:
             raise ValueError("Illegal slicing argument for scalar dataspace")
 
-                
 
- 
+
+
 
 
 

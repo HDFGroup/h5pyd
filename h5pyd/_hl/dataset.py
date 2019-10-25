@@ -120,7 +120,7 @@ def make_new_dset(parent, shape=None, dtype=None,
     if isinstance(chunks, bool):
         # ignore boolean value, as we always chunkify datasets anyway
         chunks = None
-        
+
     if chunks is not None and not isinstance(chunks, dict):
          errmsg = "Chunk shape must not be greater than data shape in any dimension. "\
                   "{} is not compatible with {}".format(chunks, shape)

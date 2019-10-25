@@ -8,5 +8,5 @@ COPY setup.py /usr/local/src/h5pyd/
 COPY README.rst /usr/local/src/h5pyd/
 RUN cd /usr/local/src/h5pyd                               ; \
      pip install requests                                 ; \
-     python setup.py install 
+     python setup.py install
 WORKDIR /usr/local/src/h5pyd/apps

@@ -93,11 +93,11 @@ class TestVlenTypes(TestCase):
         # create an attribute with compound type of vlen objref and int32
         dtcompound = np.dtype([('refs', dtvlen), ('number', 'int32')])
         # create np array with data for the attribute
-        # note: two step process is needed, see: https://github.com/h5py/h5py/issues/573 
+        # note: two step process is needed, see: https://github.com/h5py/h5py/issues/573
         data = np.zeros((2,), dtype=dtcompound)
         data[0] = (e1, 1)
         data[1] = (e2, 2)
-    
+
         g1.attrs.create("c1", data, shape=(2,), dtype=dtcompound)
         compound_val = g1.attrs["c1"]
         self.assertTrue(isinstance(compound_val, np.ndarray))
@@ -115,7 +115,7 @@ class TestVlenTypes(TestCase):
 
         # close file
         f.close()
- 
+
 
     def test_create_vlen_dset(self):
         filename = self.getFileName("create_vlen_dset")
@@ -126,7 +126,7 @@ class TestVlenTypes(TestCase):
             # vlen ref types not working for h5serv, so abort here
             f.close()
             return
-       
+
         g1 = f.create_group('g1')
         g1_1 = g1.create_group('g1_1')
         g1_1.attrs["name"] = 'g1_1'
@@ -137,9 +137,9 @@ class TestVlenTypes(TestCase):
 
         # create a dataset that is a VLEN int32
         dtvlen = h5py.special_dtype(vlen=np.dtype('uint16'))
-        
+
         dset1 = f.create_dataset("dset1", shape=(2,), dtype=dtvlen)
-        
+
         # create numpy object array
         e0 = np.array([0,1,2])
         e1 = np.array([0,1,2,3])
@@ -167,9 +167,9 @@ class TestVlenTypes(TestCase):
         e0 = dset1[0]
         self.assertEqual(len(e0), 3)
         self.assertEqual(list(e0), [0,1,2])
-        
+
         # TBD: Test for VLEN objref and comount as with attribute test above
-         
+
         # close file
         f.close()
 
@@ -182,14 +182,14 @@ class TestVlenTypes(TestCase):
             # vlen ref types not working for h5serv, so abort here
             f.close()
             return
-       
+
         # create a dataset that is a VLEN int32
         dtvlen = h5py.special_dtype(vlen=np.dtype('int32'))
-        
+
         nrows = 2
         ncols = 3
         dset1 = f.create_dataset("dset1", shape=(nrows,ncols), dtype=dtvlen)
-        
+
         # create numpy object array
         data = np.zeros((nrows,ncols), dtype=dtvlen)
         for i in range(nrows):
@@ -198,7 +198,7 @@ class TestVlenTypes(TestCase):
                 for k in range((i+1)*(j+1)):
                     alist.append(k)
                 data[i,j] = np.array(alist, dtype="int32")
-         
+
         # write data
         dset1[...] = data
 
@@ -221,7 +221,7 @@ class TestVlenTypes(TestCase):
         # py27  [(0, 1, 2) (0, 1, 2, 3)]
         self.assertEqual(list(e12), [0,1,2,3,4,5])
         self.assertEqual(e12.dtype, np.dtype('int32'))
-          
+
         # close file
         f.close()
 
@@ -233,7 +233,7 @@ class TestVlenTypes(TestCase):
         if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             # vlen ref types not working for h5serv, so abort here
             f.close()
-            return 
+            return
 
         words = (b"one", b"two", b"three", b"four", b"five", b"six", b"seven", b"eight", b"nine", b"ten")
 
@@ -243,9 +243,9 @@ class TestVlenTypes(TestCase):
 
 
         vals = f.attrs["a1"]  # read back
-        
+
         self.assertTrue("vlen" in vals.dtype.metadata)
-            
+
         for i in range(10):
             self.assertEqual(vals[i], words[i])
 
@@ -259,7 +259,7 @@ class TestVlenTypes(TestCase):
         if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             # vlen  types not working for h5serv, so abort here
             f.close()
-            return 
+            return
 
         dims = (10,)
         dt = h5py.special_dtype(vlen=bytes)
@@ -277,19 +277,19 @@ class TestVlenTypes(TestCase):
             self.assertEqual(dset.fillvalue, None)
         else:
             self.assertEqual(dset.fillvalue, 0)
-        
+
         if six.PY2:
             # empty bstrs showing up as 0 in Python 2.8
             self.assertEqual(dset[0], '0')
         else:
             self.assertEqual(dset[0], b'')
-        
+
         words = (b"one", b"two", b"three", b"four", b"five", b"six", b"seven", b"eight", b"nine", b"ten")
         dset[:] = words
         vals = dset[:]  # read back
-        
+
         self.assertTrue("vlen" in vals.dtype.metadata)
-            
+
         for i in range(10):
             self.assertEqual(vals[i], words[i])
 
@@ -330,16 +330,16 @@ class TestVlenTypes(TestCase):
         else:
             # TBD: HSDS is converteing null values to '0's
             self.assertEqual(dset[0], '0')
-        
-        
+
+
         words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94", u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
         dset[:] = words
         vals = dset[:]  # read back
-        
+
         self.assertTrue("vlen" in vals.dtype.metadata)
-            
+
         for i in range(10):
-            # TBD: h5serv and HSDS are returning unicode values 
+            # TBD: h5serv and HSDS are returning unicode values
             if six.PY3 and not config.get('use_h5py'):
                 for i in range(10):
                     self.assertEqual(vals[i], words[i])
@@ -347,7 +347,7 @@ class TestVlenTypes(TestCase):
                 self.assertEqual(vals[i], words[i])
 
         f.close()
-         
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR
