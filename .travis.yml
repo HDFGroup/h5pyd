@@ -13,7 +13,7 @@ env:
 install:
 - sudo apt-get update -qq
 - pip uninstall numpy -y
-- pip install numpy>=1.14.0
+- pip install numpy>=1.17.3
 - pip install requests
 - pip install pytz
 - pip install h5py
@@ -35,7 +35,7 @@ script:
     python update_pwd.py -a -u test_user1 -p test ;
     python update_pwd.py -a -u test_user2 -p test ;
     cd ../.. ;
-    python h5serv >app.out & 
+    python h5serv >app.out &
     sleep 5 ;
     cd .. ;
     export HS_ENDPOINT=http://127.0.0.1:5000 ;
