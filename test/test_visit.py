@@ -17,21 +17,19 @@ else:
     import h5pyd as h5py
 from common import ut, TestCase
 
-visit_names = []
-obj_ids = []
-
-def visit_item(name):
-    visit_names.append(name)
-    return None
-
-def find_g1_1(name):
-    if name.endswith("g1.1"):
-        return "found g1.1"  # stop iteration
-    return None
-
-
 class TestVisit(TestCase):
     def test_visit(self):
+        visit_names = []
+
+        def visit_item(name):
+            visit_names.append(name)
+            return None
+
+        def find_g1_1(name):
+            if name.endswith("g1.1"):
+                return "found g1.1"  # stop iteration
+            return None
+
         filename = self.getFileName("test_visit")
         print("filename:", filename)
 
@@ -58,6 +56,49 @@ class TestVisit(TestCase):
         self.assertEqual(ret, "found g1.1")
 
         f.close()
+
+    def test_visit_multilink(self):
+        obj_ids = set()
+        visited_ids = []
+
+        def visit_multilink(name, obj):
+            print("visit_multilink:", name, obj.id.id)
+            if not config.get("use_h5py"):
+                # obj ids not unique in h5py?
+                self.assertTrue(obj.id.id in obj_ids)
+            visited_ids.append(obj.id.id)
+
+        filename = self.getFileName("test_visit_multilink")
+        print("filename:", filename)
+
+        f = h5py.File(filename, 'w')
+        g1 = f.create_group("g1")
+        obj_ids.add(g1.id.id)
+        self.assertTrue("g1" in f)
+        g2 = f.create_group("g2")
+        obj_ids.add(g2.id.id)
+
+        self.assertTrue("g2" in f)
+        g1_1 = f.create_group("g1/g1.1")
+        obj_ids.add(g1_1.id.id)
+        self.assertTrue("g1/g1.1" in f)
+        dset = f.create_dataset('g1/g1.1/dset', data=42, dtype='i4')
+        obj_ids.add(dset.id.id)
+
+        # add some extra link
+        g2["g1_link"] = g1
+        g2["dset_link"] = dset
+        g1["dset_link"] = dset
+        del g1_1["dset"]
+
+        f.close()
+
+        # re-open as read-only
+        f = h5py.File(filename, 'r')
+        f.visititems(visit_multilink)
+
+        f.close()
+        self.assertEqual(len(visited_ids), len(obj_ids))
 
 
 

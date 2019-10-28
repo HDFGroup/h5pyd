@@ -988,7 +988,7 @@ class Group(HLObject, MutableMappingHDF5):
                 if retval is not None:
                     # caller indicates to end iteration
                     break
-            visited[self.id.uuid] = True
+            visited[parent.id.uuid] = True
             if parent.id.__class__ is GroupID:
                 # get group links
                 objdb = self.id._http_conn.getObjDb()
@@ -997,7 +997,7 @@ class Group(HLObject, MutableMappingHDF5):
                     if parent.id.uuid not in objdb:
                         raise IOError("expected to find id {} in objdb".format(parent.id.uuid))
                     group_json = objdb[parent.id.uuid]
-                    # make this look like the server respoonse
+                    # make this look like the server response
                     links_json = group_json["links"]
                     links = []
                     for k in links_json:
@@ -1040,13 +1040,7 @@ class Group(HLObject, MutableMappingHDF5):
                             break
 
         return retval
-        """
-        with phil:
-            def proxy(name):
-                name = self._d(name)
-                return func(name, self[name])
-            return h5o.visit(self.id, proxy)
-        """
+        
 
     def __repr__(self):
         if not self:
