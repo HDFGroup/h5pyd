@@ -41,7 +41,10 @@ class ObjectID:
     def uuid(self):
         if six.PY2:
             # convert unicode to native string type
-            return self._uuid.encode('ascii')
+            if isinstance(self._uuid, str):
+                return self._uuid.encode('ascii')
+            else:
+                return self._uuid
         else:
             return self._uuid
 
