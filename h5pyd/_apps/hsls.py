@@ -110,7 +110,7 @@ def dump(name, obj, visited=None):
             print("{0:24} {1}, same as {2}".format(name, class_name, same_as))
             return
     else:
-        raise TypeError(f"unexpected classname: {class_name}")
+        raise TypeError("unexpected classname: {}".format(class_name))
 
     is_dataset = False
     if class_name in ("Dataset", "Table"):

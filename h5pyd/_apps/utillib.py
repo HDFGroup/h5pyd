@@ -544,7 +544,6 @@ def write_dataset(src, tgt, ctx):
 
 def create_links(gsrc, gdes, ctx):
     # add soft and external links
-    print("create_links:", gsrc, gdes)
     srcid_desobj_map = ctx["srcid_desobj_map"]
     if ctx["verbose"]:
         print("create_links: {}".format(gsrc.name))
@@ -572,10 +571,6 @@ def create_links(gsrc, gdes, ctx):
                     logging.warn(msg)
                     if ctx["verbose"]:
                         print("WARNING: " + msg)
-                    print("obj_map:")
-                    for k in srcid_desobj_map:
-                        print(k, ':', srcid_desobj_map[k])
-            # TBD: handle the case where multiple hardlinks point to same object
         elif link_classname == "SoftLink":
             msg = "creating SoftLink({}) with title: {}".format(lnk.path, title)
             if ctx["verbose"]:
