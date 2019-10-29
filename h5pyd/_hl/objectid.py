@@ -47,12 +47,10 @@ class ObjectID:
 
     @property
     def id(self):
-        if six.PY2 and isinstance(self._uuid, unicode):
-            # convert unicode to native string type
-            return self._uuid.encode('ascii')
-        else:
-            return self._uuid
+        return self.uuid
 
+    def __hash__(self):
+        return self.uuid
 
     @property
     def objtype_code(self):

@@ -62,7 +62,6 @@ class TestVisit(TestCase):
         visited_ids = []
 
         def visit_multilink(name, obj):
-            print("visit_multilink:", name, obj.id.id)
             if not config.get("use_h5py"):
                 # obj ids not unique in h5py?
                 self.assertTrue(obj.id.id in obj_ids)
@@ -87,6 +86,13 @@ class TestVisit(TestCase):
 
         # add some extra link
         g2["g1_link"] = g1
+        g1_link = g2["g1_link"]
+        # verify that g1 and g1_link point to the same HDF object
+        self.assertEqual(g1.id, g1_link.id)  # id comparisons always work
+        if not config.get("use_h5py"):
+            # numeric id comparisons works for h5pyd but not h5py
+            self.assertEqual(g1.id.id, g1_link.id.id)
+        self.assertEqual(g1.id.__hash__(), g1_link.id.__hash__())
         g2["dset_link"] = dset
         g1["dset_link"] = dset
         del g1_1["dset"]

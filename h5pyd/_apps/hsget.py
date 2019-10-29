@@ -202,7 +202,7 @@ def main():
         sys.exit(1)
 
     try:
-        load_file(fin, fout)
+        load_file(fin, fout, verbose=verbose, nodata=nodata)
         msg = "Domain {} downloaded to file: {}".format(src_domain, des_file)
         logging.info(msg)
         if verbose:

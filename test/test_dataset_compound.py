@@ -11,6 +11,7 @@
 ##############################################################################
 
 import numpy as np
+import logging
 import math
 
 import config
@@ -49,4 +50,6 @@ class TestDatasetCompound(TestCase):
         f.close()
 
 if __name__ == '__main__':
+    loglevel = logging.ERROR
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

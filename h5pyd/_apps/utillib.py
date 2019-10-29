@@ -463,6 +463,9 @@ def create_dataset(dobj, ctx):
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
+        logging.debug("adding dataset id {} to {} in srcid_desobj_map".format(dobj.id.id, dset))
+        srcid_desobj_map = ctx["srcid_desobj_map"]
+        srcid_desobj_map[dobj.id.__hash__()] = dset
     except (IOError, TypeError, KeyError) as e:
         msg = "ERROR: failed to create dataset: {}".format(str(e))
         logging.error(msg)
@@ -541,6 +544,8 @@ def write_dataset(src, tgt, ctx):
 
 def create_links(gsrc, gdes, ctx):
     # add soft and external links
+    print("create_links:", gsrc, gdes)
+    srcid_desobj_map = ctx["srcid_desobj_map"]
     if ctx["verbose"]:
         print("create_links: {}".format(gsrc.name))
     for title in gsrc:
@@ -549,7 +554,27 @@ def create_links(gsrc, gdes, ctx):
         lnk = gsrc.get(title, getlink=True)
         link_classname = lnk.__class__.__name__
         if link_classname == "HardLink":
-            logging.debug("Got hardlink: {}".format(title))
+            logging.debug("Got hardlink: {} gsrc: {} gdes: {}".format(title, gsrc, gdes))
+            if title not in gdes:
+                msg = "creating multilink {} with title: {}".format(gdes, title)
+                if ctx["verbose"]:
+                    print(msg)
+                logging.info(msg)
+                src_obj_id = gsrc[title].id
+                src_obj_id_hash = src_obj_id.__hash__()
+                logging.debug("got src_obj_id hash: {}".format(src_obj_id_hash))
+                if src_obj_id_hash in srcid_desobj_map:
+                    des_obj = srcid_desobj_map[src_obj_id_hash]
+                    logging.debug("creating hardlink to {}".format(des_obj.id.id))
+                    gdes[title] = des_obj
+                else:
+                    msg = "could not find map item to src id: {}".format(src_obj_id_hash)
+                    logging.warn(msg)
+                    if ctx["verbose"]:
+                        print("WARNING: " + msg)
+                    print("obj_map:")
+                    for k in srcid_desobj_map:
+                        print(k, ':', srcid_desobj_map[k])
             # TBD: handle the case where multiple hardlinks point to same object
         elif link_classname == "SoftLink":
             msg = "creating SoftLink({}) with title: {}".format(lnk.path, title)
@@ -586,6 +611,9 @@ def create_group(gobj, ctx):
         print(msg)
     fout = ctx["fout"]
     grp = fout.create_group(gobj.name)
+    srcid_desobj_map = ctx["srcid_desobj_map"]
+    logging.debug("adding group id {} to {} in srcid_desobj_map".format(gobj.id.id, grp))
+    srcid_desobj_map[gobj.id.__hash__()] = grp
 
     # create any soft/external links
     create_links(gobj, grp, ctx)
@@ -600,6 +628,9 @@ def create_datatype(obj, ctx):
         print(msg)
     fout = ctx["fout"]
     fout[obj.name] = obj.dtype
+    srcid_desobj_map = ctx["srcid_desobj_map"]
+    logging.debug("adding datatype id {} to {} in srcid_desobj_map".format(obj.id.id, fout[obj.name]))
+    srcid_desobj_map[gobj.id.__hash__()] = fout[obj.name]
 
 
 # create_datatype
@@ -620,6 +651,7 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None,
     ctx["deflate"] = deflate
     ctx["s3path"] = s3path
     ctx["storeinfo"] = storeinfo
+    ctx["srcid_desobj_map"] = {}
 
 
     # create any root attributes

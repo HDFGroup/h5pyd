@@ -162,14 +162,12 @@ class TestObjRef(TestCase):
             del f['dset']
             try:
                 obj = f[dset_ref]
-                print("This should be an exception:", obj.name)
                 if config.get("use_h5py"):
                     # TBD - HSDS is not triggering this exception since the object
                     # is not being deleted.
                     self.assertTrue(False)
             except ValueError:
                 pass # expected
-
 
         f.close()
 
