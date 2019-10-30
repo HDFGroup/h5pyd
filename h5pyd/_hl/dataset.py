@@ -699,7 +699,7 @@ class Dataset(HLObject):
             elif isinstance(chunk_layout, dict):
                 # CHUNK_REF layout
                 if "dims" not in chunk_layout:
-                    self.log.error(f"Unexpected chunk_layout: {chunk_layout}")
+                    self.log.error("Unexpected chunk_layout: {}".format(chunk_layout))
                 else:
                     chunk_layout = tuple(chunk_layout["dims"])
 
