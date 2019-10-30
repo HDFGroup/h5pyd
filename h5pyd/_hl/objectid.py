@@ -192,7 +192,7 @@ class DatasetID(ObjectID):
             if 'layout' in dcpl:
                 layout = dcpl['layout']
 
-        if layout:
+        if layout and layout['class'] in  ('H5D_CHUNKED', 'H5D_CHUNKED_REF', 'H5D_CHUNKED_REF_INDIRECT'):
             if layout['class'] == 'H5D_CHUNKED':
                 # ordinary chunked dataset
                 chunks = layout['dims']
