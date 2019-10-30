@@ -696,6 +696,12 @@ class Dataset(HLObject):
             chunk_layout = self.id.chunks
             if chunk_layout is None:
                 chunk_layout = self._shape
+            elif isinstance(chunk_layout, dict):
+                # CHUNK_REF layout
+                if "dims" not in chunk_layout:
+                    self.log.error(f"Unexpected chunk_layout: {chunk_layout}")
+                else:
+                    chunk_layout = tuple(chunk_layout["dims"])
 
             max_chunks = 1
             split_dim = -1
