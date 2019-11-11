@@ -109,6 +109,8 @@ def dump(name, obj, visited=None):
             same_as = visited[obj_id]
             print("{0:24} {1}, same as {2}".format(name, class_name, same_as))
             return
+    elif class_name in ("ExternalLink", "SoftLink"):
+        pass
     else:
         raise TypeError("unexpected classname: {}".format(class_name))
 
@@ -130,17 +132,24 @@ def dump(name, obj, visited=None):
         desc = '{' + obj.filename + '//' + obj.path + '}'
 
     if desc is None:
-        print("{0:24} {1}".format(name, class_name))
+        print("{0} {1}".format(name, class_name))
     else:
-        print("{0:24} {1} {2}".format(name, class_name, desc))
+        print("{0} {1} {2}".format(name, class_name, desc))
 
     if cfg["verbose"] and obj_id is not None:
-        print("    {0:>12}: {1}".format("UUID", obj_id))
+        print("    {0:>32}: {1}".format("UUID", obj_id))
 
     if cfg["verbose"] and is_dataset and obj.shape is not None \
             and obj.chunks is not None:
         chunk_size = obj.dtype.itemsize
-        for chunk_dim in obj.chunks:
+        if isinstance(obj.chunks, dict):
+            # H5D_CHUNKED_REF layout
+            chunk_dims = obj.chunks["dims"]
+            storage_desc = "Storage " + obj.chunks["class"]
+        else:
+            chunk_dims = obj.chunks
+            storage_desc = "Storage H5D_CHUNKED"
+        for chunk_dim in chunk_dims:
             chunk_size *= chunk_dim
         dset_size = obj.dtype.itemsize
         for dim_extent in obj.shape:
@@ -149,26 +158,26 @@ def dump(name, obj, visited=None):
         num_chunks = obj.num_chunks
         allocated_size = obj.allocated_size
         if num_chunks is not None and allocated_size is not None:
-            fstr = "    {0:>12}: {1} {2} bytes, {3} allocated chunks"
-            print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size),
+            fstr = "    {0:>32}: {1} {2} bytes, {3} allocated chunks"
+            print(fstr.format("Chunks", chunk_dims, intToStr(chunk_size),
                               intToStr(num_chunks)))
             if dset_size > 0:
                 utilization = allocated_size / dset_size
-                fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes, {3:.2f}% utilization"
-                print(fstr.format("Storage", intToStr(dset_size),
+                fstr = "    {0:>32}: {1} logical bytes, {2} allocated bytes, {3:.2f}% utilization"
+                print(fstr.format(storage_desc, intToStr(dset_size),
                                   intToStr(allocated_size),
                                   utilization * 100.0))
             else:
-                fstr = "    {0:>12}: {1} logical bytes, {2} allocated bytes"
-                print(fstr.format("Storage", intToStr(dset_size),
+                fstr = "    {0:>32}: {1} logical bytes, {2} allocated bytes"
+                print(fstr.format(storage_desc, intToStr(dset_size),
                                   intToStr(allocated_size)))
 
         else:
             # verbose info not available, just show the chunk layout
-            fstr = "    {0:>12}: {1} {2} bytes"
-            print(fstr.format("Chunks", obj.chunks, intToStr(chunk_size)))
+            fstr = "    {0:>32}: {1} {2} bytes"
+            print(fstr.format("Chunks", chunk_dims, intToStr(chunk_size)))
 
-        fstr = "    {0:>12}: {1}"
+        fstr = "    {0:>32}: {1}"
         print(fstr.format("Type", getTypeStr(obj.dtype)))  # dump out type info
 
     if cfg["showattrs"] and class_name in ("Dataset", "Table", "Group", "Datatype"):

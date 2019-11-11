@@ -5,6 +5,7 @@ from setuptools import setup
 #   setup.py develop
 # To use a consistent encoding
 # To upload to PyPI:
+# python setup.py sdist
 # twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
 # twine upload dist/h5pyd-x.y.z.tar.gz
 #
