@@ -12,7 +12,7 @@ Introduction
 This repository contains library, test, and examples of h5pyd - a Python package for the
 HDF REST interface.
 
-The library is provides a high-level interface to the REST specification that is generally
+The library provides a high-level interface to the REST specification that is generally
 easier to use than invoking http calls directly.
 
 The package is based on the popular h5py package and aims to be source compatible with
@@ -50,7 +50,7 @@ From a release tarball or Git checkout::
 By default the examples look for a local instance of h5serv.  See the  https://github.com/HDFGroup/h5serv
 for instructions on installing and running h5serv.
 
-These tests are also to designed to work with HSDS (see https://github.com/HDFGroup/hsds).  Install HSDS locally, or set environment variables (see next section)
+These tests are also designed to work with HSDS (see https://github.com/HDFGroup/hsds).  Install HSDS locally, or set environment variables (see next section)
 to point to an existing HSDS instance.
 
 Testing
@@ -64,7 +64,11 @@ Setup the following environment variables that inform h5pyd which endpoint and u
 * ``TEST2_PASSWORD`` - password for above username - "test" for test_user2 with local h5serv install
 * ``H5PYD_TEST_FOLDER`` - server folder that will be used for generated files.  Use: "h5pyd_test.hdfgroup.org" for local h5serv install.  For HSDS, posix-style paths are also supported, e.g.: /home/bob/h5pyd_test.  For HSDS use hstouch command to create the folder before running the test, e.g.: ``$ hstouch /home/bob/h5pyd_test/``
 
-Run: ``$python testall.py`` to execute the test suite.
+Run::
+
+   python testall.py
+
+to execute the test suite.
 
 Uninstalling
 -------------
