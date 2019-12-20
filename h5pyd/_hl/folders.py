@@ -30,14 +30,23 @@ class Folder():
 
     @property
     def domain(self):
-        return self._domain + '/'
+        domain = self._domain
+        if domain is None:
+            domain = ''
+
+        r = six.u(domain + '/')
+
+        if six.PY3:
+            return r
+        else:
+            return r.encode('utf8')
 
     @property
     def parent(self):
-        parent = op.dirname(self._domain)
-        if not parent:
+        if self._domain is None:
             return None
-        return parent + '/'
+        else:
+            return op.dirname(self._domain) + '/'
 
 
     @property
@@ -366,8 +375,4 @@ class Folder():
 
     def __repr__(self):
 
-        r = six.u(self._domain + '/')
-
-        if six.PY3:
-            return r
-        return r.encode('utf8')
+        return self.domain
