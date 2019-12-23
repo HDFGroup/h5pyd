@@ -161,6 +161,9 @@ class TestFolders(TestCase):
         found = False
         self.assertTrue(len(dir) > 0)
         self.assertTrue(dir.is_folder)
+        self.assertTrue(dir.domain == '/')
+        self.assertTrue(dir.__repr__() == '/')
+        self.assertIsNone(dir.parent)
         for name in dir:
             # we should come across the given domain
             if top_level_domain == name:
