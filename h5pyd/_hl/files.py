@@ -13,7 +13,6 @@
 from __future__ import absolute_import
 
 import os
-import six
 import time
 import json
 
@@ -438,16 +437,13 @@ class File(Group):
 
     def __repr__(self):
         if not self.id:
-            r = six.u('<Closed HDF5 file>')
+            r = '<Closed HDF5 file>'
         else:
             # Filename has to be forced to Unicode if it comes back bytes
             # Mode is always a "native" string
             filename = self.filename
             if isinstance(filename, bytes):  # Can't decode fname
                 filename = filename.decode('utf8', 'replace')
-            r = (six.u('<HDF5 file "%s" (mode %s)>') %
-                 (os.path.basename(filename), self.mode))
+            r = f'<HDF5 file "{os.path.basename(filename)}" (mode {self.mode})>'
 
-        if six.PY3:
-            return r
-        return r.encode('utf8')
+        return r

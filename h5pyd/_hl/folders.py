@@ -14,8 +14,6 @@ from __future__ import absolute_import
 
 import os
 import os.path as op
-import six
-#from requests import ConnectionError
 import json
 import logging
 from .httpconn import HttpConn
@@ -34,12 +32,9 @@ class Folder():
         if domain is None:
             domain = ''
 
-        r = six.u(domain + '/')
+        r = domain + '/'
 
-        if six.PY3:
-            return r
-        else:
-            return r.encode('utf8')
+        return r
 
     @property
     def parent(self):

@@ -16,7 +16,6 @@ from h5type import special_dtype
 from h5type import check_dtype
 from base import Reference
 import h5type
-import six
 
 
 class H5TypeTest(unittest.TestCase):
@@ -62,7 +61,7 @@ class H5TypeTest(unittest.TestCase):
             pass # expected
 
     def testBaseVLenAsciiTypeItem(self):
-        dt = special_dtype(vlen=six.binary_type)
+        dt = special_dtype(vlen=bytes)
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_STRING')
         self.assertEqual(typeItem['length'], 'H5T_VARIABLE')
@@ -70,7 +69,7 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(typeItem['charSet'], 'H5T_CSET_ASCII')
 
     def testBaseVLenUnicodeTypeItem(self):
-        dt = special_dtype(vlen=six.text_type)
+        dt = special_dtype(vlen=str)
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_STRING')
         self.assertEqual(typeItem['length'], 'H5T_VARIABLE')
@@ -181,10 +180,7 @@ class H5TypeTest(unittest.TestCase):
     def testCreateBaseStringType(self):
         typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII', 'length': 6 }
         dt = h5type.createDataType(typeItem)
-        if six.PY3:
-            self.assertEqual(dt.name, 'bytes48')
-        else:
-            self.assertEqual(dt.name, 'string48')
+        self.assertEqual(dt.name, 'bytes48')
         self.assertEqual(dt.kind, 'S')
 
     def testCreateBaseUnicodeType(self):
@@ -199,10 +195,7 @@ class H5TypeTest(unittest.TestCase):
         typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII',
             'length': 6, 'strPad': 'H5T_STR_NULLTERM'}
         dt = h5type.createDataType(typeItem)
-        if six.PY3:
-            self.assertEqual(dt.name, 'bytes48')
-        else:
-            self.assertEqual(dt.name, 'string48')
+        self.assertEqual(dt.name, 'bytes48')
         self.assertEqual(dt.kind, 'S')
 
 
@@ -219,7 +212,7 @@ class H5TypeTest(unittest.TestCase):
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'object')
         self.assertEqual(dt.kind, 'O')
-        self.assertEqual(check_dtype(vlen=dt), six.text_type)
+        self.assertEqual(check_dtype(vlen=dt), str)
 
     def testCreateVLenDataType(self):
         typeItem = {'class': 'H5T_VLEN', 'base': 'H5T_STD_I32BE'}

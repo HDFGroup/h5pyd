@@ -12,8 +12,6 @@
 
 from __future__ import absolute_import
 import numpy
-import six
-from six.moves import xrange
 from .base import  _decode
 from .dataset import Dataset
 from .objectid import DatasetID
@@ -51,7 +49,7 @@ class Cursor():
         arr = None
         query_complete = False
 
-        for indx in xrange(self._start, self._stop):
+        for indx in range(self._start, self._stop):
             if indx%BUFFER_SIZE == 0:
                 # grab another buffer
                 read_count = BUFFER_SIZE
@@ -323,7 +321,7 @@ class Table(Dataset):
         # side.  However, for compound literals this is unavoidable.
         # For h5pyd, do extra check and convert type on client side for efficiency
         vlen = check_dtype(vlen=self.dtype)
-        if vlen is not None and vlen not in (bytes, six.text_type):
+        if vlen is not None and vlen not in (bytes, str):
             self.log.debug("converting ndarray for vlen data")
             try:
                 val = numpy.asarray(val, dtype=vlen)

@@ -44,8 +44,6 @@
 from __future__ import absolute_import, division
 
 import numpy as np
-# from .. import h5z, h5p, h5d
-
 
 _COMP_FILTERS = {'gzip': 'H5Z_FILTER_DEFLATE',
                 'szip': 'H5Z_FILTER_SZIP',

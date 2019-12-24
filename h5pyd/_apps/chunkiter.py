@@ -9,7 +9,6 @@
 # distribution tree.  If you do not have access to this file, you may        #
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
-import six
 class ChunkIterator:
     """
     Class to iterate through list of chunks given h5py dset
@@ -73,7 +72,3 @@ class ChunkIterator:
                 self._chunk_index[dim] = 0
             dim -= 1
         return get_ret(slices)
-
-    if six.PY2:
-        next = __next__
-

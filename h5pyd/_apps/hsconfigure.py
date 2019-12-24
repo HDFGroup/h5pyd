@@ -1,6 +1,5 @@
 import os
 import json
-import six
 import h5pyd
 if __name__ == "__main__":
     from config import Config
@@ -11,11 +10,7 @@ else:
 # input function that works with Python 2 or 3
 #
 def get_input(prompt):
-    result = None
-    if six.PY3:
-        result = input(prompt)
-    else:
-        result = raw_input(prompt)
+    result = input(prompt)
     return result
 
 #

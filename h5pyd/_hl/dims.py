@@ -11,10 +11,8 @@
 ##############################################################################
 
 from __future__ import absolute_import
-import six
 import json
 from . import base
-from .base import phil, with_phil
 from .dataset import Dataset
 from .objectid import DatasetID
 
@@ -68,7 +66,6 @@ class DimensionProxy(base.CommonStateObject):
         return dset_json
 
     @property
-    @with_phil
     def label(self):
         ''' Get the dimension scale label '''
         labels_json = self._getAttributeJson('DIMENSION_LABELS')
@@ -86,7 +83,6 @@ class DimensionProxy(base.CommonStateObject):
 
 
     @label.setter
-    @with_phil
     def label(self, val):
         # pylint: disable=missing-docstring
         dset = Dataset(self._id)
@@ -112,25 +108,20 @@ class DimensionProxy(base.CommonStateObject):
         labels['value'][self._dimension] = val
         dset.PUT(req, body=labels, replace=True)
 
-    @with_phil
     def __init__(self, id_, dimension):
         self._id = id_
         self._dimension = dimension
 
-    @with_phil
     def __hash__(self):
         return hash((type(self), self._id, self._dimension))
 
-    @with_phil
     def __eq__(self, other):
         return hash(self) == hash(other)
 
-    @with_phil
     def __iter__(self):
         for k in self.keys():
             yield k
 
-    @with_phil
     def __len__(self):
         dimlist_json = self._getAttributeJson('DIMENSION_LIST')
         if not dimlist_json:
@@ -141,7 +132,6 @@ class DimensionProxy(base.CommonStateObject):
             return 0
         return len(dimlist_values[self._dimension])
 
-    @with_phil
     def __getitem__(self, item):
 
         dimlist_attr_json = self._getAttributeJson('DIMENSION_LIST')
@@ -295,8 +285,7 @@ class DimensionProxy(base.CommonStateObject):
         new_reflist["shape"]["dims"] = [len(reflist_value), ]
 
         # Update the REFERENCE_LIST attribute of the dimension scale
-        with phil:
-            dscale.PUT(req, body=new_reflist, replace=True)
+        dscale.PUT(req, body=new_reflist, replace=True)
 
     def detach_scale(self, dscale):
         ''' Remove a scale from this dimension.
@@ -305,43 +294,41 @@ class DimensionProxy(base.CommonStateObject):
         '''
         dset = Dataset(self._id)
         req = dset.attrs._req_prefix + 'DIMENSION_LIST'
-        with phil:
-            dimlist = dset.GET(req)
-            dset.DELETE(req)
-            try:
-                ref = 'datasets/' + dscale.id.id
-                dimlist['value'][self._dimension].remove(ref)
-            except Exception as e:
-                # Restore the attribute's old value then raise the same
-                # exception
-                dset.PUT(req, body=dimlist)
-                raise e
+        dimlist = dset.GET(req)
+        dset.DELETE(req)
+        try:
+            ref = 'datasets/' + dscale.id.id
+            dimlist['value'][self._dimension].remove(ref)
+        except Exception as e:
+            # Restore the attribute's old value then raise the same
+            # exception
             dset.PUT(req, body=dimlist)
+            raise e
+        dset.PUT(req, body=dimlist)
 
         req = dscale.attrs._req_prefix + 'REFERENCE_LIST'
-        with phil:
-            old_reflist = dscale.GET(req)
-            if "value" in old_reflist and len(old_reflist["value"]) > 0:
-                new_refs = list()
+        old_reflist = dscale.GET(req)
+        if "value" in old_reflist and len(old_reflist["value"]) > 0:
+            new_refs = list()
 
-                remove = ['datasets/' + dset.id.id, self._dimension]
-                for el in old_reflist['value']:
-                    if remove[0] != el[0] and remove[1] != el[1]:
-                        new_refs.append(el)
+            remove = ['datasets/' + dset.id.id, self._dimension]
+            for el in old_reflist['value']:
+                if remove[0] != el[0] and remove[1] != el[1]:
+                    new_refs.append(el)
 
-                new_reflist = {}
-                new_reflist["type"] = old_reflist["type"]
-                if len(new_refs) > 0:
-                    new_reflist["value"] = new_refs
-                    new_reflist["shape"] = [len(new_refs), ]
-                    dscale.PUT(req, body=new_reflist, replace=True)
-                else:
-                    # Remove REFERENCE_LIST attribute if this dimension scale is
-                    # not attached to any dataset
-                    try:
-                        dscale.DELETE(req)
-                    except OSError:
-                        pass
+            new_reflist = {}
+            new_reflist["type"] = old_reflist["type"]
+            if len(new_refs) > 0:
+                new_reflist["value"] = new_refs
+                new_reflist["shape"] = [len(new_refs), ]
+                dscale.PUT(req, body=new_reflist, replace=True)
+            else:
+                # Remove REFERENCE_LIST attribute if this dimension scale is
+                # not attached to any dataset
+                try:
+                    dscale.DELETE(req)
+                except OSError:
+                    pass
 
     def items(self):
         ''' Get a list of (name, Dataset) pairs with all scales on this
@@ -360,21 +347,16 @@ class DimensionProxy(base.CommonStateObject):
 
     def keys(self):
         ''' Get a list of names for the scales on this dimension. '''
-        with phil:
-            return [key for (key, _) in self.items()]
+        return [key for (key, _) in self.items()]
 
     def values(self):
         ''' Get a list of Dataset for scales on this dimension. '''
-        with phil:
-            return [val for (_, val) in self.items()]
+        return [val for (_, val) in self.items()]
 
-    @with_phil
     def __repr__(self):
         if not self._id:
             return '<Dimension of closed HDF5 dataset>'
-        return ('<%s dimension %d of HDF5 dataset at %s>'
-                % (self.label, self._dimension, id(self._id)))
-
+        return f'<{self.label} dimension {self._dimension} of HDf5 dataset at {id(self._id)}>'
 
 class DimensionManager(base.MappingHDF5, base.CommonStateObject):
     '''
@@ -384,13 +366,11 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
         accessing the '.dims' property of a Dataset.
     '''
 
-    @with_phil
     def __init__(self, parent):
         ''' Private constructor.
         '''
         self._id = parent.id
 
-    @with_phil
     def __getitem__(self, index):
         ''' Return a Dimension object
         '''
@@ -398,18 +378,15 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
             raise IndexError('Index out of range')
         return DimensionProxy(self._id, index)
 
-    @with_phil
     def __len__(self):
         ''' Number of dimensions associated with the dataset. '''
         return len(Dataset(self._id).shape)
 
-    @with_phil
     def __iter__(self):
         ''' Iterate over the dimensions. '''
         for i in range(len(self)):
             yield self[i]
 
-    @with_phil
     def __repr__(self):
         if not self._id:
             return '<Dimensions of closed HDF5 dataset>'
@@ -439,7 +416,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
         }
 
         # NAME attribute with dimension scale's name
-        if isinstance(name, six.binary_type):
+        if isinstance(name, bytes):
             name = name.decode('ascii')
         else:
             name = name.encode('utf-8').decode('ascii')
@@ -461,9 +438,8 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
         }
         req_class = dset.attrs._req_prefix + 'CLASS'
         req_name = dset.attrs._req_prefix + 'NAME'
-        with phil:
-            dset.PUT(req_class, body=class_attr, replace=True)
-            try:
-                dset.PUT(req_name, body=name_attr, replace=True)
-            except Exception:
-                dset.DELETE(req_class)
+        dset.PUT(req_class, body=class_attr, replace=True)
+        try:
+            dset.PUT(req_name, body=name_attr, replace=True)
+        except Exception:
+            dset.DELETE(req_class)

@@ -19,9 +19,6 @@ import time
 import base64
 import numpy
 
-import six
-from six.moves import xrange
-
 from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes
 from .h5type import Reference, RegionReference
 from .base import  _decode
@@ -530,7 +527,7 @@ class Dataset(HLObject):
         self.log.info("__iter__")
         if len(shape) == 0:
             raise TypeError("Can't iterate over a scalar dataset")
-        for i in xrange(shape[0]):
+        for i in range(shape[0]):
             if i%BUFFER_SIZE == 0:
                 # grab another buffer
                 numrows = BUFFER_SIZE
@@ -582,11 +579,9 @@ class Dataset(HLObject):
                 self.log.debug("arg: [{},...] type: {}".format(arg[0], type(arg)))
 
         # Sort field indices from the rest of the args.
-        names = tuple(x for x in args if isinstance(x, six.string_types))
-        args = tuple(x for x in args if not isinstance(x, six.string_types))
-        if not six.PY3:
-            names = tuple(x.encode('utf-8') if isinstance(x, six.text_type) else x for x in names)
-
+        names = tuple(x for x in args if isinstance(x, str))
+        args = tuple(x for x in args if not isinstance(x, str))
+         
         new_dtype = getattr(self._local, 'astype', None)
         if new_dtype is not None:
             new_dtype = readtime_dtype(new_dtype, names)
@@ -852,7 +847,7 @@ class Dataset(HLObject):
             last_point = -1
             delistify = False
 
-            if len(points) == rank and isinstance(points[0], six.integer_types) and rank > 1:
+            if len(points) == rank and isinstance(points[0], int) and rank > 1:
                 # Single point selection - need to wrap this in an array
                 self.log.info("single point selection")
                 points = [ points, ]
@@ -872,7 +867,7 @@ class Dataset(HLObject):
                                 raise TypeError("index points must be strictly increasing")
                             last_point = point[0]
 
-                    elif rank == 1 and isinstance(point, six.integer_types):
+                    elif rank == 1 and isinstance(point, int):
                         if point < 0 or point>self._shape[0]:
                             raise ValueError("point out of range")
                         if point <= last_point:
@@ -957,16 +952,14 @@ class Dataset(HLObject):
             val = val.tolist()
 
         # Sort field indices from the slicing
-        names = tuple(x for x in args if isinstance(x, six.string_types))
-        args = tuple(x for x in args if not isinstance(x, six.string_types))
-        if not six.PY3:
-            names = tuple(x.encode('utf-8') if isinstance(x, six.text_type) else x for x in names)
-
+        names = tuple(x for x in args if isinstance(x, str))
+        args = tuple(x for x in args if not isinstance(x, str))
+         
         # Generally we try to avoid converting the arrays on the Python
         # side.  However, for compound literals this is unavoidable.
         # For h5pyd, do extra check and convert type on client side for efficiency
         vlen = check_dtype(vlen=self.dtype)
-        if vlen is not None and vlen not in (bytes, six.text_type):
+        if vlen is not None and vlen not in (bytes, str):
             self.log.debug("converting ndarray for vlen data")
             try:
                 val = numpy.asarray(val, dtype=vlen)
@@ -1236,19 +1229,18 @@ class Dataset(HLObject):
 
     def __repr__(self):
         if not self:
-            r = six.u('<Closed HDF5 dataset>')
+            r = '<Closed HDF5 dataset>'
         else:
             if self.name is None:
-                namestr = six.u('("anonymous")')
+                namestr = '("anonymous")'
             else:
                 name = pp.basename(pp.normpath(self.name))
-                namestr = six.u('"%s"') % (
-                    name if name != six.u('') else six.u('/'))
-            r = six.u('<HDF5 dataset %s: shape %s, type "%s">') % \
-                (namestr, self._shape, self.dtype.str)
-        if six.PY3:
-            return r
-        return r.encode('utf8')
+                if name:
+                    namestr = f'"{name}"'
+                else:
+                    namestr = '/'
+            r = f'<HDF5 dataset {namestr}: shape {self._shape}, type "{self.dtype.str}">'
+        return r
 
     def refresh(self):
         """ Refresh the dataset metadata by reloading from the file.

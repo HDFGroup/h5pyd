@@ -20,14 +20,13 @@
 from __future__ import absolute_import
 
 import numpy
-import six
 import json
 
 from . import base
-from .base import phil, with_phil, jsonToArray
+from .base import jsonToArray
 from .datatype import Datatype
 from .objectid import GroupID, DatasetID, TypeID
-from .h5type import getTypeItem, createDataType, special_dtype, check_dtype, Reference
+from .h5type import getTypeItem, createDataType, special_dtype, Reference
 
 
 class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
@@ -82,10 +81,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         Convert list that may contain bytes type elements to list of string
         elements
         """
-        if six.PY2:
-            text_types = (bytes, str, unicode)
-        else:
-            text_types = (bytes, str)
+
+        text_types = (bytes, str)
         if isinstance(data, text_types):
             is_list = False
         elif isinstance(data, (numpy.ndarray, numpy.generic)):
@@ -108,20 +105,16 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             for item in data:
                 out.append(self._bytesArrayToList(item)) # recursive call
         elif isinstance(data, bytes):
-            if six.PY3:
-                out = data.decode("utf-8")
-            else:
-                out = data
+            out = data.decode("utf-8")
         else:
             out = data
 
         return out
 
-    @with_phil
     def __getitem__(self, name):
         """ Read the value of an attribute.
         """
-        if six.PY3 and isinstance(name, bytes):
+        if isinstance(name, bytes):
             name = name.decode("utf-8")
 
         if self._objdb_attributes is not None:
@@ -166,7 +159,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             return arr[()]
         return arr
 
-    @with_phil
     def __setitem__(self, name, value):
         """ Set a new attribute, overwriting any existing attribute.
 
@@ -176,10 +168,9 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         """
         self.create(name, data=value, dtype=base.guess_dtype(value))
 
-    @with_phil
     def __delitem__(self, name):
         """ Delete an attribute (which must already exist). """
-        if six.PY3 and isinstance(name, bytes):
+        if isinstance(name, bytes):
             name = name.decode("utf-8")
         req = self._req_prefix + name
         self._parent.DELETE(req)
@@ -200,105 +191,97 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         """
         self._parent.log.info("attrs.create({})".format(name))
 
-        with phil:
-            # First, make sure we have a NumPy array.  We leave the data
-            # type conversion for HDF5 to perform.
-            if isinstance(data, Reference):
-                dtype = special_dtype(ref=Reference)
-            data = numpy.asarray(data, dtype=dtype, order='C')
+        # First, make sure we have a NumPy array.  We leave the data
+        # type conversion for HDF5 to perform.
+        if isinstance(data, Reference):
+            dtype = special_dtype(ref=Reference)
+        data = numpy.asarray(data, dtype=dtype, order='C')
 
-            if shape is None:
-                shape = data.shape
+        if shape is None:
+            shape = data.shape
 
-            use_htype = None    # If a committed type is given, we must use it
-                                # in the call to h5a.create.
+        use_htype = None    # If a committed type is given, we must use it
+                            # in the call to h5a.create.
 
-            if isinstance(dtype, Datatype):
-                use_htype = dtype.id
-                dtype = dtype.dtype
+        if isinstance(dtype, Datatype):
+            use_htype = dtype.id
+            dtype = dtype.dtype
 
-                # Special case if data are complex numbers
-                if (data.dtype.kind == 'c' and
-                    (dtype.names is None or
-                     dtype.names != ('r', 'i') or
-                     any(dt.kind != 'f' for dt, off in dtype.fields.values()) or
-                     dtype.fields['r'][0] == dtype.fields['i'][0])):
-                    raise TypeError(
-                        'Wrong committed datatype for complex numbers: %s' %
-                        dtype.name)
-            elif dtype is None:
-                if data.dtype.kind == 'U':
-                    # use vlen for unicode strings
-                    if six.PY3:
-                        dtype = special_dtype(vlen=str)
-                    else:
-                        dtype = special_dtype(vlen=unicode)
-                else:
-                    dtype = data.dtype
+            # Special case if data are complex numbers
+            if (data.dtype.kind == 'c' and
+                (dtype.names is None or
+                    dtype.names != ('r', 'i') or
+                    any(dt.kind != 'f' for dt, off in dtype.fields.values()) or
+                    dtype.fields['r'][0] == dtype.fields['i'][0])):
+                raise TypeError(
+                    'Wrong committed datatype for complex numbers: %s' %
+                    dtype.name)
+        elif dtype is None:
+            if data.dtype.kind == 'U':
+                # use vlen for unicode strings
+                dtype = special_dtype(vlen=str)
             else:
-                dtype = numpy.dtype(dtype) # In case a string, e.g. 'i8' is passed
+                dtype = data.dtype
+        else:
+            dtype = numpy.dtype(dtype) # In case a string, e.g. 'i8' is passed
 
-            #original_dtype = dtype  # We'll need this for top-level array types
+        # Where a top-level array type is requested, we have to do some
+        # fiddling around to present the data as a smaller array of
+        # subarrays.
+        if dtype.subdtype is not None:
 
-            # Where a top-level array type is requested, we have to do some
-            # fiddling around to present the data as a smaller array of
-            # subarrays.
-            if dtype.subdtype is not None:
+            subdtype, subshape = dtype.subdtype
 
-                subdtype, subshape = dtype.subdtype
+            # Make sure the subshape matches the last N axes' sizes.
+            if shape[-len(subshape):] != subshape:
+                raise ValueError("Array dtype shape %s is incompatible with data shape %s" % (subshape, shape))
 
-                # Make sure the subshape matches the last N axes' sizes.
-                if shape[-len(subshape):] != subshape:
-                    raise ValueError("Array dtype shape %s is incompatible with data shape %s" % (subshape, shape))
+            # New "advertised" shape and dtype
+            shape = shape[0:len(shape) - len(subshape)]
+            dtype = subdtype
 
-                # New "advertised" shape and dtype
-                shape = shape[0:len(shape) - len(subshape)]
-                dtype = subdtype
+        # Not an array type; make sure to check the number of elements
+        # is compatible, and reshape if needed.
+        else:
+            if numpy.product(shape) != numpy.product(data.shape):
+                raise ValueError("Shape of new attribute conflicts with shape of data")
 
-            # Not an array type; make sure to check the number of elements
-            # is compatible, and reshape if needed.
-            else:
-                if numpy.product(shape) != numpy.product(data.shape):
-                    raise ValueError(
-                        "Shape of new attribute conflicts with shape of data")
+            if shape != data.shape:
+                data = data.reshape(shape)
 
-                if shape != data.shape:
-                    data = data.reshape(shape)
+        # We need this to handle special string types.
+        data = numpy.asarray(data, dtype=dtype)
 
-            # We need this to handle special string types.
-            data = numpy.asarray(data, dtype=dtype)
+        # Make HDF5 datatype and dataspace for the H5A calls
+        if use_htype is None:
+            type_json = getTypeItem(dtype)
+            self._parent.log.debug("attrs.create type_json: {}".format(type_json))
 
-            # Make HDF5 datatype and dataspace for the H5A calls
-            if use_htype is None:
-                type_json = getTypeItem(dtype)
-                self._parent.log.debug("attrs.create type_json: {}"
-                                       .format(type_json))
+        # This mess exists because you can't overwrite attributes in HDF5.
+        # So we write to a temporary attribute first, and then rename.
 
-            # This mess exists because you can't overwrite attributes in HDF5.
-            # So we write to a temporary attribute first, and then rename.
+        req = self._req_prefix + name
+        body = {}
+        body['type'] = type_json
+        body['shape'] = shape
+        if data.dtype.kind != 'c':
+            body['value'] = self._bytesArrayToList(data)
+        else:
+            # Special case: complex numbers
+            special_dt = createDataType(type_json)
+            tmp = numpy.empty(shape=data.shape, dtype=special_dt)
+            tmp['r'] = data.real
+            tmp['i'] = data.imag
+            body['value'] = json.loads(json.dumps(tmp.tolist()))
 
-            req = self._req_prefix + name
-            body = {}
-            body['type'] = type_json
-            body['shape'] = shape
-            if data.dtype.kind != 'c':
-                body['value'] = self._bytesArrayToList(data)
-            else:
-                # Special case: complex numbers
-                special_dt = createDataType(type_json)
-                tmp = numpy.empty(shape=data.shape, dtype=special_dt)
-                tmp['r'] = data.real
-                tmp['i'] = data.imag
-                body['value'] = json.loads(json.dumps(tmp.tolist()))
-
-            try:
-                self._parent.PUT(req, body=body)
-            except RuntimeError:
-                # Resource already exist, try deleting it
-                self._parent.log.info("Update to existing attribute ({}), deleting it".format(name))
-                self._parent.DELETE(req)
-                # now add again
-                self._parent.PUT(req, body=body)
+        try:
+            self._parent.PUT(req, body=body)
+        except RuntimeError:
+            # Resource already exist, try deleting it
+            self._parent.log.info("Update to existing attribute ({}), deleting it".format(name))
+            self._parent.DELETE(req)
+            # now add again
+            self._parent.PUT(req, body=body)
 
     def modify(self, name, value):
         """ Change the value of an attribute while preserving its type.
@@ -330,7 +313,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 attr.write(value)
         """
 
-    @with_phil
     def __len__(self):
         """ Number of attributes attached to the object. """
 
@@ -343,7 +325,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             req = req[:-(len('/attributes/'))]
             rsp = self._parent.GET(req)  # get parent obj
             count = rsp['attributeCount']
-        # return h5a.get_num_attrs(self._id)
         return count
 
     def __iter__(self):
@@ -368,11 +349,10 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             for name in attrlist:
                 yield name
 
-    @with_phil
     def __contains__(self, name):
         """ Determine if an attribute exists, by name. """
         exists = True
-        if six.PY3 and isinstance(name, bytes):
+        if isinstance(name, bytes):
             name = name.decode("utf-8")
 
         if self._objdb_attributes is not None:
@@ -387,9 +367,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 exists = False
         return exists
 
-        #return h5a.exists(self._id, self._e(name))
-
-    @with_phil
     def __repr__(self):
         if not self._parent.id.id:
             return "<Attributes of closed HDF5 object>"

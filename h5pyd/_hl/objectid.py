@@ -14,8 +14,6 @@ from __future__ import absolute_import
 from datetime import datetime
 import pytz
 import time
-import six
-
 
 def parse_lastmodified(datestr):
     """Turn last modified datetime string into a datetime object."""
@@ -39,14 +37,7 @@ class ObjectID:
 
     @property
     def uuid(self):
-        if six.PY2:
-            # convert unicode to native string type
-            if isinstance(self._uuid, str):
-                return self._uuid.encode('ascii')
-            else:
-                return self._uuid
-        else:
-            return self._uuid
+        return self._uuid
 
     @property
     def id(self):

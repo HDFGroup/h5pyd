@@ -22,7 +22,6 @@ import logging.handlers
 from collections import (
     Mapping, MutableMapping, KeysView, ValuesView, ItemsView
 )
-import six
 from .objectid import GroupID
 from .h5type import Reference, check_dtype
 
@@ -290,7 +289,7 @@ def getElementSize(e, dt):
                 raise ValueError("Unexpected value: {}".format(e))
         elif isinstance(e, bytes):
             count = len(e) + 4
-        elif isinstance(e, str) or (six.PY2 and isinstance(e, unicode)):
+        elif isinstance(e, str):
             count = len(e.encode('utf-8')) + 4
         elif isinstance(e, np.ndarray):
             nElements = np.prod(e.shape)
@@ -368,7 +367,7 @@ def copyElement(e, dt, buffer, offset):
             count = np.int32(len(e))
             offset = copyBuffer(count.tobytes(), buffer, offset)
             offset = copyBuffer(e, buffer, offset)
-        elif isinstance(e, str) or (six.PY2 and isinstance(e, unicode)):
+        elif isinstance(e, str):
             text = e.encode('utf-8')
             count = np.int32(len(text))
             offset = copyBuffer(count.tobytes(), buffer, offset)
@@ -458,7 +457,7 @@ def readElement(buffer, offset, arr, index, dt):
 
                 if vlen is bytes:
                     arr[index] = bytes(e_buffer)
-                elif vlen is str or (six.PY2 and vlen is unicode):
+                elif vlen is str:
                     s = e_buffer.decode("utf-8")
                     arr[index] = s
                 else:
@@ -1085,44 +1084,17 @@ class MappingHDF5(Mapping):
         subclasses, for example DimensionManager, are read-only.
     """
 
-    if six.PY3:
-        def keys(self):
-            """ Get a view object on member names """
-            return KeysView(self)
+    def keys(self):
+        """ Get a view object on member names """
+        return KeysView(self)
 
-        def values(self):
-            """ Get a view object on member objects """
-            return ValuesViewHDF5(self)
+    def values(self):
+        """ Get a view object on member objects """
+        return ValuesViewHDF5(self)
 
-        def items(self):
-            """ Get a view object on member items """
-            return ItemsViewHDF5(self)
-
-    else:
-        def keys(self):
-            """ Get a list containing member names """
-            with phil:
-                return list(self)
-
-        def values(self):
-            """ Get a list containing member objects """
-            with phil:
-                return [self.get(x) for x in self]
-
-        def itervalues(self):
-            """ Get an iterator over member objects """
-            for x in self:
-                yield self.get(x)
-
-        def items(self):
-            """ Get a list of tuples containing (name, object) pairs """
-            with phil:
-                return [(x, self.get(x)) for x in self]
-
-        def iteritems(self):
-            """ Get an iterator over (name, object) pairs """
-            for x in self:
-                yield (x, self.get(x))
+    def items(self):
+        """ Get a view object on member items """
+        return ItemsViewHDF5(self)
 
 
 class MutableMappingHDF5(MappingHDF5, MutableMapping):

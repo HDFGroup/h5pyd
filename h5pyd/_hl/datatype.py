@@ -15,7 +15,7 @@ from __future__ import absolute_import
 import posixpath as pp
 
 #from ..h5t import TypeID
-from .base import HLObject, phil, with_phil
+from .base import HLObject
 
 from .objectid import  TypeID
 from .h5type import createDataType
@@ -32,26 +32,22 @@ class Datatype(HLObject):
         >>> assert named_type.dtype == numpy.dtype("f")  """
 
     @property
-    @with_phil
     def dtype(self):
         """Numpy dtype equivalent for this datatype"""
         return self._dtype
 
-    @with_phil
     def __init__(self, bind):
         """ Create a new Datatype object by binding to a low-level TypeID.
         """
-        with phil:
-            if not isinstance(bind, TypeID):
-                # todo: distinguish type from other hl objects
-                raise ValueError("%s is not a TypeID" % bind)
-            HLObject.__init__(self, bind)
+        if not isinstance(bind, TypeID):
+            # todo: distinguish type from other hl objects
+            raise ValueError("%s is not a TypeID" % bind)
+        HLObject.__init__(self, bind)
 
-            self._dtype = createDataType(self.id.type_json)
-            self._req_prefix = "/datatypes/" + self.id.uuid
+        self._dtype = createDataType(self.id.type_json)
+        self._req_prefix = "/datatypes/" + self.id.uuid
 
 
-    @with_phil
     def __repr__(self):
         if not self.id:
             return "<Closed HDF5 named type>"
@@ -60,5 +56,8 @@ class Datatype(HLObject):
         else:
             name = pp.basename(pp.normpath(self.name))
             namestr = '"%s"' % (name if name != '' else '/')
-        return '<HDF5 named type %s (dtype %s)>' % \
-            (namestr, self.dtype.str)
+            if name:
+                namestr = f'"{name}"'
+            else:
+                namestr = '"/"'
+        return f'<HDF5 named type {namestr} (dtype {self.dtype.str})>'

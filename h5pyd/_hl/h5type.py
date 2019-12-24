@@ -15,11 +15,7 @@ from __future__ import absolute_import
 import numpy as np
 # trying to import these results in circular references, so just use is_reference, is_regionreference helpers to identify
 #from .base import Reference, RegionReference
-import six
 import weakref
-
-if six.PY3:
-    unicode = str
 
 def is_reference(val):
     try:
@@ -301,12 +297,12 @@ def getTypeItem(dt):
         if vlen_check is not None and isinstance(vlen_check, np.dtype):
             vlen_check = np.dtype(vlen_check)
         ref_check = check_dtype(ref=dt.base)
-        if vlen_check == six.binary_type:
+        if vlen_check == bytes:
             type_info['class'] = 'H5T_STRING'
             type_info['length'] = 'H5T_VARIABLE'
             type_info['charSet'] = 'H5T_CSET_ASCII'
             type_info['strPad'] = 'H5T_STR_NULLTERM'
-        elif vlen_check == six.text_type:
+        elif vlen_check == str:
             type_info['class'] = 'H5T_STRING'
             type_info['length'] = 'H5T_VARIABLE'
             type_info['charSet'] = 'H5T_CSET_UTF8'
@@ -450,7 +446,7 @@ def getTypeItem(dt):
 """
 def getItemSize(typeItem):
     # handle the case where we are passed a primitive type first
-    if isinstance(typeItem, six.string_types) or isinstance(typeItem, six.text_type) or isinstance(typeItem, six.binary_type):
+    if isinstance(typeItem, str) or isinstance(typeItem, bytes):
         for type_prefix in ("H5T_STD_I", "H5T_STD_U", "H5T_IEEE_F"):
             if typeItem.startswith(type_prefix):
                 num_bits = typeItem[len(type_prefix):]
@@ -577,7 +573,7 @@ def getNumpyTypename(hdf5TypeName, typeClass=None):
 def createBaseDataType(typeItem):
 
     dtRet = None
-    if type(typeItem) == str or type(typeItem) == unicode:
+    if type(typeItem) == str or type(typeItem) == str:
         # should be one of the predefined types
         dtName = getNumpyTypename(typeItem)
         dtRet = np.dtype(dtName)
@@ -624,7 +620,7 @@ def createBaseDataType(typeItem):
             if typeItem['charSet'] == 'H5T_CSET_ASCII':
                 dtRet = special_dtype(vlen=bytes)
             elif typeItem['charSet'] == 'H5T_CSET_UTF8':
-                dtRet = special_dtype(vlen=unicode)
+                dtRet = special_dtype(vlen=str)
             else:
                 raise TypeError("unexpected 'charSet' value")
         else:
@@ -717,7 +713,7 @@ Create a numpy datatype given a json type
 """
 def createDataType(typeItem):
     dtRet = None
-    if type(typeItem) in [six.string_types, six.text_type, six.binary_type]:
+    if type(typeItem) in [str, bytes]:
         # should be one of the predefined types
         dtName = getNumpyTypename(typeItem)
         dtRet = np.dtype(dtName)
@@ -748,14 +744,12 @@ def createDataType(typeItem):
             if 'type' not in field:
                 raise KeyError("'type' missing from field")
             field_name = field['name']
-            if isinstance(field_name, unicode):
+            if isinstance(field_name, str):
                 # verify the field name is ascii
                 try:
-                    ascii_name = field_name.encode('ascii')
+                    field_name.encode('ascii')
                 except UnicodeDecodeError:
                     raise TypeError("non-ascii field name not allowed")
-                if not six.PY3:
-                    field['name'] = ascii_name
 
             dt = createDataType(field['type'])  # recursive call
             if dt is None:

@@ -276,6 +276,7 @@ def visitDomains(domain, depth=1):
         domain = domain[:-1]  # strip off trailing slash
 
     try:
+        print("getFolder:" + domain + '/')
         dir = getFolder(domain + '/')
         dir_class = "domain"
         display_name = domain

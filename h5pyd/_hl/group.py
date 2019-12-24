@@ -12,7 +12,6 @@
 
 from __future__ import absolute_import
 
-import six
 import os.path as op
 import numpy
 import collections
@@ -530,7 +529,7 @@ class Group(HLObject, MutableMappingHDF5):
             # return True if name looks like an object id
             # There are some additional checks we could add to reduce false positives
             # (like checking for hyphens in the right places)
-            if isinstance(name, six.string_types) and len(name) >= 38:
+            if isinstance(name, str) and len(name) >= 38:
                 if name.startswith("groups/") or name.startswith("g-"):
                     return True
                 elif name.startswith("datatypes/") or name.startswith("t-"):
@@ -967,10 +966,7 @@ class Group(HLObject, MutableMappingHDF5):
         tovisit[self.id.uuid] = self
         retval = None
 
-        if six.PY3:
-            nargs = func.__code__.co_argcount
-        else:
-            nargs = func.func_code.co_argcount
+        nargs = func.__code__.co_argcount
 
         while len(tovisit) > 0:
             (parent_uuid, parent) = tovisit.popitem(last=True)
@@ -1037,20 +1033,17 @@ class Group(HLObject, MutableMappingHDF5):
                             break
 
         return retval
-        
 
     def __repr__(self):
         if not self:
-            r = six.u("<Closed HDF5 group>")
+            r = "<Closed HDF5 group>"
         else:
-            namestr = (
-                six.u('"%s"') % self.name
-            ) if self.name is not None else six.u("(anonymous)")
-            r = six.u('<HDF5 group %s (%d members)>') % (namestr, len(self))
-
-        if six.PY3:
-            return r
-        return r.encode('utf8')
+            if self.name is None:
+                namestr = "(anonymous)"
+            else:
+                namestr = f'"{self.name}"'
+            r = f'<HDF5 group {namestr} ({len(self)} members)>'
+        return r
 
 
 class HardLink(object):
