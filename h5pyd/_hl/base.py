@@ -763,7 +763,7 @@ class HLObject(CommonStateObject):
                     self.log.debug("_getNameFromObjDb - looking at linK: {}".format(title))
                     link = links[title]
                     if link["class"] != 'H5L_TYPE_HARD':
-                        self.log.debug("_getNameFromObjDb - skipping link type: {}".foramt(link['class']))
+                        self.log.debug("_getNameFromObjDb - skipping link type: {}".format(link['class']))
                         continue
                     if link["id"] == objid:
                         # found a link to our target
