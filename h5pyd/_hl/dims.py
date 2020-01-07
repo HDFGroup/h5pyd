@@ -26,11 +26,7 @@ class DimensionProxy(base.CommonStateObject):
         if not objid:
             objid = self._id.id
         objdb = self._id.http_conn.getObjDb()
-        if objdb:
-            # objdb present, get JSON for this dataset
-            if objid not in objdb:
-                msg = "Error: expected {} to be in objdb".format(objid)
-                raise IOError(msg)
+        if objdb and objid in objdb:
             dset_json = objdb[objid]
             attrs_json = dset_json["attributes"]
             if  attr_name not in attrs_json:
@@ -50,11 +46,8 @@ class DimensionProxy(base.CommonStateObject):
         """
 
         objdb = self._id.http_conn.getObjDb()
-        if objdb:
+        if objdb and objid in objdb:
             # objdb present, get JSON for this dataset
-            if objid not in objdb:
-                msg = "Error: expected {} to be in objdb".format(objid)
-                raise IOError(msg)
             dset_json = objdb[objid]
             return dset_json
 
@@ -63,7 +56,9 @@ class DimensionProxy(base.CommonStateObject):
         rsp = self._id.http_conn.GET(req)
         if rsp.status_code == 200:
             dset_json = json.loads(rsp.text)
-        return dset_json
+            return dset_json
+        else:
+            return None
 
     @property
     def label(self):
@@ -356,7 +351,7 @@ class DimensionProxy(base.CommonStateObject):
     def __repr__(self):
         if not self._id:
             return '<Dimension of closed HDF5 dataset>'
-        return f'<{self.label} dimension {self._dimension} of HDf5 dataset at {id(self._id)}>'
+        return f'<{self.label} dimension {self._dimension} of HDf5 dataset {self._id.id}>'
 
 class DimensionManager(base.MappingHDF5, base.CommonStateObject):
     '''
