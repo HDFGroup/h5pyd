@@ -31,13 +31,12 @@ install:
      cd hsds ;
      ./build.sh --nolint ;
      ./runall.sh ;
+     echo "server starting..."
      sleep 20 ;
-     python tests/integ/uptest.py ;
-     python tests/setup_test.py ;
      cd - ;
    fi
 script:
-- echo use_h5serv ${USE_H5SERV}
+- echo h5_driver ${H5_DRIVER}
 - if [ "${H5_DRIVER}" == "h5serv" ]; then
     echo "setting up h5serv" ;
     cd h5serv/util/admin ;
@@ -70,6 +69,9 @@ script:
 - echo test2_user ${TEST2_USERNAME}
 - echo test2 password ${TEST2_PASSWORD}
 - if [ "${H5_DRIVER}" == "hsds" ]; then
+    echo "setting up HSDS folders" ;
+    hstouch -u admin -p admin /home/ ;
+    hstouch -u admin -p admin -o test_user1 /home/test_user1/ ;
     hstouch /home/test_user1/h5pyd_test/ ;
     hstouch ${H5PYD_TEST_FOLDER} ;
   fi
