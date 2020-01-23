@@ -38,7 +38,7 @@ install:
    fi'
 script:
 - echo use_h5serv ${USE_H5SERV}
-- 'if [ "${H5_DRIVER}" == "h5serv" ]; then
+- if [ "${H5_DRIVER}" == "h5serv" ]; then
     echo "setting up h5serv" ;
     cd h5serv/util/admin ;
     python makepwd_file.py ;
@@ -60,7 +60,7 @@ script:
     export TEST2_PASSWORD=test ;
   else
     export USE_H5PY=1 ;
-  fi'
+  fi
 - python setup.py install
 - echo endpoint ${HS_ENDPOINT}
 - echo python_version ${TRAVIS_PYTHON_VERSION}
@@ -69,8 +69,8 @@ script:
 - echo password ${HS_PASSWORD}
 - echo test2_user ${TEST2_USERNAME}
 - echo test2 password ${TEST2_PASSWORD}
-- 'if [ "${H5_DRIVER}" == "hsds" ]; then
+- if [ "${H5_DRIVER}" == "hsds" ]; then
     hstouch /home/test_user1/h5pyd_test/ ;
     hstouch ${H5PYD_TEST_FOLDER} ;
-  fi'
+  fi
 - python testall.py
