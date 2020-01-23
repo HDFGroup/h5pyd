@@ -16,7 +16,7 @@ install:
 - pip install requests
 - pip install pytz
 - pip install h5py
-- 'if [ "${H5_DRIVER}" == "h5serv" ]; then
+- if [ "${H5_DRIVER}" == "h5serv" ]; then
      pip install tornado ;
      pip install watchdog ;
      git clone https://github.com/HDFGroup/hdf5-json.git ;
@@ -31,11 +31,11 @@ install:
      cd hsds ;
      ./build.sh --nolint ;
      ./runall.sh ;
-     sleep 20 ; # give server time to startup
+     sleep 20 ;
      python tests/integ/uptest.py ;
      python tests/setup_test.py ;
      cd - ;
-   fi'
+   fi
 script:
 - echo use_h5serv ${USE_H5SERV}
 - if [ "${H5_DRIVER}" == "h5serv" ]; then
@@ -50,6 +50,12 @@ script:
     cd .. ;
     export HS_ENDPOINT=http://127.0.0.1:5000 ;
     export H5PYD_TEST_FOLDER=h5pyd_test.hdfgroup.org ;
+    export HS_PASSWORD=test ;
+    export TEST2_PASSWORD=test ;
+  elif [ "${H5_DRIVER}" == "hsds" ]; then
+    export HS_ENDPOINT=http://localhost:5101 ;
+    curl ${HS_ENDPOINT}/about ;
+    export H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test/${TRAVIS_PYTHON_VERSION}/ ;
     export HS_PASSWORD=test ;
     export TEST2_PASSWORD=test ;
   else
