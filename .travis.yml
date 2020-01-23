@@ -24,6 +24,17 @@ install:
      python setup.py install ;
      cd .. ;
      git clone https://github.com/HDFGroup/h5serv.git ;
+   else
+     pip install aiohttp ;
+     pip install awscli ;
+     git clone https://github.com/HDFGroup/hsds.git ;
+     cd hsds ;
+     ./build.sh --nolint ;
+     ./runall.sh ;
+     sleep 20 ; # give server time to startup
+     python tests/integ/uptest.py ;
+     python tests/setup_test.py ;
+     cd - ;
    fi'
 script:
 - echo use_h5serv ${USE_H5SERV}
@@ -42,9 +53,12 @@ script:
     export HS_PASSWORD=test ;
     export TEST2_PASSWORD=test ;
   elif [ "${H5_DRIVER}" == "hsds" ]; then
-    export HS_ENDPOINT=http://hsdshdflab.hdfgroup.org ;
-    export H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test/${TRAVIS_PYTHON_VERSION} ;
+    export HS_ENDPOINT=http://localhost:5101 ;
     curl ${HS_ENDPOINT}/about ;
+    export H5PYD_TEST_FOLDER=/home/test_user1/h5pyd_test/${TRAVIS_PYTHON_VERSION}/ ;
+    export HS_PASSWORD=test ;
+    export TEST2_PASSWORD=test ;
+
   else
     export USE_H5PY=1 ;
   fi'
@@ -56,4 +70,8 @@ script:
 - echo password ${HS_PASSWORD}
 - echo test2_user ${TEST2_USERNAME}
 - echo test2 password ${TEST2_PASSWORD}
+- if [ "${H5_DRIVER}" == "hsds" ]; then
+    hstouch /home/test_user1/h5pyd_test/ ;
+    hstouch ${H5PYD_TEST_FOLDER} ;
+  fi
 - python testall.py
