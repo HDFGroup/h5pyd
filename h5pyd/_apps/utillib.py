@@ -284,39 +284,6 @@ def copy_attribute(desobj, name, srcobj, ctx):
         logging.error(msg)
         print(msg)
 
-# copy_attribute
-
-def use_storeinfo(dobj, ctx):
-    """ determine if we should reference data stored in existing HDF5 file
-    """
-    if not ctx["storeinfo"]:
-        return False
-    storeinfo = ctx["storeinfo"]
-    if dobj.name  not in storeinfo:
-        msg = "Path {} not found in storeinfo, loading dataset directly".format(dobj.name)
-        logging.warn(msg)
-        if ctx["verbose"]:
-            print(msg)
-        return False
-
-    dset_info = storeinfo[dobj.name]
-    if "byteStreams" not in dset_info:
-        msg = "Expected to find 'byteStreams' key in storeinfo for {}".format(dobj.name)
-        logging.error(msg)
-        print(msg)
-        return False
-
-    byteStreams = dset_info["byteStreams"]
-    num_chunks = len(byteStreams)
-    if num_chunks == 0:
-        msg = "No chunks found for {}, loading datset directly".format(dobj.name)
-        logging.info(msg)
-        if ctx["verbose"]:
-            print(msg)
-        return False
-    return True
-
-
 #----------------------------------------------------------------------------------
 def create_dataset(dobj, ctx):
     """ create a dataset using the properties of the passed in h5py dataset.
@@ -337,52 +304,47 @@ def create_dataset(dobj, ctx):
         pass  # ignore
     chunks=None
 
-    can_use_storeinfo = use_storeinfo(dobj, ctx)
-    if can_use_storeinfo:
-        storeinfo = ctx["storeinfo"]
-        dset_info = storeinfo[dobj.name]
-        byteStreams = dset_info["byteStreams"]
-        num_chunks = len(byteStreams)
-        logging.info("using storeinfo to assign chunks for {} chunks".format(num_chunks))
+    # can_use_storeinfo = use_storeinfo(dobj, ctx)
+    if ctx["dataload"] == "s3link":
         dset_dims = dobj.shape
         logging.debug("dset_dims: {}".format(dset_dims))
         rank = len(dset_dims)
         chunk_dims = dobj.chunks
         logging.debug("chunk_dims: {}".format(chunk_dims))
-
+        num_chunks = 0
+        dsetid = dobj.id
+        spaceid = dsetid.get_space()
+        if chunk_dims:
+            num_chunks = dsetid.get_num_chunks(spaceid)
 
         chunks = {}  # pass a map to create_dataset
-        if num_chunks < 1:
-            # this should be caught by use_storeinfo function
-            msg = "unexpected value for num_chunks"
-            logging.error(msg)
-            print(msg)
-        elif num_chunks == 1:
-            byteStream = byteStreams[0]
+
+        if num_chunks == 0:
             chunks["class"] = 'H5D_CONTIGUOUS_REF'
             chunks["file_uri"] = ctx["s3path"]
-            chunks["offset"] = byteStream["file_offset"]
+            chunks["offset"] = dsetid.get_offset()
             # TBD - check the size is not too large
-            chunks["size"] = byteStream["size"]
-            logging.info("using chunk layout: {}".format(chunks))
+            chunks["size"] = dsetid.get_storage_size()
+            logging.info(f"using chunk layout: {chunks}")
 
         elif num_chunks < 10:
             # construct map of chunks
             chunk_map = {}
-            for item in byteStreams:
-                index = item["array_offset"]
-                if not isinstance(index, list) or len(index) != rank:
-                    logging.error("Unexpected array_offset: {} for dataset with rank: {}".format(index, rank))
-                    return
+            for i in range(num_chunks):
+                chunk_info = dsetid.get_chunk_info(i, spaceid)
+                index =  chunk_info.chunk_offset
+                logging.debug(f"got chunk_info: {chunk_info} for chunk: {i}")
+                if not isinstance(index, tuple) or len(index) != rank:
+                    msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
+                    logging.error(msg)
+                    raise IOError(msg)
                 chunk_key = ""
                 for dim in range(rank):
                     chunk_key += str(index[dim] // chunk_dims[dim])
                     if dim < rank - 1:
                         chunk_key += "_"
                 logging.debug("adding chunk_key: {}".format(chunk_key))
-                chunk_offset = item["file_offset"]
-                chunk_size = item["size"]
-                chunk_map[chunk_key] = (chunk_offset, chunk_size)
+                chunk_map[chunk_key] = (chunk_info.byte_offset, chunk_info.size)
 
             chunks["class"] = 'H5D_CHUNKED_REF'
             chunks["file_uri"] = ctx["s3path"]
@@ -400,21 +362,20 @@ def create_dataset(dobj, ctx):
             chunkinfo_arr_dims = tuple(chunkinfo_arr_dims)
             logging.debug("creating chunkinfo array of shape: {}".format(chunkinfo_arr_dims))
             chunkinfo_arr = np.zeros(np.prod(chunkinfo_arr_dims), dtype=dt)
-            for item in byteStreams:
-                index = item["array_offset"]
-                logging.debug("array_offset: {}".format(index))
-                if not isinstance(index, list) or len(index) != rank:
-                    logging.error("Unexpected array_offset: {} for dataset with rank: {}".format(index, rank))
-                    return
+            for i in range(num_chunks):
+                chunk_info = dsetid.get_chunk_info(i, spaceid)
+                index =  chunk_info.chunk_offset
+                if not isinstance(index, tuple) or len(index) != rank:
+                    msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
+                    logging.error(msg)
+                    raise IOError(msg)
                 offset = 0
                 stride = 1
                 for i in range(rank):
                     dim = rank - i - 1
                     offset += (index[dim] // chunk_dims[dim]) * stride
                     stride *= chunkinfo_arr_dims[dim]
-                    chunk_offset = item["file_offset"]
-                    chunk_size = item["size"]
-                chunkinfo_arr[offset] = (chunk_offset, chunk_size)
+                chunkinfo_arr[offset] = (chunk_info.byte_offset, chunk_info.size)
             anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
             anon_dset[...] = chunkinfo_arr
             logging.debug("anon_dset: {}".format(anon_dset))
@@ -625,15 +586,26 @@ def create_datatype(obj, ctx):
     fout[obj.name] = obj.dtype
     srcid_desobj_map = ctx["srcid_desobj_map"]
     logging.debug("adding datatype id {} to {} in srcid_desobj_map".format(obj.id.id, fout[obj.name]))
-    srcid_desobj_map[gobj.id.__hash__()] = fout[obj.name]
+    srcid_desobj_map[obj.id.__hash__()] = fout[obj.name]
 
 
 # create_datatype
 
 #----------------------------------------------------------------------------------
-def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None, storeinfo=None):
+def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=None,):
     logging.info("input file: {}".format(fin.filename))
     logging.info("output file: {}".format(fout.filename))
+    if dataload != "ingest":
+        if dataload == "nodata":
+            logging.info("no data load")
+        elif dataload == "s3link":
+            if not s3path:
+                logging.error("s3path expected to be set")
+                sys.exit(1)
+            logging.info("using s3path")
+        else:
+            logging.error("unexpected dataload value")
+            sys.exit(1)
 
     # it would be nice to make a class out of these functions, but that
     # makes it heard to use visititems iterator.
@@ -642,10 +614,10 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None,
     ctx["fin"] = fin
     ctx["fout"] = fout
     ctx["verbose"] = verbose
-    ctx["nodata"] = nodata
+    ctx["dataload"] = dataload  # ingest, s3link, None
     ctx["deflate"] = deflate
     ctx["s3path"] = s3path
-    ctx["storeinfo"] = storeinfo
+    ctx["dataload"] = dataload
     ctx["srcid_desobj_map"] = {}
 
 
@@ -671,7 +643,7 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None,
     def object_copy_helper(name, obj):
         class_name = obj.__class__.__name__
         if class_name in ("Dataset", "Table"):
-            if ctx["storeinfo"]:
+            if ctx["dataload"] == "s3link":
                 logging.info("skip datacopy for s3 reference")
             else:
                 tgt = fout[obj.name]
@@ -694,7 +666,7 @@ def load_file(fin, fout, verbose=False, nodata=False, deflate=None, s3path=None,
     # copy over any attributes
     fin.visititems(object_attribute_helper)
 
-    if not nodata:
+    if dataload:
         # copy dataset data
         fin.visititems(object_copy_helper)
 

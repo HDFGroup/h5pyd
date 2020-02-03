@@ -11,7 +11,6 @@
 ##############################################################################
 
 import sys
-import json
 import logging
 import os
 import os.path as op
@@ -25,8 +24,15 @@ except ImportError as e:
     sys.exit(1)
 
 try:
+    import s3fs
+    S3FS_IMPORT = True
+except ImportError:
+    S3FS_IMPORT = False
+
+
+try:
     import pycurl as PYCRUL
-except ImportError as e:
+except ImportError:
     PYCRUL = None
 
 if __name__ == "__main__":
@@ -101,8 +107,7 @@ def usage():
 
     print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not upload dataset data")
-    print("     --s3path :: S3Path that holds a copy of sourcefile")
-    print("     --storeinfo :: JSON file containing output of store_info utilitity")
+    print("     --s3link :: Link to dataset data (sourcefile must be s3path)")
     print("     -4 :: Force ipv4 for any file staging (doesn\'t set hsds loading net)")
     print("     -6 :: Force ipv6 (see -4)")
     print("     -h | --help    :: This message.")
@@ -122,16 +127,16 @@ def main():
 
     loglevel = logging.ERROR
     verbose = False
-    nodata = False
     deflate = None
     s3path = None
-    storeinfo = None
+    dataload = "ingest"  # or None, or "s3link"
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
     cfg["logfname"] = None
     logfname=None
     ipvfam=None
+    s3 = None  # s3fs instance
 
     src_files = []
     argn = 1
@@ -149,28 +154,17 @@ def main():
         if arg in ("-v", "--verbose"):
             verbose = True
             argn += 1
-        elif arg == "--s3path":
-            if not val.startswith("s3://"):
-                print("invalid s3path")
-                usage()
-                sys.exit(-1)
-            s3path = val
-            argn += 2
-        elif arg == "--storeinfo":
-            storeinfo = None
-            # val should be a valid filename
-            if not op.isfile(val):
-                print("Can't open storeinfo file")
-                usage()
-                sys.exit(-1)
-            # try reading the JSON contents
-            storeinfo = None
-            with open(val) as f:
-                storeinfo = json.load(f)
-            argn += 2
-
+        elif arg == "--s3link":
+            if dataload != "ingest":
+                sys.stderr("--nodata flag can't be used with s3link flag")
+                sys.exit(1)
+            dataload = "s3link"
+            argn += 1
         elif arg == "--nodata":
-            nodata = True
+            if dataload != "ingest":
+                sys.stderr("--nodata flag can't be used with s3link flag")
+                sys.exit(1)
+            dataload = None
             argn += 1
         elif arg == "--loglevel":
             if val == "debug":
@@ -272,10 +266,6 @@ def main():
             else:
                 istmp = False
 
-            if storeinfo and src_file not in storeinfo:
-                logging.error("Can't find {} in storeinfo json".format(src_file))
-                sys.exit(1)
-
             tgt = domain
             if tgt[-1] == '/':
                 # folder destination
@@ -283,11 +273,31 @@ def main():
 
 
             # get a handle to input file
-            try:
-                fin = h5py.File(src_file, mode='r')
-            except IOError as ioe:
-                logging.error("Error opening file {}: {}".format(src_file, ioe))
-                sys.exit(1)
+            if src_file.startswith("s3://"):
+                s3path = src_file
+                if not S3FS_IMPORT:
+                    sys.stderr.write("Install S3FS package to load s3 files")
+                    sys.exit(1)
+                if h5py.version.version_tuple.major != 2 or h5py.version.version_tuple.minor < 10:
+                    print("s3path source requires h5py version 2.10 or higher")
+                    sys.exit(1)
+                if h5py.version.hdf5_version_tuple[0] != 1 or h5py.version.hdf5_version_tuple[1] != 10 or h5py.version.hdf5_version_tuple[2] < 6:
+                    print("s3path source requires hdf5 lib version 1.10.6 or higher")
+                    sys.exit(1)
+                if not s3:
+                    s3 = s3fs.S3FileSystem()
+                try:
+                    fin = h5py.File(s3.open(src_file, "rb"), "r")
+                except IOError as ioe:
+                    logging.error("Error opening file {}: {}".format(src_file, ioe))
+                    sys.exit(1)
+            else:
+                s3path = None
+                try:
+                    fin = h5py.File(src_file, mode='r')
+                except IOError as ioe:
+                    logging.error("Error opening file {}: {}".format(src_file, ioe))
+                    sys.exit(1)
 
             # create the output domain
             try:
@@ -308,10 +318,7 @@ def main():
 
 
             # do the actual load
-            storeinfo_file = None
-            if storeinfo and src_file in storeinfo:
-                storeinfo_file = storeinfo[src_file]
-            load_file(fin, fout, verbose=verbose, nodata=nodata, deflate=deflate, s3path=s3path, storeinfo=storeinfo_file)
+            load_file(fin, fout, verbose=verbose, dataload=dataload, s3path=s3path, deflate=deflate,)
 
             # cleanup if needed
             if istmp:
