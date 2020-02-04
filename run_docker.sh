@@ -4,4 +4,4 @@ if [ $# -eq 0 ]; then
 else
    ARGS=$*
 fi
-docker run --rm -it -v ${HOME}/.hscfg:/root/.hscfg hdfgroup/h5pyd $ARGS
+docker run --rm -v ${HOME}/.hscfg:/root/.hscfg --env AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY --env AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} -it hdfgroup/h5pyd:0.7.0  $ARGS
