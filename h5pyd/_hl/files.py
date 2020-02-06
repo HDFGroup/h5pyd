@@ -444,7 +444,7 @@ class File(Group):
             filename = self.filename
             if isinstance(filename, bytes):  # Can't decode fname
                 filename = filename.decode('utf8', 'replace')
-                full_path = os.path.basename(filename)
+            full_path = os.path.basename(filename)
             r = f"<HDF5 file \"{full_path}\" (mode {self.mode})>"
 
         return r
