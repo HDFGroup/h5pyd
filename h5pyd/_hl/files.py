@@ -96,13 +96,34 @@ class File(Group):
         See the h5py user guide for a detailed explanation of the options.
 
         domain
-            URI of the domain name to access. E.g.: tall.data.hdfgroup.org.
+            URI of the domain name to access. E.g.: /home/username/tall.h5.  Can also
+            use DNS style:  tall.username.home
         mode
             Access mode: 'r', 'r+', 'w', or 'a'
         endpoint
             Server endpoint.   Defaults to "http://localhost:5000"
+        username
+            username for authentication
+        password
+            password for authentication
+        bucket
+            bucket (or storage container) to use for domain.  If not set, server default bucket will be used
+        api_key
+            user's api key (for server configurations that use api_key rather than username/password)
+        use_session
+            maintain http connect between calls
+        use_cache
+            save attribute and links values rather than retreiving from server each time they are accessed.
+            Set to False if the server content is expected to change
+        logger
+            supply log handler to be used
+        owner
+            set the owner to be used when new domain is created (defaults to username).  Only valid when used
+            by admin users
         linked_domain
             Create new domain using the root of the linked domain
+        retries
+            Number of retry attempts to be used if a server request fails
         """
 
         groupid = None
