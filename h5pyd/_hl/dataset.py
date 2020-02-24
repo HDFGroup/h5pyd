@@ -581,7 +581,7 @@ class Dataset(HLObject):
         # Sort field indices from the rest of the args.
         names = tuple(x for x in args if isinstance(x, str))
         args = tuple(x for x in args if not isinstance(x, str))
-         
+
         new_dtype = getattr(self._local, 'astype', None)
         if new_dtype is not None:
             new_dtype = readtime_dtype(new_dtype, names)
@@ -745,6 +745,12 @@ class Dataset(HLObject):
 
             arr = numpy.empty(mshape, dtype=mtype)
             params = {}
+            if self.id._http_conn.mode == 'r' and self.id._http_conn.cache_on:
+                # enables lambda to be used on server
+                self.log.debug("setting nonstrict parameter")
+                params["nonstrict"] = 1
+            else:
+                self.log.debug("not settng nonstrict")
             done = False
 
             while not done:

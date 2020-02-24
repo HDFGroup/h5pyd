@@ -428,6 +428,13 @@ class HttpConn:
         return self._mode
 
     @property
+    def cache_on(self):
+        if self._cache is None:
+            return False
+        else:
+            return True
+
+    @property
     def domain_json(self):
         if self._domain_json is None:
             rsp = self.GET('/')

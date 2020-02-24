@@ -114,7 +114,7 @@ class File(Group):
             maintain http connect between calls
         use_cache
             save attribute and links values rather than retreiving from server each time they are accessed.
-            Set to False if the server content is expected to change
+            Set to False if the storage content is expected to change due to another application
         logger
             supply log handler to be used
         owner
