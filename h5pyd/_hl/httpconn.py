@@ -13,16 +13,24 @@
 from __future__ import absolute_import
 
 import os
+import sys
+from datetime import datetime
+import time
 import base64
 import requests
 from requests import ConnectionError
+from msrestazure.azure_active_directory import AADTokenCredentials
+import adal
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import json
 import logging
 
 MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
+MS_AUTHORITY_HOST_URI = 'https://login.microsoftonline.com'  # login endpoint for AD auth
 
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 class CacheResponse(object):
     """ Wrap a json response in a Requests.Response looking class.
@@ -115,6 +123,43 @@ class HttpConn:
 
         self._s = None  # Sessions
 
+    def _getAzureADToken(self, aad_dict):
+        if not aad_dict:
+            return None
+        # expecting key to be in the form: AZURE_AD#<APP_ID>#<TENANT_ID>#<RESOURCE_ID>
+        
+        app_id = aad_dict["AD_APP_ID"]
+        tenant_id = aad_dict["AD_TENANT_ID"]
+        resource_id = aad_dict["AD_RESOURCE_ID"]
+        token_cache_file = os.path.expanduser(f"~/.hsazcfg_{app_id}")
+        if os.path.isfile(token_cache_file):
+            # load this file and see if the token is expired or not
+            mgmt_token = {}
+            with open(token_cache_file, 'r') as f:
+                mgmt_token = json.load(f)
+            if "expiresOn" in mgmt_token and "accessToken" in mgmt_token:
+                expiresOn = mgmt_token["expiresOn"]
+                # expected format: "YYYY-MM-DD HH:MM:SS.163773"
+                expire_dt = datetime.strptime(expiresOn, '%Y-%m-%d %H:%M:%S.%f')
+                expire_ts = expire_dt.timestamp()
+                if time.time() < expire_ts:
+                    # not expired yet!
+                    token = mgmt_token["accessToken"]
+                    return token
+        # didn't get a token or it's expired, get new one
+        authority_uri = MS_AUTHORITY_HOST_URI + '/' + tenant_id
+        context = adal.AuthenticationContext(authority_uri, api_version=None)
+        code = context.acquire_user_code(resource_id, app_id)
+        eprint(code["message"])
+        mgmt_token = context.acquire_token_with_device_code(resource_id, code, app_id)
+        if mgmt_token and "accessToken" in mgmt_token:
+            print("got mgmt_token")
+            with open(token_cache_file, 'w') as f:
+                json.dump(mgmt_token, f)
+            return mgmt_token["accessToken"]
+
+        return None
+
 
     def getHeaders(self, username=None, password=None, headers=None):
         if headers is None:
@@ -129,6 +174,11 @@ class HttpConn:
             auth_string = base64.b64encode(auth_string)
             auth_string = b"Basic " + auth_string
             headers['Authorization'] = auth_string
+        elif self._api_key and isinstance(self._api_key, dict):
+            token = self._getAzureADToken(self._api_key)
+            auth_string = b"Bearer " + token.encode('ascii')
+            headers['Authorization'] = auth_string
+
         return headers
 
     def verifyCert(self):
@@ -168,7 +218,7 @@ class HttpConn:
             params["domain"] = self._domain
         if "bucket" not in params and self._bucket:
             params["bucket"] = self._bucket
-        if self._api_key:
+        if self._api_key and not isinstance(self._api_key, dict):
             params["api_key"] = self._api_key
         #print("GET: {} [{}] bucket: {}".format(req, params["domain"], self._bucket))
 

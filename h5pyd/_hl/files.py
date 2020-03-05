@@ -199,6 +199,31 @@ class File(Group):
                 elif "hs_api_key" in cfg:
                     api_key = cfg["hs_api_key"]
 
+            if not api_key:
+                # if Azure AD ids are set, pass them to HttpConn via api_key dict
+
+                ad_app_id = None  # Azure AD HSDS Server id
+                if "HS_AD_APP_ID" in os.environ:
+                    ad_app_id = os.environ["HS_AD_APP_ID"]
+                elif "hs_ad_app_id" in cfg:
+                    ad_app_id = cfg["hs_ad_app_id"]
+
+                ad_tenant_id = None # Azure AD tenant id
+                if "HS_AD_TENANT_ID" in os.environ:
+                    ad_tenant_id = os.environ["HS_AD_TENANT_ID"]
+                elif "hs_ad_tenant_id" in cfg:
+                    ad_tenant_id = cfg["hs_ad_tenant_id"]
+
+                ad_resource_id = None # Azure AD resource id
+                if "HS_AD_RESOURCE_ID" in os.environ:
+                    ad_resource_id = os.environ["HS_AD_RESOURCE_ID"]
+                elif "hs_ad_resource_id" in cfg:
+                    ad_resource_id = cfg["hs_ad_resource_id"]
+
+                if ad_app_id and ad_tenant_id and ad_resource_id:
+                    # contruct dict to pass to HttpConn
+                    api_key = {"AD_APP_ID": ad_app_id, "AD_TENANT_ID": ad_tenant_id, "AD_RESOURCE_ID": ad_resource_id}
+
             http_conn =  HttpConn(domain, endpoint=endpoint,
                     username=username, password=password, bucket=bucket, mode=mode,
                     api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger, retries=retries)
@@ -213,7 +238,6 @@ class File(Group):
                 params["include_attrs"] = "T"
             if bucket:
                 params["bucket"] = bucket
-
 
             rsp = http_conn.GET(req, params=params)
 
