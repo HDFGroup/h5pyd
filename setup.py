@@ -29,7 +29,7 @@ setup(name='h5pyd',
       author_email='jreadey@hdfgrouup.org',
       license='BSD',
       packages=['h5pyd', 'h5pyd._hl', 'h5pyd._apps'],
-      install_requires=['numpy >= 1.17.3', 'requests', 'pytz'],
+      install_requires=['numpy >= 1.17.3', 'requests', 'pytz', 'pyjwt', 'msrestazure' ],
       setup_requires=['pkgconfig'],
       zip_safe=False,
       entry_points={'console_scripts':

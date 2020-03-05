@@ -126,8 +126,8 @@ class HttpConn:
     def _getAzureADToken(self, aad_dict):
         if not aad_dict:
             return None
-        # expecting key to be in the form: AZURE_AD#<APP_ID>#<TENANT_ID>#<RESOURCE_ID>
-        
+        # expecting argument to be dictionary with keys: AD_APP_ID, AD_TENANT_ID, AD_RESOURCE_ID
+
         app_id = aad_dict["AD_APP_ID"]
         tenant_id = aad_dict["AD_TENANT_ID"]
         resource_id = aad_dict["AD_RESOURCE_ID"]
