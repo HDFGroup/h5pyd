@@ -50,7 +50,6 @@ else:
 cfg = Config()
 
 
-
 #----------------------------------------------------------------------------------
 def stage_file(uri, netfam=None, sslv=True):
     if PYCRUL == None:
@@ -104,10 +103,9 @@ def usage():
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
-
     print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not upload dataset data")
-    print("     --s3link :: Link to dataset data (sourcefile must be s3path)")
+    print("     --link :: Link to dataset data (sourcefile given as <bucket>/<path>)")
     print("     -4 :: Force ipv4 for any file staging (doesn\'t set hsds loading net)")
     print("     -6 :: Force ipv6 (see -4)")
     print("     -h | --help    :: This message.")
@@ -129,7 +127,7 @@ def main():
     verbose = False
     deflate = None
     s3path = None
-    dataload = "ingest"  # or None, or "s3link"
+    dataload = "ingest"  # or None, or "link"
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
@@ -146,7 +144,7 @@ def main():
 
         if arg[0] == '-' and len(src_files) > 0:
             # options must be placed before filenames
-            print("options must precead source files")
+            sys.stderr.write("options must precede source files")
             usage()
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
@@ -154,15 +152,15 @@ def main():
         if arg in ("-v", "--verbose"):
             verbose = True
             argn += 1
-        elif arg == "--s3link":
+        elif arg == "--link":
             if dataload != "ingest":
-                sys.stderr("--nodata flag can't be used with s3link flag")
+                sys.stderr.write("--nodata flag can't be used with link flag")
                 sys.exit(1)
-            dataload = "s3link"
+            dataload = "link"
             argn += 1
         elif arg == "--nodata":
             if dataload != "ingest":
-                sys.stderr("--nodata flag can't be used with s3link flag")
+                sys.stderr.write("--nodata flag can't be used with link flag")
                 sys.exit(1)
             dataload = None
             argn += 1
@@ -176,7 +174,7 @@ def main():
             elif val == "error":
                 loglevel = logging.ERROR
             else:
-                print("unknown loglevel")
+                sys.stderr.write("unknown loglevel")
                 usage()
                 sys.exit(-1)
             argn += 2
@@ -211,7 +209,7 @@ def main():
                 try:
                     compressLevel = int(arg[2:])
                 except ValueError:
-                    print("Compression Level must be int between 0 and 9")
+                    sys.stderr.write("Compression Level must be int between 0 and 9")
                     sys.exit(-1)
             deflate = compressLevel
             argn += 1
@@ -241,14 +239,25 @@ def main():
     logging.info("source files: {}".format(src_files))
     logging.info("target domain: {}".format(domain))
     if len(src_files) > 1 and (domain[0] != '/' or domain[-1] != '/'):
-        print("target must be a folder if multiple source files are provided")
+        sys.stderr.write("target must be a folder if multiple source files are provided")
         usage()
         sys.exit(-1)
 
     if cfg["hs_endpoint"] is None:
-        logging.error('No endpoint given, try -h for help\n')
+        sys.stderr.write('No endpoint given, try -h for help\n')
         sys.exit(1)
     logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
+
+    # check we have min HDF5 lib version for chunk query
+    if dataload == "link":
+        print("check libversion")
+        if h5py.version.version_tuple.major != 2 or h5py.version.version_tuple.minor < 10:
+            sys.stderr.write("link option requires h5py version 2.10 or higher")
+            sys.exit(1)
+        if h5py.version.hdf5_version_tuple[0] != 1 or h5py.version.hdf5_version_tuple[1] != 10 or h5py.version.hdf5_version_tuple[2] < 6:
+            sys.stderr.write("link option requires hdf5 lib version 1.10.6 or higher")
+            sys.exit(1)
+    
 
     try:
 
@@ -271,19 +280,13 @@ def main():
                 # folder destination
                 tgt = tgt + op.basename(src_file)
 
-
             # get a handle to input file
             if src_file.startswith("s3://"):
                 s3path = src_file
                 if not S3FS_IMPORT:
                     sys.stderr.write("Install S3FS package to load s3 files")
                     sys.exit(1)
-                if h5py.version.version_tuple.major != 2 or h5py.version.version_tuple.minor < 10:
-                    print("s3path source requires h5py version 2.10 or higher")
-                    sys.exit(1)
-                if h5py.version.hdf5_version_tuple[0] != 1 or h5py.version.hdf5_version_tuple[1] != 10 or h5py.version.hdf5_version_tuple[2] < 6:
-                    print("s3path source requires hdf5 lib version 1.10.6 or higher")
-                    sys.exit(1)
+                
                 if not s3:
                     s3 = s3fs.S3FileSystem()
                 try:
@@ -292,7 +295,13 @@ def main():
                     logging.error("Error opening file {}: {}".format(src_file, ioe))
                     sys.exit(1)
             else:
-                s3path = None
+                if dataload == "link":
+                    if  op.isabs(src_file):
+                        sys.stderr.write("source file must s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)") 
+                        sys.exit(1)
+                    s3path = src_file
+                else:
+                    s3path = None
                 try:
                     fin = h5py.File(src_file, mode='r')
                 except IOError as ioe:

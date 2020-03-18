@@ -305,7 +305,7 @@ def create_dataset(dobj, ctx):
     chunks=None
 
     # can_use_storeinfo = use_storeinfo(dobj, ctx)
-    if ctx["dataload"] == "s3link":
+    if ctx["dataload"] == "link":
         dset_dims = dobj.shape
         logging.debug("dset_dims: {}".format(dset_dims))
         rank = len(dset_dims)
@@ -598,7 +598,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     if dataload != "ingest":
         if dataload == "nodata":
             logging.info("no data load")
-        elif dataload == "s3link":
+        elif dataload == "link":
             if not s3path:
                 logging.error("s3path expected to be set")
                 sys.exit(1)
@@ -643,8 +643,8 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     def object_copy_helper(name, obj):
         class_name = obj.__class__.__name__
         if class_name in ("Dataset", "Table"):
-            if ctx["dataload"] == "s3link":
-                logging.info("skip datacopy for s3 reference")
+            if ctx["dataload"] == "link":
+                logging.info("skip datacopy for link reference")
             else:
                 tgt = fout[obj.name]
                 write_dataset(obj, tgt, ctx)

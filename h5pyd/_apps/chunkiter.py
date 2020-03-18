@@ -18,6 +18,8 @@ class ChunkIterator:
         if dset.chunks is None:
             # treat the dataset as one chunk
             self._layout = dset.shape
+        elif isinstance(dset.chunks, dict):
+            self._layout = dset.chunks["dims"]
         else:
             self._layout = dset.chunks
         self._rank = len(dset.shape)
