@@ -17,23 +17,35 @@ install:
 - pip install pytz
 - pip install h5py
 - if [ "${H5_DRIVER}" == "h5serv" ]; then
-     pip install tornado ;
-     pip install watchdog ;
-     git clone https://github.com/HDFGroup/hdf5-json.git ;
-     cd hdf5-json ;
-     python setup.py install ;
-     cd .. ;
-     git clone https://github.com/HDFGroup/h5serv.git ;
+    pip install tornado ;
+    pip install watchdog ;
+    git clone https://github.com/HDFGroup/hdf5-json.git ;
+    cd hdf5-json ;
+    python setup.py install ;
+    cd .. ;
+    git clone https://github.com/HDFGroup/h5serv.git ;
   else
-     pip install aiohttp ;
-     pip install awscli ;
-     git clone https://github.com/HDFGroup/hsds.git ;
-     cd hsds ;
-     ./build.sh --nolint ;
-     ./runall.sh ;
-     echo "server starting..."
-     sleep 20 ;
-     cd - ;
+    pip install aiohttp ;
+    git clone https://github.com/HDFGroup/hsds.git ;
+    cd hsds ;
+    cp admin/config/passwd.default admin/config/passwd.txt ;
+    export ADMIN_PASSWORD=admin ;
+    export ROOT_DIR=${HOME}/buckets ;
+    export SN_PORT=5101 ;
+    export HSDS_ENDPOINT=http://localhost:5101 ;
+    export BUCKET_NAME=hsds.test ;
+    docker build -t hdfgroup/hsds . ;
+    if [ ! -d "$ROOT_DIR" ]; then
+      echo "mkdir $ROOT_DIR" ;
+      mkdir $ROOT_DIR ;
+    fi ;
+    if [ ! -d "${HOME}/buckets/hsds.test" ]; then
+      echo "mkdir ${HOME}/buckets/hsds.test" ;
+      mkdir ${HOME}/buckets/hsds.test ;
+    fi ;
+    ./runall.sh ;
+    echo "hsds server starting..." ;
+    cd - ;
   fi
 script:
 - echo h5_driver ${H5_DRIVER}
@@ -69,11 +81,12 @@ script:
 - echo password ${HS_PASSWORD}
 - echo test2_user ${TEST2_USERNAME}
 - echo test2 password ${TEST2_PASSWORD}
-- if [ "${H5_DRIVER}" == "hsds" ]; then
-    echo "setting up HSDS folders" ;
-    hstouch -u admin -p admin /home/ ;
-    hstouch -u admin -p admin -o test_user1 /home/test_user1/ ;
-    hstouch /home/test_user1/h5pyd_test/ ;
-    hstouch ${H5PYD_TEST_FOLDER} ;
+- if [ "${H5_DRIVER}" == "hsds" ] ; then
+    echo setting up HSDS folders, PWD ${PWD} ;
+    curl ${HS_ENDPOINT}/about ;
+    python h5pyd/_apps/hstouch.py -u admin -p admin /home/ ;
+    python h5pyd/_apps/hstouch.py  -u admin -p admin -o test_user1 /home/test_user1/ ;
+    python h5pyd/_apps/hstouch.py  /home/test_user1/h5pyd_test/ ;
+    python h5pyd/_apps/hstouch.py  ${H5PYD_TEST_FOLDER} ;
   fi
 - python testall.py
