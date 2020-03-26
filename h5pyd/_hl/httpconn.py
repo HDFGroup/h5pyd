@@ -21,6 +21,7 @@ import requests
 from requests import ConnectionError
 from msrestazure.azure_active_directory import AADTokenCredentials
 import adal
+from adal.adal_error import AdalError
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import json
@@ -152,10 +153,14 @@ class HttpConn:
         # didn't get a token or it's expired, get new one
         authority_uri = MS_AUTHORITY_HOST_URI + '/' + tenant_id
         context = adal.AuthenticationContext(authority_uri, api_version=None)
-        if client_secret:
-            code = context.acquire_token_with_client_credentials(resource_id, app_id, client_secret)
-        else:
-            code = context.acquire_user_code(resource_id, app_id)
+        try:
+            if client_secret:
+                code = context.acquire_token_with_client_credentials(resource_id, app_id, client_secret)
+            else:
+                code = context.acquire_user_code(resource_id, app_id)
+        except AdalError as ae:
+            eprint("unable to process AD token")
+            return None
 
         access_token = None
         if "message" in code:
@@ -188,8 +193,9 @@ class HttpConn:
             headers['Authorization'] = auth_string
         elif self._api_key and isinstance(self._api_key, dict):
             token = self._getAzureADToken(self._api_key)
-            auth_string = b"Bearer " + token.encode('ascii')
-            headers['Authorization'] = auth_string
+            if token:
+                auth_string = b"Bearer " + token.encode('ascii')
+                headers['Authorization'] = auth_string
 
         return headers
 
