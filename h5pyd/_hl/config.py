@@ -36,12 +36,12 @@ class Config:
                     if s[0] == '#':
                         # comment line
                         continue
-                    fields = s.split('=')
-                    if len(fields) < 2:
+                    index = line.find('=')
+                    if index <= 0:
                         print("config file: {} line: {} is not valid".format(self._config_file, line_number))
                         continue
-                    k = fields[0].strip()
-                    v = fields[1].strip()
+                    k = line[:index].strip()
+                    v = line[(index+1):].strip()
                     self._cfg[k] = v
         # override any config values with environment variable if found
         for k in self._cfg.keys():
@@ -81,11 +81,3 @@ class Config:
 
     def keys(self):
         return self._cfg.keys()
-
-
-
-
-
-
-
-

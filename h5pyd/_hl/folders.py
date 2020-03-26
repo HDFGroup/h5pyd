@@ -148,10 +148,17 @@ class Folder():
             elif "hs_ad_resource_id" in cfg:
                 ad_resource_id = cfg["hs_ad_resource_id"]
 
+            ad_client_secret = None # Azure client secret
+            if "HS_AD_CLIENT_SECRET" in os.environ:
+                ad_client_secret = os.environ["HS_AD_CLIENT_SECRET"]
+            elif "hs_ad_client_secret" in cfg:
+                ad_client_secret = cfg["hs_ad_client_secret"]
+
             if ad_app_id and ad_tenant_id and ad_resource_id:
                 # contruct dict to pass to HttpConn
                 api_key = {"AD_APP_ID": ad_app_id, "AD_TENANT_ID": ad_tenant_id, "AD_RESOURCE_ID": ad_resource_id}
-
+                if ad_client_secret:
+                        api_key["AD_CLIENT_SECRET"] = ad_client_secret
 
         self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username,
             password=password, bucket=bucket, api_key=api_key, mode=mode, logger=logger)

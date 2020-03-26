@@ -127,10 +127,13 @@ class HttpConn:
         if not aad_dict:
             return None
         # expecting argument to be dictionary with keys: AD_APP_ID, AD_TENANT_ID, AD_RESOURCE_ID
-
+        
         app_id = aad_dict["AD_APP_ID"]
         tenant_id = aad_dict["AD_TENANT_ID"]
         resource_id = aad_dict["AD_RESOURCE_ID"]
+        client_secret = None
+        if "AD_CLIENT_SECRET" in aad_dict:
+            client_secret = aad_dict["AD_CLIENT_SECRET"]
         token_cache_file = os.path.expanduser(f"~/.hsazcfg_{app_id}")
         if os.path.isfile(token_cache_file):
             # load this file and see if the token is expired or not
@@ -149,16 +152,25 @@ class HttpConn:
         # didn't get a token or it's expired, get new one
         authority_uri = MS_AUTHORITY_HOST_URI + '/' + tenant_id
         context = adal.AuthenticationContext(authority_uri, api_version=None)
-        code = context.acquire_user_code(resource_id, app_id)
-        eprint(code["message"])
-        mgmt_token = context.acquire_token_with_device_code(resource_id, code, app_id)
-        if mgmt_token and "accessToken" in mgmt_token:
-            print("got mgmt_token")
-            with open(token_cache_file, 'w') as f:
-                json.dump(mgmt_token, f)
-            return mgmt_token["accessToken"]
+        if client_secret:
+            code = context.acquire_token_with_client_credentials(resource_id, app_id, client_secret)
+        else:
+            code = context.acquire_user_code(resource_id, app_id)
 
-        return None
+        access_token = None
+        if "message" in code:
+            eprint(code["message"])
+            mgmt_token = context.acquire_token_with_device_code(resource_id, code, app_id)
+            if mgmt_token and "accessToken" in mgmt_token:
+                with open(token_cache_file, 'w') as f:
+                    json.dump(mgmt_token, f)
+                access_token = mgmt_token["accessToken"]
+        elif "accessToken" in code:
+            access_token = code["accessToken"]
+        else:
+            eprint("Could not authenticate with AD")
+
+        return access_token
 
 
     def getHeaders(self, username=None, password=None, headers=None):
