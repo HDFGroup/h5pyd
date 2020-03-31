@@ -33,7 +33,8 @@ def deleteDomain(domain):
     base_name = op.basename(path)
 
     if len(parent_domain) < 2:
-        sys.exit("can't get parent domain")
+        #sys.exit("can't get parent domain")
+        parent_domain = '/'
 
     if not parent_domain.endswith('/'):
         parent_domain += '/'

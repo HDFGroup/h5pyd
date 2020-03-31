@@ -68,11 +68,11 @@ def touchDomain(domain):
     parent_domain = op.dirname(domain)
 
     if parent_domain == '/':
-        if cfg["hs_username"] != "admin":
-            sys.exit("Only admin user can create top-level domains")
+        #if cfg["hs_username"] != "admin":
+        #    sys.exit("Only admin user can create top-level domains")
         if not make_folder:
             sys.exit("Only folders can be created as a top-level domain")
-        if len(domain) < 5:
+        if len(domain) < 4:
             sys.exit("Top-level folders must be at least three characters")
 
     else:

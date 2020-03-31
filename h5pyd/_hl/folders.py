@@ -168,8 +168,6 @@ class Folder():
 
         # try to do a GET from the domain
         if domain_name == '/':
-            if mode != 'r':
-                raise IOError(400, "mode must be 'r' for top-level domain")
             req = "/domains"
         else:
             req = '/'
@@ -329,7 +327,10 @@ class Folder():
             raise IOError(400, "folder is not open")
         if self._http_conn.mode == 'r':
             raise IOError(400, "folder is open as read-onnly")
-        domain = self._domain + '/' + name
+        if self._domain:
+            domain = self._domain + '/' + name
+        else:
+            domain = '/' + name  # top-level delete
         headers = self._http_conn.getHeaders()
         req = '/'
         params = {"domain": domain}

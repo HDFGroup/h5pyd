@@ -19,7 +19,6 @@ import time
 import base64
 import requests
 from requests import ConnectionError
-from msrestazure.azure_active_directory import AADTokenCredentials
 import adal
 from adal.adal_error import AdalError
 from requests.adapters import HTTPAdapter
@@ -128,7 +127,7 @@ class HttpConn:
         if not aad_dict:
             return None
         # expecting argument to be dictionary with keys: AD_APP_ID, AD_TENANT_ID, AD_RESOURCE_ID
-        
+
         app_id = aad_dict["AD_APP_ID"]
         tenant_id = aad_dict["AD_TENANT_ID"]
         resource_id = aad_dict["AD_RESOURCE_ID"]
@@ -158,7 +157,7 @@ class HttpConn:
                 code = context.acquire_token_with_client_credentials(resource_id, app_id, client_secret)
             else:
                 code = context.acquire_user_code(resource_id, app_id)
-        except AdalError as ae:
+        except AdalError:
             eprint("unable to process AD token")
             return None
 
@@ -218,8 +217,9 @@ class HttpConn:
     def GET(self, req, format="json", params=None, headers=None, use_cache=True):
         if self._endpoint is None:
             raise IOError("object not initialized")
-        #if self._domain is None:
-        #    raise IOError("no domain defined")
+        # check that domain is defined (except for some specific requests)
+        if req not in ("/domains", "/about", "/info", "/") and self._domain is None:
+            raise IOError(f"no domain defined: req: {req}")
 
         if self._objdb:
             pass
@@ -403,10 +403,10 @@ class HttpConn:
     def DELETE(self, req, params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
-        if self._domain is None:
-            raise IOError("no domain defined")
         if self._cache is not None:
             self._cache = {}
+        if req not in ("/domains", "/") and self._domain is None:
+            raise IOError("no domain defined")
         if params is None:
             params = {}
         if "domain" not in params:
