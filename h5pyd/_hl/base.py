@@ -19,7 +19,7 @@ import base64
 import numpy as np
 import logging
 import logging.handlers
-from collections import (
+from collections.abc import (
     Mapping, MutableMapping, KeysView, ValuesView, ItemsView
 )
 from .objectid import GroupID
