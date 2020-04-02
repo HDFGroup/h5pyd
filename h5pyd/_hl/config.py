@@ -88,3 +88,9 @@ class Config:
 
     def keys(self):
         return self._cfg.keys()
+
+    def get(self, name, default=None):
+        if name in self:
+            return self[name]
+        else:
+            return default
