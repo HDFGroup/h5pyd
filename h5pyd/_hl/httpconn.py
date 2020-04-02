@@ -157,8 +157,8 @@ class HttpConn:
                 code = context.acquire_token_with_client_credentials(resource_id, app_id, client_secret)
             else:
                 code = context.acquire_user_code(resource_id, app_id)
-        except AdalError:
-            eprint("unable to process AD token")
+        except AdalError as ae:
+            eprint(f"unable to process AD token: {ae}")
             return None
 
         access_token = None

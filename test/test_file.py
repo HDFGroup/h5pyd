@@ -337,24 +337,26 @@ class TestFile(TestCase):
         grp.file.close()  # try closing the file via a group reference
 
     def test_http_url(self):
-         if h5py.__name__ == "h5pyd":
-            self.assertTrue("HS_ENDPOINT" in os.environ)
-            endpoint = os.environ["HS_ENDPOINT"]
-            filename = self.getFileName("test_http_url_file")
-            is_hsds = False
-            f = h5py.File(filename, 'w')
-            if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-                is_hsds = True  # HSDS has different permission defaults
-            f.close()
-            if is_hsds:
-                url = endpoint + filename
-                f = h5py.File(url, 'w')
-                self.assertEqual(f.filename, filename)
-                self.assertEqual(f.name, "/")
-                self.assertTrue(f.id.id is not None)
-                self.assertEqual(len(f.keys()), 0)
-                self.assertEqual(f.mode, 'r+')
+        if h5py.__name__ == "h5pyd":
+            if "HS_ENDPOINT" in os.environ:
+                endpoint = os.environ["HS_ENDPOINT"]
+                filename = self.getFileName("test_http_url_file")
+                is_hsds = False
+                f = h5py.File(filename, 'w')
+                if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+                    is_hsds = True  # HSDS has different permission defaults
                 f.close()
+                if is_hsds:
+                    url = endpoint + filename
+                    f = h5py.File(url, 'w')
+                    self.assertEqual(f.filename, filename)
+                    self.assertEqual(f.name, "/")
+                    self.assertTrue(f.id.id is not None)
+                    self.assertEqual(len(f.keys()), 0)
+                    self.assertEqual(f.mode, 'r+')
+                    f.close()
+            else:
+                print("set HS_ENDPOINT environment variable to enable test_http_url test")
 
 
 
