@@ -24,7 +24,7 @@ from requests.packages.urllib3.util.retry import Retry
 import json
 import logging
 
-import openid
+from . import openid
 from .config import Config
 
 MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
