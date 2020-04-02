@@ -148,8 +148,11 @@ class HttpConn:
 
                 if provider == 'azure':
                     self._api_key = openid.AzureOpenID(self._api_key)
+
                 elif provider == 'google':
-                    self._api_key = openid.GoogleOpenID(self._api_key)
+                    config = self._api_key.get('client_secret', None)
+                    scopes = self._api_key.get('scopes', None)
+                    self._api_key = openid.GoogleOpenID(config=config, scopes=scopes)
 
             # Get a token, possibly refreshing if needed.
             if isinstance(self._api_key, openid.OpenIDHandler):
