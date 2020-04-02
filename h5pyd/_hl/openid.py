@@ -95,7 +95,7 @@ class OpenIDHandler(ABC):
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-class AzureActiveDirectory(OpenIDHandler):
+class AzureOpenID(OpenIDHandler):
 
     AUTHORITY_URI = 'https://login.microsoftonline.com'  # login endpoint for AD auth
     TOKEN_CACHE_PREFIX = 'hsazcfg'
