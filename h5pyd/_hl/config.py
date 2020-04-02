@@ -60,7 +60,7 @@ class Config:
         env_name = name.upper()
         if name not in self._cfg and env_name in os.environ:
             self._cfg[env_name] = os.environ[env_name]
-        
+
         return self._cfg[name]
 
     def __setitem__(self, name, obj):
@@ -81,7 +81,7 @@ class Config:
             yield key
 
     def __contains__(self, name):
-        return name in self._cfg
+        return name in self._cfg or name.upper() in os.environ
 
     def __repr__(self):
         return json.dumps(self._cfg)
