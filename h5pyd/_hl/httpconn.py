@@ -19,18 +19,15 @@ import time
 import base64
 import requests
 from requests import ConnectionError
-import adal
-from adal.adal_error import AdalError
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import json
 import logging
 
-MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
-MS_AUTHORITY_HOST_URI = 'https://login.microsoftonline.com'  # login endpoint for AD auth
+import openid
+from .config import Config
 
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
 
 class CacheResponse(object):
     """ Wrap a json response in a Requests.Response looking class.
@@ -123,59 +120,6 @@ class HttpConn:
 
         self._s = None  # Sessions
 
-    def _getAzureADToken(self, aad_dict):
-        if not aad_dict:
-            return None
-        # expecting argument to be dictionary with keys: AD_APP_ID, AD_TENANT_ID, AD_RESOURCE_ID
-
-        app_id = aad_dict["AD_APP_ID"]
-        tenant_id = aad_dict["AD_TENANT_ID"]
-        resource_id = aad_dict["AD_RESOURCE_ID"]
-        client_secret = None
-        if "AD_CLIENT_SECRET" in aad_dict:
-            client_secret = aad_dict["AD_CLIENT_SECRET"]
-        token_cache_file = os.path.expanduser(f"~/.hsazcfg_{app_id}")
-        if os.path.isfile(token_cache_file):
-            # load this file and see if the token is expired or not
-            mgmt_token = {}
-            with open(token_cache_file, 'r') as f:
-                mgmt_token = json.load(f)
-            if "expiresOn" in mgmt_token and "accessToken" in mgmt_token:
-                expiresOn = mgmt_token["expiresOn"]
-                # expected format: "YYYY-MM-DD HH:MM:SS.163773"
-                expire_dt = datetime.strptime(expiresOn, '%Y-%m-%d %H:%M:%S.%f')
-                expire_ts = expire_dt.timestamp()
-                if time.time() < expire_ts:
-                    # not expired yet!
-                    token = mgmt_token["accessToken"]
-                    return token
-        # didn't get a token or it's expired, get new one
-        authority_uri = MS_AUTHORITY_HOST_URI + '/' + tenant_id
-        context = adal.AuthenticationContext(authority_uri, api_version=None)
-        try:
-            if client_secret:
-                code = context.acquire_token_with_client_credentials(resource_id, app_id, client_secret)
-            else:
-                code = context.acquire_user_code(resource_id, app_id)
-        except AdalError:
-            eprint("unable to process AD token")
-            return None
-
-        access_token = None
-        if "message" in code:
-            eprint(code["message"])
-            mgmt_token = context.acquire_token_with_device_code(resource_id, code, app_id)
-            if mgmt_token and "accessToken" in mgmt_token:
-                with open(token_cache_file, 'w') as f:
-                    json.dump(mgmt_token, f)
-                access_token = mgmt_token["accessToken"]
-        elif "accessToken" in code:
-            access_token = code["accessToken"]
-        else:
-            eprint("Could not authenticate with AD")
-
-        return access_token
-
 
     def getHeaders(self, username=None, password=None, headers=None):
         if headers is None:
@@ -190,8 +134,31 @@ class HttpConn:
             auth_string = base64.b64encode(auth_string)
             auth_string = b"Basic " + auth_string
             headers['Authorization'] = auth_string
-        elif self._api_key and isinstance(self._api_key, dict):
-            token = self._getAzureADToken(self._api_key)
+
+        elif self._api_key:
+            token = ''
+
+            # Convert to OpenIDHandler
+            if isinstance(self._api_key, dict):
+
+                # Maintain Azure-defualt backwards compatibility, but allow
+                # both environment variable and kwarg override.
+                provider = Config().get('hs_openid_provider', 'azure')
+                provider = self._api_key.get('openid_provider', provider)
+
+                if provider == 'azure':
+                    self._api_key = openid.AzureOpenID(self._api_key)
+                elif provider == 'google':
+                    self._api_key = openid.GoogleOpenID(self._api_key)
+
+            # Get a token, possibly refreshing if needed.
+            if isinstance(self._api_key, openid.OpenIDHandler):
+                token = self._api_key.token
+
+            # Token was provided as a string.
+            elif isinstance(self._api_key, str):
+                token = self._api_key
+
             if token:
                 auth_string = b"Bearer " + token.encode('ascii')
                 headers['Authorization'] = auth_string
