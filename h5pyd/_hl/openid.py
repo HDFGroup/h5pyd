@@ -47,8 +47,9 @@ class OpenIDHandler(ABC):
     def token(self):
         """Return the token if valid, otherwise get a new one."""
 
-        if 'expiresOn' in self._token and time.time() >= self._token['expiresOn']:
-            self._token = self.refresh()
+        if self._token is not None:
+            if 'expiresOn' in self._token and time.time() >= self._token['expiresOn']:
+                self._token = self.refresh()
 
         if self._token is None:
             self._token = self.acquire()
@@ -141,7 +142,9 @@ class AzureOpenID(OpenIDHandler):
 
         except AdalError:
             eprint("unable to process AD token")
-            return None
+            self._token = None
+            self.write_token_cache()
+            raise
 
         if "message" in code:
             eprint(code["message"])
@@ -243,16 +246,11 @@ class GoogleOpenID(OpenIDHandler):
     def acquire(self):
         """Acquire a new Google OAuth token."""
 
-        try:
-
-            flow = GoogleInstalledAppFlow.from_client_config(self.config,
-                                                             scopes=self.scopes)
-            creds = flow.run_console()
-            self._token = self._parse(creds)
-            self.write_token_cache()
-
-        except:
-            self._token = None
+        flow = GoogleInstalledAppFlow.from_client_config(self.config,
+                                                         scopes=self.scopes)
+        creds = flow.run_console()
+        self._token = self._parse(creds)
+        self.write_token_cache()
 
     def refresh(self):
         """Try to renew a token."""
@@ -271,7 +269,6 @@ class GoogleOpenID(OpenIDHandler):
             self._token = self._parse(creds)
 
         except:
-            raise
             self._token = None
 
         self.write_token_cache()
