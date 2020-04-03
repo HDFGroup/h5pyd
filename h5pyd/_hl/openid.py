@@ -33,7 +33,9 @@ class OpenIDHandler(ABC):
         # expiresOn - The unix timestamp when the token expires (optional).
         self._token = self.read_token_cache()
         if self._token is None:
-            self._token = self.acquire()
+            self.acquire()
+        elif self.expired:
+            self.refresh()
 
     @abstractmethod
     def acquire(self):
@@ -44,15 +46,20 @@ class OpenIDHandler(ABC):
         pass
 
     @property
+    def expired(self):
+        """Return if the token is expired."""
+        t = self._token
+        return t is None or ('expiresOn' in t and time.time() >= t['expiresOn'])
+
+    @property
     def token(self):
         """Return the token if valid, otherwise get a new one."""
 
-        if self._token is not None:
-            if 'expiresOn' in self._token and time.time() >= self._token['expiresOn']:
-                self._token = self.refresh()
+        if self.expired:
+            self.refresh()
 
         if self._token is None:
-            self._token = self.acquire()
+            self.acquire()
 
         return self._token['accessToken']
 
@@ -168,7 +175,7 @@ class AzureOpenID(OpenIDHandler):
 
         token = self._token
         if 'refreshToken' not in token:
-            return None
+            return
 
         try:
 
