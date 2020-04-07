@@ -38,7 +38,7 @@ class ChunkIterator:
                 return item[0]
             else:
                 return tuple(item)
-        if self._layout is ():
+        if self._layout == ():
             # special case for scalar datasets
             if self._chunk_index[0] > 0:
                 raise StopIteration()

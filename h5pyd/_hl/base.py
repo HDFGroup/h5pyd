@@ -215,7 +215,7 @@ def jsonToArray(data_shape, data_dtype, data_json):
         index = []
         for i in range(len(data_shape)):
             index.append(0)
-        if data_shape is ():
+        if data_shape == ():
             arr[()] = data_json
         else:
             copyToArray(arr, 0, index, data_json, vlen_base=vlen_base)
