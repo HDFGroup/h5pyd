@@ -120,6 +120,59 @@ class HttpConn:
 
         self._s = None  # Sessions
 
+    def _getAzureADToken(self, aad_dict):
+        if not aad_dict:
+            return None
+        # expecting argument to be dictionary with keys: AD_APP_ID, AD_TENANT_ID, AD_RESOURCE_ID
+
+        app_id = aad_dict["AD_APP_ID"]
+        tenant_id = aad_dict["AD_TENANT_ID"]
+        resource_id = aad_dict["AD_RESOURCE_ID"]
+        client_secret = None
+        if "AD_CLIENT_SECRET" in aad_dict:
+            client_secret = aad_dict["AD_CLIENT_SECRET"]
+        token_cache_file = os.path.expanduser(f"~/.hsazcfg_{app_id}")
+        if os.path.isfile(token_cache_file):
+            # load this file and see if the token is expired or not
+            mgmt_token = {}
+            with open(token_cache_file, 'r') as f:
+                mgmt_token = json.load(f)
+            if "expiresOn" in mgmt_token and "accessToken" in mgmt_token:
+                expiresOn = mgmt_token["expiresOn"]
+                # expected format: "YYYY-MM-DD HH:MM:SS.163773"
+                expire_dt = datetime.strptime(expiresOn, '%Y-%m-%d %H:%M:%S.%f')
+                expire_ts = expire_dt.timestamp()
+                if time.time() < expire_ts:
+                    # not expired yet!
+                    token = mgmt_token["accessToken"]
+                    return token
+        # didn't get a token or it's expired, get new one
+        authority_uri = MS_AUTHORITY_HOST_URI + '/' + tenant_id
+        context = adal.AuthenticationContext(authority_uri, api_version=None)
+        try:
+            if client_secret:
+                code = context.acquire_token_with_client_credentials(resource_id, app_id, client_secret)
+            else:
+                code = context.acquire_user_code(resource_id, app_id)
+        except AdalError as ae:
+            eprint(f"unable to process AD token: {ae}")
+            return None
+
+        access_token = None
+        if "message" in code:
+            eprint(code["message"])
+            mgmt_token = context.acquire_token_with_device_code(resource_id, code, app_id)
+            if mgmt_token and "accessToken" in mgmt_token:
+                with open(token_cache_file, 'w') as f:
+                    json.dump(mgmt_token, f)
+                access_token = mgmt_token["accessToken"]
+        elif "accessToken" in code:
+            access_token = code["accessToken"]
+        else:
+            eprint("Could not authenticate with AD")
+
+        return access_token
+
 
     def getHeaders(self, username=None, password=None, headers=None):
         if headers is None:

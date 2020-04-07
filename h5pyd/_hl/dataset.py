@@ -960,7 +960,7 @@ class Dataset(HLObject):
         # Sort field indices from the slicing
         names = tuple(x for x in args if isinstance(x, str))
         args = tuple(x for x in args if not isinstance(x, str))
-         
+
         # Generally we try to avoid converting the arrays on the Python
         # side.  However, for compound literals this is unavoidable.
         # For h5pyd, do extra check and convert type on client side for efficiency
