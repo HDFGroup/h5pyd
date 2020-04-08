@@ -65,19 +65,12 @@ def guess_dtype(data):
     if nothing is appropriate (or if it should be left up the the array
     constructor to figure out)
     """
-    """
-    # todo
-    with phil:
-        if isinstance(data, h5r.RegionReference):
-            return h5t.special_dtype(ref=h5r.RegionReference)
-        if isinstance(data, h5r.Reference):
-            return h5t.special_dtype(ref=h5r.Reference)
-        if type(data) == bytes:
-            return h5t.special_dtype(vlen=bytes)
-        if type(data) == six.text_type:
-           return h5t.special_dtype(vlen=six.text_type)
-    """
+
+    # todo - handle RegionReference, Reference, vlen dtypes
+    if isinstance(data, np.ndarray):
+        return data.dtype
     return None
+
 
 def _decode(item, encoding="ascii"):
         """decode any byte items to python 3 strings
