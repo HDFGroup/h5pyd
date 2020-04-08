@@ -116,8 +116,24 @@ class HttpConn:
             api_key = os.environ["HS_API_KEY"]
         if isinstance(api_key, str) and (not api_key or api_key.upper() == "NONE"):
             api_key = None
-        self._api_key = api_key
 
+        # Convert api_key to OpenIDHandler
+        if isinstance(api_key, dict):
+
+            # Maintain Azure-defualt backwards compatibility, but allow
+            # both environment variable and kwarg override.
+            provider = Config().get('hs_openid_provider', 'azure')
+            provider = api_key.get('openid_provider', provider)
+
+            if provider == 'azure':
+                api_key = openid.AzureOpenID(endpoint, api_key)
+
+            elif provider == 'google':
+                config = api_key.get('client_secret', None)
+                scopes = api_key.get('scopes', None)
+                api_key = openid.GoogleOpenID(endpoint, config=config, scopes=scopes)
+
+        self._api_key = api_key
         self._s = None  # Sessions
 
 
@@ -137,22 +153,6 @@ class HttpConn:
 
         elif self._api_key:
             token = ''
-
-            # Convert to OpenIDHandler
-            if isinstance(self._api_key, dict):
-
-                # Maintain Azure-defualt backwards compatibility, but allow
-                # both environment variable and kwarg override.
-                provider = Config().get('hs_openid_provider', 'azure')
-                provider = self._api_key.get('openid_provider', provider)
-
-                if provider == 'azure':
-                    self._api_key = openid.AzureOpenID(self._api_key)
-
-                elif provider == 'google':
-                    config = self._api_key.get('client_secret', None)
-                    scopes = self._api_key.get('scopes', None)
-                    self._api_key = openid.GoogleOpenID(config=config, scopes=scopes)
 
             # Get a token, possibly refreshing if needed.
             if isinstance(self._api_key, openid.OpenIDHandler):

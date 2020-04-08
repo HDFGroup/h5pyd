@@ -19,37 +19,41 @@ from .config import Config
 
 class OpenIDHandler(ABC):
 
-    def __init__(self, id):
+    def __init__(self, endpoint):
         """Initialize the token."""
 
         # Location of the token cache.
         self._token_cache_file = os.path.expanduser('~/.hstokencfg')
-        self._id = id
+        self._endpoint = endpoint
 
-        # The _token attribute should be a dict with the following keys:
+        # The _token attribute should be a dict with at least the following keys:
         #
         # accessToken - The OpenID token to send.
         # refreshToken - The refresh token (optional).
         # expiresOn - The unix timestamp when the token expires (optional).
-        self._token = self.read_token_cache()
-        if self._token is None:
-            self.acquire()
-        elif self.expired:
-            self.refresh()
+
+        if not os.path.isfile(self._token_cache_file):
+            self._token = None
+
+        else:
+            with open(self._token_cache_file, 'r') as token_file:
+                self._token = json.load(token_file).get(endpoint, None)
 
     @abstractmethod
     def acquire(self):
+        """Acquire a new token from the provider."""
         pass
 
     @abstractmethod
     def refresh(self):
+        """Refresh an existing token with the provider."""
         pass
 
     @property
     def expired(self):
         """Return if the token is expired."""
         t = self._token
-        return t is None or ('expiresOn' in t and time.time() >= t['expiresOn'])
+        return t is not None and 'expiresOn' in t and time.time() >= t['expiresOn']
 
     @property
     def token(self):
@@ -57,43 +61,36 @@ class OpenIDHandler(ABC):
 
         if self.expired:
             self.refresh()
+            self.write_token_cache()
 
         if self._token is None:
             self.acquire()
+            self.write_token_cache()
 
         return self._token['accessToken']
-
-
-    def read_token_cache(self):
-        """Read the cached token from a file."""
-
-        if not os.path.isfile(self._token_cache_file):
-            return None
-
-        with open(self._token_cache_file, 'r') as token_file:
-            return json.load(token_file).get(self._id, None)
-
 
     def write_token_cache(self):
         """Write the token to a file cache."""
 
+        cache_exists = os.path.isfile(self._token_cache_file)
+
         # Create a new cache file.
-        if not os.path.isfile(self._token_cache_file) and self._token is not None:
+        if not cache_exists and self._token is not None:
             with open(self._token_cache_file, 'w') as token_file:
-                json.dump({self._id: self._token}, token_file)
+                json.dump({self._endpoint: self._token}, token_file)
 
         # Update an exisiting cache file.
-        else:
+        elif cache_exists:
             with open(self._token_cache_file, 'r+') as token_file:
                 cache = json.loads(token_file.read())
 
                 # Store valid tokens.
                 if self._token is not None:
-                    cache[self._id] = self._token
+                    cache[self._endpoint] = self._token
 
                 # Delete invalid tokens.
-                elif self._id in cache:
-                    del cache[self._id]
+                elif self._endpoint in cache:
+                    del cache[self._endpoint]
 
                 token_file.seek(0)
                 token_file.truncate(0)
@@ -106,9 +103,8 @@ def eprint(*args, **kwargs):
 class AzureOpenID(OpenIDHandler):
 
     AUTHORITY_URI = 'https://login.microsoftonline.com'  # login endpoint for AD auth
-    TOKEN_CACHE_PREFIX = 'hsazcfg'
 
-    def __init__(self, config=None):
+    def __init__(self, endpoint, config=None):
         """Store configuration."""
 
         # Configuration manager
@@ -122,21 +118,22 @@ class AzureOpenID(OpenIDHandler):
         else:
 
             self.config = {
-                'AD_APP_ID': hs_config["hs_ad_app_id"],
-                'AD_TENANT_ID': hs_config["hs_ad_tenant_id"],
-                'AD_RESOURCE_ID': hs_config["hs_ad_resource_id"],
+                'AD_APP_ID': hs_config.get("hs_ad_app_id", None),
+                'AD_TENANT_ID': hs_config.get("hs_ad_tenant_id", None),
+                'AD_RESOURCE_ID': hs_config.get("hs_ad_resource_id", None),
                 'AD_CLIENT_SECRET': hs_config.get("hs_ad_client_secret", None)
             }
 
-        super().__init__(self.config['AD_APP_ID'])
+        super().__init__(endpoint)
 
     def acquire(self):
         """Acquire a new Azure token."""
 
         app_id = self.config["AD_APP_ID"]
         resource_id = self.config["AD_RESOURCE_ID"]
-        client_secret = self.config["AD_CLIENT_SECRET"]
-        authority_uri = self.AUTHORITY_URI + '/' + self.config["AD_TENANT_ID"]
+        tenant_id = self.config["AD_TENANT_ID"]
+        client_secret = self.config.get("AD_CLIENT_SECRET", None)
+        authority_uri = self.AUTHORITY_URI + '/' + tenant_id
 
         # Try to get a token using different oauth flows.
         context = adal.AuthenticationContext(authority_uri, api_version=None)
@@ -163,43 +160,52 @@ class AzureOpenID(OpenIDHandler):
         else:
             eprint("Could not authenticate with AD")
 
-        if 'expiresOn' in mgmt_token:
-            mgmt_token['expiresOn'] = datetime.strptime(mgmt_token['expiresOn'],
-                                                        '%Y-%m-%d %H:%M:%S.%f')
+        # Only store some fields.
+        self._token = {
+            'accessToken': mgmt_token['accessToken'],
+            'refreshToken': mgmt_token.get('refreshToken', None),
+            'tenantId': mgmt_token.get('tenantId', tenant_id),
+            'clientId': mgmt_token.get('_clientId', app_id),
+            'resource': mgmt_token.get('resource', resource_id)
+        }
 
-        self._token = mgmt_token
-        self.write_token_cache()
+        # Parse time to timestamp.
+        if 'expiresOn' in mgmt_token:
+            expire_dt = datetime.strptime(mgmt_token['expiresOn'], '%Y-%m-%d %H:%M:%S.%f')
+            self._token['expiresOn'] = expire_dt.timestamp()
 
     def refresh(self):
         """Try to renew an Azure token."""
 
-        token = self._token
-        if 'refreshToken' not in token:
-            return
-
         try:
 
-            authority_uri = self.AUTHORITY_URI + '/' + self.config["AD_TENANT_ID"]
-            context = adal.AuthenticationContext(authority_uri, api_version=None)
-            token = context.acquire_token_with_refresh_token(token['refreshToken'],
-                                                             self.config['AD_APP_ID'],
-                                                             self.config['AD_RESOURCE_ID'],
-                                                             self.config['AD_CLIENT_SECRET'])
+            # This will work for device code flow, but not with client
+            # credentials. If we have the secret, we can just request a new
+            # token anyways.
 
-            if 'expiresOn' in token:
-                token['expiresOn'] = datetime.strptime(token['expiresOn'],
-                                                       '%Y-%m-%d %H:%M:%S.%f')
-            self._token = token
+            authority_uri = self.AUTHORITY_URI + '/' + self._token['tenantId']
+            context = adal.AuthenticationContext(authority_uri, api_version=None)
+            mgmt_token = context.acquire_token_with_refresh_token(self._token['refreshToken'],
+                                                                  self._token['clientId'],
+                                                                  self._token['resource'],
+                                                                  None)
+
+            # New token does not have all the metadata.
+            self._token['accessToken'] = mgmt_token['accessToken']
+            self._token['refreshToken'] = mgmt_token['refreshToken']
+
+            # Parse time to timestamp.
+            if 'expiresOn' in mgmt_token:
+                expire_dt = datetime.strptime(mgmt_token['expiresOn'], '%Y-%m-%d %H:%M:%S.%f')
+                self._token['expiresOn'] = expire_dt.timestamp()
 
         except:
             self._token = None
 
-        self.write_token_cache()
-
 
 class GoogleOpenID(OpenIDHandler):
 
-    def __init__(self, config=None, scopes=None):
+    def __init__(self, endpoint, config=None, scopes=None):
         """Store configuration."""
 
         # Configuration manager
@@ -222,9 +228,9 @@ class GoogleOpenID(OpenIDHandler):
         else:
             self.config = {
                 'installed': {
-                    'project_id': hs_config['hs_google_project_id'],
-                    'client_id': hs_config['hs_google_client_id'],
-                    'client_secret': hs_config['hs_google_client_secret'],
+                    'project_id': hs_config.get('hs_google_project_id', None),
+                    'client_id': hs_config.get('hs_google_client_id', None),
+                    'client_secret': hs_config.get('hs_google_client_secret', None),
                     'auth_uri': 'https://accounts.google.com/o/oauth2/auth',
                     'token_uri': 'https://oauth2.googleapis.com/token',
                     'auth_provider_x509_cert_url': 'https://www.googleapis.com/oauth2/v1/certs',
@@ -232,14 +238,22 @@ class GoogleOpenID(OpenIDHandler):
                 }
             }
 
-        super().__init__(self.config['installed']['client_id'])
+        super().__init__(endpoint)
 
     def _parse(self, creds):
-        """Parse credentials and store if valid."""
+        """Parse credentials."""
+
+        # NOTE: In Google OpenID, if a client is set up for InstalledAppFlow
+        # then the client_secret is not actually treated as a secret. Acquire
+        # will ALWAYS prompt for user input before granting a token.
 
         token = {
             'accessToken': creds.id_token,
             'refreshToken': creds.refresh_token,
+            'tokenUri': creds.token_uri,
+            'clientId': creds.client_id,
+            'clientSecret': creds.client_secret,
+            'scopes': creds.scopes
         }
 
         # The expiry field that is in creds is for the OAuth token, not the
@@ -251,31 +265,28 @@ class GoogleOpenID(OpenIDHandler):
         return token
 
     def acquire(self):
-        """Acquire a new Google OAuth token."""
+        """Acquire a new Google token."""
 
         flow = GoogleInstalledAppFlow.from_client_config(self.config,
                                                          scopes=self.scopes)
         creds = flow.run_console()
         self._token = self._parse(creds)
-        self.write_token_cache()
 
     def refresh(self):
         """Try to renew a token."""
 
         try:
 
-            config = self.config['installed']
+            token = self._token
             creds = GoogleCredentials(token=None,
-                                      refresh_token=self._token['refreshToken'],
-                                      scopes=self.scopes,
-                                      token_uri=config['token_uri'],
-                                      client_id=config['client_id'],
-                                      client_secret=config['client_secret'])
+                                      refresh_token=token['refreshToken'],
+                                      scopes=token['scopes'],
+                                      token_uri=token['tokenUri'],
+                                      client_id=token['clientId'],
+                                      client_secret=token['clientSecret'])
 
             creds.refresh(GoogleRequest())
             self._token = self._parse(creds)
 
         except:
             self._token = None
-
-        self.write_token_cache()
