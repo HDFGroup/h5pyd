@@ -54,6 +54,13 @@ class Config:
 
     def __getitem__(self, name):
         """ Get a config item  """
+
+        # Load a variable from environment. It would have only been loaded in
+        # __init__ if it was also specified in the config file.
+        env_name = name.upper()
+        if name not in self._cfg and env_name in os.environ:
+            self._cfg[env_name] = os.environ[env_name]
+
         return self._cfg[name]
 
     def __setitem__(self, name, obj):
@@ -74,10 +81,16 @@ class Config:
             yield key
 
     def __contains__(self, name):
-        return name in self._cfg
+        return name in self._cfg or name.upper() in os.environ
 
     def __repr__(self):
         return json.dumps(self._cfg)
 
     def keys(self):
         return self._cfg.keys()
+
+    def get(self, name, default=None):
+        if name in self:
+            return self[name]
+        else:
+            return default

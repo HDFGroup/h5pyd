@@ -19,18 +19,15 @@ import time
 import base64
 import requests
 from requests import ConnectionError
-import adal
-from adal.adal_error import AdalError
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 import json
 import logging
 
-MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
-MS_AUTHORITY_HOST_URI = 'https://login.microsoftonline.com'  # login endpoint for AD auth
+from . import openid
+from .config import Config
 
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
 
 class CacheResponse(object):
     """ Wrap a json response in a Requests.Response looking class.
@@ -119,8 +116,24 @@ class HttpConn:
             api_key = os.environ["HS_API_KEY"]
         if isinstance(api_key, str) and (not api_key or api_key.upper() == "NONE"):
             api_key = None
-        self._api_key = api_key
 
+        # Convert api_key to OpenIDHandler
+        if isinstance(api_key, dict):
+
+            # Maintain Azure-defualt backwards compatibility, but allow
+            # both environment variable and kwarg override.
+            provider = Config().get('hs_openid_provider', 'azure')
+            provider = api_key.get('openid_provider', provider)
+
+            if provider == 'azure':
+                api_key = openid.AzureOpenID(endpoint, api_key)
+
+            elif provider == 'google':
+                config = api_key.get('client_secret', None)
+                scopes = api_key.get('scopes', None)
+                api_key = openid.GoogleOpenID(endpoint, config=config, scopes=scopes)
+
+        self._api_key = api_key
         self._s = None  # Sessions
 
     def _getAzureADToken(self, aad_dict):
@@ -190,8 +203,18 @@ class HttpConn:
             auth_string = base64.b64encode(auth_string)
             auth_string = b"Basic " + auth_string
             headers['Authorization'] = auth_string
-        elif self._api_key and isinstance(self._api_key, dict):
-            token = self._getAzureADToken(self._api_key)
+
+        elif self._api_key:
+            token = ''
+
+            # Get a token, possibly refreshing if needed.
+            if isinstance(self._api_key, openid.OpenIDHandler):
+                token = self._api_key.token
+
+            # Token was provided as a string.
+            elif isinstance(self._api_key, str):
+                token = self._api_key
+
             if token:
                 auth_string = b"Bearer " + token.encode('ascii')
                 headers['Authorization'] = auth_string
