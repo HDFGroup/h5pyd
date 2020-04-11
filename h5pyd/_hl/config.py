@@ -59,7 +59,7 @@ class Config:
         # __init__ if it was also specified in the config file.
         env_name = name.upper()
         if name not in self._cfg and env_name in os.environ:
-            self._cfg[env_name] = os.environ[env_name]
+            self._cfg[name] = os.environ[env_name]
 
         return self._cfg[name]
 
