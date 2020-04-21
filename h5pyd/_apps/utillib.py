@@ -261,6 +261,7 @@ def copy_array(src_arr, ctx):
 
 #----------------------------------------------------------------------------------
 def copy_attribute(desobj, name, srcobj, ctx):
+
     msg = "creating attribute {} in {}".format(name, srcobj.name)
     logging.debug(msg)
     if ctx["verbose"]:
@@ -627,16 +628,20 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
         copy_attribute(fout, ga, fin, ctx)
 
     def object_create_helper(name, obj):
-        class_name = obj.__class__.__name__
-
-        if class_name in ("Dataset", "Table"):
-            create_dataset(obj, ctx)
-        elif class_name == "Group":
-            create_group(obj, ctx)
-        elif class_name == "Datatype":
-            create_datatype(obj, ctx)
+        if name in fout:
+            logger.warning('{} already exists and will be skipped'
+                           .format(name))
         else:
-            logging.error("no handler for object class: {}".format(type(obj)))
+            class_name = obj.__class__.__name__
+
+            if class_name in ("Dataset", "Table"):
+                create_dataset(obj, ctx)
+            elif class_name == "Group":
+                create_group(obj, ctx)
+            elif class_name == "Datatype":
+                create_datatype(obj, ctx)
+            else:
+                logging.error("no handler for object class: {}".format(type(obj)))
 
     def object_link_helper(name, obj):
         class_name = obj.__class__.__name__

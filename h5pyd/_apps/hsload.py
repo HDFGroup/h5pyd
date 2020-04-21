@@ -257,7 +257,7 @@ def main():
         if h5py.version.hdf5_version_tuple[0] != 1 or h5py.version.hdf5_version_tuple[1] != 10 or h5py.version.hdf5_version_tuple[2] < 6:
             sys.stderr.write("link option requires hdf5 lib version 1.10.6 or higher")
             sys.exit(1)
-    
+
 
     try:
 
@@ -286,7 +286,7 @@ def main():
                 if not S3FS_IMPORT:
                     sys.stderr.write("Install S3FS package to load s3 files")
                     sys.exit(1)
-                
+
                 if not s3:
                     s3 = s3fs.S3FileSystem()
                 try:
@@ -297,7 +297,7 @@ def main():
             else:
                 if dataload == "link":
                     if  op.isabs(src_file):
-                        sys.stderr.write("source file must s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)") 
+                        sys.stderr.write("source file must s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)")
                         sys.exit(1)
                     s3path = src_file
                 else:
@@ -315,7 +315,7 @@ def main():
                 endpoint = cfg["hs_endpoint"]
                 bucket = cfg["hs_bucket"]
 
-                fout = h5pyd.File(tgt, 'x', endpoint=endpoint, username=username, password=password, bucket=bucket)
+                fout = h5pyd.File(tgt, 'a', endpoint=endpoint, username=username, password=password, bucket=bucket)
             except IOError as ioe:
                 if ioe.errno == 404:
                     logging.error("Domain: {} not found".format(tgt))
