@@ -28,8 +28,7 @@ def visit_item_obj(name, obj):
 
 print("version:", h5py.version.version)
 
-#DOMAIN_PATH="/home/test_user1/test/tall.h5"
-DOMAIN_PATH="/home/john/test/tall.h5"
+DOMAIN_PATH="/home/test_user1/test/tall.h5"
 print("opening domain:", DOMAIN_PATH)
 
 f = h5py.File(DOMAIN_PATH, "r")
