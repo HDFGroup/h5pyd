@@ -641,10 +641,12 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
 
     def object_copy_helper(name, obj):
         class_name = obj.__class__.__name__
+        logging.debug("object_copy_helper for object: {}".format(obj.name))
         if class_name in ("Dataset", "Table"):
             if ctx["dataload"] == "link":
                 logging.info("skip datacopy for link reference")
             else:
+                logging.debug("calling write_dataset for dataset: {}".format(obj.name))
                 tgt = fout[obj.name]
                 write_dataset(obj, tgt, ctx)
         elif class_name == "Group":
@@ -660,14 +662,19 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
             copy_attribute(tgt, ga, obj, ctx)
 
     # build a rough map of the file using the internal function above
+    logging.info("creating target objects")
     fin.visititems(object_create_helper)
 
     # copy over any attributes
+    logging.info("creating target attributes")
     fin.visititems(object_attribute_helper)
 
-    if dataload:
+    if dataload == "ingest":
         # copy dataset data
+        logging.info("copying dataset data")
         fin.visititems(object_copy_helper)
+    else:
+        logging.info("skipping dataset data copy (dataload is None or 'link')")
 
     # Fully flush the h5py handle.
     fout.close()
