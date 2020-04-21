@@ -596,7 +596,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     logging.info("input file: {}".format(fin.filename))
     logging.info("output file: {}".format(fout.filename))
     if dataload != "ingest":
-        if dataload == "nodata":
+        if not dataload:
             logging.info("no data load")
         elif dataload == "link":
             if not s3path:
@@ -604,7 +604,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
                 sys.exit(1)
             logging.info("using s3path")
         else:
-            logging.error("unexpected dataload value")
+            logging.error("unexpected dataload value:", dataload)
             sys.exit(1)
 
     # it would be nice to make a class out of these functions, but that
@@ -617,7 +617,6 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     ctx["dataload"] = dataload  # ingest, s3link, None
     ctx["deflate"] = deflate
     ctx["s3path"] = s3path
-    ctx["dataload"] = dataload
     ctx["srcid_desobj_map"] = {}
 
 

@@ -28,9 +28,12 @@ def visit_item_obj(name, obj):
 
 print("version:", h5py.version.version)
 
-f = h5py.File("tall.data.hdfgroup.org", "r", endpoint="https://data.hdfgroup.org:7258")
+#DOMAIN_PATH="/home/test_user1/test/tall.h5"
+DOMAIN_PATH="/home/john/test/tall.h5"
+print("opening domain:", DOMAIN_PATH)
 
-# print("filename,", f.filename)
+f = h5py.File(DOMAIN_PATH, "r")
+
 print("name:", f.name)
 print("id:", f.id.id)
 
@@ -51,6 +54,8 @@ print("dset21 uuid:", dset21.id.id)
 print("dset21 name:", dset21.name)
 print("dset21 dims:", dset21.shape)
 print("dset21 type:", dset21.dtype)
+arr = dset21[...]
+print("dset21 values:", arr)
 
 dset111 = f['/g1/g1.1/dset1.1.1']
 print("dset111 uuid:", dset111.id.id)
@@ -58,6 +63,8 @@ print("dset111 name:", dset111.name)
 print("dset111 dims:", dset111.shape)
 print("dset111 type:", dset111.dtype)
 print("dset111 len:", len(dset111))
+arr = dset111[...]
+print("dset111 values:", arr)
 
 
 attr1 = dset111.attrs['attr1']
@@ -76,5 +83,6 @@ f.visititems(visit_item_obj)
 
 print("search g1.2:")
 f.visit(find_g1_2)
+
 
 
