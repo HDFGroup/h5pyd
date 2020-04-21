@@ -70,7 +70,7 @@ def main():
 
     loglevel = logging.ERROR
     verbose = False
-    nodata = False
+    dataload = "ingest"  # or None
 
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
@@ -102,7 +102,7 @@ def main():
             verbose = True
             argn += 1
         elif arg == "--nodata":
-            nodata = True
+            dataload = None
             argn += 1
         elif arg == "--loglevel":
             if val == "debug":
@@ -202,7 +202,7 @@ def main():
         sys.exit(1)
 
     try:
-        load_file(fin, fout, verbose=verbose, nodata=nodata)
+        load_file(fin, fout, verbose=verbose, dataload=dataload)
         msg = "Domain {} downloaded to file: {}".format(src_domain, des_file)
         logging.info(msg)
         if verbose:
