@@ -250,7 +250,7 @@ def main():
 
     # check we have min HDF5 lib version for chunk query
     if dataload == "link":
-        print("check libversion")
+        logging.info("checking libversion")
         if h5py.version.version_tuple.major != 2 or h5py.version.version_tuple.minor < 10:
             sys.stderr.write("link option requires h5py version 2.10 or higher")
             sys.exit(1)
