@@ -509,14 +509,16 @@ def create_links(gsrc, gdes, ctx):
     if ctx["verbose"]:
         print("create_links: {}".format(gsrc.name))
     for title in gsrc:
+        msg = "got link: {}".format(title)
         if ctx["verbose"]:
-            print("got link: {}".format(title))
+            print(msg)
+        logging.info(msg)
         lnk = gsrc.get(title, getlink=True)
         link_classname = lnk.__class__.__name__
         if link_classname == "HardLink":
             logging.debug("Got hardlink: {} gsrc: {} gdes: {}".format(title, gsrc, gdes))
             if title not in gdes:
-                msg = "creating multilink {} with title: {}".format(gdes, title)
+                msg = "creating link {} with title: {}".format(gdes, title)
                 if ctx["verbose"]:
                     print(msg)
                 logging.info(msg)
@@ -528,6 +530,9 @@ def create_links(gsrc, gdes, ctx):
                     logging.debug("creating hardlink to {}".format(des_obj.id.id))
                     gdes[title] = des_obj
                 else:
+                    # TBD - in hdf5 1.10 it seems that two references to the same object
+                    # can return different id's.  This will cause HDF5 files with 
+                    # multilinks to not load correctly  
                     msg = "could not find map item to src id: {}".format(src_obj_id_hash)
                     logging.warn(msg)
                     if ctx["verbose"]:
@@ -570,9 +575,6 @@ def create_group(gobj, ctx):
     srcid_desobj_map = ctx["srcid_desobj_map"]
     logging.debug("adding group id {} to {} in srcid_desobj_map".format(gobj.id.id, grp))
     srcid_desobj_map[gobj.id.__hash__()] = grp
-
-    # create any soft/external links
-    create_links(gobj, grp, ctx)
 
 # create_group
 
@@ -624,9 +626,6 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     for ga in fin.attrs:
         copy_attribute(fout, ga, fin, ctx)
 
-    # create root soft/external links
-    create_links(fin, fout, ctx)
-
     def object_create_helper(name, obj):
         class_name = obj.__class__.__name__
 
@@ -638,6 +637,15 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
             create_datatype(obj, ctx)
         else:
             logging.error("no handler for object class: {}".format(type(obj)))
+
+    def object_link_helper(name, obj):
+        class_name = obj.__class__.__name__
+        logging.debug("object_link_helper for object: {}".format(obj.name))
+        if class_name == "Group":
+            # create any soft/external links
+            fout = ctx["fout"]
+            grp = fout[name]
+            create_links(obj, grp, ctx)
 
     def object_copy_helper(name, obj):
         class_name = obj.__class__.__name__
@@ -668,6 +676,10 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     # copy over any attributes
     logging.info("creating target attributes")
     fin.visititems(object_attribute_helper)
+
+    # create soft/external links (and hardlinks not already created)
+    create_links(fin, fout, ctx)  # create root soft/external links
+    fin.visititems(object_link_helper)
 
     if dataload == "ingest":
         # copy dataset data
