@@ -184,7 +184,7 @@ class Folder():
                         api_key["AD_CLIENT_SECRET"] = ad_client_secret
 
         self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username,
-            password=password, bucket=bucket, api_key=api_key, mode=mode, logger=logger)
+            password=password, bucket=bucket, api_key=api_key, mode=mode, logger=logger, retries=retries)
         self.log = self._http_conn.logging
 
         domain_json = None
