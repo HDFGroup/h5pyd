@@ -905,6 +905,7 @@ class HLObject(CommonStateObject):
 
         # try to do a PUT to the domain
         rsp = self._id._http_conn.PUT(req, body=body, params=params, format=format)
+        self.log.info("PUT rsp status_code: {}".format(rsp.status_code))
 
         if rsp.status_code not in (200, 201, 204):
             if rsp.status_code == 409:

@@ -362,9 +362,9 @@ class HttpConn:
             raise IOError("Connection Error")
 
         if rsp.status_code == 201 and req == '/':
-            self.log.info("clearning domain_json cache")
+            self.log.info("clearing domain_json cache")
             self._domain_json = None
-
+        self.log.info("PUT returning: {}".format(rsp))
         return rsp
 
     def POST(self, req, body=None, format="json", params=None, headers=None):

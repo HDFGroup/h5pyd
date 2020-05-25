@@ -458,10 +458,11 @@ class File(Group):
         self.log.debug("flush")
         if  self._id.id.startswith("g-"):
             # Currently flush only works with HSDS
-            self.log.debug("sending PUT flush request")
+            self.log.info("sending PUT flush request")
             req = '/'
             body = {"flush": 1}
             self.PUT(req, body=body)
+            self.log.info("PUT flush complete")
 
     def close(self):
         """ Clears reference to remote resource.
@@ -472,10 +473,11 @@ class File(Group):
         # do a PUT flush if this file is writable and the server is HSDS
         if  self.mode == "r+" and self._id.id.startswith("g-"):
             # Currently flush only works with HSDS
-            self.log.debug("sending PUT flush request")
+            self.log.info("sending PUT flush request")
             req = '/'
             body = {"flush": 1}
             self.PUT(req, body=body)
+
 
         if self._id._http_conn:
             self._id._http_conn.close()
