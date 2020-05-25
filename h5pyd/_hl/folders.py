@@ -70,14 +70,37 @@ class Folder():
 
 
     def __init__(self, domain_name, pattern=None, query=None, mode=None, endpoint=None,
-        username=None, password=None, bucket=None, api_key=None, logger=None, owner=None, batch_size=1000, **kwds):
+        username=None, password=None, bucket=None, api_key=None, logger=None, owner=None, batch_size=1000, retries=3, **kwds):
         """Create a new Folders object.
 
         domain_name
             URI of the domain name to access. E.g.: /org/hdfgroup/folder/
-
+        pattern
+            Regex filter to apply to any domains in the folder
+        query
+            Query for root level attributes - only domains matching the query will be returned
+        mode
+            Access mode: 'r', 'r+', 'w', or 'a'
         endpoint
             Server endpoint.   Defaults to "http://localhost:5000"
+        username
+            username for authentication
+        password
+            password for authentication
+        bucket
+            bucket (or storage container) to use for domain.  If not set, server default bucket will be used
+        api_key
+            user's api key (for server configurations that use api_key rather than username/password)
+        logger
+            supply log handler to be used
+        owner
+            set the owner to be used when new domain is created (defaults to username).  Only valid when used
+            by admin users
+        linked_domain
+            Create new domain using the root of the linked domain
+        retries
+            Number of retry attempts to be used if a server request fails
+
         """
 
         self.log = logging.getLogger("h5pyd")
