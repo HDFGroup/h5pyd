@@ -180,12 +180,18 @@ class File(Group):
                     username = os.environ["H5SERV_USERNAME"]
                 elif "hs_username" in cfg:
                     username = cfg["hs_username"]
+            #else:
+            #    # save the username for external link access
+            #    os.environ["H5SERV_USERNAME"] = username  
 
             if password is None:
                 if "H5SERV_PASSWORD" in os.environ:
                     password = os.environ["H5SERV_PASSWORD"]
                 elif "hs_password" in cfg:
                     password = cfg["hs_password"]
+            #else:
+            #    # save the username for external link access
+            #    os.environ["H5SERV_PASSWORD"] = password
 
             if bucket is None:
                 if "HS_BUCKET" in os.environ:

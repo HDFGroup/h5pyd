@@ -583,7 +583,10 @@ class Group(HLObject, MutableMappingHDF5):
                 external_domain = op.join(op.dirname(current_domain), external_domain)
                 external_domain = op.normpath(external_domain)
             try:
-                f = File(external_domain, endpoint=self.id.http_conn.endpoint, mode='r', use_session=False)
+                endpoint = self.id.http_conn.endpoint
+                username = self.id.http_conn.username
+                password = self.id.http_conn.password
+                f = File(external_domain, endpoint=endpoint, username=username, password=password, mode='r', use_session=False) 
             except IOError:
                 # unable to find external link
                 raise KeyError("Unable to open file: " + link_json['h5domain'])

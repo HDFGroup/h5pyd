@@ -119,7 +119,6 @@ class HttpConn:
 
         # Convert api_key to OpenIDHandler
         if isinstance(api_key, dict):
-
             # Maintain Azure-defualt backwards compatibility, but allow
             # both environment variable and kwarg override.
             provider = Config().get('hs_openid_provider', 'azure')
