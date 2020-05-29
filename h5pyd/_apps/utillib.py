@@ -304,8 +304,14 @@ def create_dataset(dobj, ctx):
         pass  # ignore
     chunks=None
 
+
+    if dobj.dtype.metadata and 'vlen' in dobj.dtype.metadata:
+        is_vlen = True
+    else:
+        is_vlen = False
+
     # can_use_storeinfo = use_storeinfo(dobj, ctx)
-    if ctx["dataload"] == "link":
+    if ctx["dataload"] == "link" and not is_vlen:
         dset_dims = dobj.shape
         logging.debug("dset_dims: {}".format(dset_dims))
         rank = len(dset_dims)
@@ -650,8 +656,13 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     def object_copy_helper(name, obj):
         class_name = obj.__class__.__name__
         logging.debug("object_copy_helper for object: {}".format(obj.name))
+        
         if class_name in ("Dataset", "Table"):
-            if ctx["dataload"] == "link":
+            if obj.dtype.metadata and 'vlen' in obj.dtype.metadata:
+                is_vlen = True
+            else:
+                is_vlen = False
+            if ctx["dataload"] == "link" and not is_vlen:
                 logging.info("skip datacopy for link reference")
             else:
                 logging.debug("calling write_dataset for dataset: {}".format(obj.name))
@@ -681,12 +692,12 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     create_links(fin, fout, ctx)  # create root soft/external links
     fin.visititems(object_link_helper)
 
-    if dataload == "ingest":
+    if dataload:
         # copy dataset data
         logging.info("copying dataset data")
         fin.visititems(object_copy_helper)
     else:
-        logging.info("skipping dataset data copy (dataload is None or 'link')")
+        logging.info("skipping dataset data copy (dataload is None)")
 
     # Fully flush the h5py handle.
     fout.close()
