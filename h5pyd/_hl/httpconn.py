@@ -76,7 +76,7 @@ class HttpConn:
             self.log = logging
         else:
             self.log = logging.getLogger(logger)
-        self.log.debug("HttpCon.init(omaion: {} use_session: {} use_cache: {} retries: {})".format(domain_name, use_session, use_cache, retries))
+        self.log.debug("HttpCon.init(domain: {} use_session: {} use_cache: {} retries: {})".format(domain_name, use_session, use_cache, retries))
         if endpoint is None:
             if "HS_ENDPOINT" in os.environ:
                 endpoint = os.environ["HS_ENDPOINT"]
