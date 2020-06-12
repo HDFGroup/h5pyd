@@ -111,6 +111,22 @@ def usage():
     print("     -6 :: Force ipv6 (see -4)")
     print("     -h | --help    :: This message.")
     print("")
+    print("Note about --link option:")
+    print("    --link enables just the source HDF5 metadata to be ingested while the dataset data")
+    print("     is left in the original file and fetched as needed.")
+    print("     When used with files stored in AWS S3, the source file can be specified using the S3")
+    print("     path: 's3://<bucket_name>/<s3_path>'.  Preferably, the bucket should be in the same")
+    print("     region as the HSDS service")
+    print("     For Posix or Azure deployments, the source file needs to be copied to a regular file")
+    print("     system and hsload run from a directory that mirrors the bucket layout.  E.g. if")
+    print("     consider a Posix deployment where the ROOT_DIR is '/mnt/data' and the HSDS default")
+    print("     bucket is 'hsdsdata' (so ingested data will be stored in '/mnt/data/hsdsdata'), the")
+    print("     source HDF5 files could be stored in '/mnt/data/hdf5/' and the file 'myhdf5.h5'")
+    print("     would be imported as: 'hsload --link data/hdf5/myhdf5.h5 <folder>'")
+    print("")
+    print("     Also, the --link option requires hdf5lib 1.10.6 or higher and h5py 2.10 or higher.")
+    print("     The docker image: 'hdfgroup/hdf5lib:1.10.6' includes these versions as well as h5pyd.")
+    print("     E.g.: 'docker run --rm -v ~/.hscfg:/root/.hscfg  -v ~/data:/data -it hdfgroup/hdf5lib:1.10.6 bash'")
 #end print_usage
 
 #----------------------------------------------------------------------------------

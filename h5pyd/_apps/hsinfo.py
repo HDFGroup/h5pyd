@@ -152,7 +152,11 @@ def getDomainInfo(domain, cfg):
     else:
         # report HDF objects (groups, datasets, and named datatypes) vs. allocated chunks
         num_objects = f.num_groups + f.num_datatypes + f.num_datasets
-        num_chunks = f.num_objects - num_objects
+        if f.num_chunks > 0:
+            num_chunks = f.num_chunks
+        else:
+            # older storeinfo format doesn't have num_chunks, so calculate
+            num_chunks = f.num_objects - num_objects
 
         print("domain: {}".format(domain))
         print("    owner:           {}".format(f.owner))
@@ -160,9 +164,14 @@ def getDomainInfo(domain, cfg):
         print("    last modified:   {}".format(timestamp))
         print("    total_size:      {}".format(format_size(f.total_size)))
         print("    allocated_bytes: {}".format(format_size(f.allocated_bytes)))
+        if f.metadata_bytes:
+            print("    metadata_bytes:  {}".format(format_size(f.metadata_bytes)))
+        if f.linked_bytes:
+            print("    linked_bytes:    {}".format(format_size(f.linked_bytes)))
         print("    num objects:     {}".format(num_objects))
         print("    num chunks:      {}".format(num_chunks))
-
+        if f.num_linked_chunks:
+            print("    linked chunks:   {}".format(f.num_linked_chunks))
 
     f.close()
 

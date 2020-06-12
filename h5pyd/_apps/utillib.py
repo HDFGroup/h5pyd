@@ -305,8 +305,14 @@ def create_dataset(dobj, ctx):
         pass  # ignore
     chunks=None
 
+
+    if dobj.dtype.metadata and 'vlen' in dobj.dtype.metadata:
+        is_vlen = True
+    else:
+        is_vlen = False
+
     # can_use_storeinfo = use_storeinfo(dobj, ctx)
-    if ctx["dataload"] == "link":
+    if ctx["dataload"] == "link" and not is_vlen:
         dset_dims = dobj.shape
         logging.debug("dset_dims: {}".format(dset_dims))
         rank = len(dset_dims)

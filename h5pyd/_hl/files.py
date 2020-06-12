@@ -186,7 +186,7 @@ class File(Group):
                     password = os.environ["H5SERV_PASSWORD"]
                 elif "hs_password" in cfg:
                     password = cfg["hs_password"]
-
+           
             if bucket is None:
                 if "HS_BUCKET" in os.environ:
                     bucket = os.environ["HS_BUCKET"]
@@ -359,7 +359,7 @@ class File(Group):
             rsp_json = self.GET(req)
             self.log.debug("get verbose info: {}".format(rsp_json))
             props = {}
-            for k in ("num_objects", "num_datatypes", "num_groups", "num_datasets", "allocated_bytes", "total_size", "lastModified"):
+            for k in ("num_objects", "num_datatypes", "num_groups", "num_datasets", "num_chunks", "num_linked_chunks", "allocated_bytes", "metadata_bytes", "linked_bytes", "total_size", "lastModified"):
                 if k in rsp_json:
                     props[k] = rsp_json[k]
             self._verboseInfo = props
@@ -399,6 +399,22 @@ class File(Group):
         if "num_groups" in props:
             num_groups = props["num_groups"]
         return num_groups
+    
+    @property
+    def num_chunks(self):
+        props = self._getVerboseInfo()
+        num_chunks = 0
+        if "num_chunks" in props:
+            num_chunks = props["num_chunks"]
+        return num_chunks
+
+    @property
+    def num_linked_chunks(self):
+        props = self._getVerboseInfo()
+        num_linked_chunks = 0
+        if "num_linked_chunks" in props:
+            num_linked_chunks = props["num_linked_chunks"]
+        return num_linked_chunks
 
     @property
     def num_datasets(self):
@@ -415,6 +431,22 @@ class File(Group):
         if "allocated_bytes" in props:
             allocated_bytes = props["allocated_bytes"]
         return allocated_bytes
+
+    @property
+    def metadata_bytes(self):
+        props = self._getVerboseInfo()
+        metadata_bytes = 0
+        if "metadata_bytes" in props:
+            metadata_bytes = props["metadata_bytes"]
+        return metadata_bytes
+
+    @property
+    def linked_bytes(self):
+        props = self._getVerboseInfo()
+        linked_bytes = 0
+        if "linked_bytes" in props:
+            linked_bytes = props["linked_bytes"]
+        return linked_bytes
 
     @property
     def total_size(self):

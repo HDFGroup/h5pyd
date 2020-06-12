@@ -76,7 +76,7 @@ class HttpConn:
             self.log = logging
         else:
             self.log = logging.getLogger(logger)
-        self.log.debug("HttpCon.init(omaion: {} use_session: {} use_cache: {} retries: {})".format(domain_name, use_session, use_cache, retries))
+        self.log.debug("HttpCon.init(domain: {} use_session: {} use_cache: {} retries: {})".format(domain_name, use_session, use_cache, retries))
         if endpoint is None:
             if "HS_ENDPOINT" in os.environ:
                 endpoint = os.environ["HS_ENDPOINT"]
@@ -119,7 +119,6 @@ class HttpConn:
 
         # Convert api_key to OpenIDHandler
         if isinstance(api_key, dict):
-
             # Maintain Azure-defualt backwards compatibility, but allow
             # both environment variable and kwarg override.
             provider = Config().get('hs_openid_provider', 'azure')

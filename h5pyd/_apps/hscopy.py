@@ -74,7 +74,7 @@ def main():
 
     loglevel = logging.ERROR
     verbose = False
-    nodata = False
+    dataload  = "ingest"
     deflate = None
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
@@ -99,7 +99,7 @@ def main():
             verbose = True
             argn += 1
         elif arg == "--nodata":
-            nodata = True
+            dataload = None
             argn += 1
         elif arg == "--loglevel":
             if val == "debug":
@@ -212,7 +212,7 @@ def main():
 
 
         # do the actual load
-        load_file(fin, fout, verbose=verbose, nodata=nodata, deflate=deflate)
+        load_file(fin, fout, verbose=verbose, dataload=dataload, deflate=deflate)
 
         msg = "File {} uploaded to domain: {}".format(src_domain, des_domain)
         logging.info(msg)
