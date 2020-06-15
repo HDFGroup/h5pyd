@@ -506,6 +506,25 @@ class Test2DZeroFloat(TestCase):
         """ see issue #473 """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[:,[0,1,2]])
 
+class Test2DFloat(TestCase):
+
+    def setUp(self):
+        TestCase.setUp(self)
+        filename = self.getFileName("dataset_test2dzerofloat")
+        print("filename:", filename)
+        self.f = h5py.File(filename, 'w')
+        self.data = np.ones((6,8), dtype='f')
+        # TBD data in initializer not working
+        self.dset = self.f.create_dataset('x', (6,8), dtype='f')
+        self.dset[...] = self.data
+        #self.dset = self.f.create_dataset('x', data=self.data)
+
+    def test_index_simple(self):
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[2:4,3:6])
+
+    def test_squeeze(self):
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[:,:1])
+
 class Test3DFloat(TestCase):
 
     def setUp(self):

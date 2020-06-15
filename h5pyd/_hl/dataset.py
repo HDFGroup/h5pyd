@@ -918,7 +918,7 @@ class Dataset(HLObject):
             raise ValueError("selection type not supported")
 
 
-        self.log.info("got arr: {}, cleaning up shape".format(arr.shape))
+        self.log.info("got arr: {}, cleaning up shape!".format(arr.shape))
         # Patch up the output for NumPy
         if len(names) == 1:
             arr = arr[names[0]]     # Single-field recarray convention
@@ -926,8 +926,8 @@ class Dataset(HLObject):
             arr = numpy.asscalar(arr)
         elif single_element:
             arr = arr[0]
-        elif len(arr.shape) > 1:
-            arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
+        #elif len(arr.shape) > 1:
+        #    arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
         return arr
 
     def __setitem__(self, args, val):
