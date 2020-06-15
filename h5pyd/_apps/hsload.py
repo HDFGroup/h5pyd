@@ -152,7 +152,7 @@ def main():
     logfname=None
     ipvfam=None
     s3 = None  # s3fs instance
-    mode = ''
+    mode = 'w'
 
     src_files = []
     argn = 1
