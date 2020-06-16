@@ -437,9 +437,8 @@ def create_dataset(dobj, ctx):
     except (IOError, TypeError, KeyError) as e:
         msg = "ERROR: failed to create dataset: {}".format(str(e))
         logging.error(msg)
-        print(msg)
-        return
 
+    return dset
 # create_dataset
 
 #----------------------------------------------------------------------------------
@@ -583,6 +582,8 @@ def create_group(gobj, ctx):
     logging.debug("adding group id {} to {} in srcid_desobj_map".format(gobj.id.id, grp))
     srcid_desobj_map[gobj.id.__hash__()] = grp
 
+    return grp
+
 # create_group
 
 #----------------------------------------------------------------------------------
@@ -642,11 +643,11 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
         else:
             class_name = obj.__class__.__name__
             if class_name in ("Dataset", "Table"):
-                dset = self.create_dataset(name, obj)
+                dset = create_dataset(obj, ctx)
 
                 if dset is not None:
                     for da in obj.attrs:
-                        self.copy_attribute(dset, da, obj)
+                        copy_attribute(dset, da, obj, ctx)
 
                 if dataload == "ingest":
                     logging.debug("object_copy_helper for object: {}".format(obj.name))
@@ -658,11 +659,11 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
                         write_dataset(obj, tgt, ctx)
 
             elif class_name == "Group":
-                grp = self.create_group(name, obj)
+                grp = create_group(obj, ctx)
 
                 if grp is not None:
                     for ga in obj.attrs:
-                        self.copy_attribute(grp, ga, obj)
+                        copy_attribute(grp, ga, obj, ctx)
 
                 # create any soft/external links
                 logging.debug("object_link_helper for object: {}".format(obj.name))
@@ -670,7 +671,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
                 grp = fout[name]
                 create_links(obj, grp, ctx)
             elif class_name == "Datatype":
-                self.create_datatype(obj)
+                create_datatype(obj, ctx)
             else:
                 logger.error("no handler for object class: {}"
                              .format(type(obj)))
