@@ -637,6 +637,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     create_links(fin, fout, ctx)
 
     def object_helper(name, obj):
+        fout = ctx['fout']
         if name in fout:
             logger.warning('{} already exists and will be skipped'
                            .format(name))
