@@ -98,6 +98,7 @@ def usage():
     print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
+    print("     -a | --append <mode>  :: Flag to append to an existing HDF Server domain")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
     print("     --cnf-eg        :: Print a config file and then exit")
@@ -151,6 +152,7 @@ def main():
     logfname=None
     ipvfam=None
     s3 = None  # s3fs instance
+    mode = 'w'
 
     src_files = []
     argn = 1
@@ -163,8 +165,10 @@ def main():
             sys.stderr.write("options must precede source files")
             usage()
             sys.exit(-1)
+
         if len(sys.argv) > argn + 1:
-            val = sys.argv[argn+1]
+            val = sys.argv[argn + 1]
+
         if arg in ("-v", "--verbose"):
             verbose = True
             argn += 1
@@ -216,6 +220,9 @@ def main():
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = val
             argn += 2
+        elif arg in ("-a", "--append"):
+            mode = 'a'
+            argn += 1
         elif arg == '--cnf-eg':
             print_config_example()
             sys.exit(0)
@@ -273,21 +280,21 @@ def main():
         if h5py.version.hdf5_version_tuple[0] != 1 or h5py.version.hdf5_version_tuple[1] != 10 or h5py.version.hdf5_version_tuple[2] < 6:
             sys.stderr.write("link option requires hdf5 lib version 1.10.6 or higher")
             sys.exit(1)
-    
+
 
     try:
 
         for src_file in src_files:
             # check if this is a non local file, if it is remote (http, etc...) stage it first then insert it into hsds
-            src_file_chk  = urlparse(src_file)
+            src_file_chk = urlparse(src_file)
             logging.debug(src_file_chk)
 
             if src_file_chk.scheme == 'http' or src_file_chk.scheme == 'https' or src_file_chk.scheme == 'ftp':
                 src_file = stage_file(src_file, netfam=ipvfam)
-                if src_file == None:
+                if src_file is None:
                     continue
                 istmp = True
-                logging.info('temp source data: '+str(src_file))
+                logging.info('temp source data: ' + str(src_file))
             else:
                 istmp = False
 
@@ -302,7 +309,7 @@ def main():
                 if not S3FS_IMPORT:
                     sys.stderr.write("Install S3FS package to load s3 files")
                     sys.exit(1)
-                
+
                 if not s3:
                     s3 = s3fs.S3FileSystem()
                 try:
@@ -313,7 +320,7 @@ def main():
             else:
                 if dataload == "link":
                     if  op.isabs(src_file):
-                        sys.stderr.write("source file must s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)") 
+                        sys.stderr.write("source file must s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)")
                         sys.exit(1)
                     s3path = src_file
                 else:
@@ -331,7 +338,7 @@ def main():
                 endpoint = cfg["hs_endpoint"]
                 bucket = cfg["hs_bucket"]
 
-                fout = h5pyd.File(tgt, 'x', endpoint=endpoint, username=username, password=password, bucket=bucket)
+                fout = h5pyd.File(tgt, mode, endpoint=endpoint, username=username, password=password, bucket=bucket)
             except IOError as ioe:
                 if ioe.errno == 404:
                     logging.error("Domain: {} not found".format(tgt))

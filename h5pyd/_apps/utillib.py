@@ -261,6 +261,7 @@ def copy_array(src_arr, ctx):
 
 #----------------------------------------------------------------------------------
 def copy_attribute(desobj, name, srcobj, ctx):
+
     msg = "creating attribute {} in {}".format(name, srcobj.name)
     logging.debug(msg)
     if ctx["verbose"]:
@@ -436,9 +437,8 @@ def create_dataset(dobj, ctx):
     except (IOError, TypeError, KeyError) as e:
         msg = "ERROR: failed to create dataset: {}".format(str(e))
         logging.error(msg)
-        print(msg)
-        return
 
+    return dset
 # create_dataset
 
 #----------------------------------------------------------------------------------
@@ -537,8 +537,8 @@ def create_links(gsrc, gdes, ctx):
                     gdes[title] = des_obj
                 else:
                     # TBD - in hdf5 1.10 it seems that two references to the same object
-                    # can return different id's.  This will cause HDF5 files with 
-                    # multilinks to not load correctly  
+                    # can return different id's.  This will cause HDF5 files with
+                    # multilinks to not load correctly
                     msg = "could not find map item to src id: {}".format(src_obj_id_hash)
                     logging.warn(msg)
                     if ctx["verbose"]:
@@ -581,6 +581,8 @@ def create_group(gobj, ctx):
     srcid_desobj_map = ctx["srcid_desobj_map"]
     logging.debug("adding group id {} to {} in srcid_desobj_map".format(gobj.id.id, grp))
     srcid_desobj_map[gobj.id.__hash__()] = grp
+
+    return grp
 
 # create_group
 
@@ -627,84 +629,70 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     ctx["s3path"] = s3path
     ctx["srcid_desobj_map"] = {}
 
-
     # create any root attributes
     for ga in fin.attrs:
         copy_attribute(fout, ga, fin, ctx)
 
-    def object_create_helper(name, obj):
-        class_name = obj.__class__.__name__
+    # create root soft/external links
+    create_links(fin, fout, ctx)
 
-        if class_name in ("Dataset", "Table"):
-            create_dataset(obj, ctx)
-        elif class_name == "Group":
-            create_group(obj, ctx)
-        elif class_name == "Datatype":
-            create_datatype(obj, ctx)
+    def object_helper(name, obj):
+        fout = ctx['fout']
+        if name in fout:
+            logging.warning('{} already exists and will be skipped'
+                           .format(name))
         else:
-            logging.error("no handler for object class: {}".format(type(obj)))
+            class_name = obj.__class__.__name__
+            if class_name in ("Dataset", "Table"):
+                dset = create_dataset(obj, ctx)
 
-    def object_link_helper(name, obj):
-        class_name = obj.__class__.__name__
-        logging.debug("object_link_helper for object: {}".format(obj.name))
-        if class_name == "Group":
-            # create any soft/external links
-            fout = ctx["fout"]
-            grp = fout[name]
-            create_links(obj, grp, ctx)
+                if dset is not None:
+                    for da in obj.attrs:
+                        copy_attribute(dset, da, obj, ctx)
 
-    def object_copy_helper(name, obj):
-        class_name = obj.__class__.__name__
-        logging.debug("object_copy_helper for object: {}".format(obj.name))
-        
-        if class_name in ("Dataset", "Table"):
-            if obj.dtype.metadata and 'vlen' in obj.dtype.metadata:
-                is_vlen = True
+                if dataload == "ingest":
+                    logging.debug("object_copy_helper for object: {}".format(obj.name))
+                    if ctx["dataload"] == "link":
+                        logging.info("skip datacopy for link reference")
+                    else:
+                        logging.debug("calling write_dataset for dataset: {}".format(obj.name))
+                        tgt = fout[obj.name]
+                        write_dataset(obj, tgt, ctx)
+
+            elif class_name == "Group":
+                grp = create_group(obj, ctx)
+
+                if grp is not None:
+                    for ga in obj.attrs:
+                        copy_attribute(grp, ga, obj, ctx)
+
+                # create any soft/external links
+                logging.debug("object_link_helper for object: {}".format(obj.name))
+                fout = ctx["fout"]
+                grp = fout[name]
+                create_links(obj, grp, ctx)
+            elif class_name == "Datatype":
+                create_datatype(obj, ctx)
             else:
-                is_vlen = False
-            if ctx["dataload"] == "link" and not is_vlen:
-                logging.info("skip datacopy for link reference")
-            else:
-                logging.debug("calling write_dataset for dataset: {}".format(obj.name))
-                tgt = fout[obj.name]
-                write_dataset(obj, tgt, ctx)
-        elif class_name == "Group":
-            logging.debug("skip copy for group: {}".format(obj.name))
-        elif class_name == "Datatype":
-            logging.debug("skip copy for datatype: {}".format(obj.name))
-        else:
-            logging.error("no handler for object class: {}".format(type(obj)))
-
-    def object_attribute_helper(name, obj):
-        tgt = fout[obj.name]
-        for ga in obj.attrs:
-            copy_attribute(tgt, ga, obj, ctx)
+                logging.error("no handler for object class: {}"
+                             .format(type(obj)))
 
     # build a rough map of the file using the internal function above
-    logging.info("creating target objects")
-    fin.visititems(object_create_helper)
-
     # copy over any attributes
-    logging.info("creating target attributes")
-    fin.visititems(object_attribute_helper)
-
     # create soft/external links (and hardlinks not already created)
-    create_links(fin, fout, ctx)  # create root soft/external links
-    fin.visititems(object_link_helper)
-
-    if dataload:
+    logging.info("creating target objects and attributes")
+    if dataload == "ingest":
         # copy dataset data
         logging.info("copying dataset data")
-        fin.visititems(object_copy_helper)
-    else:
-        logging.info("skipping dataset data copy (dataload is None)")
+
+    fin.visititems(object_helper)
 
     # Fully flush the h5py handle.
     fout.close()
 
     # close up the source domain, see reason(s) for this below
     fin.close()
-    msg="load_file complete"
+    msg = "load_file complete"
     logging.info(msg)
     if verbose:
         print(msg)
