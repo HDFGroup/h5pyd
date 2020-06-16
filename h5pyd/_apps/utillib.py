@@ -639,7 +639,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     def object_helper(name, obj):
         fout = ctx['fout']
         if name in fout:
-            logger.warning('{} already exists and will be skipped'
+            logging.warning('{} already exists and will be skipped'
                            .format(name))
         else:
             class_name = obj.__class__.__name__
@@ -674,7 +674,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
             elif class_name == "Datatype":
                 create_datatype(obj, ctx)
             else:
-                logger.error("no handler for object class: {}"
+                logging.error("no handler for object class: {}"
                              .format(type(obj)))
 
     # build a rough map of the file using the internal function above
