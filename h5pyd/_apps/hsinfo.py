@@ -21,16 +21,19 @@ cfg = Config()
 # Usage
 #
 def printUsage():
-    print("usage: {} [-h] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-c oonf_file] [-e endpoint] [-u username] [-p password] [-b bucket] [domain]".format(cfg["cmd"]))
-    print("example: {} -e http://data.hdfgroup.org:7253".format(cfg["cmd"]))
+    print("Usage: {} [-h] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-c oonf_file] [-e endpoint] [-u username] [-p password] [-b bucket] [domain]".format(cfg["cmd"]))
+    print("")
+    print("Description:")
+    print("    Get status information from server, or domain stats if domain is provided")
     print("")
     print("Options:")
     print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
-    print("     -b | --bucket <bucket> :: bucket name")
+    print("     -b | --bucket <bucket> :: bucket name (for use when domain is provided)")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print("     -H | --human-readable :: with -v, print human readable sizes (e.g. 123M)")
+    print("     --rescan :: refresh domain stats (for use when domain is provided)")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --bucket <bucket_name> :: Storage bucket")
@@ -118,6 +121,10 @@ def getDomainInfo(domain, cfg):
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
     bucket = cfg["hs_bucket"]
+    if "rescan" in cfg and cfg["rescan"]:
+        mode = "r+"  # need write intent
+    else:
+        mode = 'r'
 
     if domain.endswith('/'):
         is_folder = True
@@ -128,10 +135,10 @@ def getDomainInfo(domain, cfg):
 
     try:
         if domain.endswith('/'):
-            f = h5pyd.Folder(domain, mode='r', endpoint=endpoint, username=username,
+            f = h5pyd.Folder(domain, mode=mode, endpoint=endpoint, username=username,
                    password=password, bucket=bucket, use_cache=True)
         else:
-            f = h5pyd.File(domain, mode='r', endpoint=endpoint, username=username,
+            f = h5pyd.File(domain, mode=mode, endpoint=endpoint, username=username,
                    password=password, bucket=bucket, use_cache=True)
     except IOError as oe:
         if oe.errno in (404, 410):   # Not Found
@@ -144,12 +151,19 @@ def getDomainInfo(domain, cfg):
             sys.exit("Unexpected error: {}".format(oe))
 
     timestamp = datetime.fromtimestamp(int(f.modified))
+    if f.last_scan:
+        last_scan = datetime.fromtimestamp(int(f.last_scan))
+    else:
+        last_scan = None
 
     if is_folder:
         print("folder: {}".format(domain))
         print("    owner:           {}".format(f.owner))
         print("    last modified:   {}".format(timestamp))
     else:
+        if "rescan" in cfg and cfg["rescan"]:
+            f.run_scan()
+            
         # report HDF objects (groups, datasets, and named datatypes) vs. allocated chunks
         num_objects = f.num_groups + f.num_datatypes + f.num_datasets
         if f.num_chunks > 0:
@@ -162,6 +176,10 @@ def getDomainInfo(domain, cfg):
         print("    owner:           {}".format(f.owner))
         print("    id:              {}".format(f.id.id))
         print("    last modified:   {}".format(timestamp))
+        if last_scan:
+            print("    last scan:       {}".format(last_scan))
+        if f.md5_sum:
+            print("    md5 sum:         {}".format(f.md5_sum))
         print("    total_size:      {}".format(format_size(f.total_size)))
         print("    allocated_bytes: {}".format(format_size(f.allocated_bytes)))
         if f.metadata_bytes:
@@ -172,6 +190,7 @@ def getDomainInfo(domain, cfg):
         print("    num chunks:      {}".format(num_chunks))
         if f.num_linked_chunks:
             print("    linked chunks:   {}".format(f.num_linked_chunks))
+
 
     f.close()
 
@@ -257,6 +276,9 @@ def main():
         elif arg in ("-b", "--bucket"):
             cfg["hs_bucket"] = val
             argn += 2
+        elif arg == "--rescan":
+            cfg["rescan"] = True
+            argn += 1
         elif arg == "-H":
              cfg["human_readable"] = True
              argn += 1

@@ -347,6 +347,7 @@ class File(Group):
         self._id = groupid
         self._verboseInfo = None  # aditional state we'll get when requested
         self._verboseUpdated = None # when the verbose data was fetched
+        self._lastScan = None  # when summary stats where last updated o server
 
 
         Group.__init__(self, self._id)
@@ -356,14 +357,21 @@ class File(Group):
         if self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME:
             # resynch the verbose data
             req = '/?verbose=1'
-            rsp_json = self.GET(req)
+            rsp_json = self.GET(req, use_cache=False)
+        
             self.log.debug("get verbose info: {}".format(rsp_json))
             props = {}
-            for k in ("num_objects", "num_datatypes", "num_groups", "num_datasets", "num_chunks", "num_linked_chunks", "allocated_bytes", "metadata_bytes", "linked_bytes", "total_size", "lastModified"):
+            for k in ("num_objects", "num_datatypes", "num_groups", "num_datasets", "num_chunks", "num_linked_chunks", "allocated_bytes", "metadata_bytes", "linked_bytes", "total_size", "lastModified", "md5_sum"):
                 if k in rsp_json:
                     props[k] = rsp_json[k]
             self._verboseInfo = props
             self._verboseUpdated = now
+            if "scan_info" in rsp_json:
+                scan_info = rsp_json["scan_info"]
+                if "scan_complete" in scan_info:
+                    self.log.debug("updating _lastScan")
+                    self._lastScan = scan_info["scan_complete"]
+
         return self._verboseInfo
 
     @property
@@ -456,6 +464,18 @@ class File(Group):
             total_size = props["total_size"]
         return total_size
 
+    @property
+    def md5_sum(self):
+        props = self._getVerboseInfo()
+        md5_sum = None
+        if "md5_sum" in props:
+            md5_sum = props["md5_sum"]
+        return md5_sum
+
+    @property
+    def last_scan(self):
+        self._getVerboseInfo() # will update _lastScan
+        return self._lastScan
 
     # override base implemention of ACL methods to use the domain rather than update root group
     def getACL(self, username):
@@ -482,7 +502,34 @@ class File(Group):
         req = '/acls/' + acl['userName']
         self.PUT(req, body=perm)
 
+    def run_scan(self):
+        MAX_WAIT=10
+        self._getVerboseInfo() 
+        prev_scan = self._lastScan
+        if prev_scan is None:
+            prev_scan = 0
+        self.log.debug(f"run_scan - lastScan: {prev_scan}")
 
+        # Tell server to re-run scan
+        self.log.info("sending rescan request")
+        params = {"rescan": 1}
+        req = '/'
+        self.PUT(req, params=params)
+
+        for i in range(MAX_WAIT):  
+            self.log.debug("run_scan - sleeping")
+            time.sleep(1)  # give the server a chance to run scan
+            self._verboseUpdated = None # clear verbose cache
+            self._getVerboseInfo() 
+            self.log.debug(f"got new scan: {self._lastScan}")
+            if self._lastScan and self._lastScan > prev_scan:
+                self.log.info('scan has been updated')
+                break
+        
+        if self._lastScan == prev_scan:
+            self.log.warning("run_scan failed to update")
+           
+        return
 
     def flush(self):
         """  Tells the service to complete any pending updates to permanent storage
