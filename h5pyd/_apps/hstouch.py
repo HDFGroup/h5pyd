@@ -204,7 +204,7 @@ def main():
         printUsage()
 
     # setup logging
-    logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s', level=loglevel)
+    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
 
     for domain in domains:

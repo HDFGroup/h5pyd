@@ -163,7 +163,7 @@ def getDomainInfo(domain, cfg):
     else:
         if "rescan" in cfg and cfg["rescan"]:
             f.run_scan()
-            
+
         # report HDF objects (groups, datasets, and named datatypes) vs. allocated chunks
         num_objects = f.num_groups + f.num_datatypes + f.num_datasets
         if f.num_chunks > 0:
@@ -288,7 +288,7 @@ def main():
 
     # setup logging
 
-    logging.basicConfig(filename=cfg["logfname"], format='%(asctime)s %(message)s', level=cfg["loglevel"])
+    logging.basicConfig(filename=cfg["logfname"], format='%(levelname)s %(asctime)s %(message)s', level=cfg["loglevel"])
     logging.debug("set log_level to {}".format(cfg["loglevel"]))
 
     endpoint = cfg["hs_endpoint"]

@@ -453,7 +453,7 @@ def main():
             argn += 1
 
     # setup logging
-    logging.basicConfig(filename=logfname, format='%(asctime)s %(message)s',
+    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s',
                         level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
 

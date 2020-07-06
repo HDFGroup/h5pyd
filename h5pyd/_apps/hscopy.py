@@ -154,7 +154,7 @@ def main():
             argn += 1
 
     # setup logging
-    logging.basicConfig(filename=logfname, format='%(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
+    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
 
     # end arg parsing
