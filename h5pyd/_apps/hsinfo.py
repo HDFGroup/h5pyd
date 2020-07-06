@@ -128,13 +128,11 @@ def getDomainInfo(domain, cfg):
 
     if domain.endswith('/'):
         is_folder = True
-        obj_class = "Folder"
     else:
         is_folder = False
-        obj_class = "Domain"
 
     try:
-        if domain.endswith('/'):
+        if is_folder:
             f = h5pyd.Folder(domain, mode=mode, endpoint=endpoint, username=username,
                    password=password, bucket=bucket, use_cache=True)
         else:
@@ -214,10 +212,10 @@ def getHomeFolder():
             try:
                 f = h5pyd.Folder(path, username=username, password=password, endpoint=endpoint)
             except IOError as ioe:
-                # print("got ioe:", ioe)
+                logging.info("find home folder - got ioe: {}".format(ioe))
                 continue
             except Exception as e:
-                 # print("got exception:", e)
+                logging.warn("find home folder - got exception: {}".format(e))
                 continue
             if f.owner == username:
                 homefolder = path

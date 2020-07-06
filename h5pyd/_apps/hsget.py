@@ -50,8 +50,6 @@ def usage():
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not download dataset data")
-    print("     -4 :: Force ipv4 for any file staging (doesn\'t set hsds loading net)")
-    print("     -6 :: Force ipv6 (see -4)")
     print("     -h | --help    :: This message.")
     print("")
 
@@ -82,7 +80,6 @@ def main():
     password=cfg["hs_password"]
     bucket = cfg["hs_bucket"]
     logfname=None
-    ipvfam=None
 
     des_file = None
     src_domain = None
@@ -124,10 +121,6 @@ def main():
         elif arg in ("-b", "--bucket"):
             bucket = val
             argn += 2
-        elif arg == '-4':
-            ipvfam = 4
-        elif arg == '-6':
-            ipvfam = 6
         elif arg in ("-h", "--help"):
             usage()
             sys.exit(0)

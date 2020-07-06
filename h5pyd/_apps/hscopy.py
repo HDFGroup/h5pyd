@@ -21,7 +21,7 @@ except ImportError as e:
 
 try:
     import pycurl as PYCRUL
-except ImportError as e:
+except ImportError:
     PYCRUL = None
 
 if __name__ == "__main__":
