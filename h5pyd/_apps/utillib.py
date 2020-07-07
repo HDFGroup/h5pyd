@@ -26,6 +26,7 @@ if __name__ == "utillib":
 else:
     from .chunkiter import ChunkIterator
 
+
 def dump_dtype(dt):
     if not isinstance(dt, np.dtype):
         raise TypeError("expected np.dtype, but got: {}".format(type(dt)))
@@ -55,6 +56,7 @@ def is_h5py(obj):
     else:
         return False
 
+
 def is_reference(val):
     try:
         if isinstance(val, object) and val.__class__.__name__ == "Reference":
@@ -67,6 +69,7 @@ def is_reference(val):
 
     return False
 
+
 def is_regionreference(val):
     try:
         if isinstance(val, object) and val.__class__.__name__ == "RegionReference":
@@ -78,6 +81,7 @@ def is_regionreference(val):
         logging.error(msg)
 
     return False
+
 
 def has_reference(dtype):
     has_ref = False
@@ -146,6 +150,7 @@ def convert_dtype(srcdt, ctx):
             tgt_dt = srcdt
     return tgt_dt
 
+
 #----------------------------------------------------------------------------------
 def copy_element(val, src_dt, tgt_dt, ctx):
     logging.debug("copy_element, val: " + str(val) + " val type: " + str(type(val)) + "src_dt: " + dump_dtype(src_dt) + " tgt_dt: " + dump_dtype(tgt_dt))
@@ -173,7 +178,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
             if is_h5py(ctx['fout']):
                 out = h5py.Reference()  # null h5py ref
             else:
-                out = '' # h5pyd refs are strings
+                out = ''  # h5pyd refs are strings
 
             if ref:
                 try:
@@ -196,8 +201,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                     if is_h5py(ctx['fout']):
                         out = fout_obj.ref
                     else:
-                        out = str(fout_obj.ref) # convert to string for JSON serialization
-
+                        out = str(fout_obj.ref)  # convert to string for JSON serialization
 
         elif is_regionreference(ref):
             out = "tbd"
@@ -230,7 +234,6 @@ def copy_element(val, src_dt, tgt_dt, ctx):
     else:
         out = val  # can just copy as is
     return out
-
 
 
 #----------------------------------------------------------------------------------
@@ -273,7 +276,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
     try:
         src_dt = data.dtype
     except AttributeError:
-        pass # auto convert to numpy array
+        pass  # auto convert to numpy array
     # First, make sure we have a NumPy array.
     srcarr = np.asarray(data, order='C', dtype=src_dt)
     tgtarr = copy_array(srcarr, ctx)
@@ -284,6 +287,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
         msg = "ERROR: failed to create attribute {} of object {} -- {}".format(name, desobj.name, str(e))
         logging.error(msg)
         print(msg)
+
 
 #----------------------------------------------------------------------------------
 def create_dataset(dobj, ctx):
@@ -303,8 +307,7 @@ def create_dataset(dobj, ctx):
         fillvalue = dobj.fillvalue
     except RuntimeError:
         pass  # ignore
-    chunks=None
-
+    chunks = None
 
     if dobj.dtype.metadata and 'vlen' in dobj.dtype.metadata:
         is_vlen = True
@@ -339,7 +342,7 @@ def create_dataset(dobj, ctx):
             chunk_map = {}
             for i in range(num_chunks):
                 chunk_info = dsetid.get_chunk_info(i, spaceid)
-                index =  chunk_info.chunk_offset
+                index = chunk_info.chunk_offset
                 logging.debug(f"got chunk_info: {chunk_info} for chunk: {i}")
                 if not isinstance(index, tuple) or len(index) != rank:
                     msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
@@ -371,7 +374,7 @@ def create_dataset(dobj, ctx):
             chunkinfo_arr = np.zeros(np.prod(chunkinfo_arr_dims), dtype=dt)
             for i in range(num_chunks):
                 chunk_info = dsetid.get_chunk_info(i, spaceid)
-                index =  chunk_info.chunk_offset
+                index = chunk_info.chunk_offset
                 if not isinstance(index, tuple) or len(index) != rank:
                     msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
                     logging.error(msg)
@@ -393,7 +396,6 @@ def create_dataset(dobj, ctx):
             chunks["chunk_table"] = anon_dset.id.id
             logging.info("using chunk layout: {}".format(chunks))
 
-
     # use the source object layout if we are not using reference mapping
     if chunks is None and dobj.chunks:
         chunks = tuple(dobj.chunks)
@@ -405,7 +407,7 @@ def create_dataset(dobj, ctx):
             compression_filter = None
             compression_opts = None
             chunks = None
-            shuffle=None
+            shuffle = None
             fletcher32 = None
             maxshape = None
             scaleoffset = None
@@ -417,16 +419,16 @@ def create_dataset(dobj, ctx):
                 compression_opts = deflate
                 if ctx["verbose"]:
                     print("applying gzip filter with level: {}".format(deflate))
-            shuffle=dobj.shuffle
-            fletcher32=dobj.fletcher32
-            maxshape=dobj.maxshape
+            shuffle = dobj.shuffle
+            fletcher32 = dobj.fletcher32
+            maxshape = dobj.maxshape
             scaleoffset = dobj.scaleoffset
 
-        dset = fout.create_dataset( dobj.name, shape=dobj.shape, dtype=tgt_dtype, chunks=chunks, \
-                compression=compression_filter, shuffle=shuffle, \
-                fletcher32=fletcher32, maxshape=maxshape, \
-                compression_opts=compression_opts, fillvalue=fillvalue, \
-                scaleoffset=scaleoffset)
+        dset = fout.create_dataset(
+            dobj.name, shape=dobj.shape, dtype=tgt_dtype, chunks=chunks,
+            compression=compression_filter, shuffle=shuffle, maxshape=maxshape,
+            fletcher32=fletcher32, compression_opts=compression_opts,
+            fillvalue=fillvalue, scaleoffset=scaleoffset)
         msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))
         logging.info(msg)
         if ctx["verbose"]:
@@ -440,6 +442,7 @@ def create_dataset(dobj, ctx):
 
     return dset
 # create_dataset
+
 
 #----------------------------------------------------------------------------------
 def write_dataset(src, tgt, ctx):
@@ -508,6 +511,7 @@ def write_dataset(src, tgt, ctx):
     if ctx["verbose"]:
         print(msg)
 # write_dataset
+
 
 def create_links(gsrc, gdes, ctx):
     # add soft and external links
@@ -583,10 +587,10 @@ def create_group(gobj, ctx):
     srcid_desobj_map[gobj.id.__hash__()] = grp
 
     return grp
-
 # create_group
 
-#----------------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
 def create_datatype(obj, ctx):
     msg = "creating datatype {}".format(obj.name)
     logging.info(msg)
@@ -618,7 +622,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
             sys.exit(1)
 
     # it would be nice to make a class out of these functions, but that
-    # makes it heard to use visititems iterator.
+    # makes it hard to use visititems iterator.
     # instead, create a context object to pass arround common state
     ctx = {}
     ctx["fin"] = fin
@@ -639,8 +643,8 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     def object_helper(name, obj):
         fout = ctx['fout']
         if name in fout:
-            logging.warning('{} already exists and will be skipped'
-                           .format(name))
+            logging.warning(
+                '{} already exists and will be skipped'.format(name))
         else:
             class_name = obj.__class__.__name__
             if class_name in ("Dataset", "Table"):
@@ -674,8 +678,8 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
             elif class_name == "Datatype":
                 create_datatype(obj, ctx)
             else:
-                logging.error("no handler for object class: {}"
-                             .format(type(obj)))
+                logging.error(
+                    "no handler for object class: {}".format(type(obj)))
 
     # build a rough map of the file using the internal function above
     # copy over any attributes

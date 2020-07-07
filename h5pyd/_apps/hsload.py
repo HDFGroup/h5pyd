@@ -52,16 +52,17 @@ cfg = Config()
 
 #----------------------------------------------------------------------------------
 def stage_file(uri, netfam=None, sslv=True):
-    if PYCRUL == None:
+    if PYCRUL is None:
         logging.warn("pycurl not available for inline staging of input %s, see pip search pycurl." % uri)
         return None
     try:
         fout = tempfile.NamedTemporaryFile(prefix='hsload.', suffix='.h5', delete=False)
         logging.info("staging %s --> %s" % (uri, fout.name))
-        if cfg["verbose"]: print("staging %s" % uri)
+        if cfg["verbose"]:
+            print("staging %s" % uri)
         crlc = PYCRUL.Curl()
         crlc.setopt(crlc.URL, uri)
-        if sslv == True:
+        if sslv is True:
             crlc.setopt(crlc.SSL_VERIFYPEER, sslv)
 
         if netfam == 4:
@@ -77,9 +78,10 @@ def stage_file(uri, netfam=None, sslv=True):
         fout.close()
         return fout.name
     except (IOError, PYCRUL.error) as e:
-      logging.error("%s : %s" % (uri, str(e)))
-      return None
+        logging.error("%s : %s" % (uri, str(e)))
+        return None
 #stage_file
+
 
 #----------------------------------------------------------------------------------
 def usage():
@@ -129,6 +131,7 @@ def usage():
     print("     E.g.: 'docker run --rm -v ~/.hscfg:/root/.hscfg  -v ~/data:/data -it hdfgroup/hdf5lib:1.10.6 bash'")
 #end print_usage
 
+
 #----------------------------------------------------------------------------------
 def print_config_example():
     print("# default")
@@ -136,6 +139,7 @@ def print_config_example():
     print("hs_password = <passwd>")
     print("hs_endpoint = http://hsdshdflab.hdfgroup.org")
 #print_config_example
+
 
 #----------------------------------------------------------------------------------
 def main():
@@ -149,8 +153,8 @@ def main():
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
     cfg["logfname"] = None
-    logfname=None
-    ipvfam=None
+    logfname = None
+    ipvfam = None
     s3 = None  # s3fs instance
     mode = 'w'
 
@@ -281,7 +285,6 @@ def main():
             sys.stderr.write("link option requires hdf5 lib version 1.10.6 or higher")
             sys.exit(1)
 
-
     try:
 
         for src_file in src_files:
@@ -319,7 +322,7 @@ def main():
                     sys.exit(1)
             else:
                 if dataload == "link":
-                    if  op.isabs(src_file):
+                    if op.isabs(src_file):
                         sys.stderr.write("source file must s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)")
                         sys.exit(1)
                     s3path = src_file
@@ -347,7 +350,6 @@ def main():
                 else:
                     logging.error("Error creating file {}: {}".format(tgt, ioe))
                 sys.exit(1)
-
 
             # do the actual load
             load_file(fin, fout, verbose=verbose, dataload=dataload, s3path=s3path, deflate=deflate,)
