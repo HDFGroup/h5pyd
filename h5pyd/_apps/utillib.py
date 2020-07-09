@@ -633,54 +633,52 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     ctx["s3path"] = s3path
     ctx["srcid_desobj_map"] = {}
 
-    # create any root attributes
-    for ga in fin.attrs:
-        copy_attribute(fout, ga, fin, ctx)
+    def copy_attribute_helper(name, obj):
+        tgt = fout[name]
+        for a in obj.attrs:
+            copy_attribute(tgt, a, obj, ctx)
 
-    # create root soft/external links
-    create_links(fin, fout, ctx)
+    def object_create_helper(name, obj):
+        class_name = obj.__class__.__name__
+        if class_name in ("Dataset", "Table"):
+            create_dataset(obj, ctx)
+        elif class_name == "Group":
+            create_group(obj, ctx)
+        elif class_name == "Datatype":
+            create_datatype(obj, ctx)
 
-    def object_helper(name, obj):
-        fout = ctx['fout']
-        if name in fout:
-            logging.warning(
-                '{} already exists and will be skipped'.format(name))
-        else:
-            class_name = obj.__class__.__name__
-            if class_name in ("Dataset", "Table"):
-                dset = create_dataset(obj, ctx)
+    def object_link_helper(name, obj):
+        class_name = obj.__class__.__name__
+        logging.debug("object_link_helper for object: {}".format(obj.name))
+        if class_name == "Group":
+            # create any soft/external links
+            fout = ctx["fout"]
+            grp = fout[name]
+            create_links(obj, grp, ctx)
 
-                if dset is not None:
-                    for da in obj.attrs:
-                        copy_attribute(dset, da, obj, ctx)
+    def object_copy_helper(name, obj):
+        class_name = obj.__class__.__name__
+        logging.debug("object_copy_helper for object: {}".format(obj.name))
 
-                if dataload == "ingest":
-                    logging.debug("object_copy_helper for object: {}".format(obj.name))
-                    if ctx["dataload"] == "link":
-                        logging.info("skip datacopy for link reference")
-                    else:
-                        logging.debug("calling write_dataset for dataset: {}".format(obj.name))
-                        tgt = fout[obj.name]
-                        write_dataset(obj, tgt, ctx)
-
-            elif class_name == "Group":
-                grp = create_group(obj, ctx)
-
-                if grp is not None:
-                    for ga in obj.attrs:
-                        copy_attribute(grp, ga, obj, ctx)
-
-                # create any soft/external links
-                logging.debug("object_link_helper for object: {}".format(obj.name))
-                fout = ctx["fout"]
-                grp = fout[name]
-                create_links(obj, grp, ctx)
-            elif class_name == "Datatype":
-                create_datatype(obj, ctx)
+        if class_name in ("Dataset", "Table"):
+            if obj.dtype.metadata and 'vlen' in obj.dtype.metadata:
+                is_vlen = True
             else:
-                logging.error(
-                    "no handler for object class: {}".format(type(obj)))
+                is_vlen = False
+            if ctx["dataload"] == "link" and not is_vlen:
+                logging.info("skip datacopy for link reference")
+            else:
+                logging.debug("calling write_dataset for dataset: {}".format(obj.name))
+                tgt = fout[obj.name]
+                write_dataset(obj, tgt, ctx)
+        elif class_name == "Group":
+            logging.debug("skip copy for group: {}".format(obj.name))
+        elif class_name == "Datatype":
+            logging.debug("skip copy for datatype: {}".format(obj.name))
+        else:
+            logging.error("no handler for object class: {}".format(type(obj)))
 
+                
     # build a rough map of the file using the internal function above
     # copy over any attributes
     # create soft/external links (and hardlinks not already created)
@@ -689,7 +687,31 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
         # copy dataset data
         logging.info("copying dataset data")
 
-    fin.visititems(object_helper)
+     # build a rough map of the file using the internal function above
+    logging.info("creating target objects")
+    fin.visititems(object_create_helper)
+
+    # copy over any attributes
+    logging.info("creating target attributes")
+    fin.visititems(copy_attribute_helper)
+
+    # create soft/external links (and hardlinks not already created)
+    create_links(fin, fout, ctx)  # create root soft/external links
+    fin.visititems(object_link_helper)
+
+    if dataload == "ingest":
+        # copy dataset data
+        logging.info("copying dataset data")
+        fin.visititems(object_copy_helper)
+    else:
+        logging.info("skipping dataset data copy (dataload is None)")
+
+    # create any root attributes
+    for ga in fin.attrs:
+        copy_attribute(fout, ga, fin, ctx)
+
+    # create root soft/external links
+    create_links(fin, fout, ctx)
 
     # Fully flush the h5py handle.
     fout.close()
