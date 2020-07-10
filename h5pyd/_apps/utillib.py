@@ -402,8 +402,9 @@ def create_dataset(dobj, ctx):
 
     try:
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
-        if len(dobj.shape) == 0:
+        if len(dobj.shape) == 0 or (is_vlen and is_h5py(fout)):
             # don't use compression/chunks for scalar datasets
+            # or vlen 
             compression_filter = None
             compression_opts = None
             chunks = None
@@ -423,6 +424,9 @@ def create_dataset(dobj, ctx):
             fletcher32 = dobj.fletcher32
             maxshape = dobj.maxshape
             scaleoffset = dobj.scaleoffset
+
+        if is_vlen:
+            fillvalue=None
 
         dset = fout.create_dataset(
             dobj.name, shape=dobj.shape, dtype=tgt_dtype, chunks=chunks,
