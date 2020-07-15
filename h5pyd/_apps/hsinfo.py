@@ -149,7 +149,7 @@ def getDomainInfo(domain, cfg):
             sys.exit("Unexpected error: {}".format(oe))
 
     timestamp = datetime.fromtimestamp(int(f.modified))
-    if f.last_scan:
+    if not is_folder and f.last_scan:
         last_scan = datetime.fromtimestamp(int(f.last_scan))
     else:
         last_scan = None
