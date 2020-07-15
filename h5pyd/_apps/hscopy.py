@@ -32,11 +32,8 @@ else:
     from .utillib import load_file
 
 
-cfg = Config()
-
-
 #----------------------------------------------------------------------------------
-def usage():
+def usage(cfg):
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  source  destination".format(cfg["cmd"])))
     print("")
@@ -71,6 +68,7 @@ def print_config_example():
 
 #----------------------------------------------------------------------------------
 def main():
+    cfg = Config()
 
     loglevel = logging.ERROR
     verbose = False
@@ -91,7 +89,7 @@ def main():
         if arg[0] == '-' and len(src_files) > 0:
             # options must be placed before filenames
             print("options must precead source files")
-            usage()
+            usage(cfg)
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1]
@@ -112,14 +110,14 @@ def main():
                 loglevel = logging.ERROR
             else:
                 print("unknown loglevel")
-                usage()
+                usage(cfg)
                 sys.exit(-1)
             argn += 2
         elif arg == '--logfile':
             logfname = val
             argn += 2
         elif arg in ("-h", "--help"):
-            usage()
+            usage(cfg)
             sys.exit(0)
         elif arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = val
@@ -147,7 +145,7 @@ def main():
             deflate = compressLevel
             argn += 1
         elif arg[0] == '-':
-            usage()
+            usage(cfg)
             sys.exit(-1)
         else:
             src_files.append(arg)
@@ -164,7 +162,7 @@ def main():
 
     if len(src_files) < 2:
         # need at least a src and destination
-        usage()
+        usage(cfg)
         sys.exit(-1)
     src_domain = src_files[0]
     des_domain = src_files[1]
@@ -173,12 +171,12 @@ def main():
     logging.info("target domain: {}".format(des_domain))
     if src_domain[0] != '/' or src_domain[-1] == '/':
         print("source domain must be an absolute path, non-folder domain")
-        usage()
+        usage(cfg)
         sys.exit(-1)
 
     if des_domain[0] != '/' or des_domain[-1] == '/':
         print("source domain must be an absolute path, non-folder domain")
-        usage()
+        usage(cfg)
         sys.exit(-1)
 
 

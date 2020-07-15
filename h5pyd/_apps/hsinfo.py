@@ -14,13 +14,10 @@ else:
 #
 
 
-cfg = Config()
-
-
 #
 # Usage
 #
-def printUsage():
+def printUsage(cfg):
     print("Usage: {} [-h] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-c oonf_file] [-e endpoint] [-u username] [-p password] [-b bucket] [domain]".format(cfg["cmd"]))
     print("")
     print("Description:")
@@ -115,7 +112,7 @@ def getServerInfo(cfg):
         else:
             print("Error: {}".format(ioe))
 
-def getDomainInfo(domain, cfg):
+def getDomainInfo(cfg, domain):
     """ get info about the domain and print """
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -195,7 +192,7 @@ def getDomainInfo(domain, cfg):
 #
 # Get folder in /home/ that is owned by given user
 #
-def getHomeFolder():
+def getHomeFolder(cfg):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -229,6 +226,8 @@ def getHomeFolder():
 # Main
 #
 def main():
+    cfg = Config()
+
     argn = 1
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
@@ -255,13 +254,13 @@ def main():
             elif val == "ERROR":
                 cfg["loglevel"] = logging.ERROR
             else:
-                printUsage()
+                printUsage(cfg)
             argn += 2
         elif arg == '--logfile':
             cfg["logfname"] = val
             argn += 2
         elif arg in ("-h", "--help"):
-            printUsage()
+            printUsage(cfg)
         elif arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = val
             argn += 2
@@ -297,7 +296,7 @@ def main():
         getServerInfo(cfg)
     else:
         for domain in domains:
-            getDomainInfo(domain, cfg)
+            getDomainInfo(cfg, domain)
 
 
 if __name__ == "__main__":

@@ -11,9 +11,7 @@ else:
 # Delete domain
 #
 
-cfg = Config()
-
-def getFolder(domain, mode='r'):
+def getFolder(cfg, domain, mode='r'):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -22,7 +20,7 @@ def getFolder(domain, mode='r'):
     return dir
 
 
-def deleteDomain(domain):
+def deleteDomain(cfg, domain):
 
     # get handle to parent folder
     if domain.endswith('/'):
@@ -39,7 +37,7 @@ def deleteDomain(domain):
     if not parent_domain.endswith('/'):
         parent_domain += '/'
     try:
-        hparent = getFolder(parent_domain, mode='a')
+        hparent = getFolder(cfg, parent_domain, mode='a')
     except IOError as oe:
         if oe.errno == 404:   # Not Found
             sys.exit("Parent domain: {} not found".format(parent_domain))
@@ -79,7 +77,7 @@ def deleteDomain(domain):
 #
 # Usage
 #
-def printUsage():
+def printUsage(cfg):
     print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] [--bucket <bucket_name>] domains".format(cfg["cmd"]))
     print("example: {} -e http://hsdshdflab.hdfgroup.org /hdfgroup/data/test/deleteme.h5".format(cfg["cmd"]))
     sys.exit()
@@ -88,6 +86,8 @@ def printUsage():
 # Main
 #
 def main():
+    cfg = Config()
+
     domains = []
     argn = 1
     loglevel = logging.ERROR
@@ -104,7 +104,7 @@ def main():
             val = sys.argv[argn+1]
 
         if arg in ("-h", "--help"):
-            printUsage()
+            printUsage(cfg)
         elif arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = val
             argn += 2
@@ -131,20 +131,20 @@ def main():
             elif val == "ERROR":
                 loglevel = logging.ERROR
             else:
-                printUsage()
+                printUsage(cfg)
             argn += 2
         elif arg == '--logfile':
             logfname = val
             argn += 2
         elif arg[0] == '-':
-            printUsage()
+            printUsage(cfg)
         else:
             domains.append(arg)
             argn += 1
 
     if len(domains) == 0:
         # need a domain
-        printUsage()
+        printUsage(cfg)
 
 
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
@@ -154,7 +154,7 @@ def main():
         if not domain.startswith('/'):
             sys.exit("domain: {} must start with a slash".format(domain))
 
-        deleteDomain(domain)
+        deleteDomain(cfg, domain)
 
 
 if __name__ == "__main__":

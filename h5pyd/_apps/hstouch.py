@@ -11,9 +11,7 @@ else:
 # Create domain or update timestamp if domain already exist
 #
 
-cfg = Config()
-
-def getFolder(domain):
+def getFolder(cfg, domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -22,7 +20,7 @@ def getFolder(domain):
     dir = h5py.Folder(domain, endpoint=endpoint, username=username, password=password, bucket=bucket)
     return dir
 
-def createFolder(domain):
+def createFolder(cfg, domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -34,7 +32,7 @@ def createFolder(domain):
     dir = h5py.Folder(domain, mode='x', endpoint=endpoint, username=username, password=password, bucket=bucket, owner=owner)
     return dir
 
-def getFile(domain):
+def getFile(cfg, domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -43,7 +41,7 @@ def getFile(domain):
     fh = h5py.File(domain, mode='r', endpoint=endpoint, username=username, password=password, bucket=bucket)
     return fh
 
-def createFile(domain):
+def createFile(cfg, domain):
     #print("createFile", domain)
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -57,7 +55,7 @@ def createFile(domain):
 
 
 
-def touchDomain(domain):
+def touchDomain(cfg, domain):
 
     make_folder = False
     if domain[-1] == '/':
@@ -79,7 +77,7 @@ def touchDomain(domain):
         if not parent_domain.endswith('/'):
             parent_domain += '/'
         try:
-            getFolder(parent_domain)
+            getFolder(cfg, parent_domain)
         except IOError as oe:
             #print("errno:", oe.errno)
             if oe.errno in (404, 410):   # Not Found
@@ -93,7 +91,7 @@ def touchDomain(domain):
 
     hdomain = None
     try:
-        hdomain = getFile(domain)
+        hdomain = getFile(cfg, domain)
     except IOError as oe:
         #print("errno:", oe.errno)
         if oe.errno in (404, 410):   # Not Found
@@ -117,7 +115,7 @@ def touchDomain(domain):
         # create domain
         if not make_folder:
             try:
-                fh = createFile(domain)
+                fh = createFile(cfg, domain)
                 if cfg["verbose"]:
                     print("domain created: {}, root id: {}".format(domain, fh.id.id))
                 fh.close()
@@ -126,7 +124,7 @@ def touchDomain(domain):
         else:
             # make folder
             try:
-                fh = createFolder(domain + '/')
+                fh = createFolder(cfg, domain + '/')
                 if cfg["verbose"]:
                     print("folder created", domain + '/')
                 fh.close()
@@ -136,7 +134,7 @@ def touchDomain(domain):
 #
 # Usage
 #
-def printUsage():
+def printUsage(cfg):
     print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [-o owner] [--loglevel debug|info|warning|error] [--logfile <logfile>] [--bucket <bucket_name>] domains".format(cfg["cmd"]))
     print("example: {} -e  http://hsdshdflab.hdfgroup.org  /home/myfolder/emptydomain.h5".format(cfg["cmd"]))
     sys.exit()
@@ -145,6 +143,8 @@ def printUsage():
 # Main
 #
 def main():
+    cfg = Config()
+
     domains = []
     argn = 1
     loglevel = logging.ERROR
@@ -161,7 +161,7 @@ def main():
             val = sys.argv[argn+1]
 
         if arg in ("-h", "--help"):
-            printUsage()
+            printUsage(cfg)
         elif arg in ("-v", "--verbose"):
             cfg["verbose"] = True
             argn += 1
@@ -176,7 +176,7 @@ def main():
             elif val == "ERROR":
                 loglevel = logging.ERROR
             else:
-                printUsage()
+                printUsage(cfg)
             argn += 2
         elif arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = sys.argv[argn+1]
@@ -194,14 +194,14 @@ def main():
             cfg["hs_owner"] = sys.argv[argn+1]
             argn += 2
         elif arg[0] == '-':
-            printUsage()
+            printUsage(cfg)
         else:
             domains.append(arg)
             argn += 1
 
     if len(domains) == 0:
         # need a domain
-        printUsage()
+        printUsage(cfg)
 
     # setup logging
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
@@ -211,7 +211,7 @@ def main():
         if not domain.startswith('/'):
             sys.exit("domain: {} must start with a slash".format(domain))
 
-        touchDomain(domain)
+        touchDomain(cfg, domain)
 
 if __name__ == "__main__":
     main()

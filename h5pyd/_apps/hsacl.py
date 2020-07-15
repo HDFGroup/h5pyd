@@ -18,8 +18,6 @@ if __name__ == "__main__":
 else:
     from .config import Config
 
-cfg = Config()
-
 #
 # get given ACL, return None if not found
 #
@@ -46,7 +44,7 @@ def getACL(f, username="default"):
 #
 # Usage
 #
-def printUsage():
+def printUsage(cfg):
     print("")
     print("Usage: {} [options] domain [+crudep] [-crudep] [userid1 userid2 ...]".format(cfg["cmd"]))
     print("")
@@ -75,6 +73,8 @@ def printUsage():
 
 
 def main():
+    cfg = Config()
+
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
@@ -91,7 +91,7 @@ def main():
     remove_list = set()
 
     if len(sys.argv) == 1 or sys.argv[1] == "-h":
-        printUsage()
+        printUsage(cfg)
 
     # setup logging
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
@@ -120,13 +120,13 @@ def main():
             elif val == "ERROR":
                 loglevel = logging.ERROR
             else:
-                printUsage()
+                printUsage(cfg)
             argn += 2
         elif domain is None and arg == '--logfile':
             logfname = val
             argn += 2
         elif domain is None and arg in ("-h", "--help"):
-            printUsage()
+            printUsage(cfg)
         elif domain is None and arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = val
             argn += 2
@@ -141,7 +141,7 @@ def main():
             argn += 2
         elif domain is None and arg[0] in ('-', '+'):
             print("No domain given")
-            printUsage()
+            printUsage(cfg)
         elif domain is None:
             logging.debug("get domain")
             domain = arg
@@ -154,7 +154,7 @@ def main():
             logging.debug("got plus")
             if len(usernames) > 0:
                 logging.debug("usernames:", usernames)
-                printUsage()
+                printUsage(cfg)
             add_list = set(arg[1:])
             logging.info("add_list:", add_list)
             argn += 1
@@ -162,7 +162,7 @@ def main():
         elif arg[0] == '-':
             logging.debug("got minus")
             if len(usernames) > 0:
-                printUsage()
+                printUsage(cfg)
             remove_list = set(arg[1:])
             logging.info("remove_list:", remove_list)
             argn += 1
@@ -170,7 +170,7 @@ def main():
             logging.info("got username:", arg)
             if arg.find('/') >= 0:
                 print("Invalid username:", arg)
-                printUsage()
+                printUsage(cfg)
             usernames.append(arg)
             argn += 1
 
@@ -181,7 +181,7 @@ def main():
 
     if len(usernames) == 0 and (add_list or remove_list):
         print("At least one username must be given to add/remove permissions")
-        printUsage()
+        printUsage(cfg)
 
     if domain is None:
         print("no domain specified")

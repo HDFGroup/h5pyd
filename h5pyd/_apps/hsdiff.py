@@ -28,7 +28,6 @@ else:
     from .config import Config
     from .chunkiter import ChunkIterator
 
-cfg = Config()
 
 def diff_attrs(src, tgt, ctx):
     """ compare attributes of src and tgt """
@@ -360,7 +359,7 @@ def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False)
 
 
 #----------------------------------------------------------------------------------
-def usage():
+def usage(cfg):
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  file  domain".format(cfg["cmd"])))
     print("")
@@ -397,6 +396,7 @@ def print_config_example():
 
 #----------------------------------------------------------------------------------
 def main():
+    cfg = Config()
 
     loglevel = logging.ERROR
     verbose = False
@@ -419,7 +419,7 @@ def main():
         if arg[0] == '-' and len(src_files) > 0:
             # options must be placed before filenames
             print("options must precead source files")
-            usage()
+            usage(cfg)
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1]
@@ -446,7 +446,7 @@ def main():
                 loglevel = logging.ERROR
             else:
                 print("unknown loglevel")
-                usage()
+                usage(cfg)
                 sys.exit(-1)
             argn += 2
         elif arg == '--logfile':
@@ -456,7 +456,7 @@ def main():
             cfg["hs_bucket"] = val
             argn += 2
         elif arg in ("-h", "--help"):
-            usage()
+            usage(cfg)
             sys.exit(0)
         elif arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = val
@@ -471,7 +471,7 @@ def main():
             print_config_example()
             sys.exit(0)
         elif arg[0] == '-':
-            usage()
+            usage(cfg)
             sys.exit(-1)
         else:
             src_files.append(arg)
@@ -488,7 +488,7 @@ def main():
 
     if len(src_files) < 2:
         # need at least a src and destination
-        usage()
+        usage(cfg)
         sys.exit(-1)
     file_path = src_files[0]
     domain_path = src_files[1]
@@ -497,7 +497,7 @@ def main():
     logging.info("domain: {}".format(domain_path))
     if domain_path[0] != '/' or domain_path[-1] == '/':
         print("domain must be an absolute path, non-folder domain")
-        usage()
+        usage(cfg)
         sys.exit(-1)
 
 

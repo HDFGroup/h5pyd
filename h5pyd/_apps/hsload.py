@@ -47,11 +47,10 @@ if sys.version_info >= (3, 0):
 else:
     from urlparse import urlparse
 
-cfg = Config()
 
 
 #----------------------------------------------------------------------------------
-def stage_file(uri, netfam=None, sslv=True):
+def stage_file(cfg, uri, netfam=None, sslv=True):
     if PYCRUL is None:
         logging.warn("pycurl not available for inline staging of input %s, see pip search pycurl." % uri)
         return None
@@ -84,7 +83,7 @@ def stage_file(uri, netfam=None, sslv=True):
 
 
 #----------------------------------------------------------------------------------
-def usage():
+def usage(cfg):
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  sourcefile  domain".format(cfg["cmd"])))
     print(("    {} [ OPTIONS ]  sourcefile  folder".format(cfg["cmd"])))
@@ -143,6 +142,7 @@ def print_config_example():
 
 #----------------------------------------------------------------------------------
 def main():
+    cfg = Config()
 
     loglevel = logging.ERROR
     verbose = False
@@ -167,7 +167,7 @@ def main():
         if arg[0] == '-' and len(src_files) > 0:
             # options must be placed before filenames
             sys.stderr.write("options must precede source files")
-            usage()
+            usage(cfg)
             sys.exit(-1)
 
         if len(sys.argv) > argn + 1:
@@ -199,7 +199,7 @@ def main():
                 loglevel = logging.ERROR
             else:
                 sys.stderr.write("unknown loglevel")
-                usage()
+                usage(cfg)
                 sys.exit(-1)
             argn += 2
         elif arg == '--logfile':
@@ -213,7 +213,7 @@ def main():
         elif arg == '-6':
             ipvfam = 6
         elif arg in ("-h", "--help"):
-            usage()
+            usage(cfg)
             sys.exit(0)
         elif arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = val
@@ -241,7 +241,7 @@ def main():
             deflate = compressLevel
             argn += 1
         elif arg[0] == '-':
-            usage()
+            usage(cfg)
             sys.exit(-1)
         else:
             src_files.append(arg)
@@ -258,7 +258,7 @@ def main():
 
     if len(src_files) < 2:
         # need at least a src and destination
-        usage()
+        usage(cfg)
         sys.exit(-1)
     domain = src_files[-1]
     src_files = src_files[:-1]
@@ -267,7 +267,7 @@ def main():
     logging.info("target domain: {}".format(domain))
     if len(src_files) > 1 and (domain[0] != '/' or domain[-1] != '/'):
         sys.stderr.write("target must be a folder if multiple source files are provided")
-        usage()
+        usage(cfg)
         sys.exit(-1)
 
     if cfg["hs_endpoint"] is None:

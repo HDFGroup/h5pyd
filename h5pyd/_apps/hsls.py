@@ -14,10 +14,7 @@ else:
 # Print objects in a domain in the style of the hsls utilitiy
 #
 
-cfg = Config()
-
-
-def intToStr(n):
+def intToStr(cfg, n):
     if cfg["human_readable"]:
         s = "{:,}".format(n)
     else:
@@ -25,7 +22,7 @@ def intToStr(n):
     return s
 
 
-def format_size(n):
+def format_size(cfg, n):
     if n is None or n == ' ':
         return ' ' * 8
     symbol = ' '
@@ -43,7 +40,7 @@ def format_size(n):
         return "{:7.1f}{}".format(n, symbol)
 
 
-def getShapeText(dset):
+def getShapeText(cfg, dset):
     shape_text = "Scalar"
     shape = dset.shape
     if shape is not None:
@@ -68,7 +65,7 @@ def getShapeText(dset):
     return shape_text
 
 
-def visititems(name, grp, visited):
+def visititems(cfg, name, grp, visited):
     for k in grp:
         item = grp.get(k, getlink=True)
         class_name = item.__class__.__name__
@@ -77,7 +74,7 @@ def visititems(name, grp, visited):
             # follow hardlinks
             try:
                 item = grp.get(k)
-                dump(item_name, item, visited=visited)
+                dump(cfg, item_name, item, visited=visited)
             except IOError:
                 # object deleted but hardlink left?
                 desc = "{Missing hardlink object}"
@@ -99,7 +96,7 @@ def getTypeStr(dt):
     return str(dt)
 
 
-def dump(name, obj, visited=None):
+def dump(cfg, name, obj, visited=None):
     class_name = obj.__class__.__name__
     desc = None
     obj_id = None
@@ -244,7 +241,7 @@ def dumpAcls(obj):
         dumpACL(acl)
 
 
-def getFolder(domain):
+def getFolder(cfg, domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -257,7 +254,7 @@ def getFolder(domain):
     return dir
 
 
-def getFile(domain):
+def getFile(cfg, domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -267,7 +264,7 @@ def getFile(domain):
     return fh
 
 
-def visitDomains(domain, depth=1):
+def visitDomains(cfg, domain, depth=1):
     if depth == 0:
         return 0
 
@@ -348,7 +345,7 @@ def visitDomains(domain, depth=1):
 #
 # Usage
 #
-def printUsage():
+def printUsage(cfg):
     print("usage: {} [-r] [-v] [-h] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] [--bucket bucketname] domains".format(cfg["cmd"]))
     print("example: {} -r -e http://hsdshdflab.hdfgroup.org /shared/tall.h5".format(cfg["cmd"]))
     print("")
@@ -374,6 +371,8 @@ def printUsage():
 # Main
 #
 def main():
+    cfg = Config()
+
     domains = []
     argn = 1
     depth = 1
@@ -414,7 +413,7 @@ def main():
             elif val == "ERROR":
                 loglevel = logging.ERROR
             else:
-                printUsage()
+                printUsage(cfg)
             argn += 2
         elif arg == '--logfile':
             logfname = val
@@ -426,7 +425,7 @@ def main():
             cfg["showattrs"] = True
             argn += 1
         elif arg in ("-h", "--help"):
-            printUsage()
+            printUsage(cfg)
         elif arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = val
             argn += 2
@@ -447,7 +446,7 @@ def main():
             argn += 2
 
         elif arg[0] == '-':
-            printUsage()
+            printUsage(cfg)
         else:
             domains.append(arg)
             argn += 1
@@ -464,12 +463,12 @@ def main():
     for domain in domains:
         if domain.endswith('/'):
             # given a folder path
-            count = visitDomains(domain, depth=depth)
+            count = visitDomains(cfg, domain, depth=depth)
             print("{} items".format(count))
 
         else:
             try:
-                f = getFile(domain)
+                f = getFile(cfg, domain)
             except IOError as ioe:
                 if ioe.errno == 401:
                     print("Username/Password missing or invalid")
@@ -491,7 +490,7 @@ def main():
             if grp is None:
                 print("{}: No such domain".format(domain))
                 domain += '/'
-                count = visitDomains(domain, depth=depth)
+                count = visitDomains(cfg, domain, depth=depth)
                 print("{} items".format(count))
                 continue
             dump('/', grp)
@@ -500,7 +499,7 @@ def main():
                 # recursive
                 visited = {}  # dict of id to h5path
                 visited[grp.id.id] = '/'
-                visititems('/', grp, visited)
+                visititems(cfg, '/', grp, visited)
             else:
                 for k in grp:
                     item = grp.get(k, getlink=True)

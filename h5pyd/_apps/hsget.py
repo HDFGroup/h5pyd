@@ -27,10 +27,8 @@ else:
     from .config import Config
     from .utillib import load_file
 
-cfg = Config()  #  config object
-
 #----------------------------------------------------------------------------------
-def usage():
+def usage(cfg):
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  domain filepath".format(cfg["cmd"])))
     print("")
@@ -65,6 +63,7 @@ def print_config_example():
 
 #----------------------------------------------------------------------------------
 def main():
+    cfg = Config()  #  config object
 
     loglevel = logging.ERROR
     verbose = False
@@ -91,7 +90,7 @@ def main():
         if arg[0] == '-' and src_domain is not None:
             # options must be placed before filenames
             print("options must precead source files")
-            usage()
+            usage(cfg)
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1]
@@ -112,7 +111,7 @@ def main():
                 loglevel = logging.ERROR
             else:
                 print("unknown loglevel")
-                usage()
+                usage(cfg)
                 sys.exit(-1)
             argn += 2
         elif arg == '--logfile':
@@ -122,7 +121,7 @@ def main():
             bucket = val
             argn += 2
         elif arg in ("-h", "--help"):
-            usage()
+            usage(cfg)
             sys.exit(0)
         elif arg in ("-e", "--endpoint"):
             endpoint = val
@@ -137,7 +136,7 @@ def main():
             print_config_example()
             sys.exit(0)
         elif arg[0] == '-':
-            usage()
+            usage(cfg)
             sys.exit(-1)
         elif src_domain is None:
             src_domain = arg
@@ -146,7 +145,7 @@ def main():
             des_file = arg
             argn += 1
         else:
-            usage()
+            usage(cfg)
             sys.exit(-1)
 
     # setup logging
@@ -161,7 +160,7 @@ def main():
 
     if src_domain is None or des_file is None:
         # need at least a src and destination
-        usage()
+        usage(cfg)
         sys.exit(-1)
 
     logging.info("source domain: {}".format(src_domain))

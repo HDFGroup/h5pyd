@@ -26,12 +26,9 @@ if __name__ == "__main__":
 else:
     from .config import Config
 
-cfg = Config()
-
-
 
 #----------------------------------------------------------------------------------
-def usage():
+def usage(cfg):
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  source_domain  des_domain".format(cfg["cmd"])))
     print(("    {} [ OPTIONS ]  source_domain  folder".format(cfg["cmd"])))
@@ -69,7 +66,7 @@ def print_config_example():
 
 #----------------------------------------------------------------------------------
 
-def getFolder(domain, mode="r"):
+def getFolder(cfg, domain, mode="r"):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -79,7 +76,7 @@ def getFolder(domain, mode="r"):
     return dir
 
 
-def getFile(domain, mode="r"):
+def getFile(cfg, domain, mode="r"):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -88,7 +85,7 @@ def getFile(domain, mode="r"):
                    password=password, bucket=bucket, use_cache=True)
     return fh
 
-def createFile(domain, linked_domain=None):
+def createFile(cfg, domain, linked_domain=None):
     #print("createFile", domain)
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -143,6 +140,7 @@ def deleteDomain(domain, keep_root=False):
             print("Domain: {} deleted".format(domain))
 
 def main():
+    cfg = Config()
 
     loglevel = logging.ERROR
     verbose = False
@@ -161,7 +159,7 @@ def main():
         if arg[0] == '-' and len(src_files) > 0:
             # options must be placed before filenames
             print("options must precead source files")
-            usage()
+            usage(cfg)
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1]
@@ -179,14 +177,14 @@ def main():
                 loglevel = logging.ERROR
             else:
                 print("unknown loglevel")
-                usage()
+                usage(cfg)
                 sys.exit(-1)
             argn += 2
         elif arg == '--logfile':
             logfname = val
             argn += 2
         elif arg in ("-h", "--help"):
-            usage()
+            usage(cfg)
             sys.exit(0)
         elif arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = val
@@ -204,7 +202,7 @@ def main():
             print_config_example()
             sys.exit(0)
         elif arg[0] == '-':
-            usage()
+            usage(cfg)
             sys.exit(-1)
         else:
             src_files.append(arg)
@@ -221,14 +219,14 @@ def main():
 
     if len(src_files) < 2:
         # need at least a src and destination
-        usage()
+        usage(cfg)
         sys.exit(-1)
     src_domain = src_files[0]
     des_domain = src_files[1]
 
     if src_domain[0] != '/' or des_domain[0] != '/':
         print("absolute paths must be used")
-        usage()
+        usage(cfg)
         sys.exit(-1)
 
     if src_domain[-1] == '/':
@@ -250,7 +248,7 @@ def main():
 
     # get root id of source file
     try:
-        fin = getFile(src_domain, "r")
+        fin = getFile(cfg, src_domain, "r")
     except IOError as oe:
         # this will fail if we try to open a folder
         msg = "Error: {} getting domain: {}".format(oe.errno, src_domain)
@@ -263,7 +261,7 @@ def main():
 
     # create a new file using the src domain for the root group
     try:
-        fout = createFile(des_domain, linked_domain=src_domain)
+        fout = createFile(cfg, des_domain, linked_domain=src_domain)
     except IOError as oe:
         msg = "Error: {} creating domain: {}".format(oe.errno, des_domain)
         logging.error(msg)
@@ -273,7 +271,7 @@ def main():
     logging.info("des root id: {}".format(fout.id.id))
 
     try:
-        deleteDomain(src_domain, keep_root=True)
+        deleteDomain(cfg, src_domain, keep_root=True)
         logging.info("domain: {} removed".format(src_domain))
     except IOError as oe:
         msg = "Error: {} removing source domain: {}".format(oe.errno, src_domain)
