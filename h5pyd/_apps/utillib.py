@@ -515,8 +515,7 @@ def write_dataset(src, tgt, ctx):
     if ctx["verbose"]:
         print(msg)
     logging.info("flush fout")
-    fout = ctx["fout"]
-    fout.flush()
+
 # write_dataset
 
 
@@ -580,8 +579,6 @@ def create_links(gsrc, gdes, ctx):
             if ctx["verbose"]:
                 print(msg)
     logging.info("flush fout")
-    fout = ctx["fout"]
-    fout.flush()
 
 
 #----------------------------------------------------------------------------------
