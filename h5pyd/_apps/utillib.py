@@ -485,7 +485,7 @@ def create_dataset(dobj, ctx):
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
         if len(dobj.shape) == 0 or (is_vlen and is_h5py(fout)):
             # don't use compression/chunks for scalar datasets
-            # or vlen 
+            # or vlen
             compression_filter = None
             compression_opts = None
             chunks = None
@@ -772,7 +772,6 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
         else:
             logging.error("no handler for object class: {}".format(type(obj)))
 
-                
     # build a rough map of the file using the internal function above
     # copy over any attributes
     # create soft/external links (and hardlinks not already created)
