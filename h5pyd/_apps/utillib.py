@@ -290,6 +290,70 @@ def copy_attribute(desobj, name, srcobj, ctx):
 
 
 #----------------------------------------------------------------------------------
+def anon_dset_chunk_size(chunkinfo_arr_dims, chunk_size=1):
+    """
+    Determine if anon_dset needs to be chunked
+    """
+    data_size = np.product(chunkinfo_arr_dims) * (64 / 8 + 32 / 8) * 10**-6
+
+    if data_size > chunk_size:
+        chunks = np.ceil(data_size / chunk_size)
+        axis = np.argmax(chunkinfo_arr_dims)
+        anon_chunks = []
+        for i, dim in enumerate(chunkinfo_arr_dims):
+            if i == axis:
+                anon_chunks.append(int(dim // chunks) + 1)
+            else:
+                anon_chunks.append(dim)
+
+        anon_chunks = tuple(anon_chunks)
+    else:
+        anon_chunks = None
+
+    return anon_chunks
+
+
+def get_chunk_slices(arr_shape, arr_chunks):
+    """
+    Create list of chunk slices [(s_i, e_i), ...]
+
+    Parameters
+    ----------
+    arr_shape : tuple
+        array shape
+    arr_cunks : tuple
+        Chunk for arr
+
+    Returns
+    -------
+    chunk_slices : list
+        List of chunk slices
+    """
+    axis = np.argmax(arr_chunks)
+    ds_dim = arr_shape[axis]
+    chunk_size = arr_chunks[axis]
+
+    chunks = list(range(0, ds_dim, chunk_size))
+    if chunks[-1] < ds_dim:
+        chunks.append(ds_dim)
+    else:
+        chunks[-1] = ds_dim
+
+    chunk_slices = []
+    if axis > 0:
+        prefix = tuple([slice(None) for i in range(axis)])
+    else:
+        prefix = None
+
+    for start, end in zip(chunks[:-1], chunks[1:]):
+        if prefix is not None:
+            chunk_slices.append(prefix + (slice(start, end, None), ))
+        else:
+            chunk_slices.append((slice(start, end, None), ))
+
+    return chunk_slices
+
+
 def create_dataset(dobj, ctx):
     """ create a dataset using the properties of the passed in h5py dataset.
         If successful, proceed to copy attributes and data.
@@ -387,11 +451,26 @@ def create_dataset(dobj, ctx):
                     dim = rank - i - 1
                     offset += (index[dim] // chunk_dims[dim]) * stride
                     stride *= chunkinfo_arr_dims[dim]
+
                 chunkinfo_arr[offset] = (chunk_info.byte_offset, chunk_info.size)
-            anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
-            anon_dset[...] = chunkinfo_arr
+
+            anon_dset_chunks = anon_dset_chunk_size(chunkinfo_arr_dims)
+            anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims,
+                                            dtype=dt, chunks=anon_dset_chunks)
+            chunkinfo_arr = chunkinfo_arr.reshape(chunkinfo_arr_dims)
+            if anon_dset_chunks is not None:
+                chunk_slices = get_chunk_slices(chunkinfo_arr_dims,
+                                                anon_dset_chunks)
+                for i, c_slice in enumerate(chunk_slices):
+                    logging.debug('writing anon_dset chunk {} of {}'
+                                  .format(i, len(chunks)))
+                    anon_dset[c_slice] = chunkinfo_arr[c_slice]
+            else:
+                anon_dset[...] = chunkinfo_arr
+
             logging.debug("anon_dset: {}".format(anon_dset))
-            logging.debug("annon_values: {}".format(anon_dset[...]))
+            logging.debug('anon_dset_chunks: {}'.format(anon_dset_chunks))
+            logging.debug("a non_values: {}".format(chunkinfo_arr))
             chunks["class"] = 'H5D_CHUNKED_REF_INDIRECT'
             chunks["file_uri"] = ctx["s3path"]
             chunks["dims"] = dobj.chunks
