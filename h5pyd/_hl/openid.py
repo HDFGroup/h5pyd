@@ -19,7 +19,7 @@ from .config import Config
 
 class OpenIDHandler(ABC):
 
-    def __init__(self, endpoint):
+    def __init__(self, endpoint, use_token_cache=True):
         """Initialize the token."""
 
         # Location of the token cache.
@@ -32,7 +32,7 @@ class OpenIDHandler(ABC):
         # refreshToken - The refresh token (optional).
         # expiresOn - The unix timestamp when the token expires (optional).
 
-        if not os.path.isfile(self._token_cache_file):
+        if not use_token_cache or not os.path.isfile(self._token_cache_file):
             self._token = None
 
         else:
@@ -124,7 +124,18 @@ class AzureOpenID(OpenIDHandler):
                 'AD_CLIENT_SECRET': hs_config.get("hs_ad_client_secret", None)
             }
 
-        super().__init__(endpoint)
+        if 'AD_CLIENT_SECRET' in self.config and self.config['AD_CLIENT_SECRET']:
+            use_token_cache = False
+        else:
+            use_token_cache = True
+
+        super().__init__(endpoint, use_token_cache=use_token_cache)
+
+    def write_token_cache(self):
+        if 'AD_CLIENT_SECRET' in self.config and self.config['AD_CLIENT_SECRET']:
+            pass # don't use token cache for unattended authentication
+        else:
+            super().write_token_cache()
 
     def acquire(self):
         """Acquire a new Azure token."""
