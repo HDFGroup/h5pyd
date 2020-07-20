@@ -84,7 +84,7 @@ def main():
     fields = ('username', 'create', 'read', 'update', 'delete', 'readACL', 'updateACL')
     domain = None
     perm = None
-    loglevel = logging.ERROR
+    loglevel = logging.DEBUG
     logfname = None
     usernames = []
     add_list = set()
@@ -93,23 +93,17 @@ def main():
     if len(sys.argv) == 1 or sys.argv[1] == "-h":
         printUsage()
 
-    # setup logging
-    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
-    logging.debug("set log_level to {}".format(loglevel))
-
-
     argn = 1
     while argn < len(sys.argv):
         arg = sys.argv[argn]
         val = None
         if len(sys.argv) > argn + 1:
             val = sys.argv[argn+1]
-        logging.debug("arg:", arg, "val:", val)
 
-        if domain is None and arg in ("-v", "--verbose"):
+        if arg in ("-v", "--verbose"):
             cfg["verbose"] = True
             argn += 1
-        elif domain is None and arg == "--loglevel":
+        elif arg == "--loglevel":
             val = val.upper()
             if val == "DEBUG":
                 loglevel = logging.DEBUG
@@ -143,41 +137,37 @@ def main():
             print("No domain given")
             printUsage()
         elif domain is None:
-            logging.debug("get domain")
             domain = arg
             if domain[0] != '/':
                 print("Domain must start with '/'")
                 printUsage()
-            logging.debug("domain:", domain)
             argn += 1
         elif arg[0] == '+':
-            logging.debug("got plus")
             if len(usernames) > 0:
-                logging.debug("usernames:", usernames)
                 printUsage()
             add_list = set(arg[1:])
-            logging.info("add_list:", add_list)
             argn += 1
 
         elif arg[0] == '-':
-            logging.debug("got minus")
             if len(usernames) > 0:
                 printUsage()
             remove_list = set(arg[1:])
-            logging.info("remove_list:", remove_list)
             argn += 1
         else:
-            logging.info("got username:", arg)
             if arg.find('/') >= 0:
                 print("Invalid username:", arg)
                 printUsage()
             usernames.append(arg)
             argn += 1
 
-    logging.info("domain:", domain)
-    logging.info("add_list:", add_list)
-    logging.info("remove_list:", remove_list)
-    logging.info("usernames:", usernames)
+    # setup logging
+    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
+    logging.debug("set log_level to {}".format(loglevel))
+
+    logging.info("domain: {}".format(domain))
+    logging.info("add_list: {}".format(add_list))
+    logging.info("remove_list: {}".format(remove_list))
+    logging.info("usernames: {}".format(usernames))
 
     if len(usernames) == 0 and (add_list or remove_list):
         print("At least one username must be given to add/remove permissions")
@@ -186,7 +176,6 @@ def main():
     if domain is None:
         print("no domain specified")
         sys.exit(1)
-
 
     conflicts = list(add_list & remove_list)
 
