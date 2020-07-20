@@ -84,7 +84,7 @@ def main():
     fields = ('username', 'create', 'read', 'update', 'delete', 'readACL', 'updateACL')
     domain = None
     perm = None
-    loglevel = logging.DEBUG
+    loglevel = logging.ERROR
     logfname = None
     usernames = []
     add_list = set()
