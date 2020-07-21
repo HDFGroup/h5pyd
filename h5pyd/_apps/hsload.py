@@ -323,7 +323,7 @@ def main():
             else:
                 if dataload == "link":
                     if op.isabs(src_file):
-                        sys.stderr.write("source file must s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)")
+                        sys.stderr.write("source file must be s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)")
                         sys.exit(1)
                     s3path = src_file
                 else:
