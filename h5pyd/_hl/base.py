@@ -220,7 +220,7 @@ def jsonToArray(data_shape, data_dtype, data_json):
         else:
             copyToArray(arr, 0, index, data_json, vlen_base=vlen_base)
     else:
-        npoints = np.product(data_shape)
+        npoints = int(np.prod(data_shape))
         if type(data_json) in (list, tuple):
             np_shape_rank = len(data_shape)
             converted_data = []
@@ -285,7 +285,7 @@ def getElementSize(e, dt):
         elif isinstance(e, str):
             count = len(e.encode('utf-8')) + 4
         elif isinstance(e, np.ndarray):
-            nElements = np.prod(e.shape)
+            nElements = int(np.prod(e.shape))
             if e.dtype.kind != 'O':
                 count = e.dtype.itemsize * nElements
             else:
@@ -309,7 +309,7 @@ Get number of bytes needed to store given numpy array as a bytestream
 def getByteArraySize(arr):
     if not isVlen(arr.dtype):
         return arr.itemsize * np.prod(arr.shape)
-    nElements = np.prod(arr.shape)
+    nElements = int(np.prod(arr.shape))
     # reshape to 1d for easier iteration
     arr1d = arr.reshape((nElements,))
     dt = arr1d.dtype
@@ -367,7 +367,7 @@ def copyElement(e, dt, buffer, offset):
             offset = copyBuffer(text, buffer, offset)
 
         elif isinstance(e, np.ndarray):
-            nElements = np.prod(e.shape)
+            nElements = int(np.prod(e.shape))
             if e.dtype.kind != 'O':
                 count = np.int32(e.dtype.itemsize * nElements)
                 offset = copyBuffer(count.tobytes(), buffer, offset)
@@ -436,7 +436,7 @@ def readElement(buffer, offset, arr, index, dt):
         e = arr[index]
 
         if isinstance(e, np.ndarray):
-            nelements = np.prod(dt.shape)
+            nelements = int(np.prod(dt.shape))
             e.reshape((nelements,))
             for i in range(nelements):
                 offset = readElement(buffer, offset, e, i, dt)
@@ -474,7 +474,7 @@ def arrayToBytes(arr):
     nSize = getByteArraySize(arr)
     buffer = bytearray(nSize)
     offset = 0
-    nElements = np.prod(arr.shape)
+    nElements = int(np.prod(arr.shape))
     arr1d = arr.reshape((nElements,))
     for e in arr1d:
         offset = copyElement(e, arr1d.dtype, buffer, offset)

@@ -301,18 +301,20 @@ def create_dataset(dobj, ctx):
     fout = ctx["fout"]
     deflate = ctx["deflate"]
 
-    fillvalue = None
-    try:
-        # can trigger a runtime error if fillvalue is undefined
-        fillvalue = dobj.fillvalue
-    except RuntimeError:
-        pass  # ignore
     chunks = None
 
     if dobj.dtype.metadata and 'vlen' in dobj.dtype.metadata:
         is_vlen = True
     else:
         is_vlen = False
+
+    fillvalue = None
+    if not is_vlen:
+        try:
+            # can trigger a runtime error if fillvalue is undefined
+            fillvalue = dobj.fillvalue
+        except RuntimeError:
+            pass  # ignore
 
     # can_use_storeinfo = use_storeinfo(dobj, ctx)
     if ctx["dataload"] == "link" and not is_vlen:
@@ -427,7 +429,6 @@ def create_dataset(dobj, ctx):
 
         if is_vlen:
             fillvalue=None
-
         dset = fout.create_dataset(
             dobj.name, shape=dobj.shape, dtype=tgt_dtype, chunks=chunks,
             compression=compression_filter, shuffle=shuffle, maxshape=maxshape,
@@ -475,13 +476,20 @@ def write_dataset(src, tgt, ctx):
         tgt[()] = x
         return
 
-    fillvalue = None
-    try:
-        # can trigger a runtime error if fillvalue is undefined
-        fillvalue = src.fillvalue
-    except RuntimeError:
-        pass  # ignore
+    if src.dtype.metadata and 'vlen' in src.dtype.metadata:
+        is_vlen = True
+    else:
+        is_vlen = False
 
+    
+    fillvalue = None
+    if not is_vlen:
+        try:
+            # can trigger a runtime error if fillvalue is undefined
+            fillvalue = src.fillvalue
+        except RuntimeError:
+            pass  # ignore
+    
     msg = "iterating over chunks for {}".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
