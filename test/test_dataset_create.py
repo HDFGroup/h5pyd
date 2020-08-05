@@ -394,6 +394,85 @@ class TestCreateDataset(TestCase):
 
         f.close()
 
+    def test_require_dset(self):
+        filename = self.getFileName("require_dset")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+
+        self.assertEqual(len(f), 0)
+
+        dims = (40, 80)
+        dset = f.require_dataset('dset', dims, dtype='f8')
+
+        self.assertEqual(dset.name, "/dset")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 2)
+        self.assertEqual(dset.ndim, 2)
+        self.assertEqual(dset.shape[0], 40)
+        self.assertEqual(dset.shape[1], 80)
+        self.assertEqual(str(dset.dtype), 'float64')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 2)
+        self.assertEqual(dset.maxshape[0], 40)
+        self.assertEqual(dset.maxshape[1], 80)
+        self.assertEqual(dset[0,0], 0)
+
+        self.assertEqual(len(f), 1)
+
+        dset_2 = f.require_dataset('dset', dims, dtype='f8')
+        self.assertEqual(dset.id.id, dset_2.id.id)
+        self.assertEqual(len(f), 1)
+
+        dset_3 = f.require_dataset('dset', dims, dtype='f4')
+        self.assertEqual(dset.id.id, dset_3.id.id)
+        self.assertEqual(str(dset_3.dtype), 'float64')
+
+        self.assertEqual(len(f), 1)
+
+        try: 
+            f.require_dataset('dset', dims, dtype='f4', exact=True)
+            self.assertTrue(False)  # exception expected
+        except TypeError:
+            pass
+
+        self.assertEqual(len(f), 1)
+
+        f.close()
+
+    def test_create_dset_like(self):
+        filename = self.getFileName("create_dset_like")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+
+        def check_props(dset):
+            self.assertTrue(isinstance(dset.shape, tuple))
+            self.assertEqual(len(dset.shape), 2)
+            self.assertEqual(dset.ndim, 2)
+            self.assertEqual(dset.shape[0], 40)
+            self.assertEqual(dset.shape[1], 80)
+            self.assertEqual(str(dset.dtype), 'float32')
+            self.assertTrue(isinstance(dset.maxshape, tuple))
+            self.assertEqual(len(dset.maxshape), 2)
+            self.assertEqual(dset.maxshape[0], 40)
+            self.assertEqual(dset.maxshape[1], 80)
+            self.assertEqual(dset[0,0], 0)
+
+        dims = (40, 80)
+        dset = f.create_dataset('simple_dset', dims, dtype='f4')
+
+        self.assertEqual(dset.name, '/simple_dset')
+        check_props(dset)
+        
+
+        dset_copy = f.create_dataset_like('similar_dset', dset)
+        self.assertEqual(dset_copy.name, '/similar_dset')
+        check_props(dset_copy)
+
+        self.assertEqual(len(f), 2)
+
+
+        f.close()
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

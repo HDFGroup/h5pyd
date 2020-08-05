@@ -1265,6 +1265,16 @@ class Dataset(HLObject):
        """
        pass # todo
 
+    def make_scale(self, name=''):
+        """Make this dataset an HDF5 dimension scale.
+
+        You can then attach it to dimensions of other datasets like this:
+
+            other_ds.dims[0].attach_scale(ds)
+
+        You can optionally pass a name to associate with this scale.
+        """
+        self.dims.create_scale(self, name=name)
 
     """
       Convert a list to a tuple, recursively.
