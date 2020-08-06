@@ -406,7 +406,7 @@ def create_dataset(dobj, ctx):
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
         if len(dobj.shape) == 0 or (is_vlen and is_h5py(fout)):
             # don't use compression/chunks for scalar datasets
-            # or vlen 
+            # or vlen
             compression_filter = None
             compression_opts = None
             chunks = None
@@ -481,7 +481,7 @@ def write_dataset(src, tgt, ctx):
     else:
         is_vlen = False
 
-    
+
     fillvalue = None
     if not is_vlen:
         try:
@@ -489,7 +489,7 @@ def write_dataset(src, tgt, ctx):
             fillvalue = src.fillvalue
         except RuntimeError:
             pass  # ignore
-    
+
     msg = "iterating over chunks for {}".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
@@ -693,16 +693,12 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
         else:
             logging.error("no handler for object class: {}".format(type(obj)))
 
-                
     # build a rough map of the file using the internal function above
     # copy over any attributes
     # create soft/external links (and hardlinks not already created)
     logging.info("creating target objects and attributes")
-    if dataload == "ingest":
-        # copy dataset data
-        logging.info("copying dataset data")
 
-     # build a rough map of the file using the internal function above
+    # build a rough map of the file using the internal function above
     logging.info("creating target objects")
     fin.visititems(object_create_helper)
 
@@ -725,9 +721,6 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     for ga in fin.attrs:
         copy_attribute(fout, ga, fin, ctx)
 
-    # create root soft/external links
-    create_links(fin, fout, ctx)
-
     # Fully flush the h5py handle.
     fout.close()
 
@@ -739,4 +732,4 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
         print(msg)
 
     return 0
-# load_file
+    # load_file
