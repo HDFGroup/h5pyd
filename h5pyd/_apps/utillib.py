@@ -35,6 +35,7 @@ def dump_dtype(dt):
         for name in dt.fields:
             subdt = dt.fields[name][0]
             out += "{}: {} |".format(name, dump_dtype(subdt))
+
         out = out[:-1] + "}"
     else:
         ref = h5py.check_dtype(ref=dt)
@@ -46,6 +47,7 @@ def dump_dtype(dt):
                 out = "VLEN: " + dump_dtype(vlen)
             else:
                 out = str(dt)
+
     return out
 
 
@@ -87,6 +89,7 @@ def has_reference(dtype):
     has_ref = False
     if not isinstance(dtype, np.dtype):
         return False
+
     if len(dtype) > 0:
         for name in dtype.fields:
             item = dtype.fields[name]
@@ -99,6 +102,7 @@ def has_reference(dtype):
     elif dtype.metadata and 'vlen' in dtype.metadata:
         basedt = dtype.metadata['vlen']
         has_ref = has_reference(basedt)
+
     return has_ref
 
 
@@ -117,6 +121,7 @@ def convert_dtype(srcdt, ctx):
             # item is a tuple of dtype and integer offset
             field_dt = convert_dtype(item[0], ctx)
             fields.append((name, field_dt))
+
         tgt_dt = np.dtype(fields)
     else:
         # check if this a "special dtype"
@@ -142,12 +147,14 @@ def convert_dtype(srcdt, ctx):
                 tgt_base = convert_dtype(src_vlen, ctx)
             else:
                 tgt_base = src_vlen
+
             if is_h5py(ctx['fout']):
                 tgt_dt = h5py.special_dtype(vlen=tgt_base)
             else:
                 tgt_dt = h5pyd.special_dtype(vlen=tgt_base)
         else:
             tgt_dt = srcdt
+
     return tgt_dt
 
 
@@ -172,6 +179,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
     elif src_dt.metadata and 'ref' in src_dt.metadata:
         if not tgt_dt.metadata or 'ref' not in tgt_dt.metadata:
             raise TypeError("Expected tgt dtype to be ref, but got: {}".format(tgt_dt))
+
         ref = tgt_dt.metadata['ref']
         if is_reference(ref):
             # initialize out to null ref
@@ -207,12 +215,15 @@ def copy_element(val, src_dt, tgt_dt, ctx):
             out = "tbd"
         else:
             raise TypeError("Unexpected ref type: {}".format(type(ref)))
+
     elif src_dt.metadata and 'vlen' in src_dt.metadata:
         logging.debug("copy_elment, got vlen element, dt: {}".format(src_dt.metadata["vlen"]))
         if not isinstance(val, np.ndarray):
             raise TypeError("Expecting ndarray or vlen element, but got: {}".format(type(val)))
+
         if not tgt_dt.metadata or 'vlen' not in tgt_dt.metadata:
             raise TypeError("Expected tgt dtype to be vlen, but got: {}".format(tgt_dt))
+
         src_vlen_dt = src_dt.metadata["vlen"]
         tgt_vlen_dt = tgt_dt.metadata["vlen"]
         if has_reference(src_vlen_dt):
@@ -243,6 +254,7 @@ def copy_array(src_arr, ctx):
     """
     if not isinstance(src_arr, np.ndarray):
         raise TypeError("Expecting ndarray, but got: {}".format(src_arr))
+
     tgt_dt = convert_dtype(src_arr.dtype, ctx)
     tgt_arr = np.zeros(src_arr.shape, dtype=tgt_dt)
 
@@ -255,10 +267,12 @@ def copy_array(src_arr, ctx):
             e = src_arr_flat[i]
             element = copy_element(e, src_arr.dtype, tgt_dt, ctx)
             tgt_arr_flat[i] = element
+
         tgt_arr = tgt_arr_flat.reshape(src_arr.shape)
     else:
         # can just copy the entire array
         tgt_arr[...] = src_arr[...]
+
     return tgt_arr
 
 
@@ -277,6 +291,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
         src_dt = data.dtype
     except AttributeError:
         pass  # auto convert to numpy array
+
     # First, make sure we have a NumPy array.
     srcarr = np.asarray(data, order='C', dtype=src_dt)
     tgtarr = copy_array(srcarr, ctx)
@@ -290,11 +305,11 @@ def copy_attribute(desobj, name, srcobj, ctx):
 
 
 #----------------------------------------------------------------------------------
-def anon_dset_chunk_size(chunkinfo_arr_dims, chunk_size=1):
+def anon_dset_chunk_size(chunkinfo_arr_dims, dtype, chunk_size=2):
     """
     Determine if anon_dset needs to be chunked
     """
-    data_size = np.product(chunkinfo_arr_dims) * (64 / 8 + 32 / 8) * 10**-6
+    data_size = np.product(chunkinfo_arr_dims) * dtype.itemsize * 10**-6
 
     if data_size > chunk_size:
         chunks = np.ceil(data_size / chunk_size)
@@ -341,7 +356,7 @@ def get_chunk_slices(arr_shape, arr_chunks):
 
     chunk_slices = []
     if axis > 0:
-        prefix = tuple([slice(None) for i in range(axis)])
+        prefix = tuple([slice(None) for _ in range(axis)])
     else:
         prefix = None
 
@@ -352,6 +367,50 @@ def get_chunk_slices(arr_shape, arr_chunks):
             chunk_slices.append((slice(start, end, None), ))
 
     return chunk_slices
+
+def create_anon_dset(self, shape, dtype, data, chunk_size=2):
+    """
+    Create anonymous chunk dataset
+
+    Parameters
+    ----------
+    shape : tuple
+        Dataset shape
+    dtype : str | tuple | np.dtype
+        Dataset dtype
+    data : ndarray
+        Dataset data
+    chunk_size : int, optional
+        Maximum chunk size in mb, by default 2
+
+    Returns
+    -------
+    anon_dset : h5pyd.Dataset
+        anonymous chunk dataset
+    """
+    chunks = self.anon_dset_chunk_size(shape, dtype, chunk_size=chunk_size)
+    anon_dset = fout.create_dataset(None, shape=shape, dtype=dtype,
+                                    chunks=chunks)
+
+    data = data.reshape(shape)
+    if chunks is not None:
+        chunk_slices = get_chunk_slices(shape, chunks)
+        for i, c_slice in enumerate(chunk_slices):
+            logging.debug('writing anon_dset chunk {} of {}'
+                          .format(i, len(chunk_slices)))
+            anon_dset[c_slice] = data[c_slice]
+            logging.debug('- flushing anon dataset chunk to s3')
+            fout.flush()
+    else:
+        anon_dset[...] = data
+        logging.debug('- flushing anon dataset to s3')
+        fout.flush()
+
+    logging.debug("anon_dset: {}".format(anon_dset))
+    logging.debug('anon_dset.chunks: {}'.format(chunks))
+    logging.debug("anon_values: {}".format(data))
+
+    return anon_dset
 
 
 def create_dataset(dobj, ctx):
@@ -414,11 +473,13 @@ def create_dataset(dobj, ctx):
                     msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
                     logging.error(msg)
                     raise IOError(msg)
+
                 chunk_key = ""
                 for dim in range(rank):
                     chunk_key += str(index[dim] // chunk_dims[dim])
                     if dim < rank - 1:
                         chunk_key += "_"
+
                 logging.debug("adding chunk_key: {}".format(chunk_key))
                 chunk_map[chunk_key] = (chunk_info.byte_offset, chunk_info.size)
 
@@ -435,6 +496,7 @@ def create_dataset(dobj, ctx):
             chunkinfo_arr_dims = []
             for dim in range(rank):
                 chunkinfo_arr_dims.append(int(np.ceil(dset_dims[dim] / chunk_dims[dim])))
+
             chunkinfo_arr_dims = tuple(chunkinfo_arr_dims)
             logging.debug("creating chunkinfo array of shape: {}".format(chunkinfo_arr_dims))
             chunkinfo_arr = np.zeros(np.prod(chunkinfo_arr_dims), dtype=dt)
@@ -445,6 +507,7 @@ def create_dataset(dobj, ctx):
                     msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
                     logging.error(msg)
                     raise IOError(msg)
+
                 offset = 0
                 stride = 1
                 for i in range(rank):
@@ -454,23 +517,9 @@ def create_dataset(dobj, ctx):
 
                 chunkinfo_arr[offset] = (chunk_info.byte_offset, chunk_info.size)
 
-            anon_dset_chunks = anon_dset_chunk_size(chunkinfo_arr_dims)
-            anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims,
-                                            dtype=dt, chunks=anon_dset_chunks)
-            chunkinfo_arr = chunkinfo_arr.reshape(chunkinfo_arr_dims)
-            if anon_dset_chunks is not None:
-                chunk_slices = get_chunk_slices(chunkinfo_arr_dims,
-                                                anon_dset_chunks)
-                for i, c_slice in enumerate(chunk_slices):
-                    logging.debug('writing anon_dset chunk {} of {}'
-                                  .format(i, len(chunks)))
-                    anon_dset[c_slice] = chunkinfo_arr[c_slice]
-            else:
-                anon_dset[...] = chunkinfo_arr
+            anon_dset = create_anon_dset(fout, chunkinfo_arr_dims, dt,
+                                         chunkinfo_arr)
 
-            logging.debug("anon_dset: {}".format(anon_dset))
-            logging.debug('anon_dset_chunks: {}'.format(anon_dset_chunks))
-            logging.debug("a non_values: {}".format(chunkinfo_arr))
             chunks["class"] = 'H5D_CHUNKED_REF_INDIRECT'
             chunks["file_uri"] = ctx["s3path"]
             chunks["dims"] = dobj.chunks
@@ -501,6 +550,7 @@ def create_dataset(dobj, ctx):
                 compression_opts = deflate
                 if ctx["verbose"]:
                     print("applying gzip filter with level: {}".format(deflate))
+
             shuffle = dobj.shuffle
             fletcher32 = dobj.fletcher32
             maxshape = dobj.maxshape
@@ -508,15 +558,18 @@ def create_dataset(dobj, ctx):
 
         if is_vlen:
             fillvalue=None
+
         dset = fout.create_dataset(
             dobj.name, shape=dobj.shape, dtype=tgt_dtype, chunks=chunks,
             compression=compression_filter, shuffle=shuffle, maxshape=maxshape,
             fletcher32=fletcher32, compression_opts=compression_opts,
             fillvalue=fillvalue, scaleoffset=scaleoffset)
+
         msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
+
         logging.debug("adding dataset id {} to {} in srcid_desobj_map".format(dobj.id.id, dset))
         srcid_desobj_map = ctx["srcid_desobj_map"]
         srcid_desobj_map[dobj.id.__hash__()] = dset
@@ -560,7 +613,7 @@ def write_dataset(src, tgt, ctx):
     else:
         is_vlen = False
 
-    
+
     fillvalue = None
     if not is_vlen:
         try:
@@ -568,11 +621,12 @@ def write_dataset(src, tgt, ctx):
             fillvalue = src.fillvalue
         except RuntimeError:
             pass  # ignore
-    
+
     msg = "iterating over chunks for {}".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
+
     try:
         it = ChunkIterator(tgt)
 
@@ -585,11 +639,13 @@ def write_dataset(src, tgt, ctx):
             empty_arr = np.zeros(arr.shape, dtype=arr.dtype)
             if fillvalue:
                 empty_arr.fill(fillvalue)
+
             if np.array_equal(arr, empty_arr):
                 msg = "skipping chunk for slice: {}".format(str(s))
             else:
                 msg = "writing dataset data for slice: {}".format(s)
                 tgt[s] = arr
+
             logging.info(msg)
             if ctx["verbose"]:
                 print(msg)
@@ -597,10 +653,12 @@ def write_dataset(src, tgt, ctx):
         msg = "ERROR : failed to copy dataset data : {}".format(str(e))
         logging.error(msg)
         print(msg)
+
     msg = "done with dataload for {}".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
+
     logging.info("flush fout")
 
 # write_dataset
@@ -611,10 +669,12 @@ def create_links(gsrc, gdes, ctx):
     srcid_desobj_map = ctx["srcid_desobj_map"]
     if ctx["verbose"]:
         print("create_links: {}".format(gsrc.name))
+
     for title in gsrc:
         msg = "got link: {}".format(title)
         if ctx["verbose"]:
             print(msg)
+
         logging.info(msg)
         lnk = gsrc.get(title, getlink=True)
         link_classname = lnk.__class__.__name__
@@ -624,6 +684,7 @@ def create_links(gsrc, gdes, ctx):
                 msg = "creating link {} with title: {}".format(gdes, title)
                 if ctx["verbose"]:
                     print(msg)
+
                 logging.info(msg)
                 src_obj_id = gsrc[title].id
                 src_obj_id_hash = src_obj_id.__hash__()
@@ -644,27 +705,32 @@ def create_links(gsrc, gdes, ctx):
             msg = "creating SoftLink({}) with title: {}".format(lnk.path, title)
             if ctx["verbose"]:
                 print(msg)
+
             logging.info(msg)
             if is_h5py(gdes):
                 soft_link = h5py.SoftLink(lnk.path)
             else:
                 soft_link = h5pyd.SoftLink(lnk.path)
+
             gdes[title] = soft_link
         elif link_classname == "ExternalLink":
             msg = "creating ExternalLink({}, {}) with title: {}".format(lnk.filename, lnk.path, title)
             if ctx["verbose"]:
                 print(msg)
+
             logging.info(msg)
             if is_h5py(gdes):
                 ext_link = h5py.ExternalLink(lnk.filename, lnk.path)
             else:
                 ext_link = h5pyd.ExternalLink(lnk.filename, lnk.path)
+
             gdes[title] = ext_link
         else:
             msg = "Unexpected link type: {}".format(lnk.__class__.__name__)
             logging.warning(msg)
             if ctx["verbose"]:
                 print(msg)
+
     logging.info("flush fout")
 
 
@@ -674,6 +740,7 @@ def create_group(gobj, ctx):
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
+
     fout = ctx["fout"]
     grp = fout.create_group(gobj.name)
     srcid_desobj_map = ctx["srcid_desobj_map"]
@@ -690,6 +757,7 @@ def create_datatype(obj, ctx):
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
+
     fout = ctx["fout"]
     fout[obj.name] = obj.dtype
     srcid_desobj_map = ctx["srcid_desobj_map"]
@@ -710,6 +778,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
             if not s3path:
                 logging.error("s3path expected to be set")
                 sys.exit(1)
+
             logging.info("using s3path")
         else:
             logging.error("unexpected dataload value:", dataload)
@@ -759,6 +828,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
                 is_vlen = True
             else:
                 is_vlen = False
+
             if ctx["dataload"] == "link" and not is_vlen:
                 logging.info("skip datacopy for link reference")
             else:
