@@ -846,9 +846,6 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     # copy over any attributes
     # create soft/external links (and hardlinks not already created)
     logging.info("creating target objects and attributes")
-    if dataload == "ingest":
-        # copy dataset data
-        logging.info("copying dataset data")
 
      # build a rough map of the file using the internal function above
     logging.info("creating target objects")
@@ -872,9 +869,6 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     # create any root attributes
     for ga in fin.attrs:
         copy_attribute(fout, ga, fin, ctx)
-
-    # create root soft/external links
-    create_links(fin, fout, ctx)
 
     # Fully flush the h5py handle.
     fout.close()
