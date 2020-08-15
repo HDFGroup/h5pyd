@@ -294,7 +294,7 @@ class TestCreateDataset(TestCase):
         else:
             self.assertEqual(chunks[0], 20)
             self.assertEqual(chunks[1], 40)
-        if not f.id.id.startswith("g-"):
+        if f.id.id.startswith("g-"):
             # h5serv not setting this
             self.assertEqual(dset.compression, 'gzip')
             self.assertEqual(dset.compression_opts, 9)
