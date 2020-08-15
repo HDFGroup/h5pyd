@@ -477,6 +477,16 @@ class File(Group):
         self._getVerboseInfo() # will update _lastScan
         return self._lastScan
 
+    
+    @property
+    def compressors(self):
+        """ return list of compressors supported by this server """
+        if self.id:
+            compressors = self.id.http_conn.compressors
+        else:
+            compressors = []
+        return compressors
+
     # override base implemention of ACL methods to use the domain rather than update root group
     def getACL(self, username):
         req = '/acls/' + username

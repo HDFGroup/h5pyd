@@ -103,6 +103,7 @@ def usage():
     print("     -a | --append <mode>  :: Flag to append to an existing HDF Server domain")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
+    print("     --compression blosclz|lz4|lz4hc|snappy|gzip|zstd :: use the given compression algorithm for -z option (lz4 is default)")
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
@@ -144,9 +145,11 @@ def print_config_example():
 #----------------------------------------------------------------------------------
 def main():
 
+    COMPRESSION_FILTERS = ('blosclz', 'lz4', 'lz4hc', 'snappy', 'gzip', 'zstd')
     loglevel = logging.ERROR
     verbose = False
-    deflate = None
+    compression = None
+    compression_opts = None
     s3path = None
     dataload = "ingest"  # or None, or "link"
     cfg["cmd"] = sys.argv[0].split('/')[-1]
@@ -231,21 +234,32 @@ def main():
             print_config_example()
             sys.exit(0)
         elif arg.startswith("-z"):
-            compressLevel = 4
+            compression_opts = 4
             if len(arg) > 2:
                 try:
-                    compressLevel = int(arg[2:])
+                    compression_opts = int(arg[2:])
                 except ValueError:
                     sys.stderr.write("Compression Level must be int between 0 and 9")
                     sys.exit(-1)
-            deflate = compressLevel
+            if not compression:
+                compression = 'lz4'
             argn += 1
+        elif arg in ("-c", "--compression"):
+            if val not in COMPRESSION_FILTERS:
+                sys.stderr.write("unknown compression filter")
+                usage()
+                sys.exit(-1)
+            compression = val
+            argn += 2
         elif arg[0] == '-':
             usage()
             sys.exit(-1)
         else:
             src_files.append(arg)
             argn += 1
+
+    print("compression: ", compression)
+    print("compression_opts: ", compression_opts)
 
     # setup logging
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
@@ -352,7 +366,7 @@ def main():
                 sys.exit(1)
 
             # do the actual load
-            load_file(fin, fout, verbose=verbose, dataload=dataload, s3path=s3path, deflate=deflate,)
+            load_file(fin, fout, verbose=verbose, dataload=dataload, s3path=s3path, compression=compression, compression_opts=compression_opts)
 
             # cleanup if needed
             if istmp:

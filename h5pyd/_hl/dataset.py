@@ -164,6 +164,8 @@ def make_new_dset(parent, shape=None, dtype=None,
             #tid = h5t.py_create(dtype, logical=1)
     body['type'] = type_json
 
+    compressors = parent.id.http_conn.compressors
+
     # Legacy
     if compression is True:
         if compression_opts is None:
@@ -176,6 +178,9 @@ def make_new_dset(parent, shape=None, dtype=None,
             raise TypeError("Conflict in compression options")
         compression_opts = compression
         compression = 'gzip'
+    
+    if compression and compression not in compressors:
+        raise ValueError("expected compression to be one of the following values: {}".format(compressors))
 
     dcpl = filters.generate_dcpl(shape, dtype, chunks, compression, compression_opts,
                      shuffle, fletcher32, maxshape, scaleoffset, layout)
@@ -190,7 +195,6 @@ def make_new_dset(parent, shape=None, dtype=None,
 
     if chunks and isinstance(chunks, dict):
         dcpl["layout"] = chunks
-        #print("using layout:", chunks)
 
     body['creationProperties'] = dcpl
 
@@ -333,26 +337,77 @@ class Dataset(HLObject):
 
     @property
     def compression(self):
-        """Compression strategy (or None)"""
-        for x in ('gzip','lzf','szip'):
-            if x in self._filters:
-                return x
+        
+        """ iterate through list of filters and return compression filter
+        or None if none found """
+        compressors = self.id.http_conn.compressors
+        for filter in self._filters:
+            if isinstance(filter, str):
+                filter_name = filter
+            elif isinstance(filter, dict) and "name" in filter:
+                filter_name = filter['name']
+            else:
+                filter_name = None
+
+            if filter_name and filter_name in compressors:
+                return filter_name
         return None
 
     @property
     def compression_opts(self):
         """ Compression setting.  Int(0-9) for gzip, 2-tuple for szip. """
-        return self._filters.get(self.compression, None)
+        compressors = self.id.http_conn.compressors
+        for filter in self._filters:
+            if isinstance(filter, str):
+                return None  # compression filter, but no options
+            elif isinstance(filter, dict) and "name" in filter:
+                filter_name = filter['name']
+                if filter_name not in compressors:
+                    continue
+                if filter_name == "szip":
+                    opt_keys = ("bitsPerPixel", "coding", "pixelsPerBlock", "pixelsPerScanline")
+                    opt = []
+                    for opt_key in opt_keys:
+                        if opt_key in filter:
+                            opt.append(filter[opt_key])
+                    if len(opt) == len(opt_keys):
+                        # expected number of options
+                        return tuple(opt)
+                    else:
+                        return None
+                if "level" in filter:
+                    # just return level as an int
+                    return filter["level"]
+                else:
+                    return None
+                
+        return None
+
 
     @property
     def shuffle(self):
         """Shuffle filter present (T/F)"""
-        return 'shuffle' in self._filters
+        for filter in self._filters:
+            # check by class or name
+            if 'class' in filter and filter['class'] == 'H5Z_FILTER_SHUFFLE':
+                return True
+            if 'name' in filter and filter['name'] == 'shuffle':
+                return True
+
+        return False
 
     @property
     def fletcher32(self):
         """Fletcher32 filter is present (T/F)"""
         return 'fletcher32' in self._filters
+        for filter in self._filters:
+            # check by class or name
+            if 'class' in filter and filter['class'] == 'H5Z_FILTER_FLETCHER32':
+                return True
+            if 'name' in filter and filter['name'] == 'fletcher32':
+                return True
+
+        return False
 
     @property
     def scaleoffset(self):
@@ -360,10 +415,14 @@ class Dataset(HLObject):
         the number of bits stored, or 0 for auto-detected. For floating
         point data types, this is the number of decimal places retained.
         If the scale/offset filter is not in use, this is None."""
-        try:
-            return self._filters['scaleoffset'][1]
-        except KeyError:
-            return None
+        for filter in self._filters:
+            # check by class or name
+            if ('class' in filter and filter['class'] == 'H5Z_FILTER_SCALEOFFSET') or ('name' in filter and filter['name'] == 'scaleoffset'):
+                if 'scaleOffset' in filter:
+                    return filter['scaleOffset']
+                else:
+                    return 0
+        return None
 
     @property
     def maxshape(self):

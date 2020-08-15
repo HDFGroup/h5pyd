@@ -543,6 +543,15 @@ class HttpConn:
         return root_uuid
 
     @property
+    def compressors(self):
+        compressors = []
+        if "compressors" in self.domain_json:
+            compressors = self.domain_json["compressors"]
+        if not compressors:
+            compressors = ["gzip",]
+        return compressors
+
+    @property
     def modified(self):
         """Last modified time of the domain as a datetime object."""
         domain_json = self.domain_json

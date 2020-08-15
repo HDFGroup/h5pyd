@@ -45,32 +45,9 @@ from __future__ import absolute_import, division
 
 import numpy as np
 
-_COMP_FILTERS = {'gzip': 'H5Z_FILTER_DEFLATE',
-                'szip': 'H5Z_FILTER_SZIP',
-                'lzf': 'H5Z_FILTER_LZF',
-                'shuffle': 'H5Z_FILTER_SHUFFLE',
-                'fletcher32': 'H5Z_FILTER_FLETCHER32',
-                'scaleoffset': 'H5Z_FILTER_SCALEOFFSET' }
-
 DEFAULT_GZIP = 4
-DEFAULT_SZIP = ('nn', 8)
-SO_INT_MINBITS_DEFAULT = 0
+dSO_INT_MINBITS_DEFAULT = 0
 
-def _gen_filter_tuples():
-    """ Bootstrap function to figure out what filters are available. """
-    dec = []
-    enc = []
-    for name, code in _COMP_FILTERS.items():
-        # TBD: Provide a REST operation to query which filters are available
-        #info = h5z.get_filter_info(code)
-        enc.append(name)
-        dec.append(name)
-
-    return tuple(dec), tuple(enc)
-
-
-
-decode, encode = _gen_filter_tuples()
 
 def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
                   shuffle, fletcher32, maxshape, scaleoffset, layout):
@@ -103,38 +80,7 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
     rq_tuple(chunks, 'chunks')
     rq_tuple(maxshape, 'maxshape')
 
-    if compression is not None:
-
-        if compression not in encode and not isinstance(compression, int):
-            raise ValueError('Compression filter "%s" is unavailable' % compression)
-
-        if compression == 'gzip':
-            if compression_opts is None:
-                gzip_level = DEFAULT_GZIP
-            elif compression_opts in range(10):
-                gzip_level = compression_opts
-            else:
-                raise ValueError("GZIP setting must be an integer from 0-9, not %r" % compression_opts)
-
-        elif compression == 'lzf':
-            if compression_opts is not None:
-                raise ValueError("LZF compression filter accepts no options")
-
-        elif compression == 'szip':
-            if compression_opts is None:
-                compression_opts = DEFAULT_SZIP
-
-            err = "SZIP options must be a 2-tuple ('ec'|'nn', even integer 0-32)"
-            try:
-                szmethod, szpix = compression_opts
-            except TypeError:
-                raise TypeError(err)
-            if szmethod not in ('ec', 'nn'):
-                raise ValueError(err)
-            if not (0<szpix<=32 and szpix%2 == 0):
-                raise ValueError(err)
-
-    elif compression_opts is not None:
+    if compression is None and compression_opts is not None:
         # Can't specify just compression_opts by itself.
         raise TypeError("Compression method must be specified")
 
@@ -211,17 +157,41 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
 
     if compression == 'gzip':
         #plist.set_deflate(gzip_level)
+        gzip_level = DEFAULT_GZIP
+        if compression_opts:
+            if compression_opts in range(10):
+                gzip_level = compression_opts
+            else:
+                raise ValueError("GZIP setting must be an integer from 0-9, not %r" % compression_opts)
+
         filter_gzip = { 'class': 'H5Z_FILTER_DEFLATE' }
         filter_gzip['id'] = 1
         filter_gzip['level'] = gzip_level
         filters.append(filter_gzip)
     elif compression == 'lzf':
         #plist.set_filter(h5z.FILTER_LZF, h5z.FLAG_OPTIONAL)
+        if compression_opts is not None:
+            raise ValueError("LZF compression filter accepts no options")
+
         filter_lzf = { 'class': 'H5Z_FILTER_LZF' }
         filter_lzf['id'] = 32000
         filters.append(filter_lzf)
 
     elif compression == 'szip':
+        if compression_opts:
+            err = "SZIP options must be a 2-tuple ('ec'|'nn', even integer 0-32)"
+            try:
+                szmethod, szpix = compression_opts
+            except TypeError:
+                raise TypeError(err)
+            if szmethod not in ('ec', 'nn'):
+                raise ValueError(err)
+            if not (0<szpix<=32 and szpix%2 == 0):
+                raise ValueError(err)
+        else:
+            szmethod = DEFAULT_SZIP[0]
+            szpix = DEFAULT_SZIP[1]
+
         opts = {'ec': 'H5Z_SZIP_EC_OPTION_MASK', 'nn': 'H5Z_SZIP_NN_OPTION_MASK' }
         # plist.set_szip(opts[szmethod], szpix)
         filter_szip = { 'class': 'H5Z_FILTER_SZIP' }
@@ -233,20 +203,20 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
             filter_szip['coding'] = 'H5_SZIP_NN_OPTION_MASK'
         filter_szip['bitsPerPixel'] = szpix
         filters.append(filter_szip)
-
-    elif isinstance(compression, int):
-        # TBD - don't have a way to query available filters via REST API
-        # just throw ValueError for now
-        raise ValueError("Unsupported compression filter: {}".format(compression))
-        """
-        if not h5z.filter_avail(compression):
-            raise ValueError("Unknown compression filter number: %s" % compression)
-        filter_ext = { 'id': compression }
-        for k in compression_opts:
-            filter_ext[k] = compression_opts[k]
-        filters.append(filter_ext)
-        plist.set_filter(compression, h5z.FLAG_OPTIONAL, compression_opts)
-        """
+    elif compression:
+        # generic compression filter
+        filter = {'class': 'H5Z_FILTER_USER', 'name': compression}
+        if compression_opts:
+            if isinstance(compression_opts, dict):
+                for k in compression_opts:
+                    filter[k] = compression_opts[k]
+            else:
+                if compression_opts in range(10):
+                    level = compression_opts
+                else:
+                    raise ValueError("compression setting must be a dict or integer from 0-9, not {}".format(compression_opts))
+                filter["level"] = level
+        filters.append(filter)
 
     if len(filters) > 0:
         plist["filters"] = filters
@@ -259,51 +229,11 @@ def get_filters(plist):
 
     Undocumented and subject to change without warning.
     """
+    if "filters" not in plist:
+        return []
+    else:
+        return plist["filters"]
 
-    filter_names = {'H5Z_FILTER_DEFLATE': 'gzip',
-               'H5Z_FILTER_SZIP': 'szip',
-               'H5Z_FILTER_SHUFFLE': 'shuffle',
-               'H5Z_FILTER_FLETCHER32': 'fletcher32',
-               'H5Z_FILTER_LZF': 'lzf',
-               'H5Z_FILTER_SCALEOFFSET': 'scaleoffset' }
-
-    vals = None
-    pipeline = {}
-    if 'filters' not in plist:
-        return pipeline
-
-
-    filters = plist['filters']
-
-    for filter in filters:
-
-        if filter['class'] == 'H5Z_FILTER_DEFLATE':
-            vals = filter['level'] # gzip level
-
-        elif filter['class'] == 'H5Z_FILTER_SZIP':
-            mask = None
-            if filter['coding'] == "H5Z_SZIP_EC_OPTION_MASK":
-                mask = 'ec'
-            elif filter['coding'] == "H5Z_SZIP_NN_OPTION_MASK":
-                mask = 'nn'
-            else:
-                raise TypeError("Unknown SZIP configuration")
-            pixels = filter['bitsPerPixel']
-            vals = (mask, pixels)
-        elif filter['class'] == 'H5Z_FILTER_LZF':
-            vals = None
-        else:
-            if vals and len(vals) == 0:
-               vals = None
-        filter_name = "Extension"
-        if filter['class'] in filter_names:
-            filter_name = filter_names[filter['class']]
-
-        if filter['class'] in filter_names.keys():
-            filter_name = filter_names[filter['class']]
-            pipeline[filter_name] = vals
-
-    return pipeline
 
 CHUNK_BASE = 16*1024    # Multiplier by which chunks are adjusted
 CHUNK_MIN = 8*1024      # Soft lower limit (8k)

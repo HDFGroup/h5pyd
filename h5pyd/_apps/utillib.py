@@ -299,7 +299,6 @@ def create_dataset(dobj, ctx):
     if ctx["verbose"]:
         print(msg)
     fout = ctx["fout"]
-    deflate = ctx["deflate"]
 
     chunks = None
 
@@ -407,7 +406,7 @@ def create_dataset(dobj, ctx):
         if len(dobj.shape) == 0 or (is_vlen and is_h5py(fout)):
             # don't use compression/chunks for scalar datasets
             # or vlen
-            compression_filter = None
+            compression = None
             compression_opts = None
             chunks = None
             shuffle = None
@@ -415,13 +414,13 @@ def create_dataset(dobj, ctx):
             maxshape = None
             scaleoffset = None
         else:
-            compression_filter = dobj.compression
+            compression = dobj.compression
             compression_opts = dobj.compression_opts
-            if deflate is not None and compression_filter is None:
-                compression_filter = "gzip"
-                compression_opts = deflate
-                if ctx["verbose"]:
-                    print("applying gzip filter with level: {}".format(deflate))
+            if ctx["default_compression"] is not None and compression is None:
+                compression = ctx["default_compression"]
+                compression_opts = ctx["default_compression_opts"]
+                if compression and ctx["verbose"]:
+                    print("applying {} filter with level: {}".format(compression, compression_opts))
             shuffle = dobj.shuffle
             fletcher32 = dobj.fletcher32
             maxshape = dobj.maxshape
@@ -431,7 +430,7 @@ def create_dataset(dobj, ctx):
             fillvalue=None
         dset = fout.create_dataset(
             dobj.name, shape=dobj.shape, dtype=tgt_dtype, chunks=chunks,
-            compression=compression_filter, shuffle=shuffle, maxshape=maxshape,
+            compression=compression, shuffle=shuffle, maxshape=maxshape,
             fletcher32=fletcher32, compression_opts=compression_opts,
             fillvalue=fillvalue, scaleoffset=scaleoffset)
         msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))
@@ -621,7 +620,7 @@ def create_datatype(obj, ctx):
 # create_datatype
 
 #----------------------------------------------------------------------------------
-def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=None,):
+def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compression=None,compression_opts=None):
     logging.info("input file: {}".format(fin.filename))
     logging.info("output file: {}".format(fout.filename))
     if dataload != "ingest":
@@ -644,7 +643,8 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, deflate=
     ctx["fout"] = fout
     ctx["verbose"] = verbose
     ctx["dataload"] = dataload  # ingest, s3link, None
-    ctx["deflate"] = deflate
+    ctx["default_compression"] = compression
+    ctx["default_compression_opts"] = compression_opts
     ctx["s3path"] = s3path
     ctx["srcid_desobj_map"] = {}
 
