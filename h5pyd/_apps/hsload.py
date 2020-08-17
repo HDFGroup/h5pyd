@@ -20,7 +20,8 @@ try:
     import h5py
     import h5pyd
 except ImportError as e:
-    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
+    sys.stderr.write(
+        "ERROR : %s : install it to use this utility...\n" % str(e))
     sys.exit(1)
 
 try:
@@ -37,10 +38,10 @@ except ImportError:
 
 if __name__ == "__main__":
     from config import Config
-    from utillib import load_file
+    from utillib import HSLoad
 else:
     from .config import Config
-    from .utillib import load_file
+    from .utillib import HSLoad
 
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse
@@ -53,10 +54,12 @@ cfg = Config()
 #----------------------------------------------------------------------------------
 def stage_file(uri, netfam=None, sslv=True):
     if PYCRUL is None:
-        logging.warn("pycurl not available for inline staging of input %s, see pip search pycurl." % uri)
+        logging.warn(
+            "pycurl not available for inline staging of input %s, see pip search pycurl." % uri)
         return None
     try:
-        fout = tempfile.NamedTemporaryFile(prefix='hsload.', suffix='.h5', delete=False)
+        fout = tempfile.NamedTemporaryFile(
+            prefix='hsload.', suffix='.h5', delete=False)
         logging.info("staging %s --> %s" % (uri, fout.name))
         if cfg["verbose"]:
             print("staging %s" % uri)
@@ -102,7 +105,8 @@ def usage():
     print("     -p | --password <password> :: Password credential")
     print("     -a | --append <mode>  :: Flag to append to an existing HDF Server domain")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
-    print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
+    print(
+        "     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
     print("     --compression blosclz|lz4|lz4hc|snappy|gzip|zstd :: use the given compression algorithm for -z option (lz4 is default)")
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
@@ -239,7 +243,8 @@ def main():
                 try:
                     compression_opts = int(arg[2:])
                 except ValueError:
-                    sys.stderr.write("Compression Level must be int between 0 and 9")
+                    sys.stderr.write(
+                        "Compression Level must be int between 0 and 9")
                     sys.exit(-1)
             if not compression:
                 compression = 'lz4'
@@ -262,7 +267,8 @@ def main():
     print("compression_opts: ", compression_opts)
 
     # setup logging
-    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
+    logging.basicConfig(
+        filename=logfname, format='%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
 
     # end arg parsing
@@ -280,7 +286,8 @@ def main():
     logging.info("source files: {}".format(src_files))
     logging.info("target domain: {}".format(domain))
     if len(src_files) > 1 and (domain[0] != '/' or domain[-1] != '/'):
-        sys.stderr.write("target must be a folder if multiple source files are provided")
+        sys.stderr.write(
+            "target must be a folder if multiple source files are provided")
         usage()
         sys.exit(-1)
 
@@ -293,10 +300,12 @@ def main():
     if dataload == "link":
         logging.info("checking libversion")
         if h5py.version.version_tuple.major != 2 or h5py.version.version_tuple.minor < 10:
-            sys.stderr.write("link option requires h5py version 2.10 or higher")
+            sys.stderr.write(
+                "link option requires h5py version 2.10 or higher")
             sys.exit(1)
         if h5py.version.hdf5_version_tuple[0] != 1 or h5py.version.hdf5_version_tuple[1] != 10 or h5py.version.hdf5_version_tuple[2] < 6:
-            sys.stderr.write("link option requires hdf5 lib version 1.10.6 or higher")
+            sys.stderr.write(
+                "link option requires hdf5 lib version 1.10.6 or higher")
             sys.exit(1)
 
     try:
@@ -332,12 +341,14 @@ def main():
                 try:
                     fin = h5py.File(s3.open(src_file, "rb"), "r")
                 except IOError as ioe:
-                    logging.error("Error opening file {}: {}".format(src_file, ioe))
+                    logging.error(
+                        "Error opening file {}: {}".format(src_file, ioe))
                     sys.exit(1)
             else:
                 if dataload == "link":
                     if op.isabs(src_file):
-                        sys.stderr.write("source file must be s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)")
+                        sys.stderr.write(
+                            "source file must be s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)")
                         sys.exit(1)
                     s3path = src_file
                 else:
@@ -345,7 +356,8 @@ def main():
                 try:
                     fin = h5py.File(src_file, mode='r')
                 except IOError as ioe:
-                    logging.error("Error opening file {}: {}".format(src_file, ioe))
+                    logging.error(
+                        "Error opening file {}: {}".format(src_file, ioe))
                     sys.exit(1)
 
             # create the output domain
@@ -355,25 +367,30 @@ def main():
                 endpoint = cfg["hs_endpoint"]
                 bucket = cfg["hs_bucket"]
 
-                fout = h5pyd.File(tgt, mode, endpoint=endpoint, username=username, password=password, bucket=bucket)
+                fout = h5pyd.File(tgt, mode, endpoint=endpoint,
+                                  username=username, password=password, bucket=bucket)
             except IOError as ioe:
                 if ioe.errno == 404:
                     logging.error("Domain: {} not found".format(tgt))
                 elif ioe.errno == 403:
                     logging.error("No write access to domain: {}".format(tgt))
                 else:
-                    logging.error("Error creating file {}: {}".format(tgt, ioe))
+                    logging.error(
+                        "Error creating file {}: {}".format(tgt, ioe))
                 sys.exit(1)
 
             # do the actual load
-            load_file(fin, fout, verbose=verbose, dataload=dataload, s3path=s3path, compression=compression, compression_opts=compression_opts)
+            HSLoad.run(fin, fout, dataload=dataload, s3path=s3path,
+                       compression_filter=compression,
+                       compression_opts=compression_opts verbose=verbose)
 
             # cleanup if needed
             if istmp:
                 try:
                     os.unlink(src_file)
                 except IOError as e:
-                    logging.warn("failed to delete %s : %s" % (src_file, str(e)))
+                    logging.warn("failed to delete %s : %s" %
+                                 (src_file, str(e)))
 
             msg = "File {} uploaded to domain: {}".format(src_file, tgt)
             logging.info(msg)

@@ -16,7 +16,8 @@ import logging
 try:
     import h5pyd
 except ImportError as e:
-    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
+    sys.stderr.write(
+        "ERROR : %s : install it to use this utility...\n" % str(e))
     sys.exit(1)
 
 try:
@@ -26,10 +27,10 @@ except ImportError:
 
 if __name__ == "__main__":
     from config import Config
-    from utillib import load_file
+    from utillib import HSLoad
 else:
     from .config import Config
-    from .utillib import load_file
+    from .utillib import HSLoad
 
 
 cfg = Config()
@@ -51,7 +52,8 @@ def usage():
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
-    print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
+    print(
+        "     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
@@ -62,6 +64,8 @@ def usage():
 #end print_usage
 
 #----------------------------------------------------------------------------------
+
+
 def print_config_example():
     print("# default")
     print("hs_username = <username>")
@@ -70,17 +74,19 @@ def print_config_example():
 #print_config_example
 
 #----------------------------------------------------------------------------------
+
+
 def main():
 
     loglevel = logging.ERROR
     verbose = False
-    dataload  = "ingest"
+    dataload = "ingest"
     deflate = None
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
     cfg["logfname"] = None
-    logfname=None
+    logfname = None
 
     src_files = []
     argn = 1
@@ -94,7 +100,7 @@ def main():
             usage()
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
-            val = sys.argv[argn+1]
+            val = sys.argv[argn + 1]
         if arg in ("-v", "--verbose"):
             verbose = True
             argn += 1
@@ -154,7 +160,8 @@ def main():
             argn += 1
 
     # setup logging
-    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
+    logging.basicConfig(
+        filename=logfname, format='%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
 
     # end arg parsing
@@ -181,7 +188,6 @@ def main():
         usage()
         sys.exit(-1)
 
-
     if cfg["hs_endpoint"] is None:
         logging.error('No endpoint given, try -h for help\n')
         sys.exit(1)
@@ -194,7 +200,8 @@ def main():
         bucket = cfg["hs_bucket"]
         # get a handle to input file
         try:
-            fin = h5pyd.File(src_domain, mode='r', endpoint=endpoint, username=username, password=password, bucket=bucket)
+            fin = h5pyd.File(src_domain, mode='r', endpoint=endpoint,
+                             username=username, password=password, bucket=bucket)
         except IOError as ioe:
             logging.error("Error opening file {}: {}".format(src_domain, ioe))
             sys.exit(1)
@@ -202,17 +209,19 @@ def main():
         # create the output domain
         try:
 
-            fout = h5pyd.File(des_domain, 'x', endpoint=endpoint, username=username, password=password, bucket=bucket)
+            fout = h5pyd.File(des_domain, 'x', endpoint=endpoint,
+                              username=username, password=password, bucket=bucket)
         except IOError as ioe:
             if ioe.errno == 403:
-                logging.error("No write access to domain: {}".format(des_domain))
+                logging.error(
+                    "No write access to domain: {}".format(des_domain))
             else:
-                logging.error("Error creating file {}: {}".format(des_domain, ioe))
+                logging.error(
+                    "Error creating file {}: {}".format(des_domain, ioe))
             sys.exit(1)
 
-
         # do the actual load
-        load_file(fin, fout, verbose=verbose, dataload=dataload, deflate=deflate)
+        HSLoad(fin, fout, verbose=verbose, dataload=dataload)
 
         msg = "File {} uploaded to domain: {}".format(src_domain, des_domain)
         logging.info(msg)
