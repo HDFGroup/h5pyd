@@ -875,81 +875,6 @@ class ObjectHelper:
             elif class_name == "Group":
                 self.load_datasets(dobj)
 
-    def create_anon_dset(self, data):
-        """
-        Create anonymous chunk dataset
-
-        Parameters
-        ----------
-        data : ndarray
-            Dataset data
-
-        Returns
-        -------
-        anon_dset : h5pyd.Dataset
-            anonymous chunk dataset
-        """
-
-        anon_dset = self._hsds.create_dataset(None, data.shape, data.dtype)
-        anon_dset[...] = data
-        logging.debug("anon_dset: {}".format(anon_dset))
-        logging.debug("anon_dset.chunks: {}".format(anon_dset.chunks))
-        logging.debug("anon_values: {}".format(data))
-        logging.debug('- flushing anon dataset to s3')
-        self._hsds.flush()
-
-        return anon_dset
-
-    def _create_dataset(self, name, shape, dtype, chunks=None,
-                        compression=None, shuffle=None, fletcher32=None,
-                        maxshape=None, compression_opts=None, fillvalue=None,
-                        scaleoffset=None):
-        """
-        Create h5pyd Dataset
-
-        Parameters
-        ----------
-        name : str
-            Dataset name
-        shape : tuple
-            Dataset shape
-        dtype : str | tuple | np.dtype
-            Dataset dtype
-        chunks : dict | tuple, optional
-            Dataset chunks, by default None
-        compression : str, optional
-            Dataset compression filter, by default None
-        shuffle : bool, optional
-            Whether the shuffle filter is applied (T/F), by default None
-        fletcher32 : bool, optional
-            Whether Fletcher32 checksumming is enabled (T/F), by default None
-        maxshape : tuple, optional
-            Maximum shape, by default None
-        compression_opts : dict, optional
-            Kwargs for compression filter, by default None
-        fillvalue : int, optional
-            Value used when reading uninitialized portions of the dataset,
-            by default None
-        scaleoffset : int, optional
-            Setting for the HDF5 scale-offset filter (integer), by default None
-
-        Returns
-        -------
-        dset : h5pyd.Dataset
-            HSDS dataset object
-        """
-        dset = self._hsds.create_dataset(name, shape=shape,
-                                         dtype=dtype, chunks=chunks,
-                                         compression=compression,
-                                         shuffle=shuffle,
-                                         fletcher32=fletcher32,
-                                         maxshape=maxshape,
-                                         compression_opts=compression_opts,
-                                         fillvalue=fillvalue,
-                                         scaleoffset=scaleoffset)
-
-        return dset
-
     def create_dataset(self, name, dobj):
         """
         create a dataset using the properties of the passed in h5py dataset.
@@ -1009,7 +934,16 @@ class ObjectHelper:
                 # create anonymous dataset to hold chunk info
                 chunkinfo_arr = ChunkInfo.get(self._h5.filename, dobj.name)
 
-                anon_dset = self.create_anon_dset(chunkinfo_arr)
+                anon_dset = self._hsds.create_dataset(None,
+                                                      chunkinfo_arr.shape,
+                                                      chunkinfo_arr.dtype)
+                anon_dset[...] = chunkinfo_arr
+                logging.debug("anon_dset: {}".format(anon_dset))
+                logging.debug("anon_dset.chunks: {}".format(anon_dset.chunks))
+                logging.debug("anon_values: {}".format(chunkinfo_arr))
+                logging.debug('- flushing anon dataset to s3')
+                self._hsds.flush()
+
                 chunks["class"] = 'H5D_CHUNKED_REF_INDIRECT'
                 chunks["file_uri"] = self._s3_path
                 chunks["dims"] = dobj.chunks
@@ -1050,15 +984,15 @@ class ObjectHelper:
             if is_vlen:
                 fillvalue = None
 
-            dset = self._create_dataset(name, dobj.shape, tgt_dtype,
-                                        chunks=chunks,
-                                        compression=compression_filter,
-                                        shuffle=shuffle,
-                                        fletcher32=fletcher32,
-                                        maxshape=maxshape,
-                                        compression_opts=compression_opts,
-                                        fillvalue=fillvalue,
-                                        scaleoffset=scaleoffset)
+            dset = self._hsds.create_dataset(name, shape=dobj.shape,
+                                             dtype=tgt_dtype, chunks=chunks,
+                                             compression=compression_filter,
+                                             shuffle=shuffle,
+                                             fletcher32=fletcher32,
+                                             maxshape=maxshape,
+                                             compression_opts=compression_opts,
+                                             fillvalue=fillvalue,
+                                             scaleoffset=scaleoffset)
             msg = ("dataset {} created, uuid: {}, chunk_size: {}"
                    .format(name, dset.id.id, str(dset.chunks)))
             logging.info(msg)
