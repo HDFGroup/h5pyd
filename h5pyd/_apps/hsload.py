@@ -258,9 +258,6 @@ def main():
             src_files.append(arg)
             argn += 1
 
-    print("compression: ", compression)
-    print("compression_opts: ", compression_opts)
-
     # setup logging
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
