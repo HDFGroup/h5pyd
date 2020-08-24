@@ -883,14 +883,19 @@ class HLObject(CommonStateObject):
     def GET(self, req, params=None, use_cache=True, format="json"):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
+        # This should be the default - but explictly set anyway
+        headers = {"Accept-Encoding": "deflate, gzip"}
 
-        rsp = self.id._http_conn.GET(req, params=params, format=format, use_cache=use_cache)
+        rsp = self.id._http_conn.GET(req, params=params, headers=headers, format=format, use_cache=use_cache)
         if rsp.status_code != 200:
             self.log.info("Got response: {}".format(rsp.status_code))
             raise IOError(rsp.status_code, rsp.reason)
         if rsp.headers['Content-Type'] == "application/octet-stream":
-            self.log.info("returning binary content, length: " +
-                          rsp.headers['Content-Length'])
+            if 'Content-Length' in rsp.headers:
+                # not available when http compression is used
+                self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
+            else:
+                self.log.info("returning binary compressed content")
             return rsp.content
         else:
             # assume JSON
@@ -942,7 +947,11 @@ class HLObject(CommonStateObject):
             raise IOError(rsp.reason)
 
         if rsp.headers['Content-Type'] == "application/octet-stream":
-            self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
+            if 'Content-Length' in rsp.headers:
+                # not available when http compression is used
+                self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
+            else:
+                self.log.info("returning binary compressed content")
             return rsp.content
         else:
             # assume JSON
