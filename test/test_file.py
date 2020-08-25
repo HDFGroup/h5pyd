@@ -145,7 +145,7 @@ class TestFile(TestCase):
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously
             if is_hsds:
-                time.sleep(12)  # let async process update obj number
+                time.sleep(20)  # let async process update obj number
                 self.assertEqual(f.num_objects, 2)
                 self.assertEqual(f.num_groups, 2)
             else:
