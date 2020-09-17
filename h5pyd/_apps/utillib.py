@@ -307,7 +307,7 @@ class ChunkInfo:
                    ' for datasets with less than 10 chunks. It is advised '
                    ' that you use a chunkinfo_arr instead!'
                    .format(self.dset_path, self.num_chunks))
-            logging.warning(msg)
+            logging.info(msg)
 
         chunk_map = {}
         chunk_info = self.get_chunk_info(max_workers=max_workers,
@@ -448,6 +448,7 @@ class ObjectHelper:
         """
         self._h5 = h5
         self._hsds = hsds
+        self._dataload = dataload
         self._s3_path = s3_path
         self._compression_filter = compression_filter
         self._compression_opts = compression_opts
@@ -899,7 +900,7 @@ class ObjectHelper:
             is_vlen = False
 
         chunks = None
-        if self.dataload == "link" and not is_vlen:
+        if self._dataload == "link" and not is_vlen:
             dset_dims = dobj.shape
             logging.debug("dset_dims: {}".format(dset_dims))
             chunk_dims = dobj.chunks
@@ -1132,7 +1133,7 @@ class HSLoad:
     Base class to load .h5 file into HSDS for direct read from S3
     """
 
-    def __init__(self, h5, hsds, s3_path=None):
+    def __init__(self, h5, hsds):
         """
         Parameters
         ----------
@@ -1225,7 +1226,7 @@ class HSLoad:
 
                 logging.info("using s3path")
             else:
-                logging.error("unexpected dataload value:", dataload)
+                logging.error("unexpected dataload value: {}".format(dataload))
                 sys.exit(1)
 
         load = cls(h5, hsds)
