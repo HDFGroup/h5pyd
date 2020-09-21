@@ -28,6 +28,7 @@ install:
     pip install aiohttp ;
     git clone https://github.com/HDFGroup/hsds.git ;
     cd hsds ;
+    python setup.py install ;
     cp admin/config/passwd.default admin/config/passwd.txt ;
     export ADMIN_PASSWORD=admin ;
     export ROOT_DIR=${HOME}/buckets ;
