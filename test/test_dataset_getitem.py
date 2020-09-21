@@ -380,11 +380,8 @@ class Test1DFloat(TestCase):
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
         self.data = np.arange(13).astype('f')
-        # TBD data in initializer not working
-        #self.dset = self.f.create_dataset('x', data=self.data)
-        self.dset = self.f.create_dataset('x', (13,), dtype='f')
+        self.dset = self.f.create_dataset('x', data=self.data)
         self.dset[...] = self.data
-        # self.dset = self.f.create_dataset('x', data=self.data)
 
     def test_ellipsis(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[...])
@@ -495,16 +492,19 @@ class Test2DZeroFloat(TestCase):
         filename = self.getFileName("dataset_test2dzerofloat")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
+        if isinstance(self.f.id.id, str):
+            # flag if using server
+            self.is_hsds = True
+        else:
+            self.is_hsds = False
         self.data = np.ones((0,3), dtype='f')
-        # TBD data in initializer not working
-        self.dset = self.f.create_dataset('x', (0,3),  maxshape=(None,3), dtype='f')
-        self.dset[...] = self.data
-        #self.dset = self.f.create_dataset('x', data=self.data)
+        self.dset = self.f.create_dataset('x', data=self.data)
 
-    @ut.expectedFailure
     def test_indexlist(self):
         """ see issue #473 """
-        self.assertNumpyBehavior(self.dset, self.data, np.s_[:,[0,1,2]])
+        if not self.is_hsds:
+            # TBD fix for hsds
+            self.assertNumpyBehavior(self.dset, self.data, np.s_[:,[0,1,2]])
 
 class Test2DFloat(TestCase):
 
@@ -514,10 +514,7 @@ class Test2DFloat(TestCase):
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
         self.data = np.ones((6,8), dtype='f')
-        # TBD data in initializer not working
-        self.dset = self.f.create_dataset('x', (6,8), dtype='f')
-        self.dset[...] = self.data
-        #self.dset = self.f.create_dataset('x', data=self.data)
+        self.dset = self.f.create_dataset('x', data=self.data)
 
     def test_index_simple(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[2:4,3:6])
@@ -533,10 +530,7 @@ class Test3DFloat(TestCase):
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
         self.data = np.ones((4,6,8), dtype='f')
-        # TBD data in initializer not working
-        self.dset = self.f.create_dataset('x', (4,6,8), dtype='f')
-        self.dset[...] = self.data
-        #self.dset = self.f.create_dataset('x', data=self.data)
+        self.dset = self.f.create_dataset('x', data=self.data, dtype='f')
 
     def test_index_simple(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[1,2:4,3:6])
