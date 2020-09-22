@@ -74,7 +74,8 @@ script:
   else
     export USE_H5PY=1 ;
   fi
-- python setup.py install
+- echo `pip freeze`
+- echo "h5pyd setup" ; python setup.py install
 - echo endpoint ${HS_ENDPOINT}
 - echo python_version ${TRAVIS_PYTHON_VERSION}
 - echo test folder ${H5PYD_TEST_FOLDER}
