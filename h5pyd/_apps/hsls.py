@@ -16,6 +16,19 @@ else:
 
 cfg = Config()
 
+class HSLS_Params:
+    def __init__(self):
+        self.verbose = None
+        self.showacls = None
+        self.showattrs = None
+        self.human_readable = None
+        self.pattern = None
+        self.query = None
+        self.cmd = None
+        self.hs_endpoint = None
+        self.hs_username = None
+        self.hs_password = None
+        self.hs_bucket = None
 
 def intToStr(n):
     if cfg["human_readable"]:
@@ -369,16 +382,9 @@ def printUsage():
     print("     -h | --help    :: This message.")
     sys.exit()
 
-
-#
-# Main
-#
-def main():
-    domains = []
+def parseCmdLineArgs():
     argn = 1
-    depth = 1
-    loglevel = logging.ERROR
-    logfname = None
+    domains = []
     cfg["verbose"] = False
     cfg["showacls"] = False
     cfg["showattrs"] = False
@@ -388,7 +394,6 @@ def main():
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
-
     while argn < len(sys.argv):
         arg = sys.argv[argn]
         val = None
@@ -451,6 +456,16 @@ def main():
         else:
             domains.append(arg)
             argn += 1
+
+    return domains
+
+#
+# Helper function that executes the HSLS algorithm
+#
+def _execute(domains):
+    depth = 1
+    loglevel = logging.ERROR
+    logfname = None
 
     # setup logging
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s',
@@ -516,6 +531,58 @@ def main():
                 dumpAcls(grp)
             grp.file.close()
 
+#
+# Execute method to be called directly from outside Python code.
+# Requires the domain and an input parameters object
+#
+def listDomainsContents(domains, params):
+    # Config defaults
+    if cfg.__contains__('verbose') is False:
+        cfg['verbose'] = False
+    if cfg.__contains__('showacls') is False:
+        cfg['showacls'] = False
+    if cfg.__contains__('showattrs') is False:
+        cfg['showattrs'] = False
+    if cfg.__contains__('human_readable') is False:
+        cfg['human_readable'] = False
+
+    # Add params to config object
+    if params.verbose is not None:
+        cfg['verbose'] = params.verbose
+    if params.showacls is not None:
+        cfg['showacls'] = params.showacls
+    if params.showattrs is not None:
+        cfg['showattrs'] = params.showattrs
+    if params.human_readable is not None:
+        cfg['human_readable'] = params.human_readable
+    if params.pattern is not None:
+        cfg['pattern'] = params.pattern
+    if params.query is not None:
+        cfg['query'] = params.query
+    if params.cmd is not None:
+        cfg['cmd'] = params.cmd
+    if params.hs_endpoint is not None:
+        cfg['hs_endpoint'] = params.hs_endpoint
+    if params.hs_username is not None:
+        cfg['hs_username'] = params.hs_username
+    if params.hs_password is not None:
+        cfg['hs_password'] = params.hs_password
+    if params.hs_bucket is not None:
+        cfg['hs_bucket'] = params.hs_bucket
+
+    _execute(domains)
+
+#
+# Execute method to be called directly from outside Python code.
+# Requires the domain and an input parameters object
+#
+def listDomainContents(domain, params):
+    domains = [domain]
+    listDomainsContents(domains, params)
+
+def main():
+    domains = parseCmdLineArgs()
+    _execute(domains)
 
 if __name__ == "__main__":
     main()
