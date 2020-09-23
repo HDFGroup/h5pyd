@@ -535,7 +535,7 @@ def _execute(domains):
 # Execute method to be called directly from outside Python code.
 # Requires the domain and an input parameters object
 #
-def listDomainsContents(domains, params):
+def listDomainsContents(domains, params = HSLS_Params()):
     # Config defaults
     if cfg.__contains__('verbose') is False:
         cfg['verbose'] = False
@@ -576,7 +576,7 @@ def listDomainsContents(domains, params):
 # Execute method to be called directly from outside Python code.
 # Requires the domain and an input parameters object
 #
-def listDomainContents(domain, params):
+def listDomainContents(domain, params = HSLS_Params()):
     domains = [domain]
     listDomainsContents(domains, params)
 
