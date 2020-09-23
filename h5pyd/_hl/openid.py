@@ -10,10 +10,13 @@ import adal
 from adal.adal_error import AdalError
 
 # Google
-from google_auth_oauthlib.flow import InstalledAppFlow as GoogleInstalledAppFlow
-from google.auth.transport.requests import Request as GoogleRequest
-from google.oauth2.credentials import Credentials as GoogleCredentials
-from google.oauth2 import id_token as GoogleIDToken
+try:
+    from google_auth_oauthlib.flow import InstalledAppFlow as GoogleInstalledAppFlow
+    from google.auth.transport.requests import Request as GoogleRequest
+    from google.oauth2.credentials import Credentials as GoogleCredentials
+    from google.oauth2 import id_token as GoogleIDToken
+except ModuleNotFoundError:
+    print("Unable to import google auth packages")
 
 from .config import Config
 

@@ -294,7 +294,7 @@ class TestCreateDataset(TestCase):
         else:
             self.assertEqual(chunks[0], 20)
             self.assertEqual(chunks[1], 40)
-        if f.id.id.startswith("g-"):
+        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
             # h5serv not setting this
             self.assertEqual(dset.compression, 'gzip')
             self.assertEqual(dset.compression_opts, 9)
@@ -478,11 +478,13 @@ class TestCreateDataset(TestCase):
         self.assertEqual(len(f), 1)
 
         dset_2 = f.require_dataset('dset', dims, dtype='f8')
-        self.assertEqual(dset.id.id, dset_2.id.id)
+        if not config.get("use_h5py"):
+            self.assertEqual(dset.id.id, dset_2.id.id)
         self.assertEqual(len(f), 1)
 
         dset_3 = f.require_dataset('dset', dims, dtype='f4')
-        self.assertEqual(dset.id.id, dset_3.id.id)
+        if not config.get("use_h5py"):
+            self.assertEqual(dset.id.id, dset_3.id.id)
         self.assertEqual(str(dset_3.dtype), 'float64')
 
         self.assertEqual(len(f), 1)
