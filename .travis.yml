@@ -75,7 +75,7 @@ script:
   else
     export USE_H5PY=1 ;
   fi
-- echo "six version: `pip freeze | grep six`"
+- echo six version `pip freeze | grep six`
 - python setup.py install
 - echo endpoint ${HS_ENDPOINT}
 - echo python_version ${TRAVIS_PYTHON_VERSION}
