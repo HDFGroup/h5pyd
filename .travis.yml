@@ -16,6 +16,7 @@ install:
 - pip install requests
 - pip install pytz
 - pip install h5py
+- pip install six
 - if [ "${H5_DRIVER}" == "h5serv" ]; then
     pip install tornado ;
     pip install watchdog ;
