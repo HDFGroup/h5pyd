@@ -16,7 +16,6 @@ install:
 - pip install requests
 - pip install pytz
 - pip install h5py
-- pip install six
 - if [ "${H5_DRIVER}" == "h5serv" ]; then
     pip install tornado ;
     pip install watchdog ;
@@ -49,6 +48,10 @@ install:
     echo "hsds server starting..." ;
     cd - ;
   fi
+- echo six version `pip freeze | grep six`
+- pip install six --upgrade
+- echo six version `pip freeze | grep six`
+- python setup.py install
 script:
 - echo h5_driver ${H5_DRIVER}
 - if [ "${H5_DRIVER}" == "h5serv" ]; then
@@ -75,8 +78,6 @@ script:
   else
     export USE_H5PY=1 ;
   fi
-- echo six version `pip freeze | grep six`
-- python setup.py install
 - echo endpoint ${HS_ENDPOINT}
 - echo python_version ${TRAVIS_PYTHON_VERSION}
 - echo test folder ${H5PYD_TEST_FOLDER}
