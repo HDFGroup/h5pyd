@@ -17,22 +17,19 @@ try:
     import h5py
     import h5pyd
 except ImportError as e:
-    sys.stderr.write(
-        "ERROR : %s : install it to use this utility...\n" % str(e))
+    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
     sys.exit(1)
 
 if __name__ == "__main__":
     from config import Config
-    from utillib import HSLoad
+    from utillib import load_file
 else:
     from .config import Config
-    from .utillib import HSLoad
+    from .utillib import load_file
 
-cfg = Config()  # config object
+cfg = Config()  #  config object
 
 #----------------------------------------------------------------------------------
-
-
 def usage():
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  domain filepath".format(cfg["cmd"])))
@@ -59,8 +56,6 @@ def usage():
 #end print_usage
 
 #----------------------------------------------------------------------------------
-
-
 def print_config_example():
     print("# default")
     print("hs_username = <username>")
@@ -69,8 +64,6 @@ def print_config_example():
 #print_config_example
 
 #----------------------------------------------------------------------------------
-
-
 def main():
 
     loglevel = logging.ERROR
@@ -82,11 +75,11 @@ def main():
         cfg["cmd"] = "python " + cfg["cmd"]
     cfg["verbose"] = False
 
-    endpoint = cfg["hs_endpoint"]
-    username = cfg["hs_username"]
-    password = cfg["hs_password"]
+    endpoint=cfg["hs_endpoint"]
+    username=cfg["hs_username"]
+    password=cfg["hs_password"]
     bucket = cfg["hs_bucket"]
-    logfname = None
+    logfname=None
 
     des_file = None
     src_domain = None
@@ -101,7 +94,7 @@ def main():
             usage()
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
-            val = sys.argv[argn + 1]
+            val = sys.argv[argn+1]
         if arg in ("-v", "--verbose"):
             verbose = True
             argn += 1
@@ -157,8 +150,7 @@ def main():
             sys.exit(-1)
 
     # setup logging
-    logging.basicConfig(
-        filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
+    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
     logging.debug("set log_level to {}".format(loglevel))
 
     # end arg parsing
@@ -175,6 +167,7 @@ def main():
     logging.info("source domain: {}".format(src_domain))
     logging.info("target file: {}".format(des_file))
 
+
     if endpoint is None:
         logging.error('No endpoint given, try -h for help\n')
         sys.exit(1)
@@ -182,19 +175,16 @@ def main():
 
     # get a handle to input domain
     try:
-        fin = h5pyd.File(src_domain, mode='r', endpoint=endpoint,
-                         username=username, password=password, bucket=bucket, use_cache=True)
+        fin = h5pyd.File(src_domain, mode='r', endpoint=endpoint, username=username, password=password, bucket=bucket, use_cache=True)
     except IOError as ioe:
         if ioe.errno == 403:
             logging.error("No read access to domain: {}".format(src_domain))
         elif ioe.errno == 404:
             logging.error("Domain: {} not found".format(src_domain))
         elif ioe.errno == 410:
-            logging.error(
-                "Domain: {} has been recently deleted".format(src_domain))
+            logging.error("Domain: {} has been recently deleted".format(src_domain))
         else:
-            logging.error(
-                "Error opening domain {}: {}".format(src_domain, ioe))
+            logging.error("Error opening domain {}: {}".format(src_domain, ioe))
         sys.exit(1)
 
     # create the output HDF5 file
@@ -205,7 +195,7 @@ def main():
         sys.exit(1)
 
     try:
-        HSLoad(fin, fout, verbose=verbose, dataload=dataload)
+        load_file(fin, fout, verbose=verbose, dataload=dataload)
         msg = "Domain {} downloaded to file: {}".format(src_domain, des_file)
         logging.info(msg)
         if verbose:
@@ -213,8 +203,6 @@ def main():
     except KeyboardInterrupt:
         logging.error('Aborted by user via keyboard interrupt.')
         sys.exit(1)
-
-
 #__main__
 if __name__ == "__main__":
     main()
