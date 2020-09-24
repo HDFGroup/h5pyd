@@ -378,8 +378,9 @@ def main():
 
             # do the actual load
             HSLoad.run(fin, fout, dataload=dataload, s3path=s3path,
-                       compression_filter=compression,
-                       compression_opts=compression_opts verbose=verbose)
+                    compression_filter=compression,
+                    compression_opts=compression_opts,
+                    verbose=verbose)
 
             # cleanup if needed
             if istmp:
