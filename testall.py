@@ -14,7 +14,7 @@
 import os
 import sys
 
-tests = ('test_attribute',
+hl_tests = ('test_attribute',
          'test_committedtype',
          'test_complex_numbers',
          'test_dataset_compound',
@@ -39,11 +39,13 @@ tests = ('test_attribute',
 # Run tests
 #
 os.chdir('test')
-for file_name in tests:
+os.chdir('hl')
+for file_name in hl_tests:
     print(file_name)
     rc = os.system('python ' + file_name + '.py')
     if rc != 0:
         sys.exit("Failed")
 
+os.chdir('..')
 os.chdir('..')
 print("Done!")
