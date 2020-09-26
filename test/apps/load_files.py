@@ -56,9 +56,9 @@ for filename in filenames:
         rc = os.system("wget -q https://s3.amazonaws.com/hdfgroup/data/hdf5test/{} -P {}".format(filename, data_dir))
         if rc != 0:
             sys.exit("Failed to retreive test data file")
-    # load to server is HSDS is running
+    # run hsload for each file
     print("running hsload for {}".format(hdf5_path))
     rc = os.system("hsload {} {}".format(hdf5_path, test_folder))
     if rc != 0:
-        sys.exist("Failed to load {}".format(filename))
+        sys.exit("Failed to load {}".format(filename))
     
