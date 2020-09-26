@@ -12,9 +12,7 @@
 
 import sys
 import logging
-import os
 import os.path as op
-import tempfile
 
 try:
     import h5py
@@ -29,12 +27,6 @@ try:
 except ImportError:
     S3FS_IMPORT = False
 
-
-try:
-    import pycurl as PYCRUL
-except ImportError:
-    PYCRUL = None
-
 if __name__ == "__main__":
     from config import Config
     from utillib import load_file
@@ -48,39 +40,6 @@ else:
     from urlparse import urlparse
 
 cfg = Config()
-
-
-#----------------------------------------------------------------------------------
-def stage_file(uri, netfam=None, sslv=True):
-    if PYCRUL is None:
-        logging.warn("pycurl not available for inline staging of input %s, see pip search pycurl." % uri)
-        return None
-    try:
-        fout = tempfile.NamedTemporaryFile(prefix='hsload.', suffix='.h5', delete=False)
-        logging.info("staging %s --> %s" % (uri, fout.name))
-        if cfg["verbose"]:
-            print("staging %s" % uri)
-        crlc = PYCRUL.Curl()
-        crlc.setopt(crlc.URL, uri)
-        if sslv is True:
-            crlc.setopt(crlc.SSL_VERIFYPEER, sslv)
-
-        if netfam == 4:
-            crlc.setopt(crlc.IPRESOLVE, crlc.IPRESOLVE_V4)
-        elif netfam == 6:
-            crlc.setopt(crlc.IPRESOLVE, crlc.IPRESOLVE_V6)
-
-        if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
-            crlc.setopt(crlc.VERBOSE, True)
-        crlc.setopt(crlc.WRITEFUNCTION, fout.write)
-        crlc.perform()
-        crlc.close()
-        fout.close()
-        return fout.name
-    except (IOError, PYCRUL.error) as e:
-        logging.error("%s : %s" % (uri, str(e)))
-        return None
-#stage_file
 
 
 #----------------------------------------------------------------------------------
@@ -110,8 +69,6 @@ def usage():
     print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not upload dataset data")
     print("     --link :: Link to dataset data (sourcefile given as <bucket>/<path>)")
-    print("     -4 :: Force ipv4 for any file staging (doesn\'t set hsds loading net)")
-    print("     -6 :: Force ipv6 (see -4)")
     print("     -h | --help    :: This message.")
     print("")
     print("Note about --link option:")
@@ -157,7 +114,6 @@ def main():
         cfg["cmd"] = "python " + cfg["cmd"]
     cfg["logfname"] = None
     logfname = None
-    ipvfam = None
     s3 = None  # s3fs instance
     mode = 'w'
 
@@ -211,10 +167,6 @@ def main():
         elif arg in ("-b", "--bucket"):
             cfg["hs_bucket"] = val
             argn += 2
-        elif arg == '-4':
-            ipvfam = 4
-        elif arg == '-6':
-            ipvfam = 6
         elif arg in ("-h", "--help"):
             usage()
             sys.exit(0)
@@ -303,15 +255,6 @@ def main():
             src_file_chk = urlparse(src_file)
             logging.debug(src_file_chk)
 
-            if src_file_chk.scheme == 'http' or src_file_chk.scheme == 'https' or src_file_chk.scheme == 'ftp':
-                src_file = stage_file(src_file, netfam=ipvfam)
-                if src_file is None:
-                    continue
-                istmp = True
-                logging.info('temp source data: ' + str(src_file))
-            else:
-                istmp = False
-
             tgt = domain
             if tgt[-1] == '/':
                 # folder destination
@@ -364,13 +307,6 @@ def main():
 
             # do the actual load
             load_file(fin, fout, verbose=verbose, dataload=dataload, s3path=s3path, compression=compression, compression_opts=compression_opts)
-
-            # cleanup if needed
-            if istmp:
-                try:
-                    os.unlink(src_file)
-                except IOError as e:
-                    logging.warn("failed to delete %s : %s" % (src_file, str(e)))
 
             msg = "File {} uploaded to domain: {}".format(src_file, tgt)
             logging.info(msg)
