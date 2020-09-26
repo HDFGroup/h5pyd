@@ -22,10 +22,8 @@ class TestHsinfo(TestCase):
     def test_help(self):
 
         arg = "-h"
-        result = subprocess.run(["hsinfo", "-h"], capture_output=True, text=True)
-        self.assertEqual(result.returncode, 0)
-        self.assertTrue(len(result.stdout) > 400)
-        self.assertFalse(result.stderr)
+        result = subprocess.check_output(["hsinfo", "-h"])
+        self.assertTrue(len(result) > 400)
 
 if __name__ == '__main__':
     loglevel = logging.ERROR
