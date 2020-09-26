@@ -11,10 +11,12 @@
 ##############################################################################
 import os
 
+def get_test_filenames():
+    return ("tall.h5",)
+
 cfg = {
     'use_h5py': False
 }
-
 
 def get(x):
     # see if there is a command-line override

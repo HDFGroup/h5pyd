@@ -35,17 +35,36 @@ hl_tests = ('test_attribute',
          'test_vlentype'
          )
 
+app_tests = ('test_hsinfo', 'test_tall_inspect')
+
+
+if "H5PYD_TEST_FOLDER" not in os.environ:
+    print("set H5PYD_TEST_FOLDER environment not set")
+    sys.exit(1)
+
 #
 # Run tests
 #
 os.chdir('test')
 os.chdir('hl')
-for file_name in hl_tests:
-    print(file_name)
-    rc = os.system('python ' + file_name + '.py')
+for test_name in hl_tests:
+    print(test_name)
+    rc = os.system('python ' + test_name + '.py')
     if rc != 0:
         sys.exit("Failed")
 
-os.chdir('..')
+os.chdir('../apps')
+rc = os.system('python is_hsds.py')
+if rc == 0:
+    # these test are only support with HSDS
+    rc = os.system('python load_files.py')
+    if rc != 0:
+        sys.exit("load_files.py failed")
+    for test_name in app_tests:
+        print(test_name)
+        rc = os.system('python ' + test_name + '.py')
+        if rc != 0:
+            sys.exit("Failed")
+
 os.chdir('..')
 print("Done!")
