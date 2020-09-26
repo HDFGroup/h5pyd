@@ -36,7 +36,7 @@ hl_tests = ('test_attribute',
          )
 hl_tests = ('test_visit',)
 
-app_tests = ('test_hsinfo', 'test_tall_inspect')
+app_tests = ('test_hsinfo',) # 'test_tall_inspect')
 
 
 if "H5PYD_TEST_FOLDER" not in os.environ:
@@ -61,8 +61,8 @@ if rc == 0:
     rc = os.system('python load_files.py')
     if rc != 0:
         sys.exit("load_files.py failed")
-    test_folder = os.environ["H5PYD_TEST_FOLDER"]
-    rc = os.system("hsload data/tall.h5 {}".format(test_folder))
+    #test_folder = os.environ["H5PYD_TEST_FOLDER"]
+    #rc = os.system("hsload data/tall.h5 {}".format(test_folder))
     for test_name in app_tests:
         print(test_name)
         rc = os.system('python ' + test_name + '.py')
