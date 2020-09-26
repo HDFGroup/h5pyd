@@ -57,8 +57,9 @@ for filename in filenames:
         if rc != 0:
             sys.exit("Failed to retreive test data file")
     # run hsload for each file
+    """
     print("running hsload for {}".format(hdf5_path))
     rc = os.system("hsload {} {}".format(hdf5_path, test_folder))
     if rc != 0:
         sys.exit("Failed to load {}".format(filename))
-    
+    """
