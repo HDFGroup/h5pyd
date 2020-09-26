@@ -53,10 +53,6 @@ for test_name in hl_tests:
     rc = os.system('python ' + test_name + '.py')
     if rc != 0:
         sys.exit("Failed")
-os.chdir('../../h5pyd/_apps')
-rc = os.system("python hsload.py -h")
-if rc != 0:
-    sys.exit("hsload Failed")
 
 os.chdir('../apps')
 rc = os.system('python is_hsds.py')
