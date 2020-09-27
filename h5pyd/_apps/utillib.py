@@ -315,8 +315,15 @@ def create_dataset(dobj, ctx):
         except RuntimeError:
             pass  # ignore
 
+    cpl = dobj.id.get_create_plist()
+    if cpl.get_layout == h5py.h5d.COMPACT:
+        logging.info("dataset is using COMPACT layout")
+        is_compact = True
+    else:
+        is_compact = False
+
     # can_use_storeinfo = use_storeinfo(dobj, ctx)
-    if ctx["dataload"] == "link" and not is_vlen:
+    if ctx["dataload"] == "link" and not is_vlen and not is_compact:
         dset_dims = dobj.shape
         logging.debug("dset_dims: {}".format(dset_dims))
         rank = len(dset_dims)
