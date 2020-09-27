@@ -9,31 +9,20 @@
 # distribution tree.  If you do not have access to this file, you may        #
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
+
+import sys
 import os
+import config
+import h5pyd
 
-cfg = {
-    'use_h5py': False
-}
+if config.get("use_h5py"):
+    sys.exit("use_h5py")
 
-
-def get(x):
-    # see if there is a command-line override
-    config_value = None
-
-    # see if there are an environment variable override
-    if x.upper() in os.environ:
-        config_value = os.environ[x.upper()]
-    # no command line override, just return the cfg value
-    if config_value is None:
-        config_value = cfg[x]
-
-    # convert string to boolean if true or false
-    if type(config_value) is str:
-        if config_value.upper() in ('T', 'TRUE'):
-            config_value = True
-        elif config_value.upper() in ('F', 'FALSE'):
-            config_value = False
-    return config_value
-
+print("is_hsds.py")
+if "H5PYD_TEST_FOLDER" not in os.environ:
+    sys.exit("set H5PYD_TEST_FOLDER environment not set")
+folder_path = os.environ["H5PYD_TEST_FOLDER"]
+folder_obj = h5pyd.Folder(folder_path)
+print("test domain count:", len(folder_obj))
 
 
