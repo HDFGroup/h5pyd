@@ -61,4 +61,5 @@ for filename in filenames:
     rc = os.system("python ../../h5pyd/_apps/hsload.py {} {}".format(hdf5_path, test_folder))
     if rc != 0:
         sys.exit("Failed to load {}".format(filename))
+print("load_files done")
     
