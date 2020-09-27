@@ -12,7 +12,7 @@
 import os
 
 def get_test_filenames():
-    return ("tall.h5", "diamond.h5")
+    return ("tall.h5", "diamond.h5", "shuffle_compress.h5")
 
 cfg = {
     'use_h5py': False

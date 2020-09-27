@@ -33,10 +33,9 @@ hl_tests = ('test_attribute',
          'test_table',
          'test_visit',
          'test_vlentype'
-         )
-hl_tests = ('test_visit',)
+         }
 
-app_tests = ('test_hsinfo', 'test_tall_inspect')
+app_tests = ('test_hsinfo', 'test_tall_inspect', 'test_diamond_inspect', 'test_shuffle_inspect')
 
 
 #if "H5PYD_TEST_FOLDER" not in os.environ:
