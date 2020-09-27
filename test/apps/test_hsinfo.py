@@ -22,7 +22,7 @@ class TestHsinfo(TestCase):
     def test_help(self):
 
         arg = "-h"
-        result = subprocess.check_output(["hsinfo", "-h"])
+        result = subprocess.check_output(["python", "../../h5pyd/_apps/hsinfo.py", "-h"])
         self.assertTrue(len(result) > 400)
 
 if __name__ == '__main__':
