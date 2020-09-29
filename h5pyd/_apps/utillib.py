@@ -101,6 +101,31 @@ def has_reference(dtype):
         has_ref = has_reference(basedt)
     return has_ref
 
+def is_vlen(dtype):
+    if dtype.metadata and 'vlen' in dtype.metadata:
+        return True
+    else:
+        return False
+
+def get_fillvalue(dset):
+
+    fillvalue = None
+    if not is_vlen(dset.dtype):
+        try:
+            # can trigger a runtime error if fillvalue is undefined
+            fillvalue = dset.fillvalue
+        except RuntimeError:
+            pass  # ignore
+    return fillvalue
+
+def is_compact(dset):
+    if isinstance(dset.id.id, str):
+        return False  # compact storage not used with HSDS
+    cpl = dset.id.get_create_plist()
+    if cpl.get_layout() == h5py.h5d.COMPACT:
+        return True
+    else:
+        return False
 
 def convert_dtype(srcdt, ctx):
     """ Return a dtype based on input dtype, converting any Reference types from
@@ -302,28 +327,7 @@ def create_dataset(dobj, ctx):
 
     chunks = None
 
-    if dobj.dtype.metadata and 'vlen' in dobj.dtype.metadata:
-        is_vlen = True
-    else:
-        is_vlen = False
-
-    fillvalue = None
-    if not is_vlen:
-        try:
-            # can trigger a runtime error if fillvalue is undefined
-            fillvalue = dobj.fillvalue
-        except RuntimeError:
-            pass  # ignore
-
-    cpl = dobj.id.get_create_plist()
-    if cpl.get_layout() == h5py.h5d.COMPACT:
-        logging.info("dataset is using COMPACT layout")
-        is_compact = True
-    else:
-        is_compact = False
-
-    # can_use_storeinfo = use_storeinfo(dobj, ctx)
-    if ctx["dataload"] == "link" and not is_vlen and not is_compact:
+    if ctx["dataload"] == "link" and not is_vlen(dobj.dtype) and not is_compact(dobj):
         dset_dims = dobj.shape
         logging.debug("dset_dims: {}".format(dset_dims))
         rank = len(dset_dims)
@@ -410,7 +414,7 @@ def create_dataset(dobj, ctx):
 
     try:
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
-        if len(dobj.shape) == 0 or (is_vlen and is_h5py(fout)):
+        if len(dobj.shape) == 0 or (is_vlen(dobj.dtype) and is_h5py(fout)):
             # don't use compression/chunks for scalar datasets
             # or vlen
             compression = None
@@ -433,8 +437,7 @@ def create_dataset(dobj, ctx):
             maxshape = dobj.maxshape
             scaleoffset = dobj.scaleoffset
 
-        if is_vlen:
-            fillvalue=None
+        fillvalue=get_fillvalue(dobj)
         dset = fout.create_dataset(
             dobj.name, shape=dobj.shape, dtype=tgt_dtype, chunks=chunks,
             compression=compression, shuffle=shuffle, maxshape=maxshape,
@@ -482,19 +485,8 @@ def write_dataset(src, tgt, ctx):
         tgt[()] = x
         return
 
-    if src.dtype.metadata and 'vlen' in src.dtype.metadata:
-        is_vlen = True
-    else:
-        is_vlen = False
 
-
-    fillvalue = None
-    if not is_vlen:
-        try:
-            # can trigger a runtime error if fillvalue is undefined
-            fillvalue = src.fillvalue
-        except RuntimeError:
-            pass  # ignore
+    fillvalue = get_fillvalue(src)
 
     msg = "iterating over chunks for {}".format(src.name)
     logging.info(msg)
@@ -683,11 +675,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
         logging.debug("object_copy_helper for object: {}".format(obj.name))
 
         if class_name in ("Dataset", "Table"):
-            if obj.dtype.metadata and 'vlen' in obj.dtype.metadata:
-                is_vlen = True
-            else:
-                is_vlen = False
-            if ctx["dataload"] == "link" and not is_vlen:
+            if ctx["dataload"] == "link" and not is_vlen(obj.dtype) and not is_compact(obj):
                 logging.info("skip datacopy for link reference")
             else:
                 logging.debug("calling write_dataset for dataset: {}".format(obj.name))
