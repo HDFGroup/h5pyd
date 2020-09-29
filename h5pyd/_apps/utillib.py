@@ -316,7 +316,7 @@ def create_dataset(dobj, ctx):
             pass  # ignore
 
     cpl = dobj.id.get_create_plist()
-    if cpl.get_layout == h5py.h5d.COMPACT:
+    if cpl.get_layout() == h5py.h5d.COMPACT:
         logging.info("dataset is using COMPACT layout")
         is_compact = True
     else:
