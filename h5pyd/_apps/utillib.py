@@ -641,7 +641,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
     ctx["fin"] = fin
     ctx["fout"] = fout
     ctx["verbose"] = verbose
-    ctx["dataload"] = dataload  # ingest, s3link, None
+    ctx["dataload"] = dataload  # ingest, link, or None
     ctx["default_compression"] = compression
     ctx["default_compression_opts"] = compression_opts
     ctx["s3path"] = s3path
@@ -705,7 +705,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
     create_links(fin, fout, ctx)  # create root soft/external links
     fin.visititems(object_link_helper)
 
-    if dataload == "ingest":
+    if dataload == "ingest" or dataload == "link":
         # copy dataset data
         logging.info("copying dataset data")
         fin.visititems(object_copy_helper)
