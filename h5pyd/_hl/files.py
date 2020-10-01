@@ -553,20 +553,19 @@ class File(Group):
             self.PUT(req, body=body)
             self.log.info("PUT flush complete")
 
-    def close(self):
+    def close(self, flush=False):
         """ Clears reference to remote resource.
         """
         # this will close the socket of the http_conn singleton
 
         self.log.debug("close, mode: {}".format(self.mode))
-        # do a PUT flush if this file is writable and the server is HSDS
-        if  self.mode == "r+" and self._id.id.startswith("g-"):
+        # do a PUT flush if this file is writable and the server is HSDS and flush is set
+        if  self.mode == "r+" and self._id.id.startswith("g-") and flush:
             # Currently flush only works with HSDS
             self.log.info("sending PUT flush request")
             req = '/'
             body = {"flush": 1}
             self.PUT(req, body=body)
-
 
         if self._id._http_conn:
             self._id._http_conn.close()

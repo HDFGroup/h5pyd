@@ -125,7 +125,7 @@ class TestAttribute(TestCase):
 
 
         # close file
-        f.close()
+        f.close(flush=False)
 
 
 if __name__ == '__main__':
