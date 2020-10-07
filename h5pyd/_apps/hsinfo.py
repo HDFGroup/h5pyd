@@ -137,7 +137,7 @@ def getDomainInfo(domain, cfg):
                    password=password, bucket=bucket, use_cache=True)
         else:
             f = h5pyd.File(domain, mode=mode, endpoint=endpoint, username=username,
-                   password=password, bucket=bucket, use_cache=True)
+                   password=password, bucket=bucket, use_cache=False)
     except IOError as oe:
         if oe.errno in (404, 410):   # Not Found
             sys.exit("domain: {} not found".format(domain))

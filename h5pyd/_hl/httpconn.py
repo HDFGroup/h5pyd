@@ -274,6 +274,10 @@ class HttpConn:
                 return rsp
 
         self.log.info("GET: {} [{}]".format(self._endpoint + req, params["domain"]))
+        for k in params:
+            if k != "domain":
+                v = params[k]
+                self.log.debug(f"GET params {k}:{v}")
         if self._username and self._password:
             auth = (self._username, self._password)
         else:
