@@ -102,6 +102,7 @@ script:
     echo restarting ;
     ./runall.sh ;
     cd - ; 
+    echo cwd ${PWD} ;
     python testall.py ;
   fi
 

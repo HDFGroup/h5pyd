@@ -58,16 +58,6 @@ class TestCase(ut.TestCase):
         Base class for unit tests.
     """
 
-    """
-    @property
-    def endpoint(self):
-        if "HS_ENDPOINT" in os.environ:
-            endpoint = os.environ["HS_ENDPOINT"]
-        else:
-            endpoint = "http://127.0.0.1:5000"
-        return endpoint
-    """
-
     @property
     def test_user1(self):
         # HS_USERNAME is the username h5pyd will look up if

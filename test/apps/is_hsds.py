@@ -18,11 +18,10 @@ import h5pyd
 if config.get("use_h5py"):
     sys.exit("use_h5py")
 
-print("is_hsds.py")
 if "H5PYD_TEST_FOLDER" not in os.environ:
     sys.exit("set H5PYD_TEST_FOLDER environment not set")
 folder_path = os.environ["H5PYD_TEST_FOLDER"]
-folder_obj = h5pyd.Folder(folder_path)
-print("test domain count:", len(folder_obj))
+folder_obj = h5pyd.Folder(folder_path)  # will trigger error with h5serv
+
 
 
