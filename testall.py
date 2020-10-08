@@ -38,10 +38,6 @@ hl_tests = ('test_attribute',
 app_tests = ('test_hsinfo', 'test_tall_inspect', 'test_diamond_inspect', 'test_shuffle_inspect')
 
 
-#if "H5PYD_TEST_FOLDER" not in os.environ:
-#    print("set H5PYD_TEST_FOLDER environment not set")
-#    sys.exit(1)
-
 #
 # Run tests
 #
