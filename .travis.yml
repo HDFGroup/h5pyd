@@ -96,8 +96,8 @@ script:
   fi
 - python testall.py
 - if [ "${H5_DRIVER}" == "hsds" ] ; then
-    cd hsds ; # bounce server to verify persisted data is correct
-    echo stopping serve ;
+    cd ../hsds ; # bounce server to verify persisted data is correct
+    echo stopping server ;
     ./stopserver.sh ; 
     echo restarting ;
     ./runall.sh ;
