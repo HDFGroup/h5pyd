@@ -102,4 +102,5 @@ script:
     echo restarting
     ./runall.sh
     cd -
-    python testall.py 
+    python testall.py
+  fi
