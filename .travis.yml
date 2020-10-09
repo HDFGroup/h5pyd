@@ -96,13 +96,14 @@ script:
   fi
 - python testall.py
 - if [ "${H5_DRIVER}" == "hsds" ] ; then
-    cd ../hsds ; 
+    echo cwd ${PWD} ;
+    cd hsds ; 
     echo stopping server ;
     ./stopserver.sh ; 
     echo restarting ;
     ./runall.sh ;
     cd - ; 
     echo cwd ${PWD} ;
-    python testall.py ;
+    python testall.py --app_only ;
   fi
 
