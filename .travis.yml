@@ -104,7 +104,7 @@ script:
 - echo second add run - cwd ${PWD} 
 - cd hsds 
 - echo stopping server
-- ./stopserver.sh  
+- ./stopall.sh  
 - echo restarting 
 - ./runall.sh 
 - cd - 
