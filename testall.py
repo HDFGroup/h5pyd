@@ -37,31 +37,46 @@ hl_tests = ('test_attribute',
 
 app_tests = ('test_hsinfo', 'test_tall_inspect', 'test_diamond_inspect', 'test_shuffle_inspect')
 
+run_hl = True
+run_app = True
+if len(sys.argv) > 1:
+    if sys.argv[1] in ("-h", "--help"):
+        print("Usage: python testall.py [--hl_only | --app_only]")
+        sys.exit(0)
+    if sys.argv[1] == "--hl_only":
+        run_app = False
+    elif sys.argv[1] == "--app_only":
+        run_hl = False
+    else:
+        print("Unexpected argument")
+        sys.exit(1)
 
 #
 # Run tests
 #
 os.chdir('test')
-os.chdir('hl')
-for test_name in hl_tests:
-    print(test_name)
-    rc = os.system('python ' + test_name + '.py')
-    if rc != 0:
-        sys.exit("Failed")
-
-os.chdir('../apps')
-rc = os.system('python is_hsds.py')
-print("running HSDS app tests")
-if rc == 0:
-    # these test are only support with HSDS
-    rc = os.system('python load_files.py')
-    if rc != 0:
-        sys.exit("load_files.py failed")
-    for test_name in app_tests:
+if run_hl:
+    os.chdir('hl')
+    for test_name in hl_tests:
         print(test_name)
         rc = os.system('python ' + test_name + '.py')
         if rc != 0:
             sys.exit("Failed")
+    os.chdir('..')
+if run_app:
+    os.chdir('apps')
+    rc = os.system('python is_hsds.py')
+    if rc == 0:
+        print("running HSDS app tests")
+        # these tests are only support with HSDS
+        rc = os.system('python load_files.py')
+        if rc != 0:
+            sys.exit("load_files.py failed")
+        for test_name in app_tests:
+            print(test_name)
+            rc = os.system('python ' + test_name + '.py')
+            if rc != 0:
+                sys.exit("Failed")
 
 os.chdir('..')
 

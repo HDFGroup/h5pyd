@@ -94,13 +94,20 @@ script:
     python h5pyd/_apps/hstouch.py  /home/test_user1/h5pyd_test/ ;
     python h5pyd/_apps/hstouch.py  ${H5PYD_TEST_FOLDER} ;
   fi
-- python testall.py
-- if [ "${H5_DRIVER}" == "hsds" ] ; then
-    cd ../hsds ; # bounce server to verify persisted data is correct
-    echo stopping server ;
-    ./stopserver.sh ; 
-    echo restarting ;
-    ./runall.sh ;
-    cd - ; 
-    python testall.py ;
+- python testall.py --hl_only
+- if [ "${H5_DRIVER}" != "hsds" ] ; then
+    echo "done" ;
+    exit ;
   fi
+- echo first app run - cwd ${PWD}
+- python testall.py --app_only
+- echo second add run - cwd ${PWD} 
+- cd hsds 
+- echo stopping server
+- ./stopall.sh  
+- echo restarting 
+- ./runall.sh 
+- cd - 
+- echo cwd ${PWD} 
+- python testall.py --app_only 
+
