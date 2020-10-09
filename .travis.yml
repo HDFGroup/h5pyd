@@ -94,8 +94,9 @@ script:
     python h5pyd/_apps/hstouch.py  /home/test_user1/h5pyd_test/ ;
     python h5pyd/_apps/hstouch.py  ${H5PYD_TEST_FOLDER} ;
   fi
-- python testall.py
+- python testall.py --hl_only
 - if [ "${H5_DRIVER}" == "hsds" ] ; then
+    python testall.py --app_only
     echo cwd ${PWD} ;
     cd hsds ; 
     echo stopping server ;

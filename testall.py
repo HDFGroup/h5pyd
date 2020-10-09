@@ -66,17 +66,17 @@ if run_hl:
 if run_app:
     os.chdir('apps')
     rc = os.system('python is_hsds.py')
-    print("running HSDS app tests")
     if rc == 0:
+        print("running HSDS app tests")
         # these tests are only support with HSDS
         rc = os.system('python load_files.py')
         if rc != 0:
             sys.exit("load_files.py failed")
-    for test_name in app_tests:
-        print(test_name)
-        rc = os.system('python ' + test_name + '.py')
-        if rc != 0:
-            sys.exit("Failed")
+        for test_name in app_tests:
+            print(test_name)
+            rc = os.system('python ' + test_name + '.py')
+            if rc != 0:
+                sys.exit("Failed")
 
 os.chdir('..')
 
