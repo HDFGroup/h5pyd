@@ -97,9 +97,9 @@ script:
 - python testall.py --hl_only
 - if [ "${H5_DRIVER}" != "hsds" ] ; then
     echo "done" ;
-    exit(0) ;
+    exit ;
   fi
--  echo first app run - cwd ${PWD}
+- echo first app run - cwd ${PWD}
 - python testall.py --app_only
 - echo second add run - cwd ${PWD} 
 - cd hsds 
