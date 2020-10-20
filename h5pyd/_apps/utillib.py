@@ -326,6 +326,7 @@ def create_dataset(dobj, ctx):
     fout = ctx["fout"]
 
     chunks = None
+    dset = None
 
     if ctx["dataload"] == "link" and not is_vlen(dobj.dtype) and not is_compact(dobj):
         dset_dims = dobj.shape
