@@ -18,6 +18,8 @@ from datetime import datetime
 import time
 import base64
 import requests
+import adal	
+from adal.adal_error import AdalError
 from requests import ConnectionError
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -28,6 +30,26 @@ from . import openid
 from .config import Config
 
 MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
+MS_AUTHORITY_HOST_URI = 'https://login.microsoftonline.com' 
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+DEFAULT_TIMEOUT = 180 # seconds - allow time for hsds service to bounce
+
+class TimeoutHTTPAdapter(HTTPAdapter):
+    def __init__(self, *args, **kwargs):
+        self.timeout = DEFAULT_TIMEOUT
+        if "timeout" in kwargs:
+            self.timeout = kwargs["timeout"]
+            del kwargs["timeout"]
+        super().__init__(*args, **kwargs)
+
+    def send(self, request, **kwargs):
+        timeout = kwargs.get("timeout")
+        if timeout is None:
+            kwargs["timeout"] = self.timeout
+        return super().send(request, **kwargs)
 
 class CacheResponse(object):
     """ Wrap a json response in a Requests.Response looking class.
@@ -488,9 +510,9 @@ class HttpConn:
                     backoff_factor=backoff_factor,
                     status_forcelist=status_forcelist
                 )
-                adapter = HTTPAdapter(max_retries=retry)
-                s.mount('http://', adapter)
-                s.mount('https://', adapter)
+             
+                s.mount('http://', TimeoutHTTPAdapter(max_retries=retry))
+                s.mount('https://', TimeoutHTTPAdapter(max_retries=retry))
                 self._s = s
             else:
                 s = self._s

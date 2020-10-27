@@ -90,7 +90,7 @@ class File(Group):
         return self._limits
 
     def __init__(self, domain, mode=None, endpoint=None, username=None, password=None, bucket=None,
-        api_key=None, use_session=True, use_cache=True, logger=None, owner=None, linked_domain=None, retries=3, **kwds):
+        api_key=None, use_session=True, use_cache=True, logger=None, owner=None, linked_domain=None, retries=10, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
