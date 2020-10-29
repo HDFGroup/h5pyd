@@ -944,6 +944,7 @@ class HLObject(CommonStateObject):
         if rsp.status_code == 409:
             raise ValueError("name already exists")
         if rsp.status_code not in (200, 201):
+            self.log.error("POST error - status_code: {}, reason: {}".format(rsp.status_code, rsp.reason))
             raise IOError(rsp.reason)
 
         if rsp.headers['Content-Type'] == "application/octet-stream":

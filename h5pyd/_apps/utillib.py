@@ -649,11 +649,13 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
     ctx["srcid_desobj_map"] = {}
 
     def copy_attribute_helper(name, obj):
+        print(f"copy attribute - name: {name}  obj: {obj.name}")
         tgt = fout[name]
         for a in obj.attrs:
             copy_attribute(tgt, a, obj, ctx)
 
     def object_create_helper(name, obj):
+        print(f"object create helper - name: {name} obj: {obj.name}")
         class_name = obj.__class__.__name__
         if class_name in ("Dataset", "Table"):
             create_dataset(obj, ctx)

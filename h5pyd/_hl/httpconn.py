@@ -439,12 +439,22 @@ class HttpConn:
             auth = (self._username, self._password)
         else:
             auth = None
-        try:
-            s = self.session
-            rsp = s.post(self._endpoint + req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
-        except ConnectionError as ce:
-            self.log.warn("connection error: ", ce)
-            raise IOError(str(ce))
+
+        for i in range(self._retries):    
+            try:
+                s = self.session
+                rsp = s.post(self._endpoint + req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
+            except ConnectionError as ce:
+                self.log.warn("connection error: ", ce)
+                raise IOError(str(ce))
+            if rsp.status_code == 504:
+                # gateway timeout, reset connection
+                self.log.error("POST - gateway timeout - retry: {}".format(i))
+                self.close()
+            elif rsp.status_code not in (200, 201):
+                self.log.error("POST error: {} - retry: {}".format(rsp.status_code, i))
+            else:
+                break
 
         return rsp
 
