@@ -402,7 +402,7 @@ def create_dataset(dobj, ctx):
             anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
             anon_dset[...] = chunkinfo_arr
             logging.debug("anon_dset: {}".format(anon_dset))
-            logging.debug("annon_values: {}".format(anon_dset[...]))
+            #logging.debug("anon_values: {}".format(anon_dset[...]))
             chunks["class"] = 'H5D_CHUNKED_REF_INDIRECT'
             chunks["file_uri"] = ctx["s3path"]
             chunks["dims"] = dobj.chunks
