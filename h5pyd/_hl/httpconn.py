@@ -439,22 +439,16 @@ class HttpConn:
             auth = (self._username, self._password)
         else:
             auth = None
-
-        for i in range(self._retries):    
-            try:
-                s = self.session
-                rsp = s.post(self._endpoint + req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
-            except ConnectionError as ce:
-                self.log.warn("connection error: ", ce)
-                raise IOError(str(ce))
-            if rsp.status_code == 504:
-                # gateway timeout, reset connection
-                self.log.error("POST - gateway timeout - retry: {}".format(i))
-                self.close()
-            elif rsp.status_code not in (200, 201):
-                self.log.error("POST error: {} - retry: {}".format(rsp.status_code, i))
-            else:
-                break
+  
+        try:
+            s = self.session
+            rsp = s.post(self._endpoint + req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
+        except ConnectionError as ce:
+            self.log.warn("connection error: ", ce)
+            raise IOError(str(ce))
+        
+        if rsp.status_code not in (200, 201):
+            self.log.error("POST error: {}".format(rsp.status_code))
 
         return rsp
 
@@ -507,8 +501,9 @@ class HttpConn:
         # create a session object to re-use http connection when possible
         s = requests
         retries=self._retries
-        backoff_factor=0.1
+        backoff_factor=1
         status_forcelist=(500, 502, 503, 504)
+        method_whitelist = ["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE", "POST"]  # include POST retries
         if self._use_session:
             if self._s is None:
                 s = requests.Session()
@@ -518,7 +513,8 @@ class HttpConn:
                     read=retries,
                     connect=retries,
                     backoff_factor=backoff_factor,
-                    status_forcelist=status_forcelist
+                    status_forcelist=status_forcelist,
+                    method_whielist=method_whitelist
                 )
              
                 s.mount('http://', TimeoutHTTPAdapter(max_retries=retry))
