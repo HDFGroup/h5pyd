@@ -514,7 +514,7 @@ class HttpConn:
                     connect=retries,
                     backoff_factor=backoff_factor,
                     status_forcelist=status_forcelist,
-                    method_whielist=method_whitelist
+                    method_whitelist=method_whitelist
                 )
              
                 s.mount('http://', TimeoutHTTPAdapter(max_retries=retry))
