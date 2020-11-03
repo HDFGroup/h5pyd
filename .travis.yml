@@ -16,7 +16,7 @@ install:
 - pip install numpy>=1.17.3
 - pip install requests
 - pip install pytz
-- pip install h5py
+- pip install h5py==2.9
 - if [ "${H5_DRIVER}" == "h5serv" ]; then
     pip install tornado ;
     pip install watchdog ;
