@@ -47,6 +47,12 @@ class File(Group):
 
     @property
     def driver(self):
+        """
+        Return a driver
+
+        Args:
+            self: (todo): write your description
+        """
         return "rest_driver"
 
     @property
@@ -68,6 +74,12 @@ class File(Group):
 
     @property
     def serverver(self):
+        """
+        Returns the server version.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._version
 
     @property
@@ -87,6 +99,12 @@ class File(Group):
 
     @property
     def limits(self):
+        """
+        Return a list of all known limits.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._limits
 
     def __init__(self, domain, mode=None, endpoint=None, username=None, password=None, bucket=None,
@@ -353,6 +371,12 @@ class File(Group):
         Group.__init__(self, self._id)
 
     def _getVerboseInfo(self):
+        """
+        Gets info about a single scan
+
+        Args:
+            self: (dict): write your description
+        """
         now = time.time()
         if self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME:
             # resynch the verbose data
@@ -386,6 +410,12 @@ class File(Group):
 
     @property
     def num_objects(self):
+        """
+        Returns the number of objects.
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         num_objects = 0
         if "num_objects" in props:
@@ -394,6 +424,12 @@ class File(Group):
 
     @property
     def num_datatypes(self):
+        """
+        Returns the number of datatypes.
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         num_datatypes = 0
         if "num_datatypes" in props:
@@ -402,6 +438,12 @@ class File(Group):
 
     @property
     def num_groups(self):
+        """
+        Return the number of groups.
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         num_groups = 0
         if "num_groups" in props:
@@ -410,6 +452,12 @@ class File(Group):
     
     @property
     def num_chunks(self):
+        """
+        Returns the number of chunks in the chunk.
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         num_chunks = 0
         if "num_chunks" in props:
@@ -418,6 +466,12 @@ class File(Group):
 
     @property
     def num_linked_chunks(self):
+        """
+        Return the number of chunks in this chunk.
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         num_linked_chunks = 0
         if "num_linked_chunks" in props:
@@ -426,6 +480,12 @@ class File(Group):
 
     @property
     def num_datasets(self):
+        """
+        Return the number of datasets.
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         num_datasets = 0
         if "num_datasets" in props:
@@ -434,6 +494,12 @@ class File(Group):
 
     @property
     def allocated_bytes(self):
+        """
+        Returns a byte string containing all bytes in the buffer.
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         allocated_bytes = 0
         if "allocated_bytes" in props:
@@ -442,6 +508,12 @@ class File(Group):
 
     @property
     def metadata_bytes(self):
+        """
+        Retrieve metadata as a byte array.
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         metadata_bytes = 0
         if "metadata_bytes" in props:
@@ -450,6 +522,12 @@ class File(Group):
 
     @property
     def linked_bytes(self):
+        """
+        Retrieves the linked linked linked linked byte.
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         linked_bytes = 0
         if "linked_bytes" in props:
@@ -458,6 +536,12 @@ class File(Group):
 
     @property
     def total_size(self):
+        """
+        Returns the total size in bytes.
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         total_size = 0
         if "total_size" in props:
@@ -466,6 +550,12 @@ class File(Group):
 
     @property
     def md5_sum(self):
+        """
+        Return md5 sum
+
+        Args:
+            self: (todo): write your description
+        """
         props = self._getVerboseInfo()
         md5_sum = None
         if "md5_sum" in props:
@@ -474,6 +564,12 @@ class File(Group):
 
     @property
     def last_scan(self):
+        """
+        Return the last scan.
+
+        Args:
+            self: (todo): write your description
+        """
         self._getVerboseInfo() # will update _lastScan
         return self._lastScan
 
@@ -489,18 +585,38 @@ class File(Group):
 
     # override base implemention of ACL methods to use the domain rather than update root group
     def getACL(self, username):
+        """
+        Returns a list of a acl
+
+        Args:
+            self: (dict): write your description
+            username: (str): write your description
+        """
         req = '/acls/' + username
         rsp_json = self.GET(req)
         acl_json = rsp_json["acl"]
         return acl_json
 
     def getACLs(self):
+        """
+        Retrieve a list of the synls
+
+        Args:
+            self: (dict): write your description
+        """
         req = '/acls'
         rsp_json = self.GET(req)
         acls_json = rsp_json["acls"]
         return acls_json
 
     def putACL(self, acl):
+        """
+        Add or update acl
+
+        Args:
+            self: (todo): write your description
+            acl: (todo): write your description
+        """
         if "userName" not in acl:
             raise IOError(404, "ACL has no 'userName' key")
         perm = {}
@@ -513,6 +629,12 @@ class File(Group):
         self.PUT(req, body=perm)
 
     def run_scan(self):
+        """
+        Run scan.
+
+        Args:
+            self: (todo): write your description
+        """
         MAX_WAIT=10
         self._getVerboseInfo() 
         prev_scan = self._lastScan
@@ -572,13 +694,31 @@ class File(Group):
         self._id.close()
 
     def __enter__(self):
+        """
+        Decor function.
+
+        Args:
+            self: (todo): write your description
+        """
         return self
 
     def __exit__(self, *args):
+        """
+        Exit the context manager is closed.
+
+        Args:
+            self: (todo): write your description
+        """
         if self.id:
             self.close()
 
     def __repr__(self):
+        """
+        Return a human - readable representation of this object.
+
+        Args:
+            self: (todo): write your description
+        """
         if not self.id:
             r = '<Closed HDF5 file>'
         else:

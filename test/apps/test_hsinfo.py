@@ -20,6 +20,12 @@ class TestHsinfo(TestCase):
 
 
     def test_help(self):
+        """
+        Show the help.
+
+        Args:
+            self: (todo): write your description
+        """
 
         arg = "-h"
         result = subprocess.check_output(["python", "../../h5pyd/_apps/hsinfo.py", "-h"])

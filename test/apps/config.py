@@ -12,6 +12,11 @@
 import os
 
 def get_test_filenames():
+    """
+    Return list of filenames.
+
+    Args:
+    """
     return ("tall.h5", "diamond.h5", "shuffle_compress.h5")
 
 cfg = {
@@ -19,6 +24,12 @@ cfg = {
 }
 
 def get(x):
+    """
+    Get the value from the environment.
+
+    Args:
+        x: (int): write your description
+    """
     # see if there is a command-line override
     config_value = None
 

@@ -44,6 +44,11 @@ cfg = Config()
 
 #----------------------------------------------------------------------------------
 def usage():
+    """
+    Print usage of the usage.
+
+    Args:
+    """
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  sourcefile  domain".format(cfg["cmd"])))
     print(("    {} [ OPTIONS ]  sourcefile  folder".format(cfg["cmd"])))
@@ -92,6 +97,11 @@ def usage():
 
 #----------------------------------------------------------------------------------
 def print_config_example():
+    """
+    Print the config example.
+
+    Args:
+    """
     print("# default")
     print("hs_username = <username>")
     print("hs_password = <passwd>")
@@ -101,6 +111,11 @@ def print_config_example():
 
 #----------------------------------------------------------------------------------
 def main():
+    """
+    Main function.
+
+    Args:
+    """
 
     COMPRESSION_FILTERS = ('blosclz', 'lz4', 'lz4hc', 'snappy', 'gzip', 'zstd')
     loglevel = logging.ERROR

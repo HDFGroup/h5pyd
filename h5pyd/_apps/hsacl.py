@@ -24,6 +24,13 @@ cfg = Config()
 # get given ACL, return None if not found
 #
 def getACL(f, username="default"):
+    """
+    Gets acl
+
+    Args:
+        f: (todo): write your description
+        username: (str): write your description
+    """
     try:
        acl = f.getACL(username)
     except IOError as ioe:
@@ -47,6 +54,11 @@ def getACL(f, username="default"):
 # Usage
 #
 def printUsage():
+    """
+    Prints out the configuration
+
+    Args:
+    """
     print("")
     print("Usage: {} [options] domain [+crudep] [-crudep] [userid1 userid2 ...]".format(cfg["cmd"]))
     print("")
@@ -75,6 +87,11 @@ def printUsage():
 
 
 def main():
+    """
+    Main function.
+
+    Args:
+    """
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]

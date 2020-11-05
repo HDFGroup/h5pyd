@@ -26,6 +26,12 @@ from common import ut, TestCase
 
 class TestTable(TestCase):
     def test_create_table(self):
+        """
+        Create a hdf5 file.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_table_dset")
         print("filename:", filename)
         if config.get("use_h5py"):
@@ -70,6 +76,12 @@ class TestTable(TestCase):
         f.close()
 
     def test_query_table(self):
+        """
+        Generate a test table *
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("query_compound_dset")
         print("filename:", filename)
         if config.get("use_h5py"):

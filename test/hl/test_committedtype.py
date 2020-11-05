@@ -22,6 +22,12 @@ from common import ut, TestCase
 
 class TestCommittedType(TestCase):
     def test_createtype(self):
+        """
+        Dump the hdf5 file.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("committed_type")
         print("filename:", filename)
         f = h5py.File(filename, "w")

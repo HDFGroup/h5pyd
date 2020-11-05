@@ -17,6 +17,16 @@ from .httpconn import HttpConn
 from .config import Config
 
 def getServerInfo( endpoint=None, username=None, password=None, api_key=None, **kwds):
+    """
+    Retrieves info about a specific endpoint.
+
+    Args:
+        endpoint: (str): write your description
+        username: (str): write your description
+        password: (str): write your description
+        api_key: (str): write your description
+        kwds: (todo): write your description
+    """
 
     cfg = Config()  # get credentials from .hscfg file (if found)
 

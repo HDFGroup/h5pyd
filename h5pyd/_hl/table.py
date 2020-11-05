@@ -25,6 +25,16 @@ class Cursor():
       Cursor for retreiving rows from a table
     """
     def __init__(self, table, query=None, start=None, stop=None):
+        """
+        Initialize the query.
+
+        Args:
+            self: (todo): write your description
+            table: (str): write your description
+            query: (str): write your description
+            start: (int): write your description
+            stop: (int): write your description
+        """
         self._table = table
         self._query = query
         if start is None:
@@ -100,9 +110,26 @@ class Table(Dataset):
 
     @property
     def nrows(self):
+        """
+        Return the number of rows.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._shape[0]
 
     def read(self, start=None, stop=None, step=None, field=None, out=None):
+        """
+        Read data from the stream.
+
+        Args:
+            self: (todo): write your description
+            start: (todo): write your description
+            stop: (todo): write your description
+            step: (todo): write your description
+            field: (todo): write your description
+            out: (array): write your description
+        """
         if start is None:
             start = 0
         if stop is None:

@@ -26,6 +26,12 @@ class TestFolders(TestCase):
 
 
     def test_list(self):
+        """
+        Return a list of - packages.
+
+        Args:
+            self: (todo): write your description
+        """
         #loglevel = logging.DEBUG
         #logging.basicConfig( format='%(asctime)s %(message)s', level=loglevel)
         test_domain = self.getFileName("folder_test")
@@ -108,6 +114,12 @@ class TestFolders(TestCase):
 
 
     def test_create_folder(self):
+        """
+        Create a folder
+
+        Args:
+            self: (todo): write your description
+        """
         empty = self.getFileName("empty")
         empty_path = self.getPathFromDomain(empty)
 
@@ -138,6 +150,12 @@ class TestFolders(TestCase):
 
 
     def test_root_folder(self):
+        """
+        Test if a folder of the root folder * is a root *
+
+        Args:
+            self: (todo): write your description
+        """
         test_domain = self.getFileName("folder_test")
 
 

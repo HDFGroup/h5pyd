@@ -28,6 +28,12 @@ class Folder():
 
     @property
     def domain(self):
+        """
+        The domain of the domain
+
+        Args:
+            self: (todo): write your description
+        """
         domain = self._domain
         if domain is None:
             domain = ''
@@ -38,6 +44,12 @@ class Folder():
 
     @property
     def parent(self):
+        """
+        : class : classname of the parent.
+
+        Args:
+            self: (todo): write your description
+        """
         if self._domain is None:
             return None
         else:
@@ -239,6 +251,13 @@ class Folder():
             self._owner = None
 
     def getACL(self, username):
+        """
+        Retrieves acl
+
+        Args:
+            self: (todo): write your description
+            username: (str): write your description
+        """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         req = '/acls/' + username
@@ -250,6 +269,12 @@ class Folder():
         return acl_json
 
     def getACLs(self):
+        """
+        Retrieves all device status
+
+        Args:
+            self: (todo): write your description
+        """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         req = '/acls'
@@ -261,6 +286,13 @@ class Folder():
         return acls_json
 
     def putACL(self, acl):
+        """
+        R update acl for a bucket
+
+        Args:
+            self: (todo): write your description
+            acl: (todo): write your description
+        """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         if self._http_conn.mode == 'r':
@@ -280,6 +312,12 @@ class Folder():
 
 
     def _getSubdomains(self):
+        """
+        Function path : get the list of subdomains.
+
+        Args:
+            self: (todo): write your description
+        """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         if self._subdomains is not None and not self._subdomain_marker:
@@ -419,11 +457,29 @@ class Folder():
 
 
     def __enter__(self):
+        """
+        Decor function.
+
+        Args:
+            self: (todo): write your description
+        """
         return self
 
     def __exit__(self, *args):
+        """
+        Execute a exit code.
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def __repr__(self):
+        """
+        Return a repr representation of this domain.
+
+        Args:
+            self: (todo): write your description
+        """
 
         return self.domain

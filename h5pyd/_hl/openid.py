@@ -101,6 +101,11 @@ class OpenIDHandler(ABC):
 
 
 def eprint(*args, **kwargs):
+    """
+    Prints the function.
+
+    Args:
+    """
     print(*args, file=sys.stderr, **kwargs)
 
 class AzureOpenID(OpenIDHandler):
@@ -135,6 +140,12 @@ class AzureOpenID(OpenIDHandler):
         super().__init__(endpoint, use_token_cache=use_token_cache)
 
     def write_token_cache(self):
+        """
+        Write the token to the cache.
+
+        Args:
+            self: (todo): write your description
+        """
         if 'AD_CLIENT_SECRET' in self.config and self.config['AD_CLIENT_SECRET']:
             pass # don't use token cache for unattended authentication
         else:

@@ -37,6 +37,11 @@ cfg = Config()
 
 #----------------------------------------------------------------------------------
 def usage():
+    """
+    Print usage information about the usage.
+
+    Args:
+    """
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  source  destination".format(cfg["cmd"])))
     print("")
@@ -63,6 +68,11 @@ def usage():
 
 #----------------------------------------------------------------------------------
 def print_config_example():
+    """
+    Print the config example.
+
+    Args:
+    """
     print("# default")
     print("hs_username = <username>")
     print("hs_password = <passwd>")
@@ -71,6 +81,11 @@ def print_config_example():
 
 #----------------------------------------------------------------------------------
 def main():
+    """
+    Main function.
+
+    Args:
+    """
 
     loglevel = logging.ERROR
     verbose = False

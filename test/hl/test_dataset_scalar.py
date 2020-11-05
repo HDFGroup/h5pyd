@@ -28,6 +28,12 @@ import six
 
 class TestScalarDataset(TestCase):
     def test_scalar_dset(self):
+        """
+        Create a scalar_scalar * dset * hasproperties *
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("scalar_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")

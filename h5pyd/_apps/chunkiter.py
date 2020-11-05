@@ -14,6 +14,13 @@ class ChunkIterator:
     Class to iterate through list of chunks given h5py dset
     """
     def __init__(self, dset):
+        """
+        Initialize the chunks.
+
+        Args:
+            self: (todo): write your description
+            dset: (todo): write your description
+        """
         self._shape = dset.shape
         if dset.chunks is None:
             # treat the dataset as one chunk
@@ -29,11 +36,29 @@ class ChunkIterator:
             self._chunk_index = [0,] * self._rank
 
     def __iter__(self):
+        """
+        Returns an iterator over the iterable.
+
+        Args:
+            self: (todo): write your description
+        """
         return self
 
     def __next__(self):
+        """
+        Return the next chunk.
+
+        Args:
+            self: (todo): write your description
+        """
 
         def get_ret(item):
+            """
+            Get the last item from an item.
+
+            Args:
+                item: (todo): write your description
+            """
             if len(item) == 1:
                 return item[0]
             else:

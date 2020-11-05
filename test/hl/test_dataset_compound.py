@@ -26,6 +26,12 @@ from common import ut, TestCase
 
 class TestDatasetCompound(TestCase):
     def test_create_compound_dset(self):
+        """
+        Create a computes the compound.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_compound_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")

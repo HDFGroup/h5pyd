@@ -28,6 +28,12 @@ class TestAttribute(TestCase):
 
 
     def test_create(self):
+        """
+        Create a new hdf5 file
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_attribute")
         print("filename:", filename)
         f = h5py.File(filename, 'w')

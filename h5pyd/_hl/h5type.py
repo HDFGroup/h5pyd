@@ -18,6 +18,12 @@ import numpy as np
 import weakref
 
 def is_reference(val):
+    """
+    Return true if val is a reference.
+
+    Args:
+        val: (str): write your description
+    """
     try:
         if  val.__class__.__name__ == "Reference":
             return True
@@ -32,6 +38,12 @@ def is_reference(val):
     return False
 
 def is_regionreference(val):
+    """
+    Returns true if val is a valid region.
+
+    Args:
+        val: (todo): write your description
+    """
     try:
         if  val.__class__.__name__ == "RegionReference":
             return True
@@ -68,6 +80,12 @@ class Reference():
         self._objref = weakref.ref(bind)
 
     def __repr__(self):
+        """
+        Return a string representation of the object.
+
+        Args:
+            self: (todo): write your description
+        """
         if not isinstance(self._id.id, str):
             raise TypeError("Expected string id")
         item = None
@@ -83,6 +101,12 @@ class Reference():
         return item
 
     def tolist(self):
+        """
+        Return a copy of this object.
+
+        Args:
+            self: (todo): write your description
+        """
         return [self.__repr__(),]
 
 class RegionReference():
@@ -107,6 +131,12 @@ class RegionReference():
         self._objref = weakref.ref(bind)
 
     def __repr__(self):
+        """
+        Return a repr representation of a repr__.
+
+        Args:
+            self: (todo): write your description
+        """
         return "<HDF5 region reference>"
 
 def special_dtype(**kwds):
@@ -206,6 +236,12 @@ For compound types, recursively iterate through the typeItem and do same
 conversion for fields of the compound type.  """
 
 def getTypeResponse(typeItem):
+    """
+    Convert a response for a given type.
+
+    Args:
+        typeItem: (str): write your description
+    """
 
     response = None
     if 'uuid' in typeItem:
@@ -445,6 +481,12 @@ def getTypeItem(dt):
     return the string "H5T_VARIABLE"
 """
 def getItemSize(typeItem):
+    """
+    Returns the size of the item.
+
+    Args:
+        typeItem: (str): write your description
+    """
     # handle the case where we are passed a primitive type first
     if isinstance(typeItem, str) or isinstance(typeItem, bytes):
         for type_prefix in ("H5T_STD_I", "H5T_STD_U", "H5T_IEEE_F"):
@@ -535,6 +577,13 @@ def getItemSize(typeItem):
 
 
 def getNumpyTypename(hdf5TypeName, typeClass=None):
+    """
+    Retrieve a table for a hdf file
+
+    Args:
+        hdf5TypeName: (str): write your description
+        typeClass: (str): write your description
+    """
     predefined_int_types = {
           'H5T_STD_I8':  'i1',
           'H5T_STD_U8':  'u1',
@@ -571,6 +620,12 @@ def getNumpyTypename(hdf5TypeName, typeClass=None):
 
 
 def createBaseDataType(typeItem):
+    """
+    Create a data type for a given item type.
+
+    Args:
+        typeItem: (str): write your description
+    """
 
     dtRet = None
     if type(typeItem) == str or type(typeItem) == str:
@@ -712,6 +767,12 @@ def createBaseDataType(typeItem):
 Create a numpy datatype given a json type
 """
 def createDataType(typeItem):
+    """
+    Create a data type for a data type.
+
+    Args:
+        typeItem: (todo): write your description
+    """
     dtRet = None
     if type(typeItem) in [str, bytes]:
         # should be one of the predefined types

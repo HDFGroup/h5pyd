@@ -28,6 +28,12 @@ class TestVlenTypes(TestCase):
 
 
     def test_create_vlen_attr(self):
+        """
+        Create a vlenels object
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_vlen_attribute")
         print("filename:", filename)
         if config.get("use_h5py"):
@@ -121,6 +127,12 @@ class TestVlenTypes(TestCase):
 
 
     def test_create_vlen_dset(self):
+        """
+        Create a vlenels file
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_vlen_dset")
         print("filename:", filename)
         if config.get("use_h5py"):
@@ -180,6 +192,12 @@ class TestVlenTypes(TestCase):
         f.close()
 
     def test_create_vlen_2d_dset(self):
+        """
+        Create a 2dset of 2dset
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_vlen_2d_dset")
         print("filename:", filename)
         if config.get("use_h5py"):
@@ -236,6 +254,12 @@ class TestVlenTypes(TestCase):
 
 
     def test_variable_len_str_attr(self):
+        """
+        Reads the length of a variable.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("variable_len_str_dset")
         print("filename:", filename)
         if config.get("use_h5py"):
@@ -265,6 +289,12 @@ class TestVlenTypes(TestCase):
 
 
     def test_variable_len_str_dset(self):
+        """
+        Loads the dataset metadata file for a dataset
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("variable_len_str_dset")
         print("filename:", filename)
         if config.get("use_h5py"):
@@ -311,6 +341,12 @@ class TestVlenTypes(TestCase):
         f.close()
 
     def test_variable_len_unicode_dset(self):
+        """
+        Test if the dataset has a 2dset ().
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("variable_len_unicode_dset")
         print("filename:", filename)
         if config.get("use_h5py"):

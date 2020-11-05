@@ -14,6 +14,13 @@ else:
 cfg = Config()
 
 def getFolder(domain, mode='r'):
+    """
+    Get the h5 object.
+
+    Args:
+        domain: (str): write your description
+        mode: (str): write your description
+    """
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -23,6 +30,12 @@ def getFolder(domain, mode='r'):
 
 
 def deleteDomain(domain):
+    """
+    Delete a domain.
+
+    Args:
+        domain: (str): write your description
+    """
 
     # get handle to parent folder
     if domain.endswith('/'):
@@ -80,6 +93,11 @@ def deleteDomain(domain):
 # Usage
 #
 def printUsage():
+    """
+    Prints the current configuration
+
+    Args:
+    """
     print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] [--bucket <bucket_name>] domains".format(cfg["cmd"]))
     print("example: {} -e http://hsdshdflab.hdfgroup.org /hdfgroup/data/test/deleteme.h5".format(cfg["cmd"]))
     sys.exit()
@@ -88,6 +106,11 @@ def printUsage():
 # Main
 #
 def main():
+    """
+    Main function.
+
+    Args:
+    """
     domains = []
     argn = 1
     loglevel = logging.ERROR

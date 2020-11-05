@@ -21,6 +21,11 @@ cfg = Config()
 # Usage
 #
 def printUsage():
+    """
+    Prints out the information.
+
+    Args:
+    """
     print("Usage: {} [-h] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-c oonf_file] [-e endpoint] [-u username] [-p password] [-b bucket] [domain]".format(cfg["cmd"]))
     print("")
     print("Description:")
@@ -43,6 +48,12 @@ def printUsage():
 #
 #
 def getUpTime(start_time):
+    """
+    Returns a string representing the time in seconds.
+
+    Args:
+        start_time: (int): write your description
+    """
     now = int(time.time())
     sec = now - start_time
     days = sec // (24*60*60)
@@ -63,6 +74,12 @@ def getUpTime(start_time):
     return ret_str
 
 def format_size(n):
+    """
+    Return human readable in human readable
+
+    Args:
+        n: (todo): write your description
+    """
     if n is None or n == ' ':
         return ' ' * 8
     symbol = ' '
@@ -196,6 +213,11 @@ def getDomainInfo(domain, cfg):
 # Get folder in /home/ that is owned by given user
 #
 def getHomeFolder():
+    """
+    Get username / etc.
+
+    Args:
+    """
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -229,6 +251,11 @@ def getHomeFolder():
 # Main
 #
 def main():
+    """
+    Main function.
+
+    Args:
+    """
     argn = 1
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):

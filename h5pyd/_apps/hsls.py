@@ -18,6 +18,12 @@ cfg = Config()
 
 
 def intToStr(n):
+    """
+    Convert an integer to an integer.
+
+    Args:
+        n: (todo): write your description
+    """
     if cfg["human_readable"]:
         s = "{:,}".format(n)
     else:
@@ -26,6 +32,12 @@ def intToStr(n):
 
 
 def format_size(n):
+    """
+    Return human readable in human readable
+
+    Args:
+        n: (todo): write your description
+    """
     if n is None or n == ' ':
         return ' ' * 8
     symbol = ' '
@@ -44,6 +56,12 @@ def format_size(n):
 
 
 def getShapeText(dset):
+    """
+    Returns a string shape of the shape.
+
+    Args:
+        dset: (todo): write your description
+    """
     shape_text = "Scalar"
     shape = dset.shape
     if shape is not None:
@@ -69,6 +87,14 @@ def getShapeText(dset):
 
 
 def visititems(name, grp, visited):
+    """
+    Dump all items of the class.
+
+    Args:
+        name: (str): write your description
+        grp: (dict): write your description
+        visited: (todo): write your description
+    """
     for k in grp:
         item = grp.get(k, getlink=True)
         class_name = item.__class__.__name__
@@ -95,11 +121,25 @@ def visititems(name, grp, visited):
 
 
 def getTypeStr(dt):
+    """
+    Returns the string type of a datetime
+
+    Args:
+        dt: (todo): write your description
+    """
     # TBD: convert dt to more HDF5-like representation
     return str(dt)
 
 
 def dump(name, obj, visited=None):
+    """
+    Dump a dataset.
+
+    Args:
+        name: (str): write your description
+        obj: (dict): write your description
+        visited: (todo): write your description
+    """
     class_name = obj.__class__.__name__
     desc = None
     obj_id = None
@@ -205,6 +245,12 @@ def dump(name, obj, visited=None):
 
 
 def dumpACL(acl):
+    """
+    Dump acl
+
+    Args:
+        acl: (todo): write your description
+    """
     perms = ""
     if acl["create"]:
         perms += 'c'
@@ -234,6 +280,12 @@ def dumpACL(acl):
 
 
 def dumpAcls(obj):
+    """
+    Dump acls
+
+    Args:
+        obj: (todo): write your description
+    """
     try:
         acls = obj.getACLs()
     except IOError:
@@ -245,6 +297,12 @@ def dumpAcls(obj):
 
 
 def getFolder(domain):
+    """
+    Retrieve h5 information.
+
+    Args:
+        domain: (str): write your description
+    """
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -258,6 +316,12 @@ def getFolder(domain):
 
 
 def getFile(domain):
+    """
+    Retrieve a bucket
+
+    Args:
+        domain: (str): write your description
+    """
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -268,6 +332,13 @@ def getFile(domain):
 
 
 def visitDomains(domain, depth=1):
+    """
+    Determine the number of a domain.
+
+    Args:
+        domain: (str): write your description
+        depth: (int): write your description
+    """
     if depth == 0:
         return 0
 
@@ -349,6 +420,11 @@ def visitDomains(domain, depth=1):
 # Usage
 #
 def printUsage():
+    """
+    Prints out the configuration.
+
+    Args:
+    """
     print("usage: {} [-r] [-v] [-h] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] [--bucket bucketname] domains".format(cfg["cmd"]))
     print("example: {} -r -e http://hsdshdflab.hdfgroup.org /shared/tall.h5".format(cfg["cmd"]))
     print("")
@@ -374,6 +450,11 @@ def printUsage():
 # Main
 #
 def main():
+    """
+    Main function.
+
+    Args:
+    """
     domains = []
     argn = 1
     depth = 1

@@ -23,6 +23,11 @@ else:
 from common import ut, TestCase
 
 def get_filename():
+    """
+    Return the filename of the config file.
+
+    Args:
+    """
     if config.get("use_h5py"):
         dirpath = "data" 
     else:
@@ -34,13 +39,31 @@ def get_filename():
 class TestDiamondInspect(TestCase):
 
     def setUp(self):
+        """
+        Sets the h5py h5py.
+
+        Args:
+            self: (todo): write your description
+        """
         
         filename = get_filename()
         self.f = h5py.File(filename, "r")
 
     def test_obj_count(self):
+        """
+        Read the number of the test for each hdf5 file.
+
+        Args:
+            self: (todo): write your description
+        """
         counts = {"groups": 0, "datasets": 0}
         def visit(name):
+            """
+            Writes an hdf5 file.
+
+            Args:
+                name: (str): write your description
+            """
             obj = self.f[name]
             if isinstance(obj, h5py.Dataset):
                 counts["datasets"] += 1
@@ -54,6 +77,12 @@ class TestDiamondInspect(TestCase):
         self.assertEqual(1, counts["datasets"])
 
     def test_links(self):
+        """
+        Test for the test links
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertEqual(len(self.f), 2)
         self.assertTrue("g1" in self.f)
         self.assertTrue("g2" in self.f)

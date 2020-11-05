@@ -31,6 +31,11 @@ cfg = Config()  #  config object
 
 #----------------------------------------------------------------------------------
 def usage():
+    """
+    Print usage information about the usage.
+
+    Args:
+    """
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  domain filepath".format(cfg["cmd"])))
     print("")
@@ -57,6 +62,11 @@ def usage():
 
 #----------------------------------------------------------------------------------
 def print_config_example():
+    """
+    Print the config example.
+
+    Args:
+    """
     print("# default")
     print("hs_username = <username>")
     print("hs_password = <passwd>")
@@ -65,6 +75,11 @@ def print_config_example():
 
 #----------------------------------------------------------------------------------
 def main():
+    """
+    Main entry point.
+
+    Args:
+    """
 
     loglevel = logging.ERROR
     verbose = False

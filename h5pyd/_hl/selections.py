@@ -170,6 +170,12 @@ class Selection(object):
         return (self.nselect,)
 
     def getSelectNpoints(self):
+        """
+        Returns the number of the grid points in the grid
+
+        Args:
+            self: (todo): write your description
+        """
         npoints = None
         if self._select_type == H5S_SELECT_NONE:
             npoints = 0
@@ -190,6 +196,12 @@ class Selection(object):
         yield self._id
 
     def __getitem__(self, args):
+        """
+        Return the item from the given args.
+
+        Args:
+            self: (todo): write your description
+        """
         raise NotImplementedError("This class does not support indexing")
 
 class PointSelection(Selection):
@@ -211,6 +223,12 @@ class PointSelection(Selection):
 
 
     def getSelectNpoints(self):
+        """
+        Return the number of the points.
+
+        Args:
+            self: (todo): write your description
+        """
         npoints = None
         if self._select_type == H5S_SELECT_NONE:
             npoints = 0
@@ -306,17 +324,43 @@ class SimpleSelection(Selection):
 
     @property
     def start(self):
+        """
+        Starts a new start.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._sel[0]
 
     @property
     def count(self):
+        """
+        Return the number of results.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._sel[1]
 
     @property
     def step(self):
+        """
+        Return the current step.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._sel[2]
 
     def __init__(self, shape, *args, **kwds):
+        """
+        Initialize a shape.
+
+        Args:
+            self: (todo): write your description
+            shape: (int): write your description
+            kwds: (todo): write your description
+        """
         Selection.__init__(self, shape, *args, **kwds)
         rank = len(self._shape)
         self._sel = ((0,)*rank, self._shape, (1,)*rank, (False,)*rank)
@@ -324,6 +368,12 @@ class SimpleSelection(Selection):
         self._select_type = H5S_SELECT_ALL
 
     def __getitem__(self, args):
+        """
+        Return an item from the array.
+
+        Args:
+            self: (todo): write your description
+        """
 
         if not isinstance(args, tuple):
             args = (args,)
@@ -370,6 +420,12 @@ class SimpleSelection(Selection):
         return npoints
 
     def getQueryParam(self):
+        """
+        Returns the query for this parameter
+
+        Args:
+            self: (todo): write your description
+        """
         param = ''
         rank = len(self._shape)
         if rank == 0:
@@ -449,19 +505,45 @@ class FancySelection(Selection):
 
     @property
     def mshape(self):
+        """
+        Returns the mshape in mshape.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._mshape
 
     @property
     def hyperslabs(self):
+        """
+        : returns the diagonal of the density.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._hyperslabs
 
 
     def __init__(self, shape, *args, **kwds):
+        """
+        Initialize the shape.
+
+        Args:
+            self: (todo): write your description
+            shape: (int): write your description
+            kwds: (todo): write your description
+        """
         Selection.__init__(self, shape, *args, **kwds)
         self._mshape = self._shape
         self._hyperslabs = []
 
     def __getitem__(self, args):
+        """
+        Get an index of a dictionary.
+
+        Args:
+            self: (todo): write your description
+        """
         #print("args:", args)
 
         if not isinstance(args, tuple):
@@ -529,6 +611,13 @@ class FancySelection(Selection):
         self._mshape = tuple(x for x in mshape if x != 0)
 
     def broadcast(self, target_shape):
+        """
+        Broadcast target_shape.
+
+        Args:
+            self: (todo): write your description
+            target_shape: (todo): write your description
+        """
         if not target_shape == self._mshape:
             raise TypeError("Broadcasting is not supported for complex selections")
         yield self._id
@@ -723,10 +812,24 @@ class ScalarSelection(Selection):
 
     @property
     def mshape(self):
+        """
+        Returns the mshape in mshape.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._mshape
 
 
     def __init__(self, shape,  *args, **kwds):
+        """
+        Initialize an array.
+
+        Args:
+            self: (todo): write your description
+            shape: (int): write your description
+            kwds: (todo): write your description
+        """
         Selection.__init__(self, shape, *args, **kwds)
         arg = None
         if len(args) > 0:

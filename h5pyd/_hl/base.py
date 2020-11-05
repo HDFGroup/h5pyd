@@ -30,12 +30,33 @@ numpy_float_types = (np.float16, np.float32, np.float64)
 
 class FakeLock():
     def __init__(self):
+        """
+        Initialize the object
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def __enter__(self):
+        """
+        Enter the callable
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def __exit__(self, a, b, c):
+        """
+        Exit a and exit.
+
+        Args:
+            self: (todo): write your description
+            a: (todo): write your description
+            b: (todo): write your description
+            c: (todo): write your description
+        """
         pass
 
 _phil = FakeLock()
@@ -53,6 +74,12 @@ def with_phil(func):
     import functools
 
     def wrapper(*args, **kwds):
+        """
+        Decorator for a wrapper.
+
+        Args:
+            kwds: (todo): write your description
+        """
         with _phil:
             return func(*args, **kwds)
 
@@ -106,6 +133,15 @@ def _decode(item, encoding="ascii"):
 
 
 def getHeaders(domain, username=None, password=None, headers=None):
+    """
+    Returns a dictionary of http headers.
+
+    Args:
+        domain: (todo): write your description
+        username: (str): write your description
+        password: (str): write your description
+        headers: (dict): write your description
+    """
         if headers is None:
             headers = {}
         headers['host'] = domain
@@ -126,6 +162,13 @@ Example. [[1,2],[3,4]] -> ((1,2),(3,4))
 """
 # TBD: this was cut & pasted from attrs.py
 def toTuple(rank, data):
+    """
+    Convert a tuple into a tuple.
+
+    Args:
+        rank: (int): write your description
+        data: (array): write your description
+    """
     if type(data) in (list, tuple):
         if rank > 0:
             return list(toTuple(rank-1, x) for x in data)
@@ -138,6 +181,12 @@ def toTuple(rank, data):
 Helper - get num elements defined by a shape
 """
 def getNumElements(dims):
+    """
+    Get the number of the dimensions.
+
+    Args:
+        dims: (todo): write your description
+    """
     num_elements = 0
     if isinstance(dims, int):
         num_elements = dims
@@ -153,6 +202,16 @@ def getNumElements(dims):
 Copy JSON array into given numpy array
 """
 def copyToArray(arr, rank, index, data, vlen_base=None):
+    """
+    Copy a copy of arrays to another array.
+
+    Args:
+        arr: (array): write your description
+        rank: (int): write your description
+        index: (int): write your description
+        data: (array): write your description
+        vlen_base: (int): write your description
+    """
 
     nlen = arr.shape[rank]
     if len(data) != nlen:
@@ -247,6 +306,12 @@ def jsonToArray(data_shape, data_dtype, data_json):
 Return True if the type contains variable length elements
 """
 def isVlen(dt):
+    """
+    Check if dt is a datetime.
+
+    Args:
+        dt: (todo): write your description
+    """
     is_vlen = False
     if len(dt) > 1:
         names = dt.names
@@ -263,6 +328,13 @@ def isVlen(dt):
 Get number of byte needed to given element as a bytestream
 """
 def getElementSize(e, dt):
+    """
+    Return the size of a dt element.
+
+    Args:
+        e: (array): write your description
+        dt: (todo): write your description
+    """
     #print("getElementSize - e: {}  dt: {}".format(e, dt))
     if len(dt) > 1:
         count = 0
@@ -307,6 +379,12 @@ def getElementSize(e, dt):
 Get number of bytes needed to store given numpy array as a bytestream
 """
 def getByteArraySize(arr):
+    """
+    Returns the size of the array.
+
+    Args:
+        arr: (array): write your description
+    """
     if not isVlen(arr.dtype):
         return arr.itemsize * np.prod(arr.shape)
     nElements = int(np.prod(arr.shape))
@@ -322,6 +400,14 @@ def getByteArraySize(arr):
 Copy to buffer at given offset
 """
 def copyBuffer(src, des, offset):
+    """
+    Copy bytes from source buffer to destination.
+
+    Args:
+        src: (todo): write your description
+        des: (str): write your description
+        offset: (int): write your description
+    """
     for i in range(len(src)):
         des[i+offset] = src[i]
 
@@ -331,6 +417,15 @@ def copyBuffer(src, des, offset):
 Copy element to bytearray
 """
 def copyElement(e, dt, buffer, offset):
+    """
+    Copies an element of the buffer.
+
+    Args:
+        e: (todo): write your description
+        dt: (todo): write your description
+        buffer: (todo): write your description
+        offset: (int): write your description
+    """
     if len(dt) > 1:
         for name in dt.names:
             field_dt = dt[name]
@@ -395,6 +490,13 @@ def copyElement(e, dt, buffer, offset):
 Get the count value from persisted vlen array
 """
 def getElementCount(buffer, offset):
+    """
+    Return the number of rows in the buffer.
+
+    Args:
+        buffer: (todo): write your description
+        offset: (int): write your description
+    """
     count_bytes = bytes(buffer[offset:(offset+4)])
 
     try:
@@ -415,6 +517,16 @@ def getElementCount(buffer, offset):
 Read element from bytearrray
 """
 def readElement(buffer, offset, arr, index, dt):
+    """
+    Read the next element from the buffer.
+
+    Args:
+        buffer: (todo): write your description
+        offset: (int): write your description
+        arr: (array): write your description
+        index: (str): write your description
+        dt: (todo): write your description
+    """
     #print("readElement, offset: {}, index: {} dt: {}".format(offset, index, dt))
 
     if len(dt) > 1:
@@ -466,6 +578,12 @@ def readElement(buffer, offset, arr, index, dt):
 Return byte representation of numpy array
 """
 def arrayToBytes(arr):
+    """
+    Convert a numpy array to a numpy array.
+
+    Args:
+        arr: (array): write your description
+    """
     #print("arrayToBytes: ", arr)
     if not isVlen(arr.dtype):
         # can just return normal numpy bytestream
@@ -485,6 +603,14 @@ def arrayToBytes(arr):
 Create numpy array based on byte representation
 """
 def bytesToArray(data, dt, shape):
+    """
+    Convert dtype array to an array.
+
+    Args:
+        data: (todo): write your description
+        dt: (todo): write your description
+        shape: (int): write your description
+    """
     nelements = getNumElements(shape)
     if not isVlen(dt):
         # regular numpy from string
@@ -505,6 +631,13 @@ class LinkCreationPropertyList(object):
     """
     @with_phil
     def __init__(self, char_encoding=None):
+        """
+        Initialize the character.
+
+        Args:
+            self: (todo): write your description
+            char_encoding: (str): write your description
+        """
         if char_encoding:
             if char_encoding not in ("CSET_ASCII", "CSET_UTF8"):
                 raise ValueError("Unknown encoding")
@@ -514,10 +647,22 @@ class LinkCreationPropertyList(object):
 
     @with_phil
     def __repr__(self):
+        """
+        Return a repr representation of a repr__.
+
+        Args:
+            self: (todo): write your description
+        """
         return "<HDF5 LinkCreationPropertyList>"
 
     @property
     def char_encoding(self):
+        """
+        The character encoding.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._char_encoding
 
 
@@ -529,6 +674,12 @@ class LinkAccessPropertyList(object):
 
     @with_phil
     def __repr__(self):
+        """
+        Return a repr representation of a repr__.
+
+        Args:
+            self: (todo): write your description
+        """
         return "<HDF5 LinkAccessPropertyList>"
 
 def default_lcpl():
@@ -580,6 +731,12 @@ class CommonStateObject(object):
         If name is None, returns either None or (None, None) appropriately.
         """
         def get_lcpl(coding):
+            """
+            Return the coding string.
+
+            Args:
+                coding: (str): write your description
+            """
             lcpl = self._lcpl.copy()
             lcpl.set_char_encoding(coding)
             return lcpl
@@ -641,15 +798,35 @@ class _RegionProxy(object):
     """
 
     def __init__(self, obj):
+        """
+        Initialize the object.
+
+        Args:
+            self: (todo): write your description
+            obj: (todo): write your description
+        """
         self.id = obj.id
         self._name = None
 
     def __getitem__(self, args):
+        """
+        Get the item from the given args.
+
+        Args:
+            self: (todo): write your description
+        """
         pass
         # bases classes will override
 
 
     def shape(self, ref):
+        """
+        Add a shape of a reference.
+
+        Args:
+            self: (todo): write your description
+            ref: (str): write your description
+        """
         pass
 
 
@@ -663,31 +840,73 @@ class ACL(object):
 
     @property
     def username(self):
+        """
+        The username of the user.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._username
 
     @property
     def create(self):
+        """
+        Create a new record.
+
+        Args:
+            self: (int): write your description
+        """
         return self._create
 
     @property
     def delete(self):
+        """
+        Deletes the object.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._delete
 
     @property
     def read(self):
+        """
+        Reads the readme.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._read
 
     @property
     def update(self):
+        """
+        Update the list of the list.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._update
 
 
     @property
     def readACL(self):
+        """
+        Reads the l { read } bytes.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._readACL
 
     @property
     def updateACL(self):
+        """
+        Update the result of the } object.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._updateACL
 
 
@@ -698,6 +917,12 @@ class ACL(object):
     """
 
     def __init__(self):
+        """
+        Initialize the object.
+
+        Args:
+            self: (todo): write your description
+        """
         self._username = None
         self._create = True
         self._delete = True
@@ -728,6 +953,12 @@ class HLObject(CommonStateObject):
         return File(groupid)
 
     def _getNameFromObjDb(self):
+        """
+        Get database name from database
+
+        Args:
+            self: (todo): write your description
+        """
         objdb = self._id._http_conn.getObjDb()
 
         if not objdb:
@@ -868,6 +1099,12 @@ class HLObject(CommonStateObject):
         return self.id._modified
 
     def verifyCert(self):
+        """
+        Verify that the certificate.
+
+        Args:
+            self: (todo): write your description
+        """
         # default to validate CERT for https requests, unless
         # the H5PYD_VERIFY_CERT environment variable is set and True
         #
@@ -881,6 +1118,16 @@ class HLObject(CommonStateObject):
 
 
     def GET(self, req, params=None, use_cache=True, format="json"):
+        """
+        Perform a http request
+
+        Args:
+            self: (todo): write your description
+            req: (str): write your description
+            params: (dict): write your description
+            use_cache: (bool): write your description
+            format: (str): write your description
+        """
         if self.id.http_conn is None:
             raise IOError("object not initialized")
         # This should be the default - but explictly set anyway
@@ -905,6 +1152,17 @@ class HLObject(CommonStateObject):
 
 
     def PUT(self, req, body=None, params=None, format="json", replace=False):
+        """
+        Make a http request.
+
+        Args:
+            self: (todo): write your description
+            req: (str): write your description
+            body: (todo): write your description
+            params: (dict): write your description
+            format: (str): write your description
+            replace: (bool): write your description
+        """
         if self.id.http_conn is None:
             raise IOError("object not initialized")
 
@@ -933,6 +1191,15 @@ class HLObject(CommonStateObject):
             return rsp_json
 
     def POST(self, req, body=None, format="json"):
+        """
+        Make a http post request.
+
+        Args:
+            self: (todo): write your description
+            req: (todo): write your description
+            body: (todo): write your description
+            format: (str): write your description
+        """
         if self.id.http_conn is None:
             raise IOError("object not initialized")
 
@@ -960,6 +1227,13 @@ class HLObject(CommonStateObject):
             return rsp_json
 
     def DELETE(self, req):
+        """
+        Delete a http request.
+
+        Args:
+            self: (todo): write your description
+            req: (str): write your description
+        """
         if self.id.http_conn is None:
             raise IOError("object not initialized")
 
@@ -992,31 +1266,71 @@ class HLObject(CommonStateObject):
             pass
 
     def __eq__(self, other):
+        """
+        Returns true if other objects are equal.
+
+        Args:
+            self: (todo): write your description
+            other: (todo): write your description
+        """
         if hasattr(other, 'id'):
             return self.id == other.id
         return False
 
     def __ne__(self, other):
+        """
+        Determine if self and false otherwise.
+
+        Args:
+            self: (todo): write your description
+            other: (todo): write your description
+        """
         return not self.__eq__(other)
 
     def __bool__(self):
+        """
+        Returns true if the boolean is true false otherwise.
+
+        Args:
+            self: (todo): write your description
+        """
         with phil:
             return bool(self.id)
     __nonzero__ = __bool__  # Python 2.7 compat
 
     def getACL(self, username):
+        """
+        Retrieves the acl
+
+        Args:
+            self: (dict): write your description
+            username: (str): write your description
+        """
         req = self._req_prefix + '/acls/' + username
         rsp_json = self.GET(req)
         acl_json = rsp_json["acl"]
         return acl_json
 
     def getACLs(self):
+        """
+        Retrieves a list of requests
+
+        Args:
+            self: (dict): write your description
+        """
         req = self._req_prefix + '/acls'
         rsp_json = self.GET(req)
         acls_json = rsp_json["acls"]
         return acls_json
 
     def putACL(self, acl):
+        """
+        Add or update acl
+
+        Args:
+            self: (todo): write your description
+            acl: (todo): write your description
+        """
         if "userName" not in acl:
             raise IOError("ACL has no 'userName' key")
         perm = {}
@@ -1047,6 +1361,13 @@ class ValuesViewHDF5(ValuesView):
     """
 
     def __contains__(self, value):
+        """
+        Determine if a mapping contains a mapping.
+
+        Args:
+            self: (todo): write your description
+            value: (str): write your description
+        """
         with phil:
             for key in self._mapping:
                 if value == self._mapping.get(key):
@@ -1054,6 +1375,12 @@ class ValuesViewHDF5(ValuesView):
             return False
 
     def __iter__(self):
+        """
+        Iterate over all keys value of the values.
+
+        Args:
+            self: (todo): write your description
+        """
         with phil:
             for key in self._mapping:
                 yield self._mapping.get(key)
@@ -1066,6 +1393,13 @@ class ItemsViewHDF5(ItemsView):
     """
 
     def __contains__(self, item):
+        """
+        Determine if a given item is contained in the list.
+
+        Args:
+            self: (todo): write your description
+            item: (str): write your description
+        """
         with phil:
             key, val = item
             if key in self._mapping:
@@ -1073,6 +1407,12 @@ class ItemsViewHDF5(ItemsView):
             return False
 
     def __iter__(self):
+        """
+        Iterate over the keys value ).
+
+        Args:
+            self: (todo): write your description
+        """
         with phil:
             for key in self._mapping:
                 yield (key, self._mapping.get(key))

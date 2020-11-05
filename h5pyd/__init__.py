@@ -50,6 +50,11 @@ __doc__ = \
 
 
 def enable_ipython_completer():
+    """
+    Enable ipython ipython ipython.
+
+    Args:
+    """
     import sys
     if 'IPython' in sys.modules:
         ip_running = False

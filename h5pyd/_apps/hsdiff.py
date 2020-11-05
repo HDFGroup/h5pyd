@@ -329,6 +329,17 @@ def diff_dataset(src, ctx):
 
 
 def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False):
+    """
+    Diff two diffs
+
+    Args:
+        fin: (dict): write your description
+        fout: (str): write your description
+        verbose: (bool): write your description
+        nodata: (str): write your description
+        noattr: (str): write your description
+        quiet: (str): write your description
+    """
     ctx = {}
     ctx["fin"] = fin
     ctx["fout"] = fout
@@ -340,6 +351,13 @@ def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False)
 
 
     def object_diff_helper(name, obj):
+        """
+        Object diff diff.
+
+        Args:
+            name: (str): write your description
+            obj: (todo): write your description
+        """
         class_name = obj.__class__.__name__
 
         if class_name in ("Dataset", "Table"):
@@ -361,6 +379,11 @@ def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False)
 
 #----------------------------------------------------------------------------------
 def usage():
+    """
+    Print usage information about the usage.
+
+    Args:
+    """
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  file  domain".format(cfg["cmd"])))
     print("")
@@ -389,6 +412,11 @@ def usage():
 
 #----------------------------------------------------------------------------------
 def print_config_example():
+    """
+    Print the config example.
+
+    Args:
+    """
     print("# default")
     print("hs_username = <username>")
     print("hs_password = <passwd>")
@@ -397,6 +425,11 @@ def print_config_example():
 
 #----------------------------------------------------------------------------------
 def main():
+    """
+    Main function.
+
+    Args:
+    """
 
     loglevel = logging.ERROR
     verbose = False

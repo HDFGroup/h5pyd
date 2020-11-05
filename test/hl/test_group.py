@@ -24,6 +24,12 @@ import six
 class TestGroup(TestCase):
 
     def test_create(self):
+        """
+        Create a new hdf5 file.
+
+        Args:
+            self: (todo): write your description
+        """
         # create main test file
         filename = self.getFileName("create_group")
         print("filename:", filename)
@@ -210,6 +216,12 @@ class TestGroup(TestCase):
 
 
     def test_nested_create(self):
+        """
+        Create a new fits file
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_nested_group")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
@@ -236,6 +248,12 @@ class TestGroup(TestCase):
 
 
     def test_external_links(self):
+        """
+        Return the external links.
+
+        Args:
+            self: (todo): write your description
+        """
         # create a file for use a link target
         if config.get("use_h5py"):
             # for some reason this test is failing in Travis
@@ -288,8 +306,20 @@ class TestGroup(TestCase):
         f.close()
 
     def test_link_removal(self):
+        """
+        Create a link link link to hdf
+
+        Args:
+            self: (todo): write your description
+        """
 
         def get_count(grp):
+            """
+            Return the number of occurrences of the given count *.
+
+            Args:
+                grp: (todo): write your description
+            """
             count = 0
             for item in grp:
                 count += 1
