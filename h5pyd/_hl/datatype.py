@@ -49,6 +49,12 @@ class Datatype(HLObject):
 
 
     def __repr__(self):
+        """
+        Return a human - readable representation of this path.
+
+        Args:
+            self: (todo): write your description
+        """
         if not self.id:
             return "<Closed HDF5 named type>"
         if self.name is None:

@@ -242,13 +242,33 @@ def make_new_dset(parent, shape=None, dtype=None,
 
 class AstypeContext(object):
     def __init__(self, dset, dtype):
+        """
+        Initialize the dset.
+
+        Args:
+            self: (todo): write your description
+            dset: (todo): write your description
+            dtype: (todo): write your description
+        """
         self._dset = dset
         self._dtype = numpy.dtype(dtype)
 
     def __enter__(self):
+        """
+        Enter the dset.
+
+        Args:
+            self: (todo): write your description
+        """
         self._dset._local.astype = self._dtype
 
     def __exit__(self, *args):
+        """
+        Set the exit.
+
+        Args:
+            self: (todo): write your description
+        """
         self._dset._local.astype = None
 
 
@@ -270,6 +290,12 @@ class Dataset(HLObject):
 
     @property
     def dims(self):
+        """
+        Returns a copy of the dimensions object with dimensions.
+
+        Args:
+            self: (todo): write your description
+        """
         from .dims import DimensionManager
         return DimensionManager(self)
 
@@ -286,6 +312,13 @@ class Dataset(HLObject):
         return self._shape
 
     def get_shape(self, check_server=False):
+        """
+        Gets shape
+
+        Args:
+            self: (todo): write your description
+            check_server: (bool): write your description
+        """
         # this version will optionally refetch the shape from the server
         # (if the dataset is resiable)
         shape_json = self.id.shape_json
@@ -306,6 +339,13 @@ class Dataset(HLObject):
 
     @shape.setter
     def shape(self, shape):
+        """
+        Resize shape. shape.
+
+        Args:
+            self: (todo): write your description
+            shape: (int): write your description
+        """
         self.resize(shape)
 
     @property
@@ -495,6 +535,12 @@ class Dataset(HLObject):
         # self._local.astype = None #todo
 
     def _getVerboseInfo(self):
+        """
+        Retrieves the info for this analysis.
+
+        Args:
+            self: (dict): write your description
+        """
         now = time.time()
         if self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME:
             # resynch the verbose data
@@ -598,6 +644,15 @@ class Dataset(HLObject):
             yield arr[i%BUFFER_SIZE]
 
     def _getQueryParam(self, start, stop, step=None):
+        """
+        Gets the query for a given parameter.
+
+        Args:
+            self: (todo): write your description
+            start: (todo): write your description
+            stop: (todo): write your description
+            step: (todo): write your description
+        """
         param = ''
         rank = len(self._shape)
         if rank == 0:
@@ -1293,6 +1348,12 @@ class Dataset(HLObject):
         return arr
 
     def __repr__(self):
+        """
+        Return a human - readable string.
+
+        Args:
+            self: (todo): write your description
+        """
         if not self:
             r = '<Closed HDF5 dataset>'
         else:
@@ -1340,6 +1401,13 @@ class Dataset(HLObject):
       Example. [[1,2],[3,4]] -> ((1,2),(3,4))
     """
     def toTuple(self, data):
+        """
+        Convert a tuple to a tuple.
+
+        Args:
+            self: (todo): write your description
+            data: (array): write your description
+        """
         if type(data) in (list, tuple):
             return tuple(self.toTuple(x) for x in data)
         else:

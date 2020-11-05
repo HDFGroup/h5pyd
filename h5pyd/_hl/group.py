@@ -561,6 +561,12 @@ class Group(HLObject, MutableMappingHDF5):
             return tgt
 
         def isUUID(name):
+            """
+            Return true if name is a valid name.
+
+            Args:
+                name: (str): write your description
+            """
             # return True if name looks like an object id
             # There are some additional checks we could add to reduce false positives
             # (like checking for hyphens in the right places)
@@ -1073,6 +1079,12 @@ class Group(HLObject, MutableMappingHDF5):
         return retval
 
     def __repr__(self):
+        """
+        Return a repr string.
+
+        Args:
+            self: (todo): write your description
+        """
         if not self:
             r = "<Closed HDF5 group>"
         else:
@@ -1105,12 +1117,31 @@ class SoftLink(object):
 
     @property
     def path(self):
+        """
+        Return the : class : ~.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._path
 
     def __init__(self, path):
+        """
+        Initialize the path.
+
+        Args:
+            self: (todo): write your description
+            path: (str): write your description
+        """
         self._path = str(path)
 
     def __repr__(self):
+        """
+        Return a human - readable representation of this object.
+
+        Args:
+            self: (todo): write your description
+        """
         return '<SoftLink to "%s">' % self.path
 
 
@@ -1123,17 +1154,43 @@ class ExternalLink(object):
 
     @property
     def path(self):
+        """
+        Return the : class : ~.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._path
 
     @property
     def filename(self):
+        """
+        Return the filename.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._filename
 
     def __init__(self, filename, path):
+        """
+        Initialize a new file.
+
+        Args:
+            self: (todo): write your description
+            filename: (str): write your description
+            path: (str): write your description
+        """
         self._filename = str(filename)
         self._path = str(path)
 
     def __repr__(self):
+        """
+        Return a human - readable representation of this object.
+
+        Args:
+            self: (todo): write your description
+        """
         return '<ExternalLink to "%s" in file "%s">' % (self.path, self.filename)
 
 class UserDefinedLink(object):
@@ -1143,7 +1200,19 @@ class UserDefinedLink(object):
     """
 
     def __init__(self):
+        """
+        Initialize the object
+
+        Args:
+            self: (todo): write your description
+        """
         pass
 
     def __repr__(self):
+        """
+        Return a repr representation of a repr__.
+
+        Args:
+            self: (todo): write your description
+        """
         return '<UDLink >'

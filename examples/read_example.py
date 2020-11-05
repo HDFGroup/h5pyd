@@ -13,16 +13,35 @@
 import h5pyd as h5py
 
 def visit_item(name):
+    """
+    Prints an item
+
+    Args:
+        name: (str): write your description
+    """
     print("visit:", name)
     return None
 
 def find_g1_2(name):
+    """
+    Find the g1 name of the given name
+
+    Args:
+        name: (str): write your description
+    """
     print("visit:", name)
     if name.endswith("g1.2"):
         return True  # stop iteration
 
 
 def visit_item_obj(name, obj):
+    """
+    Return an object for an object obj
+
+    Args:
+        name: (str): write your description
+        obj: (todo): write your description
+    """
     print("visit:", name, obj.id.id)
     return None
 

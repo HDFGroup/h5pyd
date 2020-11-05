@@ -14,6 +14,12 @@ else:
 cfg = Config()
 
 def getFolder(domain):
+    """
+    Retrieve the h5 bucket.
+
+    Args:
+        domain: (str): write your description
+    """
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -23,6 +29,12 @@ def getFolder(domain):
     return dir
 
 def createFolder(domain):
+    """
+    Create a bucket.
+
+    Args:
+        domain: (str): write your description
+    """
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -35,6 +47,12 @@ def createFolder(domain):
     return dir
 
 def getFile(domain):
+    """
+    Retrieve a bucket from h5
+
+    Args:
+        domain: (str): write your description
+    """
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -44,6 +62,12 @@ def getFile(domain):
     return fh
 
 def createFile(domain):
+    """
+    Create a new hdf5 file.
+
+    Args:
+        domain: (str): write your description
+    """
     #print("createFile", domain)
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -58,6 +82,12 @@ def createFile(domain):
 
 
 def touchDomain(domain):
+    """
+    Create a new domain.
+
+    Args:
+        domain: (str): write your description
+    """
 
     make_folder = False
     if domain[-1] == '/':
@@ -137,6 +167,11 @@ def touchDomain(domain):
 # Usage
 #
 def printUsage():
+    """
+    Prints the current configuration
+
+    Args:
+    """
     print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [-o owner] [--loglevel debug|info|warning|error] [--logfile <logfile>] [--bucket <bucket_name>] domains".format(cfg["cmd"]))
     print("example: {} -e  http://hsdshdflab.hdfgroup.org  /home/myfolder/emptydomain.h5".format(cfg["cmd"]))
     sys.exit()
@@ -145,6 +180,11 @@ def printUsage():
 # Main
 #
 def main():
+    """
+    Main function.
+
+    Args:
+    """
     domains = []
     argn = 1
     loglevel = logging.ERROR

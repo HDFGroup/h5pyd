@@ -70,6 +70,12 @@ class TestCase(ut.TestCase):
 
     @property
     def test_user1(self):
+        """
+        Return the user - specific environment variables.
+
+        Args:
+            self: (todo): write your description
+        """
         # HS_USERNAME is the username h5pyd will look up if
         #   if not provided in the File constructor
         user1 = {}
@@ -86,6 +92,12 @@ class TestCase(ut.TestCase):
 
     @property
     def test_user2(self):
+        """
+        Return the user - specific user - specific environment variables.
+
+        Args:
+            self: (todo): write your description
+        """
         user2 = {}
         if  "TEST12_USERNAME" in os.environ:
             user2["name"] = os.environ["TEST2_USERNAME"]
@@ -108,19 +120,43 @@ class TestCase(ut.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        """
+        Sets a class to the given cls.
+
+        Args:
+            cls: (todo): write your description
+        """
         pass
         #cls.tempdir = tempfile.mkdtemp(prefix='h5py-test_')
 
     @classmethod
     def tearDownClass(cls):
+        """
+        Tear down the class.
+
+        Args:
+            cls: (todo): write your description
+        """
         pass
         #shutil.rmtree(cls.tempdir)
 
     def setUp(self):
+        """
+        Sets the test test time.
+
+        Args:
+            self: (todo): write your description
+        """
         self.test_dir = str(int(time.time()))
         #self.f = h5py.File(self.mktemp(), 'w')
 
     def tearDown(self):
+        """
+        Close the fd file.
+
+        Args:
+            self: (todo): write your description
+        """
         try:
             if self.f:
                 self.f.close()
@@ -130,6 +166,14 @@ class TestCase(ut.TestCase):
     if not hasattr(ut.TestCase, 'assertSameElements'):
         # shim until this is ported into unittest2
         def assertSameElements(self, a, b):
+            """
+            Determine if two positions.
+
+            Args:
+                self: (todo): write your description
+                a: (todo): write your description
+                b: (todo): write your description
+            """
             for x in a:
                 match = False
                 for y in b:

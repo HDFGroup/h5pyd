@@ -62,6 +62,12 @@ Update using new NULL dataset constructor once h5py 2.7 is out.
 class TestEmpty(TestCase):
 
     def setUp(self):
+        """
+        Sets the configuration for this configuration file.
+
+        Args:
+            self: (todo): write your description
+        """
         TestCase.setUp(self)
         filename = self.getFileName("dataset_testempty")
         print("filename:", filename)
@@ -134,6 +140,12 @@ class TestEmpty(TestCase):
 class TestScalarFloat(TestCase):
 
     def setUp(self):
+        """
+        Sets the instance of this instance.
+
+        Args:
+            self: (todo): write your description
+        """
         TestCase.setUp(self)
         filename = self.getFileName("dataset_testscalarflot")
         print("filename:", filename)
@@ -192,6 +204,12 @@ class TestScalarFloat(TestCase):
 class TestScalarCompound(TestCase):
 
     def setUp(self):
+        """
+        Sets the dataset to disk
+
+        Args:
+            self: (todo): write your description
+        """
         TestCase.setUp(self)
         filename = self.getFileName("dataset_testscalarcompound")
         print("filename:", filename)
@@ -262,6 +280,12 @@ class TestScalarCompound(TestCase):
 class TestScalarArray(TestCase):
 
     def setUp(self):
+        """
+        Sets the instance from disk.
+
+        Args:
+            self: (todo): write your description
+        """
         TestCase.setUp(self)
         filename = self.getFileName("dataset_testscalararray")
         print("filename:", filename)
@@ -325,6 +349,12 @@ class TestScalarArray(TestCase):
 class Test1DZeroFloat(TestCase):
 
     def setUp(self):
+        """
+        Sets the hdf5.
+
+        Args:
+            self: (todo): write your description
+        """
         TestCase.setUp(self)
         filename = self.getFileName("dataset_test1dzerofloat")
         print("filename:", filename)
@@ -375,6 +405,12 @@ class Test1DZeroFloat(TestCase):
 class Test1DFloat(TestCase):
 
     def setUp(self):
+        """
+        Sets the dataset as a dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         TestCase.setUp(self)
         filename = self.getFileName("dataset_test1dfloat")
         print("filename:", filename)
@@ -384,24 +420,66 @@ class Test1DFloat(TestCase):
         self.dset[...] = self.data
 
     def test_ellipsis(self):
+        """
+        Test whether the ellipsis is_ellipsis test.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[...])
 
     def test_tuple(self):
+        """
+        Test if the data.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[()])
 
     def test_slice_simple(self):
+        """
+        Test if the slice is a simple simple copy.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[0:4])
 
     def test_slice_zerosize(self):
+        """
+        Test whether the slice of the zero - indexed slice.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[4:4])
 
     def test_slice_strides(self):
+        """
+        Test if the data is slice slice.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[1:7:3])
 
     def test_slice_negindexes(self):
+        """
+        Test if the slice is equal to the slice.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[-8:-2:3])
 
     def test_slice_outofrange(self):
+        """
+        Return a copy ofofrange of the slice.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[100:400:3])
 
     def test_slice_backwards(self):
@@ -410,16 +488,40 @@ class Test1DFloat(TestCase):
             self.dset[::-1]
 
     def test_slice_zerostride(self):
+        """
+        Test if the slice is zero.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[::0])
 
     def test_index_simple(self):
+        """
+        Simple test indexing
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[3])
 
     def test_index_neg(self):
+        """
+        Test the test test test.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[-4])
 
     # FIXME: NumPy permits this... it adds a new axis in front
     def test_index_none(self):
+        """
+        Assign the test index of test is none.
+
+        Args:
+            self: (todo): write your description
+        """
         with self.assertRaises(TypeError):
             self.dset[None]
 
@@ -433,22 +535,46 @@ class Test1DFloat(TestCase):
 
     # FIXME: NumPy raises IndexError
     def test_index_outofrange(self):
+        """
+        : parameter test index is set.
+
+        Args:
+            self: (todo): write your description
+        """
         with self.assertRaises(ValueError):
             self.dset[100]
 
     def test_indexlist_simple(self):
+        """
+        Convert indexlistlistlistlistlist
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[[1,2,5]])
 
     # Another UnboundLocalError
     #@ut.expectedFailure
     # Fails for h5py, but works for h5pyd
     def test_indexlist_empty(self):
+        """
+        Test if the indexlist is empty.
+
+        Args:
+            self: (todo): write your description
+        """
         if not config.get('use_h5py'):
             self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
 
 
     # FIXME: NumPy has IndexError
     def test_indexlist_outofrange(self):
+        """
+        Assign the index of test index.
+
+        Args:
+            self: (todo): write your description
+        """
         with self.assertRaises(ValueError):
             self.dset[[100]]
 
@@ -466,12 +592,30 @@ class Test1DFloat(TestCase):
             self.dset[[1,1,2]]
 
     def test_mask_true(self):
+        """
+        Test the masked masked masked masked values.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[self.data > -100])
 
     def test_mask_false(self):
+        """
+        Test if the masked masked.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[self.data > 100])
 
     def test_mask_partial(self):
+        """
+        Test if the data is partial.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[self.data > 5])
 
     def test_mask_wrongsize(self):
@@ -488,6 +632,12 @@ class Test1DFloat(TestCase):
 class Test2DZeroFloat(TestCase):
 
     def setUp(self):
+        """
+        Sets the instance of this dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         TestCase.setUp(self)
         filename = self.getFileName("dataset_test2dzerofloat")
         print("filename:", filename)
@@ -509,6 +659,12 @@ class Test2DZeroFloat(TestCase):
 class Test2DFloat(TestCase):
 
     def setUp(self):
+        """
+        Sets the hdf5 dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         TestCase.setUp(self)
         filename = self.getFileName("dataset_test2dzerofloat")
         print("filename:", filename)
@@ -517,14 +673,32 @@ class Test2DFloat(TestCase):
         self.dset = self.f.create_dataset('x', data=self.data)
 
     def test_index_simple(self):
+        """
+        Test if the index of the index
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[2:4,3:6])
 
     def test_squeeze(self):
+        """
+        Squeeze the data.
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[:,:1])
 
 class Test3DFloat(TestCase):
 
     def setUp(self):
+        """
+        Sets the hdf5 dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         TestCase.setUp(self)
         filename = self.getFileName("dataset_test3dfloat")
         print("filename:", filename)
@@ -533,6 +707,12 @@ class Test3DFloat(TestCase):
         self.dset = self.f.create_dataset('x', data=self.data, dtype='f')
 
     def test_index_simple(self):
+        """
+        Test if the index is set
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[1,2:4,3:6])
 
 

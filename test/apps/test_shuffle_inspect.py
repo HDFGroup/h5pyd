@@ -23,6 +23,11 @@ else:
 from common import ut, TestCase
 
 def get_filename():
+    """
+    Return the filename of the config file.
+
+    Args:
+    """
     if config.get("use_h5py"):
         dirpath = "data" 
     else:
@@ -34,12 +39,24 @@ def get_filename():
 class TestShuffleInspect(TestCase):
 
     def setUp(self):
+        """
+        Sets the h5py h5py.
+
+        Args:
+            self: (todo): write your description
+        """
         
         filename = get_filename()
         self.f = h5py.File(filename, "r")
 
 
     def test_dset(self):
+        """
+        Reset the eigenvalue
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertEqual(len(self.f), 1)
         self.assertTrue("dset" in self.f)
         dset = self.f["dset"]

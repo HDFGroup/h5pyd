@@ -28,6 +28,12 @@ import logging
 class TestFile(TestCase):
 
     def test_version(self):
+        """
+        Test if the h5.
+
+        Args:
+            self: (todo): write your description
+        """
         version = h5py.version.version
         # should be of form "n.n.n"
         n = version.find(".")
@@ -36,6 +42,12 @@ class TestFile(TestCase):
         self.assertTrue(m>=1)
 
     def test_serverinfo(self):
+        """
+        Set the h5py h5py h5 info.
+
+        Args:
+            self: (todo): write your description
+        """
         if h5py.__name__ == "h5pyd":
             info = h5py.getServerInfo()
             self.assertTrue("greeting" in info)
@@ -46,6 +58,12 @@ class TestFile(TestCase):
             self.assertTrue("password" in info)
 
     def test_create(self):
+        """
+        Create a new test file
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("new_file")
         print("filename:", filename)
         now = time.time()
@@ -196,6 +214,12 @@ class TestFile(TestCase):
 
 
     def test_open_notfound(self):
+        """
+        Test if the h5 file
+
+        Args:
+            self: (todo): write your description
+        """
         # verify open of non-existent file throws exception
 
         try:
@@ -208,6 +232,12 @@ class TestFile(TestCase):
 
 
     def test_auth(self):
+        """
+        Determine if the user has a valid auth token
+
+        Args:
+            self: (todo): write your description
+        """
         if h5py.__name__ == "h5py":
             return  # ACLs are just for h5pyd
 
@@ -337,6 +367,12 @@ class TestFile(TestCase):
         grp.file.close()  # try closing the file via a group reference
 
     def test_http_url(self):
+        """
+        Sets the http url to a http server.
+
+        Args:
+            self: (todo): write your description
+        """
         if h5py.__name__ == "h5pyd":
             if "HS_ENDPOINT" in os.environ:
                 endpoint = os.environ["HS_ENDPOINT"]
@@ -361,6 +397,12 @@ class TestFile(TestCase):
 
 
     def test_close(self):
+        """
+        Close the h5 file.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("close_file")
         print("filename:", filename)
         f = h5py.File(filename, 'w')

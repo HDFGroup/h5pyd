@@ -28,6 +28,12 @@ else:
 
 
 def dump_dtype(dt):
+    """
+    Dtype of dtype.
+
+    Args:
+        dt: (todo): write your description
+    """
     if not isinstance(dt, np.dtype):
         raise TypeError("expected np.dtype, but got: {}".format(type(dt)))
     if len(dt) > 0:
@@ -50,6 +56,12 @@ def dump_dtype(dt):
 
 
 def is_h5py(obj):
+    """
+    Return true if obj is a h5py object
+
+    Args:
+        obj: (todo): write your description
+    """
     # Return True if objref is a h5py object and False is not
     if isinstance(obj, object) and isinstance(obj.id.id, int):
         return True
@@ -58,6 +70,12 @@ def is_h5py(obj):
 
 
 def is_reference(val):
+    """
+    Returns true if val is a reference
+
+    Args:
+        val: (str): write your description
+    """
     try:
         if isinstance(val, object) and val.__class__.__name__ == "Reference":
             return True
@@ -71,6 +89,12 @@ def is_reference(val):
 
 
 def is_regionreference(val):
+    """
+    Checks if val is a valid region.
+
+    Args:
+        val: (todo): write your description
+    """
     try:
         if isinstance(val, object) and val.__class__.__name__ == "RegionReference":
             return True
@@ -84,6 +108,12 @@ def is_regionreference(val):
 
 
 def has_reference(dtype):
+    """
+    Return true if dtype is a dtype
+
+    Args:
+        dtype: (todo): write your description
+    """
     has_ref = False
     if not isinstance(dtype, np.dtype):
         return False
@@ -102,12 +132,24 @@ def has_reference(dtype):
     return has_ref
 
 def is_vlen(dtype):
+    """
+    Return true if dtype is a dtype
+
+    Args:
+        dtype: (todo): write your description
+    """
     if dtype.metadata and 'vlen' in dtype.metadata:
         return True
     else:
         return False
 
 def get_fillvalue(dset):
+    """
+    Get the fillvalue of dset.
+
+    Args:
+        dset: (todo): write your description
+    """
 
     fillvalue = None
     if not is_vlen(dset.dtype):
@@ -119,6 +161,12 @@ def get_fillvalue(dset):
     return fillvalue
 
 def is_compact(dset):
+    """
+    Returns true if dset is a multipart
+
+    Args:
+        dset: (todo): write your description
+    """
     if isinstance(dset.id.id, str):
         return False  # compact storage not used with HSDS
     cpl = dset.id.get_create_plist()
@@ -178,6 +226,15 @@ def convert_dtype(srcdt, ctx):
 
 #----------------------------------------------------------------------------------
 def copy_element(val, src_dt, tgt_dt, ctx):
+    """
+    Copy an element from src_dt to dest_dt.
+
+    Args:
+        val: (float): write your description
+        src_dt: (array): write your description
+        tgt_dt: (todo): write your description
+        ctx: (todo): write your description
+    """
     logging.debug("copy_element, val: " + str(val) + " val type: " + str(type(val)) + "src_dt: " + dump_dtype(src_dt) + " tgt_dt: " + dump_dtype(tgt_dt))
 
     fin = ctx["fin"]
@@ -289,6 +346,15 @@ def copy_array(src_arr, ctx):
 
 #----------------------------------------------------------------------------------
 def copy_attribute(desobj, name, srcobj, ctx):
+    """
+    Copy an attribute from one place to another.
+
+    Args:
+        desobj: (todo): write your description
+        name: (str): write your description
+        srcobj: (todo): write your description
+        ctx: (todo): write your description
+    """
 
     msg = "creating attribute {} in {}".format(name, srcobj.name)
     logging.debug(msg)
@@ -527,6 +593,14 @@ def write_dataset(src, tgt, ctx):
 
 
 def create_links(gsrc, gdes, ctx):
+    """
+    Create links from sourceid_desobj
+
+    Args:
+        gsrc: (dict): write your description
+        gdes: (str): write your description
+        ctx: (todo): write your description
+    """
     # add soft and external links
     srcid_desobj_map = ctx["srcid_desobj_map"]
     if ctx["verbose"]:
@@ -590,6 +664,13 @@ def create_links(gsrc, gdes, ctx):
 
 #----------------------------------------------------------------------------------
 def create_group(gobj, ctx):
+    """
+    Create group
+
+    Args:
+        gobj: (todo): write your description
+        ctx: (todo): write your description
+    """
     msg = "creating group {}".format(gobj.name)
     logging.info(msg)
     if ctx["verbose"]:
@@ -606,6 +687,13 @@ def create_group(gobj, ctx):
 
 # -----------------------------------------------------------------------------
 def create_datatype(obj, ctx):
+    """
+    Create datatype.
+
+    Args:
+        obj: (todo): write your description
+        ctx: (todo): write your description
+    """
     msg = "creating datatype {}".format(obj.name)
     logging.info(msg)
     if ctx["verbose"]:
@@ -621,6 +709,18 @@ def create_datatype(obj, ctx):
 
 #----------------------------------------------------------------------------------
 def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compression=None,compression_opts=None):
+    """
+    Load the data from a file.
+
+    Args:
+        fin: (str): write your description
+        fout: (str): write your description
+        verbose: (str): write your description
+        dataload: (str): write your description
+        s3path: (str): write your description
+        compression: (str): write your description
+        compression_opts: (str): write your description
+    """
     logging.info("input file: {}".format(fin.filename))
     logging.info("output file: {}".format(fout.filename))
     if dataload != "ingest":
@@ -649,12 +749,26 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
     ctx["srcid_desobj_map"] = {}
 
     def copy_attribute_helper(name, obj):
+        """
+        Copy attributes of a copy of a copy
+
+        Args:
+            name: (str): write your description
+            obj: (todo): write your description
+        """
         logging.info(f"copy attribute - name: {name}  obj: {obj.name}")
         tgt = fout[name]
         for a in obj.attrs:
             copy_attribute(tgt, a, obj, ctx)
 
     def object_create_helper(name, obj):
+        """
+        Creates a new dataset
+
+        Args:
+            name: (str): write your description
+            obj: (todo): write your description
+        """
         logging.info(f"object create helper - name: {name} obj: {obj.name}")
         class_name = obj.__class__.__name__
         if class_name in ("Dataset", "Table"):
@@ -665,6 +779,13 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
             create_datatype(obj, ctx)
 
     def object_link_helper(name, obj):
+        """
+        Create link links to object
+
+        Args:
+            name: (str): write your description
+            obj: (todo): write your description
+        """
         class_name = obj.__class__.__name__
         logging.info("object_link_helper for object: {}".format(obj.name))
         if class_name == "Group":
@@ -674,6 +795,13 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
             create_links(obj, grp, ctx)
 
     def object_copy_helper(name, obj):
+        """
+        Copy a copy of an object
+
+        Args:
+            name: (str): write your description
+            obj: (todo): write your description
+        """
         class_name = obj.__class__.__name__
         logging.debug("object_copy_helper for object: {}".format(obj.name))
 

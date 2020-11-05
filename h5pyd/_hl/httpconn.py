@@ -33,12 +33,23 @@ MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
 MS_AUTHORITY_HOST_URI = 'https://login.microsoftonline.com' 
 
 def eprint(*args, **kwargs):
+    """
+    Prints the function.
+
+    Args:
+    """
     print(*args, file=sys.stderr, **kwargs)
 
 DEFAULT_TIMEOUT = 180 # seconds - allow time for hsds service to bounce
 
 class TimeoutHTTPAdapter(HTTPAdapter):
     def __init__(self, *args, **kwargs):
+        """
+        Initialize the class.
+
+        Args:
+            self: (todo): write your description
+        """
         self.timeout = DEFAULT_TIMEOUT
         if "timeout" in kwargs:
             self.timeout = kwargs["timeout"]
@@ -46,6 +57,13 @@ class TimeoutHTTPAdapter(HTTPAdapter):
         super().__init__(*args, **kwargs)
 
     def send(self, request, **kwargs):
+        """
+        Send a request.
+
+        Args:
+            self: (todo): write your description
+            request: (todo): write your description
+        """
         timeout = kwargs.get("timeout")
         if timeout is None:
             kwargs["timeout"] = self.timeout
@@ -57,6 +75,13 @@ class CacheResponse(object):
         would contain refernces to other objects
     """
     def __init__(self, rsp):
+        """
+        Initialize the response. response.
+
+        Args:
+            self: (todo): write your description
+            rsp: (todo): write your description
+        """
         # just save off what we need
         self._text = rsp.text
         self._status_code = rsp.status_code
@@ -64,14 +89,32 @@ class CacheResponse(object):
 
     @property
     def text(self):
+        """
+        Return the text
+
+        Args:
+            self: (todo): write your description
+        """
         return self._text
 
     @property
     def status_code(self):
+        """
+        Return the status code.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._status_code
 
     @property
     def headers(self):
+        """
+        Returns the headers.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._headers
 
 
@@ -82,6 +125,24 @@ class HttpConn:
     """
     def __init__(self, domain_name, endpoint=None, username=None, password=None, bucket=None,
             api_key=None, mode='a', use_session=True, use_cache=True, logger=None, retries=3, **kwds):
+        """
+        Initialize a connection.
+
+        Args:
+            self: (todo): write your description
+            domain_name: (str): write your description
+            endpoint: (str): write your description
+            username: (str): write your description
+            password: (str): write your description
+            bucket: (str): write your description
+            api_key: (str): write your description
+            mode: (todo): write your description
+            use_session: (todo): write your description
+            use_cache: (bool): write your description
+            logger: (todo): write your description
+            retries: (todo): write your description
+            kwds: (todo): write your description
+        """
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
@@ -158,6 +219,13 @@ class HttpConn:
         self._s = None  # Sessions
 
     def _getAzureADToken(self, aad_dict):
+        """
+        Gets an access token.
+
+        Args:
+            self: (todo): write your description
+            aad_dict: (dict): write your description
+        """
         if not aad_dict:
             return None
         # expecting argument to be dictionary with keys: AD_APP_ID, AD_TENANT_ID, AD_RESOURCE_ID
@@ -212,6 +280,15 @@ class HttpConn:
 
 
     def getHeaders(self, username=None, password=None, headers=None):
+        """
+        Return a dictionary of headers.
+
+        Args:
+            self: (todo): write your description
+            username: (str): write your description
+            password: (str): write your description
+            headers: (dict): write your description
+        """
         if headers is None:
             headers = {}
         if username is None:
@@ -243,6 +320,12 @@ class HttpConn:
         return headers
 
     def verifyCert(self):
+        """
+        Verify that the certificate.
+
+        Args:
+            self: (todo): write your description
+        """
         # default to validate CERT for https requests, unless
         # the H5PYD_VERIFY_CERT environment variable is set and True
         #
@@ -255,10 +338,27 @@ class HttpConn:
         return True
 
     def getObjDb(self):
+        """
+        Get the database object.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._objdb
 
 
     def GET(self, req, format="json", params=None, headers=None, use_cache=True):
+        """
+        Make an http request.
+
+        Args:
+            self: (todo): write your description
+            req: (str): write your description
+            format: (str): write your description
+            params: (dict): write your description
+            headers: (dict): write your description
+            use_cache: (bool): write your description
+        """
         if self._endpoint is None:
             raise IOError("object not initialized")
         # check that domain is defined (except for some specific requests)
@@ -339,6 +439,17 @@ class HttpConn:
         return rsp
 
     def PUT(self, req, body=None, format="json", params=None, headers=None):
+        """
+        Make a http request.
+
+        Args:
+            self: (todo): write your description
+            req: (str): write your description
+            body: (todo): write your description
+            format: (str): write your description
+            params: (dict): write your description
+            headers: (dict): write your description
+        """
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
@@ -393,6 +504,17 @@ class HttpConn:
         return rsp
 
     def POST(self, req, body=None, format="json", params=None, headers=None):
+        """
+        Make a http post request.
+
+        Args:
+            self: (todo): write your description
+            req: (str): write your description
+            body: (todo): write your description
+            format: (str): write your description
+            params: (dict): write your description
+            headers: (str): write your description
+        """
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
@@ -453,6 +575,15 @@ class HttpConn:
         return rsp
 
     def DELETE(self, req, params=None, headers=None):
+        """
+        Perform a http post request.
+
+        Args:
+            self: (todo): write your description
+            req: (str): write your description
+            params: (dict): write your description
+            headers: (dict): write your description
+        """
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._cache is not None:
@@ -498,6 +629,12 @@ class HttpConn:
 
     @property
     def session(self):
+        """
+        Creates a session.
+
+        Args:
+            self: (todo): write your description
+        """
         # create a session object to re-use http connection when possible
         s = requests
         retries=self._retries
@@ -525,32 +662,74 @@ class HttpConn:
         return s
 
     def close(self):
+        """
+        Close the connection.
+
+        Args:
+            self: (todo): write your description
+        """
         if self._s:
             self._s.close()
             self._s = None
 
     @property
     def domain(self):
+        """
+        Returns the domain of this node.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._domain
 
     @property
     def username(self):
+        """
+        The username of the user.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._username
 
     @property
     def endpoint(self):
+        """
+        Returns the endpoint.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._endpoint
 
     @property
     def password(self):
+        """
+        Returns the password of the server.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._password
 
     @property
     def mode(self):
+        """
+        Return the mode.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._mode
 
     @property
     def cache_on(self):
+        """
+        Returns true if the cache has been cached.
+
+        Args:
+            self: (todo): write your description
+        """
         if self._cache is None:
             return False
         else:
@@ -558,6 +737,12 @@ class HttpConn:
 
     @property
     def domain_json(self):
+        """
+        Returns the json representation of the domain.
+
+        Args:
+            self: (dict): write your description
+        """
         if self._domain_json is None:
             rsp = self.GET('/')
             if rsp.status_code != 200:
@@ -568,6 +753,12 @@ class HttpConn:
 
     @property
     def root_uuid(self):
+        """
+        The root uuid of this resource.
+
+        Args:
+            self: (todo): write your description
+        """
         domain_json = self.domain_json
         if "root" not in domain_json:
             raise IOError("Unexpected response")
@@ -576,6 +767,12 @@ class HttpConn:
 
     @property
     def compressors(self):
+        """
+        Compress the domain name.
+
+        Args:
+            self: (todo): write your description
+        """
         compressors = []
         if "compressors" in self.domain_json:
             compressors = self.domain_json["compressors"]

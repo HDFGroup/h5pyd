@@ -26,6 +26,12 @@ from common import ut, TestCase
 
 class TestSetItemDataset(TestCase):
     def test_set_all(self):
+        """
+        Test if all the test set of all the files. h5.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("dset_set_all")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -37,6 +43,12 @@ class TestSetItemDataset(TestCase):
         f.close()
 
     def test_broadcast(self):
+        """
+        Test if the dataset to hdf5 dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("dset_broadcast")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -47,6 +59,12 @@ class TestSetItemDataset(TestCase):
         f.close()
 
     def test_type_conversion(self):
+        """
+        Test that the conversion of the hdf5 file.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("dset_type_conversion")
         print("filename:", filename)
         f = h5py.File(filename, "w")

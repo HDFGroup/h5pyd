@@ -23,6 +23,12 @@ class TestObjRef(TestCase):
 
 
     def test_create(self):
+        """
+        Create a new hdf5 file
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("objref_test")
         print(filename)
 
@@ -144,6 +150,12 @@ class TestObjRef(TestCase):
 
 
     def test_delete(self):
+        """
+        Delete the testset of the dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("objref_delete_test")
         print(filename)
         f = h5py.File(filename, 'w')

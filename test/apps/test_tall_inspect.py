@@ -23,6 +23,11 @@ else:
 from common import ut, TestCase
 
 def get_filename():
+    """
+    Return the filename of the config file.
+
+    Args:
+    """
     if config.get("use_h5py"):
         dirpath = "data" 
     else:
@@ -34,13 +39,31 @@ def get_filename():
 class TestTallInspect(TestCase):
 
     def setUp(self):
+        """
+        Sets the h5py h5py.
+
+        Args:
+            self: (todo): write your description
+        """
         
         filename = get_filename()
         self.f = h5py.File(filename, "r")
 
     def test_obj_count(self):
+        """
+        Read the number of hdfills in an hdf5.
+
+        Args:
+            self: (todo): write your description
+        """
         counts = {"groups": 0, "datasets": 0}
         def visit(name):
+            """
+            Writes an hdf5 file.
+
+            Args:
+                name: (str): write your description
+            """
             obj = self.f[name]
             if isinstance(obj, h5py.Dataset):
                 counts["datasets"] += 1
@@ -54,6 +77,12 @@ class TestTallInspect(TestCase):
         self.assertEqual(4, counts["datasets"])
 
     def test_attributes(self):
+        """
+        Reset attributes. equal
+
+        Args:
+            self: (todo): write your description
+        """
         self.assertEqual(2, len(self.f.attrs))
         self.assertTrue("attr1" in self.f.attrs)
         attr1 = self.f.attrs["attr1"]
@@ -74,6 +103,12 @@ class TestTallInspect(TestCase):
         self.assertTrue("attr2" in dset111.attrs)
 
     def test_links(self):
+        """
+        Test if the softlink links
+
+        Args:
+            self: (todo): write your description
+        """
         g12 = self.f["/g1/g1.2"]
         self.assertEqual(len(g12), 2)
         self.assertTrue("extlink" in g12)
@@ -87,6 +122,12 @@ class TestTallInspect(TestCase):
         self.assertEqual(softlink.path, "somevalue")
 
     def test_dataset(self):
+        """
+        Test if the dataset hashed.
+
+        Args:
+            self: (todo): write your description
+        """
         dset112 = self.f["/g1/g1.1/dset1.1.2"]
         self.assertEqual(dset112.shape, (20,))
         self.assertEqual(dset112.dtype, np.dtype(">i4"))

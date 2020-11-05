@@ -27,6 +27,12 @@ class TestCreateDataset(TestCase):
 
 
     def test_create_simple_dset(self):
+        """
+        Test if the dataset *
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_simple_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -72,6 +78,12 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_create_float16_dset(self):
+        """
+        Reads a 2dset from hdfdf dataset.
+
+        Args:
+            self: (todo): write your description
+        """
 
         filename = self.getFileName("create_float16_dset")
         print("filename:", filename)
@@ -115,6 +127,12 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_fillvalue_simple_dset(self):
+        """
+        Test if the dataset hashed hdf5 file.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("fillvalue_simple_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -136,6 +154,12 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_fillvalue_char_dset(self):
+        """
+        Fills the dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("fillvalue_char_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -170,6 +194,12 @@ class TestCreateDataset(TestCase):
 
 
     def test_simple_1d_dset(self):
+        """
+        Dump the hdf5 dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("simple_1d_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -203,6 +233,12 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_fixed_len_str_dset(self):
+        """
+        Reads the dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("fixed_len_str_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -231,6 +267,12 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_create_dset_by_path(self):
+        """
+        Create a new dataset with the given name.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_dset_by_path")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -260,6 +302,12 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_create_dset_gzip(self):
+        """
+        Create a gzipped dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_dset_gzip")
         print("filename:", filename)
 
@@ -312,6 +360,12 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_create_dset_lz4(self):
+        """
+        Create a new dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_dset_lz4")
         print("filename:", filename)
 
@@ -369,6 +423,12 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_create_dset_gzip_and_shuffle(self):
+        """
+        Create a gzip dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_dset_gzip_and_shuffle")
         print("filename:", filename)
 
@@ -412,6 +472,12 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_bool_dset(self):
+        """
+        Dump the dset to a hdf5 file.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("bool_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -453,6 +519,12 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_require_dset(self):
+        """
+        Method to create dataset
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("require_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
@@ -500,11 +572,23 @@ class TestCreateDataset(TestCase):
         f.close()
 
     def test_create_dset_like(self):
+        """
+        Create a 2dset of the dataset.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("create_dset_like")
         print("filename:", filename)
         f = h5py.File(filename, "w")
 
         def check_props(dset):
+            """
+            Checks that all of the properties have the same.
+
+            Args:
+                dset: (todo): write your description
+            """
             self.assertTrue(isinstance(dset.shape, tuple))
             self.assertEqual(len(dset.shape), 2)
             self.assertEqual(dset.ndim, 2)

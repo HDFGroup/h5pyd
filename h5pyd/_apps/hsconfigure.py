@@ -10,6 +10,12 @@ else:
 # input function that works with Python 2 or 3
 #
 def get_input(prompt):
+    """
+    Get the input from the user.
+
+    Args:
+        prompt: (str): write your description
+    """
     result = input(prompt)
     return result
 
@@ -17,6 +23,15 @@ def get_input(prompt):
 # Save configuration file
 #
 def saveConfig(username, password, endpoint, api_key):
+    """
+    Save a user sam config file.
+
+    Args:
+        username: (str): write your description
+        password: (str): write your description
+        endpoint: (str): write your description
+        api_key: (str): write your description
+    """
 
     filepath = os.path.expanduser('~/.hscfg')
     print("Saving config file to: {}".format(filepath))
@@ -43,6 +58,15 @@ def saveConfig(username, password, endpoint, api_key):
 # Check to see if we can get a response from the server
 #
 def pingServer(username, password, endpoint, api_key):
+    """
+    Checks if a user is alive.
+
+    Args:
+        username: (str): write your description
+        password: (str): write your description
+        endpoint: (str): write your description
+        api_key: (str): write your description
+    """
     if not endpoint.startswith("http"):
         print("endpoint must start with 'http...'")
         return False
@@ -77,6 +101,11 @@ def pingServer(username, password, endpoint, api_key):
 # Main
 #
 def main():
+    """
+    Main function.
+
+    Args:
+    """
     cfg = Config()
 
     hs_endpoint = cfg["hs_endpoint"]

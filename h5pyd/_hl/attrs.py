@@ -368,6 +368,12 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         return exists
 
     def __repr__(self):
+        """
+        Return a human - readable representation of this object.
+
+        Args:
+            self: (todo): write your description
+        """
         if not self._parent.id.id:
             return "<Attributes of closed HDF5 object>"
         return "<Attributes of HDF5 object at %s>" % id(self._parent.id)

@@ -79,6 +79,13 @@ class DimensionProxy(base.CommonStateObject):
 
     @label.setter
     def label(self, val):
+        """
+        Returns the label for a dataset.
+
+        Args:
+            self: (todo): write your description
+            val: (float): write your description
+        """
         # pylint: disable=missing-docstring
         dset = Dataset(self._id)
         req = dset.attrs._req_prefix + 'DIMENSION_LABELS'
@@ -104,20 +111,53 @@ class DimensionProxy(base.CommonStateObject):
         dset.PUT(req, body=labels, replace=True)
 
     def __init__(self, id_, dimension):
+        """
+        Initialize a dimension.
+
+        Args:
+            self: (todo): write your description
+            id_: (int): write your description
+            dimension: (int): write your description
+        """
         self._id = id_
         self._dimension = dimension
 
     def __hash__(self):
+        """
+        Returns the hash of the field.
+
+        Args:
+            self: (todo): write your description
+        """
         return hash((type(self), self._id, self._dimension))
 
     def __eq__(self, other):
+        """
+        Returns true if other is equal.
+
+        Args:
+            self: (todo): write your description
+            other: (todo): write your description
+        """
         return hash(self) == hash(other)
 
     def __iter__(self):
+        """
+        Iterate over all keys
+
+        Args:
+            self: (todo): write your description
+        """
         for k in self.keys():
             yield k
 
     def __len__(self):
+        """
+        Returns the length of the dimensions.
+
+        Args:
+            self: (todo): write your description
+        """
         dimlist_json = self._getAttributeJson('DIMENSION_LIST')
         if not dimlist_json:
             return 0
@@ -128,6 +168,13 @@ class DimensionProxy(base.CommonStateObject):
         return len(dimlist_values[self._dimension])
 
     def __getitem__(self, item):
+        """
+        Retrieve a single item from an item.
+
+        Args:
+            self: (todo): write your description
+            item: (str): write your description
+        """
 
         dimlist_attr_json = self._getAttributeJson('DIMENSION_LIST')
         dimlist_attr_values = []
@@ -349,6 +396,12 @@ class DimensionProxy(base.CommonStateObject):
         return [val for (_, val) in self.items()]
 
     def __repr__(self):
+        """
+        Return a human - like __str__.
+
+        Args:
+            self: (todo): write your description
+        """
         if not self._id:
             return '<Dimension of closed HDF5 dataset>'
         return f'<{self.label} dimension {self._dimension} of HDf5 dataset {self._id.id}>'
@@ -383,6 +436,12 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
             yield self[i]
 
     def __repr__(self):
+        """
+        Return a human - readable representation of this object.
+
+        Args:
+            self: (todo): write your description
+        """
         if not self._id:
             return '<Dimensions of closed HDF5 dataset>'
         return '<Dimensions of HDF5 dataset at %s>' % self._id

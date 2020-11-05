@@ -20,12 +20,24 @@ import h5type
 
 class H5TypeTest(unittest.TestCase):
     def __init__(self, *args, **kwargs):
+        """
+        Initialize the logger.
+
+        Args:
+            self: (todo): write your description
+        """
         super(H5TypeTest, self).__init__(*args, **kwargs)
         # main
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.INFO)
 
     def testBaseIntegerTypeItem(self):
+        """
+        Set the hdf5 type for the h5
+
+        Args:
+            self: (todo): write your description
+        """
         dt = np.dtype('<i1')
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_INTEGER')
@@ -36,6 +48,12 @@ class H5TypeTest(unittest.TestCase):
 
 
     def testBaseFloatTypeItem(self):
+        """
+        Determine item types of the item types.
+
+        Args:
+            self: (todo): write your description
+        """
         dt = np.dtype('<f8')
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_FLOAT')
@@ -45,6 +63,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(typeItem['base'], 'H5T_IEEE_F64LE')
 
     def testBaseStringTypeItem(self):
+        """
+        Set the dtype of the data type
+
+        Args:
+            self: (todo): write your description
+        """
         dt = np.dtype('S3')
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_STRING')
@@ -53,6 +77,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(typeItem['charSet'], 'H5T_CSET_ASCII')
 
     def testBaseStringUTFTypeItem(self):
+        """
+        Determine the dtype dtype of the dtype.
+
+        Args:
+            self: (todo): write your description
+        """
         dt = np.dtype('U3')
         try:
             typeItem = h5type.getTypeItem(dt)
@@ -61,6 +91,12 @@ class H5TypeTest(unittest.TestCase):
             pass # expected
 
     def testBaseVLenAsciiTypeItem(self):
+        """
+        Create a vt height.
+
+        Args:
+            self: (todo): write your description
+        """
         dt = special_dtype(vlen=bytes)
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_STRING')
@@ -69,6 +105,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(typeItem['charSet'], 'H5T_CSET_ASCII')
 
     def testBaseVLenUnicodeTypeItem(self):
+        """
+        Convert vt height.
+
+        Args:
+            self: (todo): write your description
+        """
         dt = special_dtype(vlen=str)
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_STRING')
@@ -77,6 +119,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(typeItem['charSet'], 'H5T_CSET_UTF8')
 
     def testBaseEnumTypeItem(self):
+        """
+        Determines the dtype for a float types.
+
+        Args:
+            self: (todo): write your description
+        """
         mapping = {'RED': 0, 'GREEN': 1, 'BLUE': 2}
         dt = special_dtype(enum=(np.int8, mapping))
         typeItem = h5type.getTypeItem(dt)
@@ -88,6 +136,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(typeItem['mapping']['GREEN'], 1)
 
     def testBaseArrayTypeItem(self):
+        """
+        Returns the data type of the array
+
+        Args:
+            self: (todo): write your description
+        """
         dt = np.dtype('(2,2)<int32')
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_ARRAY')
@@ -96,6 +150,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(baseItem['base'], 'H5T_STD_I32LE')
 
     def testCompoundArrayTypeItem(self):
+        """
+        Determine the minimum number of fields.
+
+        Args:
+            self: (todo): write your description
+        """
         dt = np.dtype([('a', '<i1'), ('b', 'S1', (10,))])
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_COMPOUND')
@@ -115,12 +175,24 @@ class H5TypeTest(unittest.TestCase):
 
 
     def testOpaqueTypeItem(self):
+        """
+        Set the dtype of the item type
+
+        Args:
+            self: (todo): write your description
+        """
         dt = np.dtype('V200')
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_OPAQUE')
         self.assertTrue('base' not in typeItem)
 
     def testVlenDataItem(self):
+        """
+        Convert the data type float.
+
+        Args:
+            self: (todo): write your description
+        """
         dt = special_dtype(vlen=np.dtype('int32'))
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_VLEN')
@@ -129,6 +201,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(baseItem['base'], 'H5T_STD_I32LE')
 
     def testCompoundTypeItem(self):
+        """
+        Return the item type of the item
+
+        Args:
+            self: (todo): write your description
+        """
         dt = np.dtype([("temp", np.float32), ("pressure", np.float32), ("wind", np.int16)])
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_COMPOUND')
@@ -155,6 +233,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(tempFieldType['base'], 'H5T_IEEE_F32LE')
 
     def testCreateBaseType(self):
+        """
+        Create a hdf5 type.
+
+        Args:
+            self: (todo): write your description
+        """
         dt = h5type.createDataType('H5T_STD_U32BE')
         self.assertEqual(dt.name, 'uint32')
         self.assertEqual(dt.byteorder, '>')
@@ -178,12 +262,24 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(dt.kind, 'i')
 
     def testCreateBaseStringType(self):
+        """
+        Creates a h5 type.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII', 'length': 6 }
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'bytes48')
         self.assertEqual(dt.kind, 'S')
 
     def testCreateBaseUnicodeType(self):
+        """
+        Creates a float type.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_UTF8', 'length': 32 }
         try:
             dt = h5type.createDataType(typeItem)
@@ -192,6 +288,12 @@ class H5TypeTest(unittest.TestCase):
             pass
 
     def testCreateNullTermStringType(self):
+        """
+        Creates a data type.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII',
             'length': 6, 'strPad': 'H5T_STR_NULLTERM'}
         dt = h5type.createDataType(typeItem)
@@ -200,6 +302,12 @@ class H5TypeTest(unittest.TestCase):
 
 
     def testCreateVLenStringType(self):
+        """
+        Create a vdata type.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII', 'length': 'H5T_VARIABLE' }
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'object')
@@ -208,6 +316,12 @@ class H5TypeTest(unittest.TestCase):
 
 
     def testCreateVLenUTF8Type(self):
+        """
+        Creates vdata type.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_UTF8', 'length': 'H5T_VARIABLE' }
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'object')
@@ -215,18 +329,36 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(check_dtype(vlen=dt), str)
 
     def testCreateVLenDataType(self):
+        """
+        Creates vdata type.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = {'class': 'H5T_VLEN', 'base': 'H5T_STD_I32BE'}
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'object')
         self.assertEqual(dt.kind, 'O')
 
     def testCreateOpaqueType(self):
+        """
+        Create a gepaquequequeque object.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = {'class': 'H5T_OPAQUE', 'size': 200}
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'void1600')
         self.assertEqual(dt.kind, 'V')
 
     def testCreateCompoundType(self):
+        """
+        Creates item type.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = {
             'class': 'H5T_COMPOUND', 'fields':
                 [{'name': 'temp',     'type': 'H5T_IEEE_F32LE'},
@@ -249,6 +381,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(check_dtype(vlen=dtLocation), bytes)
 
     def testCreateCompoundTypeUnicodeFields(self):
+        """
+        Creates a float fields.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = {
             'class': 'H5T_COMPOUND', 'fields':
                 [{'name': u'temp',     'type': 'H5T_IEEE_F32LE'},
@@ -262,6 +400,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(len(dt.fields), 3)
 
     def testCreateArrayType(self):
+        """
+        Create an array type for a float type.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = {'class': 'H5T_ARRAY',
                     'base': 'H5T_STD_I64LE',
                     'dims': (3, 5) }
@@ -270,6 +414,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(dt.kind, 'V')
 
     def testCreateArrayIntegerType(self):
+        """
+        Creates an array of data types.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = {'class': 'H5T_INTEGER',
                     'base': 'H5T_STD_I64LE',
                     'dims': (3, 5) }
@@ -278,6 +428,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(dt.kind, 'V')
 
     def testCreateCompoundArrayType(self):
+        """
+        Creates a float dict to use in - array.
+
+        Args:
+            self: (todo): write your description
+        """
         typeItem = {
             "class": "H5T_COMPOUND",
             "fields": [
@@ -311,6 +467,12 @@ class H5TypeTest(unittest.TestCase):
         self.assertTrue('b' in dt.fields.keys())
 
     def testRefType(self):
+        """
+        Returns the dtype type for the given dtype.
+
+        Args:
+            self: (todo): write your description
+        """
         # todo - special_dtype not implemented
         dt = special_dtype(ref=Reference)
         self.assertEqual(dt.kind, 'S')

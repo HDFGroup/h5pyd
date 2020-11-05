@@ -26,6 +26,12 @@ from common import ut, TestCase
 
 class TestExtendDataset(TestCase):
     def test_extend_dset(self):
+        """
+        Extend the dset to a hdfset.
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("extend_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")

@@ -32,6 +32,11 @@ cfg = Config()
 
 #----------------------------------------------------------------------------------
 def usage():
+    """
+    Print out the usage
+
+    Args:
+    """
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  source_domain  des_domain".format(cfg["cmd"])))
     print(("    {} [ OPTIONS ]  source_domain  folder".format(cfg["cmd"])))
@@ -61,6 +66,11 @@ def usage():
 
 #----------------------------------------------------------------------------------
 def print_config_example():
+    """
+    Print the config example.
+
+    Args:
+    """
     print("# default")
     print("hs_username = <username>")
     print("hs_password = <passwd>")
@@ -70,6 +80,13 @@ def print_config_example():
 #----------------------------------------------------------------------------------
 
 def getFolder(domain, mode="r"):
+    """
+    Get a bucket s3
+
+    Args:
+        domain: (str): write your description
+        mode: (str): write your description
+    """
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -80,6 +97,13 @@ def getFolder(domain, mode="r"):
 
 
 def getFile(domain, mode="r"):
+    """
+    Get a bucket from an h5 file.
+
+    Args:
+        domain: (str): write your description
+        mode: (str): write your description
+    """
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
@@ -89,6 +113,13 @@ def getFile(domain, mode="r"):
     return fh
 
 def createFile(domain, linked_domain=None):
+    """
+    Create a new hdf5 bucket.
+
+    Args:
+        domain: (str): write your description
+        linked_domain: (str): write your description
+    """
     #print("createFile", domain)
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -103,6 +134,13 @@ def createFile(domain, linked_domain=None):
 
 
 def deleteDomain(domain, keep_root=False):
+    """
+    Delete a domain.
+
+    Args:
+        domain: (str): write your description
+        keep_root: (bool): write your description
+    """
 
     # get handle to parent folder
     if domain.endswith('/'):
@@ -143,6 +181,11 @@ def deleteDomain(domain, keep_root=False):
             print("Domain: {} deleted".format(domain))
 
 def main():
+    """
+    Main function.
+
+    Args:
+    """
 
     loglevel = logging.ERROR
     verbose = False

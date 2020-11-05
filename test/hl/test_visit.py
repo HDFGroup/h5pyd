@@ -19,13 +19,31 @@ from common import ut, TestCase
 
 class TestVisit(TestCase):
     def test_visit(self):
+        """
+        Test for all the hdf5 hdf5.
+
+        Args:
+            self: (todo): write your description
+        """
         visit_names = []
 
         def visit_item(name):
+            """
+            Create an astroid.
+
+            Args:
+                name: (str): write your description
+            """
             visit_names.append(name)
             return None
 
         def find_g1_1(name):
+            """
+            Find the g1 - 1 if it exists.
+
+            Args:
+                name: (str): write your description
+            """
             if name.endswith("g1.1"):
                 return "found g1.1"  # stop iteration
             return None
@@ -58,10 +76,23 @@ class TestVisit(TestCase):
         f.close()
 
     def test_visit_multilink(self):
+        """
+        Create a multilink is a multilink
+
+        Args:
+            self: (todo): write your description
+        """
         obj_ids = set()
         visited_ids = []
 
         def visit_multilink(name, obj):
+            """
+            Add a multilink.
+
+            Args:
+                name: (str): write your description
+                obj: (todo): write your description
+            """
             if not config.get("use_h5py"):
                 # obj ids not unique in h5py?
                 self.assertTrue(obj.id.id in obj_ids)

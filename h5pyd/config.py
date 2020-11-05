@@ -17,6 +17,13 @@ class Config:
     User Config state
     """
     def __init__(self, config_file=None, **kwargs):
+        """
+        Initialize a configuration file.
+
+        Args:
+            self: (todo): write your description
+            config_file: (str): write your description
+        """
         self._cfg = {}
         if config_file:
             self._config_file = config_file
@@ -70,6 +77,12 @@ class Config:
         del self._cfg[name]
 
     def __len__(self):
+        """
+        Returns the number of bytes in this der.
+
+        Args:
+            self: (todo): write your description
+        """
         return len(self._cfg)
          
     def __iter__(self):
@@ -79,12 +92,31 @@ class Config:
             yield key
 
     def __contains__(self, name):
+        """
+        Determine if a cfgroups exists.
+
+        Args:
+            self: (todo): write your description
+            name: (str): write your description
+        """
         return name in self._cfg
 
     def __repr__(self):
+        """
+        Return a json - formatted : class : class :.
+
+        Args:
+            self: (todo): write your description
+        """
         return json.dumps(self._cfg)
 
     def keys(self):
+        """
+        List of the list of keys.
+
+        Args:
+            self: (todo): write your description
+        """
         return self._cfg.keys()
 
 

@@ -28,6 +28,12 @@ from common import ut, TestCase
 
 class TestFancySelectDataset(TestCase):
     def test_dset(self):
+        """
+        Create a hdfset
+
+        Args:
+            self: (todo): write your description
+        """
         filename = self.getFileName("fancy_select_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
