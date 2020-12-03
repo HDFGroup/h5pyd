@@ -127,6 +127,7 @@ class File(Group):
         """
 
         groupid = None
+        dn_ids = []
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
         if mode is None and endpoint is None and username is None \
@@ -240,7 +241,7 @@ class File(Group):
 
             # try to do a GET from the domain
             req = "/"
-            params = {}
+            params =  {"getdnids": 1} # return dn ids if available
             if use_cache and mode == 'r':
                 params["getobjs"] = "T"
                 params["include_attrs"] = "T"
@@ -262,7 +263,7 @@ class File(Group):
             if rsp.status_code == 200 and mode == 'w':
                 # delete existing domain
                 rsp = http_conn.DELETE(req, params=params)
-                if rsp.status_code != 200:
+                if rsp.status_code not in (200, 410):
                     # failed to delete
                     http_conn.close()
                     raise IOError(rsp.status_code, rsp.reason)
@@ -280,7 +281,7 @@ class File(Group):
                     body["owner"] = owner
                 if linked_domain:
                     body["linked_domain"] = linked_domain
-                rsp = http_conn.PUT(req, body=body)
+                rsp = http_conn.PUT(req, params=params, body=body)
                 if rsp.status_code != 201:
                     http_conn.close()
                     raise IOError(rsp.status_code, rsp.reason)
@@ -290,6 +291,9 @@ class File(Group):
             if 'root' not in root_json:
                 http_conn.close()
                 raise IOError(404, "Unexpected error")
+
+            if "dn_ids" in root_json:
+                dn_ids = root_json["dn_ids"] 
 
             root_uuid = root_json['root']
 
@@ -347,7 +351,8 @@ class File(Group):
         self._id = groupid
         self._verboseInfo = None  # aditional state we'll get when requested
         self._verboseUpdated = None # when the verbose data was fetched
-        self._lastScan = None  # when summary stats where last updated o server
+        self._lastScan = None  # when summary stats where last updated by server
+        self._dn_ids = dn_ids
 
 
         Group.__init__(self, self._id)
@@ -545,12 +550,22 @@ class File(Group):
         """  Tells the service to complete any pending updates to permanent storage
         """
         self.log.debug("flush")
-        if  self._id.id.startswith("g-"):
+        if  self.mode == "r+" and self._id.id.startswith("g-"):
             # Currently flush only works with HSDS
             self.log.info("sending PUT flush request")
             req = '/'
-            body = {"flush": 1}
-            self.PUT(req, body=body)
+            body = {"flush": 1, "getdnids": 1}
+            rsp = self.PUT(req, body=body)
+            if "dn_ids" in rsp:
+                dn_ids = rsp["dn_ids"]
+                orig_ids = set(self._dn_ids)
+                current_ids = set(dn_ids)
+                self._dn_ids = current_ids
+                if orig_ids and orig_ids != current_ids:
+                    self.log.debug("original dn_ids: {}".format(orig_ids))
+                    self.log.debug("current dn_ids: {}".format(current_ids))
+                    self.log.warn("HSDS nodes have changed")
+                    raise IOError(500, "Unexpected Error")
             self.log.info("PUT flush complete")
 
     def close(self, flush=False):
@@ -560,13 +575,8 @@ class File(Group):
 
         self.log.debug("close, mode: {}".format(self.mode))
         # do a PUT flush if this file is writable and the server is HSDS and flush is set
-        if  self.mode == "r+" and self._id.id.startswith("g-") and flush:
-            # Currently flush only works with HSDS
-            self.log.info("sending PUT flush request")
-            req = '/'
-            body = {"flush": 1}
-            self.PUT(req, body=body)
-
+        if flush:
+            self.flush()
         if self._id._http_conn:
             self._id._http_conn.close()
         self._id.close()
