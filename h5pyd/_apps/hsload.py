@@ -270,7 +270,7 @@ def main():
                 if not s3:
                     s3 = s3fs.S3FileSystem()
                 try:
-                    fin = h5py.File(s3.open(src_file, "rb"), "r")
+                    fin = h5py.File(s3.open(src_file, "rb"), moe="r")
                 except IOError as ioe:
                     logging.error("Error opening file {}: {}".format(src_file, ioe))
                     sys.exit(1)

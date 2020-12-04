@@ -21,6 +21,12 @@ except ImportError as e:
     sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
     sys.exit(1)
 
+try:
+    import s3fs
+    S3FS_IMPORT = True
+except ImportError:
+    S3FS_IMPORT = False
+
 if __name__ == "__main__":
     from config import Config
     from chunkiter import ChunkIterator
@@ -380,7 +386,7 @@ def usage():
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not compare dataset data")
-    print("     --noattr :: Don not compare attributes")
+    print("     --noattr :: Do not compare attributes")
     print("     --quiet :: Do not produce output")
     print("     -h | --help    :: This message.")
     print("")
@@ -409,6 +415,7 @@ def main():
     cfg["logfname"] = None
     logfname=None
     rc = 0
+    s3 = None  # s3fs instance
 
     src_files = []
     argn = 1
@@ -509,11 +516,25 @@ def main():
     try:
 
         # get a handle to input file
-        try:
-            fin = h5py.File(file_path, mode='r')
-        except IOError as ioe:
-            logging.error("Error opening file {}: {}".format(domain_path, ioe))
-            sys.exit(1)
+        if file_path.startswith("s3://"):
+            if not S3FS_IMPORT:
+                sys.stderr.write("Install S3FS package to load s3 files")
+                sys.exit(1)
+
+            if not s3:
+                s3 = s3fs.S3FileSystem()
+            try:
+                fin = h5py.File(s3.open(file_path, "rb"), mode="r")
+            except IOError as ioe:
+                logging.error("Error opening file {}: {}".format(file_path, ioe))
+                sys.exit(1)
+        else:
+            # regular h5py open
+            try:
+                fin = h5py.File(file_path, mode='r')
+            except IOError as ioe:
+                logging.error("Error opening file {}: {}".format(domain_path, ioe))
+                sys.exit(1)
 
         # get the  domain
         try:
