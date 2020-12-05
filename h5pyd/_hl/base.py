@@ -890,7 +890,7 @@ class HLObject(CommonStateObject):
         if rsp.status_code != 200:
             self.log.info("Got response: {}".format(rsp.status_code))
             raise IOError(rsp.status_code, rsp.reason)
-        if rsp.headers['Content-Type'] == "application/octet-stream":
+        if 'Content-Type' in rsp.headers and rsp.headers['Content-Type'] == "application/octet-stream":
             if 'Content-Length' in rsp.headers:
                 # not available when http compression is used
                 self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
@@ -947,7 +947,7 @@ class HLObject(CommonStateObject):
             self.log.error("POST error - status_code: {}, reason: {}".format(rsp.status_code, rsp.reason))
             raise IOError(rsp.reason)
 
-        if rsp.headers['Content-Type'] == "application/octet-stream":
+        if 'Content-Type' in rsp.headers and rsp.headers['Content-Type'] == "application/octet-stream":
             if 'Content-Length' in rsp.headers:
                 # not available when http compression is used
                 self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
