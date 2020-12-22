@@ -143,7 +143,7 @@ class HttpConn:
         if isinstance(api_key, dict):
             # Maintain Azure-defualt backwards compatibility, but allow
             # both environment variable and kwarg override.
-            provider = Config().get('hs_openid_provider', 'azure')
+            # provider = Config().get('hs_openid_provider', 'azure')
             provider = api_key.get('openid_provider', provider)
 
             if provider == 'azure':

@@ -202,7 +202,7 @@ class Table(Dataset):
                     else:
                         # we've hit the limit for number of rows to return
                         add_count = limit - len(data)
-                        self.log.debug("adding {} from {} to rrows".format(add_count, count))
+                        self.log.debug("adding {} from {} to rows".format(add_count, count))
                         data.extend(values[:add_count])
 
                 # advance to next page
