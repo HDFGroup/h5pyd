@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import requests
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -304,3 +305,112 @@ class GoogleOpenID(OpenIDHandler):
 
         except:
             self._token = None
+
+
+class KeycloakOpenID(OpenIDHandler):
+
+    def __init__(self, endpoint, config=None, scopes=None):
+        """Store configuration."""
+
+        # Configuration manager
+        hs_config = Config()
+
+        if scopes is None:
+            scopes = hs_config.get('hs_google_scopes', 'openid').split()
+        self.scopes = scopes
+
+        # Config is a client_secrets dictionary.
+        if isinstance(config, dict):
+            self.config = config
+
+        # Config points to a client_secrets.json file.
+        elif isinstance(config, str) and os.path.isfile(config):
+            with open(config, 'r') as f:
+                self.config = json.loads(f.read())
+
+        # Maybe client_secrets are in environment variables?
+        else:
+            self.config = {
+                'client_id': hs_config.get('hs_keycloak_client_id', None),
+                'client_secret': hs_config.get('hs_keycloak_client_secret', None),
+                'keycloak_realm': hs_config.get('hs_keycloak_realm', None),
+                'keycloak_uri': hs_config.get('hs_keycloak_uri', None),
+                'token_uri': 'https://oauth2.googleapis.com/token',
+                'auth_provider_x509_cert_url': 'https://www.googleapis.com/oauth2/v1/certs',
+                'redirect_uris': ['urn:ietf:wg:oauth:2.0:oob', 'http://localhost']
+            }
+
+        super().__init__(endpoint)
+
+    def _parse(self, creds):
+        """Parse credentials."""
+
+        # NOTE: In Google OpenID, if a client is set up for InstalledAppFlow
+        # then the client_secret is not actually treated as a secret. Acquire
+        # will ALWAYS prompt for user input before granting a token.
+
+        token = {
+            'accessToken': creds.id_token,
+            'refreshToken': creds.refresh_token,
+            'tokenUri': creds.token_uri,
+            'clientId': creds.client_id,
+            'clientSecret': creds.client_secret,
+            'scopes': creds.scopes
+        }
+
+        # The expiry field that is in creds is for the OAuth token, not the
+        # OpenID token. We need to validate the OpenID tokenn to get the exp.
+        idinfo = GoogleIDToken.verify_oauth2_token(creds.id_token, GoogleRequest())
+        if 'exp' in idinfo:
+            token['expiresOn'] = idinfo['exp']
+
+        return token
+
+    def acquire(self):
+        """Acquire a new Google token."""
+        if not self.config('keycloak_uri'):
+            raise KeyError("keycloak_uri not set")
+        if not self.config('keycloak_realm'):
+            raise KeyError("Keycloak realm not set")
+        if not self.config('client_id'):
+            raise KeyError("client_id not set")
+
+
+
+        keycloak_url = self.config('keycloak_uri')
+        keycloak_url += "/auth/realms/" 
+        keycloak_url += self.config('keycloak_realm')
+        keycloak_url += "/protocol/openid-connect/token"
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        body = {}
+        body["username"] = "admin"
+        body["password"] = "admin"
+        body["grant-type"] = "password"
+        body["client_id"] = self.config.get("client_id")
+        rsp = requests.post(keycloak_url, body=body, headers=headers)
+
+        if rsp.status_code not in (200, 201):
+            print("POST error: {}".format(rsp.status_code))
+            raise IOError("KeyCloak response: {}".format(rsp.status_code))
+
+        print("rsp:", rsp)
+
+    def refresh(self):
+        """Try to renew a token."""
+
+        try:
+
+            token = self._token
+            creds = GoogleCredentials(token=None,
+                                      refresh_token=token['refreshToken'],
+                                      scopes=token['scopes'],
+                                      token_uri=token['tokenUri'],
+                                      client_id=token['clientId'],
+                                      client_secret=token['clientSecret'])
+
+            creds.refresh(GoogleRequest())
+            self._token = self._parse(creds)
+
+        except:
+            self._token = None
+
