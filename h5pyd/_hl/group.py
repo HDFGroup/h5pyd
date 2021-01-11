@@ -24,6 +24,7 @@ from . import table
 from .table import Table
 from .datatype import Datatype
 from . import h5type
+from h5pyd._apps.chunkiter import ChunkIterator
 
 
 class Group(HLObject, MutableMappingHDF5):
@@ -333,7 +334,9 @@ class Group(HLObject, MutableMappingHDF5):
         dset = dataset.Dataset(dsid)
         if data is not None:
             self.log.info("initialize data")
-            dset[...] = data
+            it = ChunkIterator(dset)
+            for chunk in it:
+                dset[chunk] = data[chunk]
 
         if name is not None:
             items = name.split('/')
