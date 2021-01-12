@@ -81,7 +81,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         Convert list that may contain bytes type elements to list of string
         elements
         """
-
         text_types = (bytes, str)
         if isinstance(data, text_types):
             is_list = False

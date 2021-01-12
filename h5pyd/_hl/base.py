@@ -14,6 +14,7 @@ from __future__ import absolute_import
 
 import posixpath
 import os
+import six
 import json
 import base64
 import numpy as np
@@ -164,10 +165,15 @@ def copyToArray(arr, rank, index, data, vlen_base=None):
             copyToArray(arr, rank+1, index, data[i], vlen_base=vlen_base)
         else:
             if vlen_base:
-                e = np.array(data[i], dtype=vlen_base)
-                if len(e.shape) > 1:
-                    # squeeze dimensions, but don't convert a 1-d to 0-d
-                    e = e.squeeze()
+                if six.PY2 and vlen_base == unicode:
+                    e = unicode(data[i])
+                elif vlen_base == str:
+                    e = str(data[i])
+                else:
+                    e = np.array(data[i], dtype=vlen_base)
+                    if len(e.shape) > 1:
+                        # squeeze dimensions, but don't convert a 1-d to 0-d
+                        e = e.squeeze()
                 arr[tuple(index)] = e
             else:
                 arr[tuple(index)] = data[i]
