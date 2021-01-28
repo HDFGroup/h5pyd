@@ -94,3 +94,4 @@ class Config:
             return self[name]
         else:
             return default
+            

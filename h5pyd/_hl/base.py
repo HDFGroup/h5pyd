@@ -24,6 +24,7 @@ from collections.abc import (
 )
 from .objectid import GroupID
 from .h5type import Reference, check_dtype
+from .config import Config
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
 numpy_float_types = (np.float16, np.float32, np.float64)
@@ -103,21 +104,6 @@ def _decode(item, encoding="ascii"):
         else:
             ret_val = item
         return ret_val
-
-
-def getHeaders(domain, username=None, password=None, headers=None):
-        if headers is None:
-            headers = {}
-        headers['host'] = domain
-
-        if username is not None and password is not None:
-            auth_string = username + ':' + password
-            auth_string = auth_string.encode('utf-8')
-            auth_string = base64.b64encode(auth_string)
-            auth_string = b"Basic " + auth_string
-            headers['Authorization'] = auth_string
-        return headers
-
 
 
 """
@@ -879,13 +865,12 @@ class HLObject(CommonStateObject):
                 return False
         return True
 
-
     def GET(self, req, params=None, use_cache=True, format="json"):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
         # This should be the default - but explictly set anyway
         headers = {"Accept-Encoding": "deflate, gzip"}
-
+        
         rsp = self.id._http_conn.GET(req, params=params, headers=headers, format=format, use_cache=use_cache)
         if rsp.status_code != 200:
             self.log.info("Got response: {}".format(rsp.status_code))

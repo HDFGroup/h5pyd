@@ -282,7 +282,6 @@ class TestFile(TestCase):
         except IOError as ioe:
             self.assertTrue(False)
 
-
         # test_user2 has read access, but opening in write mode should fail
         try:
             f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
