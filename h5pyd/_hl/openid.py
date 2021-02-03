@@ -377,7 +377,7 @@ class KeycloakOpenID(OpenIDHandler):
         # validate json returned by keycloak
         if "token_type" not in creds:
             raise IOError("Unexpected Keycloak JWT, no token_type")
-        if creds["token_type"] != "Bearer":
+        if creds["token_type"].lower() != "bearer":
             raise IOError("Unexpected Keycloak JWT, expected Bearer token")
 
         token = {}
