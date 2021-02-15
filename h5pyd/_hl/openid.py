@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import requests
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -22,12 +23,14 @@ from .config import Config
 
 class OpenIDHandler(ABC):
 
-    def __init__(self, endpoint, use_token_cache=True):
+    def __init__(self, endpoint, use_token_cache=True, username=None, password=None):
         """Initialize the token."""
 
         # Location of the token cache.
         self._token_cache_file = os.path.expanduser('~/.hstokencfg')
         self._endpoint = endpoint
+        self._username = username
+        self._password = password
 
         # The _token attribute should be a dict with at least the following keys:
         #
@@ -37,10 +40,13 @@ class OpenIDHandler(ABC):
 
         if not use_token_cache or not os.path.isfile(self._token_cache_file):
             self._token = None
-
         else:
+            if username:
+                file_key = username + '@' + endpoint
+            else:
+                file_key = endpoint
             with open(self._token_cache_file, 'r') as token_file:
-                self._token = json.load(token_file).get(endpoint, None)
+                self._token = json.load(token_file).get(file_key, None)
 
     @abstractmethod
     def acquire(self):
@@ -53,10 +59,16 @@ class OpenIDHandler(ABC):
         pass
 
     @property
+    def username(self):
+        """ Return username if known """
+        return self._username
+
+    @property
     def expired(self):
         """Return if the token is expired."""
         t = self._token
-        return t is not None and 'expiresOn' in t and time.time() >= t['expiresOn']
+        # add some buffer to account for clock skew
+        return t is not None and 'expiresOn' in t and time.time() + 10.0 >= t['expiresOn']
 
     @property
     def token(self):
@@ -64,7 +76,8 @@ class OpenIDHandler(ABC):
 
         if self.expired:
             self.refresh()
-            self.write_token_cache()
+            if self._token:
+                self.write_token_cache()
 
         if self._token is None:
             self.acquire()
@@ -77,10 +90,15 @@ class OpenIDHandler(ABC):
 
         cache_exists = os.path.isfile(self._token_cache_file)
 
+        if self._username:
+            file_key = self._username + '@' + self._endpoint
+        else:
+            file_key = self._endpoint
+
         # Create a new cache file.
         if not cache_exists and self._token is not None:
             with open(self._token_cache_file, 'w') as token_file:
-                json.dump({self._endpoint: self._token}, token_file)
+                json.dump({file_key: self._token}, token_file)
 
         # Update an exisiting cache file.
         elif cache_exists:
@@ -89,11 +107,11 @@ class OpenIDHandler(ABC):
 
                 # Store valid tokens.
                 if self._token is not None:
-                    cache[self._endpoint] = self._token
+                    cache[file_key] = self._token
 
                 # Delete invalid tokens.
-                elif self._endpoint in cache:
-                    del cache[self._endpoint]
+                elif file_key in cache:
+                    del cache[file_key]
 
                 token_file.seek(0)
                 token_file.truncate(0)
@@ -304,3 +322,102 @@ class GoogleOpenID(OpenIDHandler):
 
         except:
             self._token = None
+
+
+class KeycloakOpenID(OpenIDHandler):
+
+    def __init__(self, endpoint, config=None, scopes=None, username=None, password=None):
+        """Store configuration."""
+
+        # Configuration manager
+        hs_config = Config()
+
+        if scopes is None:
+            scopes = hs_config.get('hs_keycloak_scopes', 'openid').split()
+        self.scopes = scopes
+
+        # Config is a client_secrets dictionary.
+        if isinstance(config, dict):
+            self.config = config
+
+        # Config points to a client_secrets.json file.
+        elif isinstance(config, str) and os.path.isfile(config):
+            with open(config, 'r') as f:
+                self.config = json.loads(f.read())
+
+        # Maybe configs are in environment variables?
+        else:
+            self.config = {
+                'keycloak_client_id': hs_config.get('hs_keycloak_client_id', None),
+                'keycloak_client_secret': hs_config.get('hs_keycloak_client_secret', None),
+                'keycloak_realm': hs_config.get('hs_keycloak_realm', None),
+                'keycloak_uri': hs_config.get('hs_keycloak_uri', None)
+            }
+
+        super().__init__(endpoint, username=username, password=password)
+
+    def _getKeycloakUrl(self):
+        if not self.config['keycloak_uri']:
+            raise KeyError("keycloak_uri not set")
+        if not self.config['keycloak_realm']:
+            raise KeyError("Keycloak realm not set")
+        if not self.config['keycloak_client_id']:
+            raise KeyError("keycloak client_id not set")
+
+        url = self.config['keycloak_uri']
+        url += "/auth/realms/" 
+        url += self.config['keycloak_realm']
+        url += "/protocol/openid-connect/token"
+
+        return url
+
+    def _parse(self, creds):
+        """Parse credentials."""
+
+        # validate json returned by keycloak
+        if "token_type" not in creds:
+            raise IOError("Unexpected Keycloak JWT, no token_type")
+        if creds["token_type"].lower() != "bearer":
+            raise IOError("Unexpected Keycloak JWT, expected Bearer token")
+
+        token = {}
+        if "access_token" not in creds:
+            raise IOError("Unexpected Keycloak JWT, no access_token")
+        token["accessToken"] = creds["access_token"]
+        if "refesh_token" in creds:
+            token["refreshToken"] = creds["refresh_token"]
+        if "expires_in" in creds:
+            now = time.time()
+            token['expiresOn'] = now + creds["expires_in"]
+       
+        # TBD: client_secret
+        # TBD: scopes
+        # TBD: client_id
+
+        return token
+
+    def acquire(self):
+        """Acquire a new Keycloak token."""
+        keycloak_url = self._getKeycloakUrl()
+        
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        body = {}
+        body["username"] = self._username
+        body["password"] = self._password
+        body["grant_type"] = "password"
+        body["client_id"] = self.config.get("keycloak_client_id")
+        rsp = requests.post(keycloak_url, data=body, headers=headers)
+        
+        if rsp.status_code not in (200, 201):
+            print("POST error: {}".format(rsp.status_code))
+            raise IOError("Keycloak response: {}".format(rsp.status_code))
+
+        creds = rsp.json()  # TBD: catch json format errors?
+        self._token = self._parse(creds)
+
+    def refresh(self):
+        """Try to renew a token."""
+        # TBD 
+        # unclear if refresh is supported without a client secret
+        self._token = None
+
