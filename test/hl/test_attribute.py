@@ -94,14 +94,7 @@ class TestAttribute(TestCase):
         self.assertEqual(arr[0], b"Hello")
         self.assertEqual(arr[1], b"Good-bye")
         self.assertEqual(arr.dtype.kind, 'S')
-        if six.PY3:
-            self.assertEqual(arr.dtype.itemsize, 11)
-        else:
-            # TBD: why is this different for PY2?
-            self.assertEqual(arr.dtype.itemsize, 8)
-
-
-
+     
         # scalar byte values
         g1.attrs['e1'] = "Hello"
         s = g1.attrs['e1']
