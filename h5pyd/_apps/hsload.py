@@ -69,6 +69,7 @@ def usage():
     print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not upload dataset data")
     print("     --link :: Link to dataset data (sourcefile given as <bucket>/<path>)")
+    print("     --retries <n> :: Set number of server retry attempts")
     print("     -h | --help    :: This message.")
     print("")
     print("Note about --link option:")
@@ -116,6 +117,7 @@ def main():
     logfname = None
     s3 = None  # s3fs instance
     mode = 'w'
+    retries = 10  # number of retry attempts for HSDS requests
 
     src_files = []
     argn = 1
@@ -202,6 +204,9 @@ def main():
                 usage()
                 sys.exit(-1)
             compression = val
+            argn += 2
+        elif arg == "--retries":
+            retries = int(val)
             argn += 2
         elif arg[0] == '-':
             usage()
@@ -295,7 +300,7 @@ def main():
                 endpoint = cfg["hs_endpoint"]
                 bucket = cfg["hs_bucket"]
 
-                fout = h5pyd.File(tgt, mode, endpoint=endpoint, username=username, password=password, bucket=bucket)
+                fout = h5pyd.File(tgt, mode, endpoint=endpoint, username=username, password=password, bucket=bucket, retries=retries)
             except IOError as ioe:
                 if ioe.errno == 404:
                     logging.error("Domain: {} not found".format(tgt))
