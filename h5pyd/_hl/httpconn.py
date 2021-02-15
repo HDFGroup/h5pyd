@@ -246,7 +246,7 @@ class HttpConn:
         if headers is None:
             headers = {}
         elif "Authorization" in headers:
-            return  # already have auth key
+            return  headers # already have auth key
         if username is None:
             username = self._username
         if password is None:
@@ -277,7 +277,6 @@ class HttpConn:
         else:
             # no auth header
             pass
-
 
         return headers
 
@@ -500,7 +499,6 @@ class HttpConn:
         headers = self.getHeaders(headers=headers)
 
         self.log.info("DEL: " + req)
-      
         try:
             s = self.session
             rsp = s.delete(self._endpoint + req, headers=headers, params=params, verify=self.verifyCert())
