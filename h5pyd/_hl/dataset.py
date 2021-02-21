@@ -1028,11 +1028,11 @@ class Dataset(HLObject):
             self.log.debug("converting ndarray for vlen data")
             try:
                 val = numpy.asarray(val, dtype=vlen)
-            except ValueError:
+            except ValueError as ve:
                 try:
                     val = numpy.array([numpy.array(x, dtype=vlen)
                                        for x in val], dtype=self.dtype)
-                except ValueError:
+                except ValueError as ve2:
                     pass
             if vlen == val_dtype:
                 if val.ndim > 1:
@@ -1181,9 +1181,8 @@ class Dataset(HLObject):
             if self.id.uuid.startswith("d-"):
                 # server is HSDS, use binary data, use param values for selection
                 format = "binary"
-                #body = val.tobytes()
-                body = arrayToBytes(val)
-                self.log.debug("writing binary data, {} bytes".format(len(body)))
+                body = arrayToBytes(val, vlen=vlen)
+                self.log.debug("writing binary data, {} bytes - {}".format(len(body), body))
             else:
                 # h5serv, base64 encode, body json for selection
                 # TBD - replace with above once h5serv supports binary req

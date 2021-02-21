@@ -287,8 +287,11 @@ def getElementSize(e, dt):
                     count += getElementSize(item, dt)
             count += 4  # byte count
         elif isinstance(e, list) or isinstance(e, tuple):
-            #print("got list for e:", e)
-            count = len(e) * vlen.itemsize + 4  # +4 for byte count
+            if not e:
+                # empty list, just add byte count
+                count = 4
+            else:
+                count = len(e) * vlen.itemsize + 4  # +4 for byte count
         else:
 
             raise TypeError("unexpected type: {}".format(type(e)))
@@ -322,13 +325,15 @@ def copyBuffer(src, des, offset):
 """
 Copy element to bytearray
 """
-def copyElement(e, dt, buffer, offset):
+def copyElement(e, dt, buffer, offset, vlen=None):
+    if vlen is None and dt.metadata and "vlen" in dt.metadata:
+        vlen = dt.metadata["vlen"]
     if len(dt) > 1:
         for name in dt.names:
             field_dt = dt[name]
             field_val = e[name]
             offset = copyElement(field_val, field_dt, buffer, offset)
-    elif not dt.metadata or "vlen" not in dt.metadata:
+    elif not vlen:
         #print("e no vlen: {} type: {}".format(e, type(e)))
         e_buf = e.tobytes()
         if len(e_buf) < dt.itemsize:
@@ -341,7 +346,6 @@ def copyElement(e, dt, buffer, offset):
         offset = copyBuffer(e_buf, buffer, offset)
     else:
         # variable length element
-        vlen = dt.metadata["vlen"]
         if isinstance(e, int):
             if e == 0:
                 # write 4-byte integer 0 to buffer
@@ -418,10 +422,12 @@ def readElement(buffer, offset, arr, index, dt):
         count = dt.itemsize
         e_buffer = buffer[offset:(offset+count)]
         offset += count
-        if dt.kind == 'S':
-            arr[index] = e_buffer
-        else:
-            arr[index] = np.frombuffer(bytes(e_buffer), dtype=dt)
+        try:
+            e = np.frombuffer(bytes(e_buffer), dtype=dt)
+            arr[index] = e[0]
+        except ValueError:
+            print(f"ERROR: ValueError setting {e_buffer} and dtype: {dt}")
+            raise
     else:
         # variable length element
         vlen = dt.metadata["vlen"]
@@ -446,10 +452,12 @@ def readElement(buffer, offset, arr, index, dt):
                     s = e_buffer.decode("utf-8")
                     arr[index] = s
                 else:
-                    e = np.frombuffer(bytes(e_buffer), dtype=vlen)
+                    try:
+                        e = np.frombuffer(bytes(e_buffer), dtype=vlen)
+                    except ValueError:
+                        print("ValueError -- e_buffer:", e_buffer, "dtype:", vlen)
+                        raise
                     arr[index] = e
-            else:
-                arr[index] = vlen(0)
 
     return offset
 
@@ -457,9 +465,8 @@ def readElement(buffer, offset, arr, index, dt):
 """
 Return byte representation of numpy array
 """
-def arrayToBytes(arr):
-    #print("arrayToBytes: ", arr)
-    if not isVlen(arr.dtype):
+def arrayToBytes(arr, vlen=None):
+    if not isVlen(arr.dtype) and vlen is None:
         # can just return normal numpy bytestream
         return arr.tobytes()
 
@@ -469,8 +476,7 @@ def arrayToBytes(arr):
     nElements = int(np.prod(arr.shape))
     arr1d = arr.reshape((nElements,))
     for e in arr1d:
-        offset = copyElement(e, arr1d.dtype, buffer, offset)
-    #print("arrayToBytes buffer size: ", len(buffer))
+        offset = copyElement(e, arr1d.dtype, buffer, offset, vlen=vlen)
     return buffer
 
 """
@@ -478,6 +484,10 @@ Create numpy array based on byte representation
 """
 def bytesToArray(data, dt, shape):
     nelements = getNumElements(shape)
+    if len(dt) > 0:
+        names = dt.names
+        for name in names:
+            dt_sub = dt[name]
     if not isVlen(dt):
         # regular numpy from string
         arr = np.frombuffer(data, dtype=dt)
