@@ -997,11 +997,7 @@ class Dataset(HLObject):
         match.
         """
         self.log.info("Dataset __setitem__, args: {}".format(args))
-        #if self._item_size != "H5T_VARIABLE":
         use_base64 = True   # may need to set this to false below for some types
-        #else:
-        #    use_base64 = False  # never use for variable length types
-        #    self.log.debug("Using JSON since type is variable length")
 
         args = args if isinstance(args, tuple) else (args,)
 
@@ -1009,11 +1005,14 @@ class Dataset(HLObject):
         val_dtype = None
         try:
             val_dtype = val.dtype
+            self.log.debug("val dtype: {}, metadata: {}".format(val_dtype, val_dtype.metadata))
         except AttributeError:
+            self.log.debug("val not ndarray")
             pass # not a numpy object, just leave dtype as None
 
         if isinstance(val, Reference):
             # h5pyd References are just strings
+            self.log.info("converting Reference to string")
             val = val.tolist()
 
         # Sort field indices from the slicing
@@ -1025,24 +1024,16 @@ class Dataset(HLObject):
         # For h5pyd, do extra check and convert type on client side for efficiency
         vlen = check_dtype(vlen=self.dtype)
         if vlen is not None and vlen not in (bytes, str):
-            self.log.debug("converting ndarray for vlen data")
-            try:
-                val = numpy.asarray(val, dtype=vlen)
-            except ValueError as ve:
+            if val_dtype and check_dtype(vlen=val_dtype) == vlen:
+                self.log.debug("setting vlen dataset with vlen data of same type: {}".format(vlen))
+            else:
+                self.log.debug("converting val to vlen data type: {}".format(vlen))
                 try:
                     val = numpy.array([numpy.array(x, dtype=vlen)
-                                       for x in val], dtype=self.dtype)
-                except ValueError as ve2:
-                    pass
-            if vlen == val_dtype:
-                if val.ndim > 1:
-                    tmp = numpy.empty(shape=val.shape[:-1], dtype=object)
-                    tmp.ravel()[:] = [i for i in val.reshape(
-                        (numpy.product(val.shape[:-1]), val.shape[-1]))]
-                else:
-                    tmp = numpy.array([None], dtype=object)
-                    tmp[0] = val
-                val = tmp
+                                    for x in val], dtype=self.dtype)
+                except ValueError as ve:
+                    self.log.info("ValueError attempting to to convert to vlen data type: {}".format(ve))  
+                    pass       
 
         elif isinstance(val, complex) or \
                 getattr(getattr(val, 'dtype', None), 'kind', None) == 'c':
@@ -1076,7 +1067,6 @@ class Dataset(HLObject):
             val = numpy.asarray(val, dtype=dtype, order='C')
             if cast_compound:
                 val = val.astype(numpy.dtype([(names[0], dtype)]))
-                # val = val.reshape(val.shape[:len(val.shape) - len(dtype.shape)])
 
         elif isinstance(val, numpy.ndarray):
             # convert array if needed

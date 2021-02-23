@@ -147,8 +147,8 @@ class TestVlenTypes(TestCase):
         dset1 = f.create_dataset("dset1", shape=(2,), dtype=dtvlen)
 
         # create numpy object array
-        e0 = np.array([1,2,3])
-        e1 = np.array([1,2,3,4])
+        e0 = np.array([1,2,3],dtype='uint16')
+        e1 = np.array([1,2,3,4],dtype='uint16')
         data = np.array([e0, e1], dtype=dtvlen)
 
         # write data
@@ -175,7 +175,7 @@ class TestVlenTypes(TestCase):
         self.assertEqual(list(e0), [1,2,3])
         
         # try writing int arrays into dataset
-        data = np.array([42,], dtype='uint16') # [42,]
+        data = [42,]  
         dset1[0] = data
         ret_val = dset1[...]
         self.assertEqual(list(ret_val[0]), [42])
