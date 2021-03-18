@@ -112,6 +112,10 @@ class TestFile(TestCase):
         self.assertEqual(f.id.id, 0)
 
         # re-open as read-only
+        if is_hsds:
+            wait_time = 90
+            print("waiting {} seconds for root scan sync".format(wait_time))
+            time.sleep(wait_time)  # let async process update obj number
         f = h5py.File(filename, 'r')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
@@ -145,7 +149,6 @@ class TestFile(TestCase):
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously
             if is_hsds:
-                time.sleep(20)  # let async process update obj number
                 self.assertEqual(f.num_objects, 2)
                 self.assertEqual(f.num_groups, 2)
             else:
