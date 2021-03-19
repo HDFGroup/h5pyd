@@ -47,11 +47,14 @@ def getServerInfo( endpoint=None, username=None, password=None, api_key=None, **
 
     # mix in client connect info
     rspJson["endpoint"] = endpoint
-    rspJson["username"] = username
+    if "username" in rspJson:
+        rspJson["username"] = rspJson["username"]
+    else:
+        rspJson["username"] = username
     if not password:
         rspJson["password"] = ''
     else:
-        rspJson["password"] = '*'*len(password)
+        rspJson["password"] = '*'*len(password)        
 
     http_conn.close()
     http_conn = None

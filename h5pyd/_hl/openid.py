@@ -168,7 +168,7 @@ class AzureOpenID(OpenIDHandler):
         authority_uri = self.AUTHORITY_URI + '/' + tenant_id
 
         # Try to get a token using different oauth flows.
-        context = adal.AuthenticationContext(authority_uri, api_version=None)
+        context = adal.AuthenticationContext(authority_uri, enable_pii=True, api_version=None)
 
         try:
             if client_secret is not None:
@@ -176,8 +176,8 @@ class AzureOpenID(OpenIDHandler):
             else:
                 code = context.acquire_user_code(resource_id, app_id)
 
-        except AdalError:
-            eprint("unable to process AD token")
+        except Exception as e:
+            eprint("unable to process AD token: {}".format(e))
             self._token = None
             self.write_token_cache()
             raise

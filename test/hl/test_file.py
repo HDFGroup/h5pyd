@@ -44,6 +44,13 @@ class TestFile(TestCase):
             self.assertTrue("endpoint" in info)
             self.assertTrue("username" in info)
             self.assertTrue("password" in info)
+            if "hsds_version" in info:
+                # server is HSDS
+                self.assertTrue("node_count" in info)
+                node_count = info["node_count"]
+                self.assertTrue(node_count >= 1)
+                self.assertTrue("isadmin" in info)
+
 
     def test_create(self):
         filename = self.getFileName("new_file")

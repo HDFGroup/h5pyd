@@ -26,7 +26,6 @@ from . import openid
 from .config import Config
 
 MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
-MS_AUTHORITY_HOST_URI = 'https://login.microsoftonline.com' 
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -262,8 +261,7 @@ class HttpConn:
 
             # Token was provided as a string.
             elif isinstance(self._api_key, str):
-                token = self._api_key
-            
+                token = self._api_key            
 
             if token:
                 auth_string = b"Bearer " + token.encode('ascii')
