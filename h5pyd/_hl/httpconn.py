@@ -252,6 +252,7 @@ class HttpConn:
             password = self._password
 
         if self._api_key:
+            self.log.debug("using api key")
             # use OpenId handler to get a bearer token
             token = ''
 
@@ -263,18 +264,20 @@ class HttpConn:
             elif isinstance(self._api_key, str):
                 token = self._api_key     
 
-            print(token)       
+            # print(token)       
 
             if token:
                 auth_string = b"Bearer " + token.encode('ascii')
                 headers['Authorization'] = auth_string
         elif username is not None and password is not None:
+            self.log.debug("use basic auth with username: {}".format(username))
             auth_string = username + ':' + password
             auth_string = auth_string.encode('utf-8')
             auth_string = base64.b64encode(auth_string)
             auth_string = b"Basic " + auth_string
             headers['Authorization'] = auth_string
         else:
+            self.log.debug("no auth header")
             # no auth header
             pass
 

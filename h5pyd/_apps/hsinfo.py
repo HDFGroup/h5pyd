@@ -115,7 +115,11 @@ def getServerInfo(cfg):
 
     except IOError as ioe:
         if ioe.errno == 401:
-            print("username/password not valid for username: {}".format(username))
+            if username and password:
+                print("username/password not valid for username: {}".format(username))
+            else:
+                # authentication error with openid or app token
+                print("authentication failure")
         else:
             print("Error: {}".format(ioe))
 
