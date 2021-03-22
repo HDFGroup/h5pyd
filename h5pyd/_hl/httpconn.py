@@ -261,7 +261,9 @@ class HttpConn:
 
             # Token was provided as a string.
             elif isinstance(self._api_key, str):
-                token = self._api_key            
+                token = self._api_key     
+
+            print(token)       
 
             if token:
                 auth_string = b"Bearer " + token.encode('ascii')
