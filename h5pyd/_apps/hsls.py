@@ -297,7 +297,7 @@ def visitDomains(domain, depth=1):
         else:
             timestamp = datetime.fromtimestamp(int(dir.modified))
 
-        print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
+        print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
                                               dir_class, timestamp,
                                               display_name))
         count += 1
@@ -319,7 +319,7 @@ def visitDomains(domain, depth=1):
             else:
                 timestamp = datetime.fromtimestamp(int(item["lastModified"]))
 
-            print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
+            print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
                                               dir_class, timestamp,
                                               full_path))
             count += 1
