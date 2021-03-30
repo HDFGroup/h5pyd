@@ -62,6 +62,7 @@ class TestFile(TestCase):
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 0)
         self.assertEqual(f.mode, 'r+')
+        self.assertTrue(h5py.is_hdf5(filename))
         is_hsds = False
         if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
             is_hsds = True  # HSDS has different permission defaults
@@ -69,6 +70,8 @@ class TestFile(TestCase):
             self.assertTrue(f.id.http_conn.endpoint.startswith("http"))
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
+        # should not see id as a file
+        self.assertFalse(h5py.is_hdf5(f.id.id))
         # Check domain's timestamps
         if h5py.__name__ == "h5pyd" and is_hsds:
             # TBD: remove is_hsds when h5serv timestamp changed to float

@@ -23,6 +23,20 @@ from .config import Config
 
 VERBOSE_REFRESH_TIME=1.0  # 1 second
 
+def is_hdf5(domain, **kwargs):
+    """ Determine if domain is valid HSDS domain. 
+    kwargs can be endpoint, username, password, etc. (same as with File) 
+    """
+    found = False
+    try:
+        # set use_cache to False to avoid extensive load time
+        f = File(domain, use_cache=False, **kwargs)
+        found = True
+    except IOError:
+        pass # ignore any non-200 error
+    return found
+ 
+
 
 class File(Group):
 

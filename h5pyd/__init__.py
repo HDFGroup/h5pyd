@@ -24,7 +24,7 @@ from __future__ import absolute_import
 
 from . import version
 from ._hl.h5type import special_dtype, check_dtype, Reference, RegionReference
-from ._hl.files import File
+from ._hl.files import File, is_hdf5
 from ._hl.folders import Folder
 from ._hl.group import Group, SoftLink, ExternalLink, UserDefinedLink, HardLink
 from ._hl.dataset import Dataset
