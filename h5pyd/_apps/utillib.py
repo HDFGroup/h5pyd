@@ -303,11 +303,24 @@ def copy_attribute(desobj, name, srcobj, ctx):
     except AttributeError:
         pass  # auto convert to numpy array
     # First, make sure we have a NumPy array.
-    srcarr = np.asarray(data, order='C', dtype=src_dt)
-    tgtarr = copy_array(srcarr, ctx)
+    if is_h5py(srcobj):
+        src_empty = h5py.Empty
+    else:
+        src_empty = h5pyd.Empty
+    if is_h5py(desobj):
+        des_empty = h5py.Empty
+    else:
+        des_empty = h5pyd.Empty
+    
+    if isinstance(data, src_empty):
+        # create Empty object with tgt dtype
+        tgt_dt = convert_dtype(src_dt, ctx)
+        tgtarr = des_empty(tgt_dt)
+    else:
+        srcarr = np.asarray(data, order='C', dtype=src_dt)
+        tgtarr = copy_array(srcarr, ctx)
     try:
         desobj.attrs.create(name, tgtarr)
-
     except (IOError, TypeError) as e:
         msg = "ERROR: failed to create attribute {} of object {} -- {}".format(name, desobj.name, str(e))
         logging.error(msg)
@@ -415,7 +428,7 @@ def create_dataset(dobj, ctx):
 
     try:
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
-        if len(dobj.shape) == 0 or (is_vlen(dobj.dtype) and is_h5py(fout)):
+        if dobj.shape is None or len(dobj.shape) == 0 or (is_vlen(dobj.dtype) and is_h5py(fout)):
             # don't use compression/chunks for scalar datasets
             # or vlen
             compression = None
