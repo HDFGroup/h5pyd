@@ -531,7 +531,28 @@ class TestCreateDataset(TestCase):
 
         f.close()
 
+    def test_create_dset_empty(self):
+        filename = self.getFileName("create_dset_empty")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
 
+        def check_props(dset):
+            self.assertEqual(dset.shape, None)
+            self.assertEqual(str(dset.dtype), 'float32')
+
+        # create by providing a type
+        dset1 = f.create_dataset('dset1', dtype='f4')
+        self.assertEqual(dset1.name, '/dset1')
+        check_props(dset1)
+
+        # create using the Empty object
+        dset2 = f.create_dataset('dset2', data=h5py.Empty("float32"))
+        self.assertEqual(dset2.name, '/dset2')
+        check_props(dset2)
+
+         
+        f.close()
+        
 if __name__ == '__main__':
     loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)

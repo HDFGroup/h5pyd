@@ -19,7 +19,7 @@ import time
 import base64
 import numpy
 
-from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes
+from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes, Empty
 from .h5type import Reference, RegionReference
 from .base import  _decode
 from .objectid import DatasetID
@@ -106,30 +106,30 @@ def make_new_dset(parent, shape=None, dtype=None,
 
     # Validate shape
     if shape is None:
-        raise TypeError("shape must be specified")
+        body['shape'] = 'H5S_NULL' # null space dataset
     else:
         shape = tuple(shape)
         #if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
         #    raise ValueError("Shape tuple is incompatible with data")
-    body['shape'] = shape
+        body['shape'] = shape
 
-    # Validate chunk shape
-    if isinstance(chunks, bool):
-        # ignore boolean value, as we always chunkify datasets anyway
-        chunks = None
+        # Validate chunk shape
+        if isinstance(chunks, bool):
+            # ignore boolean value, as we always chunkify datasets anyway
+            chunks = None
 
-    if chunks is not None and not isinstance(chunks, dict):
-         errmsg = "Chunk shape must not be greater than data shape in any dimension. "\
+        if chunks is not None and not isinstance(chunks, dict):
+            errmsg = "Chunk shape must not be greater than data shape in any dimension. "\
                   "{} is not compatible with {}".format(chunks, shape)
-         if len(chunks) != len(shape):
-             raise ValueError("chunk is of wrong dimension")
-         for i in range(len(shape)):
-             if maxshape is not None:
-                 if maxshape[i] is not None and maxshape[i] < chunks[i]:
-                     raise ValueError(errmsg)
-             else:
-                 if shape[i] < chunks[i]:
-                     raise ValueError(errmsg)
+            if len(chunks) != len(shape):
+                raise ValueError("chunk is of wrong dimension")
+            for i in range(len(shape)):
+                if maxshape is not None:
+                    if maxshape[i] is not None and maxshape[i] < chunks[i]:
+                        raise ValueError(errmsg)
+                else:
+                    if shape[i] < chunks[i]:
+                        raise ValueError(errmsg)
 
     layout = None
     if chunks is not None and isinstance(chunks, dict):
@@ -140,7 +140,6 @@ def make_new_dset(parent, shape=None, dtype=None,
     if isinstance(dtype, Datatype):
         # Named types are used as-is
         type_json = dtype.id.type_json
-
     else:
         # Validate dtype
         if dtype is None:
@@ -210,13 +209,9 @@ def make_new_dset(parent, shape=None, dtype=None,
             body['maxdims'] = maxshape
         else:
             print("Warning: maxshape provided but no shape")
-    #sid = h5s.create_simple(shape, maxshape)
 
-
-    #dset_id = h5d.create(parent.id, None, tid, sid, dcpl=dcpl)
     req = "/datasets"
 
-    body['shape'] = shape
     rsp = parent.POST(req, body=body)
     json_rep = {}
     json_rep['id'] = rsp['id']
@@ -289,7 +284,9 @@ class Dataset(HLObject):
         # this version will optionally refetch the shape from the server
         # (if the dataset is resiable)
         shape_json = self.id.shape_json
-        if shape_json['class'] in ('H5S_NULL', 'H5S_SCALAR'):
+        if shape_json['class'] == 'H5S_NULL':
+            return None
+        if shape_json['class'] == 'H5S_SCALAR':
             return ()  # return empty
 
         if 'maxdims' not in shape_json or not check_server:
@@ -1009,6 +1006,16 @@ class Dataset(HLObject):
         except AttributeError:
             self.log.debug("val not ndarray")
             pass # not a numpy object, just leave dtype as None
+
+        if self._shape is None:
+            # null space dataset
+            if isinstance(val, Empty):
+                return  # nothing to do
+            else:
+                raise TypeError("Unable to assign values to dataset with null shape")
+
+        elif isinstance(val, Empty):
+            pass #  no data
 
         if isinstance(val, Reference):
             # h5pyd References are just strings

@@ -16,7 +16,7 @@ import os.path as op
 import numpy
 import collections
 
-from .base import HLObject, MutableMappingHDF5, guess_dtype
+from .base import HLObject, MutableMappingHDF5, guess_dtype, Empty
 from .objectid import TypeID, GroupID, DatasetID
 from . import dataset
 from .dataset import Dataset
@@ -305,29 +305,34 @@ class Group(HLObject, MutableMappingHDF5):
         if self.id.http_conn.mode == 'r':
             raise ValueError("Unable to create dataset (No write intent on file)")
 
-        if shape is None and data is None:
-            raise TypeError("Either data or shape must be specified")
-
         # Convert data to a C-contiguous ndarray
         if data is not None:
-            if dtype is None:
-                dtype = guess_dtype(data)
-            # if dtype is None:
-            #     dtype = numpy.float32
-            if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
-                data = numpy.asarray(data, order="C", dtype=dtype)
-                dtype = data.dtype
-            self.log.info("data dtype: {}".format(data.dtype))
+            if isinstance(data, Empty):
+                if dtype is None:
+                    dtype = data.dtype
+            else:    
+                if dtype is None:
+                    dtype = guess_dtype(data)
+                if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
+                    data = numpy.asarray(data, order="C", dtype=dtype)
+                    dtype = data.dtype
+                self.log.info("data dtype: {}".format(data.dtype))
 
         # Validate shape
-        if shape is None:
-            if data is None:
-                raise TypeError("Either data or shape must be specified")
-            shape = data.shape
+        if isinstance(data, Empty):
+            if shape:
+                raise ValueError("Shape tuple is incompatible with Empty object")
         else:
-            shape = tuple(shape)
-        if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
-            raise ValueError("Shape tuple is incompatible with data")
+            if shape is None:
+                if  data is None:
+                    pass # null space dataset
+                else:
+                    shape = data.shape
+            else:
+                shape = tuple(shape)
+            
+            if data is not None and not isinstance(data, Empty) and (numpy.product(shape) != numpy.product(data.shape)):
+                raise ValueError("Shape tuple is incompatible with data")
 
         dsid = dataset.make_new_dset(self, shape=shape, dtype=dtype, **kwds)
         dset = dataset.Dataset(dsid)
