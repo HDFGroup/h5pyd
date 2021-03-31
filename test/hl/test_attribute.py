@@ -69,15 +69,24 @@ class TestAttribute(TestCase):
         # create attribute with as a fixed length string
         g1.attrs.create('d1', np.string_("This is a numpy string"))
         value = g1.attrs['d1']
+        self.assertEqual(value, b"This is a numpy string")
+
+        # create attribute with null space
+        empty = h5py.Empty("float32")
+        g1.attrs.create('e1', empty)
+        value = g1.attrs['e1']
+        self.assertEqual(value, empty)
+
 
         attr_names = []
         for a in g1.attrs:
             attr_names.append(a)
-        self.assertEqual(len(attr_names), 4)
+        self.assertEqual(len(attr_names), 5)
         self.assertTrue('a1' in attr_names)
         self.assertTrue('b1' in attr_names)
         self.assertTrue('c1' in attr_names)
         self.assertTrue('d1' in attr_names)
+        self.assertTrue('e1' in attr_names)
 
         # create an array attribute
         g1.attrs["ones"] = np.ones((10,))
