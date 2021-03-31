@@ -37,7 +37,7 @@ class TestAttribute(TestCase):
             is_hsds = True  # HSDS has different permission defaults
 
         g1 = f.create_group('g1')
-        """
+        
         g1.attrs['a1'] = 42
 
         n = g1.attrs['a1']
@@ -79,14 +79,12 @@ class TestAttribute(TestCase):
         self.assertTrue('b1' in attr_names)
         self.assertTrue('c1' in attr_names)
         self.assertTrue('d1' in attr_names)
-        """
 
         # create attribute with null space
         empty = h5py.Empty("float32")
         g1.attrs.create('null_float', empty)
         value = g1.attrs['null_float']
         self.assertEqual(value, empty)
-        """
 
         # create an array attribute
         g1.attrs["ones"] = np.ones((10,))
@@ -125,7 +123,6 @@ class TestAttribute(TestCase):
             self.assertTrue('name' in refobj.attrs)  # should see the tag attribute
             self.assertEqual(refobj.attrs['name'], 'g1.1')  # check tag value
 
-        """
         # close file
         f.close()
 
