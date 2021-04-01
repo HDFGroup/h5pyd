@@ -341,7 +341,7 @@ def create_dataset(dobj, ctx):
     chunks = None
     dset = None
 
-    if ctx["dataload"] == "link" and not is_vlen(dobj.dtype) and not is_compact(dobj):
+    if ctx["dataload"] == "link" and not is_vlen(dobj.dtype) and dobj.shape is not None and not is_compact(dobj):
         dset_dims = dobj.shape
         logging.debug("dset_dims: {}".format(dset_dims))
         rank = len(dset_dims)

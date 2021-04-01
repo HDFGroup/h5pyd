@@ -44,13 +44,13 @@ def format_size(n):
 
 
 def getShapeText(dset):
-    shape_text = "Scalar"
+    shape_text = "{NULL}"
     shape = dset.shape
     if shape is not None:
         shape_text = "{"
         rank = len(shape)
         if rank == 0:
-            shape_text += "SCALAR"
+            shape_text += "{SCALAR}"
         else:
             for dim in range(rank):
                 if dim != 0:
