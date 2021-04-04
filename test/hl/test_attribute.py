@@ -37,7 +37,7 @@ class TestAttribute(TestCase):
             is_hsds = True  # HSDS has different permission defaults
 
         g1 = f.create_group('g1')
-
+        
         g1.attrs['a1'] = 42
 
         n = g1.attrs['a1']
@@ -69,6 +69,7 @@ class TestAttribute(TestCase):
         # create attribute with as a fixed length string
         g1.attrs.create('d1', np.string_("This is a numpy string"))
         value = g1.attrs['d1']
+        self.assertEqual(value, b"This is a numpy string")
 
         attr_names = []
         for a in g1.attrs:
@@ -78,6 +79,12 @@ class TestAttribute(TestCase):
         self.assertTrue('b1' in attr_names)
         self.assertTrue('c1' in attr_names)
         self.assertTrue('d1' in attr_names)
+
+        # create attribute with null space
+        empty = h5py.Empty("float32")
+        g1.attrs.create('null_float', empty)
+        value = g1.attrs['null_float']
+        self.assertEqual(value, empty)
 
         # create an array attribute
         g1.attrs["ones"] = np.ones((10,))
@@ -94,14 +101,7 @@ class TestAttribute(TestCase):
         self.assertEqual(arr[0], b"Hello")
         self.assertEqual(arr[1], b"Good-bye")
         self.assertEqual(arr.dtype.kind, 'S')
-        if six.PY3:
-            self.assertEqual(arr.dtype.itemsize, 11)
-        else:
-            # TBD: why is this different for PY2?
-            self.assertEqual(arr.dtype.itemsize, 8)
-
-
-
+     
         # scalar byte values
         g1.attrs['e1'] = "Hello"
         s = g1.attrs['e1']
@@ -122,7 +122,6 @@ class TestAttribute(TestCase):
             refobj = f[ref]  # get the ref'd object
             self.assertTrue('name' in refobj.attrs)  # should see the tag attribute
             self.assertEqual(refobj.attrs['name'], 'g1.1')  # check tag value
-
 
         # close file
         f.close()

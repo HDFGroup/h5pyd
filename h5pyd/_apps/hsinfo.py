@@ -90,7 +90,11 @@ def getServerInfo(cfg):
         if "state" in info:
             print("server state: {}".format(info['state']))
         print("endpoint: {}".format(endpoint))
-        print("username: {}".format(info["username"]))
+        if "isadmin" in info and info["isadmin"]:
+            admin_tag = "(admin)"
+        else:
+            admin_tag = ""
+        print("username: {} {}".format(info["username"], admin_tag))
         print("password: {}".format(info["password"]))
         if info['state'] == "READY":
             home_folder = getHomeFolder()
@@ -111,7 +115,11 @@ def getServerInfo(cfg):
 
     except IOError as ioe:
         if ioe.errno == 401:
-            print("username/password not valid for username: {}".format(username))
+            if username and password:
+                print("username/password not valid for username: {}".format(username))
+            else:
+                # authentication error with openid or app token
+                print("authentication failure")
         else:
             print("Error: {}".format(ioe))
 

@@ -147,8 +147,8 @@ class TestVlenTypes(TestCase):
         dset1 = f.create_dataset("dset1", shape=(2,), dtype=dtvlen)
 
         # create numpy object array
-        e0 = np.array([0,1,2])
-        e1 = np.array([0,1,2,3])
+        e0 = np.array([1,2,3],dtype='uint16')
+        e1 = np.array([1,2,3,4],dtype='uint16')
         data = np.array([e0, e1], dtype=dtvlen)
 
         # write data
@@ -162,21 +162,53 @@ class TestVlenTypes(TestCase):
         self.assertTrue(isinstance(ret_val[0], np.ndarray))
         # py36  attribute[a1]: [array([0, 1, 2], dtype=int32) array([0, 1, 2, 3], dtype=int32)]
         # py27  [(0, 1, 2) (0, 1, 2, 3)]
-        self.assertEqual(list(ret_val[0]), [0,1,2])
+        self.assertEqual(list(ret_val[0]), [1,2,3])
         self.assertEqual(ret_val[0].dtype, np.dtype('uint16'))
         self.assertTrue(isinstance(ret_val[1], np.ndarray))
         self.assertEqual(ret_val[1].dtype, np.dtype('uint16'))
 
-        self.assertEqual(list(ret_val[1]), [0,1,2,3])
+        self.assertEqual(list(ret_val[1]), [1,2,3,4])
 
         # Read back just one element
         e0 = dset1[0]
         self.assertEqual(len(e0), 3)
-        self.assertEqual(list(e0), [0,1,2])
+        self.assertEqual(list(e0), [1,2,3])
+        
+        # try writing int arrays into dataset
+        data = [42,]  
+        dset1[0] = data
+        ret_val = dset1[...]
+        self.assertEqual(list(ret_val[0]), [42])
+
 
         # TBD: Test for VLEN objref and comount as with attribute test above
 
         # close file
+        f.close()
+
+    def test_create_vlen_compound_dset(self):
+        filename = self.getFileName("create_vlen_compound_dset")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+
+        count = 10
+         # create a dataset that is a VLEN int32
+        dtvlen = h5py.special_dtype(vlen=np.dtype('int32'))
+        dt = np.dtype([('x', np.int32), ('vals', dtvlen)])
+        dset = f.create_dataset('compound_vlen', (count,), dtype=dt)
+
+        elem = dset[0]
+        for i in range(count):
+            elem['x'] = i
+            elem['vals'] = np.array(list(range(i+1)), dtype=np.int32)
+            dset[i] = elem
+
+        e = dset[5]
+        self.assertEqual(len(e), 2)
+        self.assertEqual(e[0], 5)
+        e1 = list(e[1])
+        self.assertEqual(e1, list(range(6)))
+        
         f.close()
 
     def test_create_vlen_2d_dset(self):
@@ -293,11 +325,7 @@ class TestVlenTypes(TestCase):
         else:
             self.assertEqual(dset.fillvalue, 0)
 
-        if six.PY2:
-            # empty bstrs showing up as 0 in Python 2.8
-            self.assertEqual(dset[0], '0')
-        else:
-            self.assertEqual(dset[0], b'')
+        self.assertEqual(dset[0], 0)
 
         words = (b"one", b"two", b"three", b"four", b"five", b"six", b"seven", b"eight", b"nine", b"ten")
         dset[:] = words
@@ -313,9 +341,11 @@ class TestVlenTypes(TestCase):
     def test_variable_len_unicode_dset(self):
         filename = self.getFileName("variable_len_unicode_dset")
         print("filename:", filename)
+        """
         if config.get("use_h5py"):
             # TBD - skipping as this core dumps in travis for some reason
             return
+        """
         f = h5py.File(filename, "w")
         if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             f.close()
@@ -346,8 +376,8 @@ class TestVlenTypes(TestCase):
         if config.get('use_h5py'):
             self.assertEqual(dset[0], '')
         else:
-            # TBD: HSDS is converteing null values to '0's
-            self.assertEqual(dset[0], '0')
+            # TBD: HSDS is converteing null values to zeros
+            self.assertEqual(dset[0], 0)
 
 
         words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94", u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
@@ -357,12 +387,44 @@ class TestVlenTypes(TestCase):
         self.assertTrue("vlen" in vals.dtype.metadata)
 
         for i in range(10):
-            # TBD: h5serv and HSDS are returning unicode values
-            if six.PY3 and not config.get('use_h5py'):
-                for i in range(10):
-                    self.assertEqual(vals[i], words[i])
+            self.assertEqual(vals[i], words[i])
+
+        f.close()
+
+    def test_variable_len_unicode_attr(self):
+        filename = self.getFileName("variable_len_unicode_attr")
+        print("filename:", filename)
+        """
+        if config.get("use_h5py"):
+            # TBD - skipping as this core dumps in travis for some reason
+            return
+        """
+        f = h5py.File(filename, "w")
+        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
+            f.close()
+            return  # variable len types not working with h5serv
+
+        dims = (10,)
+        if six.PY2:
+            dt = h5py.special_dtype(vlen=unicode)
+        else:
+            dt = h5py.special_dtype(vlen=str)
+
+        words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94", u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
+
+        f.attrs.create('a1', words, shape=dims, dtype=dt)
+
+        vals = f.attrs["a1"]  # read back
+        #print("type:", type(vals))
+        self.assertTrue("vlen" in vals.dtype.metadata)
+
+        for i in range(10):
+            self.assertEqual(vals[i], words[i])
+            if six.PY2:
+                self.assertEqual(type(vals[i]), unicode)
             else:
-                self.assertEqual(vals[i], words[i])
+                self.assertEqual(type(vals[i]), str)
+
 
         f.close()
 

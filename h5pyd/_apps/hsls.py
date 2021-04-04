@@ -44,13 +44,13 @@ def format_size(n):
 
 
 def getShapeText(dset):
-    shape_text = "Scalar"
+    shape_text = "{NULL}"
     shape = dset.shape
     if shape is not None:
         shape_text = "{"
         rank = len(shape)
         if rank == 0:
-            shape_text += "SCALAR"
+            shape_text += "{SCALAR}"
         else:
             for dim in range(rank):
                 if dim != 0:
@@ -297,7 +297,7 @@ def visitDomains(domain, depth=1):
         else:
             timestamp = datetime.fromtimestamp(int(dir.modified))
 
-        print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
+        print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
                                               dir_class, timestamp,
                                               display_name))
         count += 1
@@ -319,7 +319,7 @@ def visitDomains(domain, depth=1):
             else:
                 timestamp = datetime.fromtimestamp(int(item["lastModified"]))
 
-            print("{:15} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
+            print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
                                               dir_class, timestamp,
                                               full_path))
             count += 1

@@ -14,12 +14,8 @@ from __future__ import absolute_import
 
 import os
 import sys
-from datetime import datetime
-import time
 import base64
 import requests
-import adal	
-from adal.adal_error import AdalError
 from requests import ConnectionError
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -30,10 +26,10 @@ from . import openid
 from .config import Config
 
 MAX_CACHE_ITEM_SIZE=10000  # max size of an item to put in the cache
-MS_AUTHORITY_HOST_URI = 'https://login.microsoftonline.com' 
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
+
 
 DEFAULT_TIMEOUT = 180 # seconds - allow time for hsds service to bounce
 
@@ -74,7 +70,81 @@ class CacheResponse(object):
     def headers(self):
         return self._headers
 
+def getAzureApiKey():
+    """ construct API key for Active Directory if configured """
+    # TBD: GoogleID?
 
+    api_key = None
+
+    # if Azure AD ids are set, pass them to HttpConn via api_key dict
+    cfg = Config() # pulls in state from a .hscfg file (if found).
+
+    ad_app_id = None  # Azure AD HSDS Server id
+    if "HS_AD_APP_ID" in os.environ:
+        ad_app_id = os.environ["HS_AD_APP_ID"]
+    elif "hs_ad_app_id" in cfg:
+        ad_app_id = cfg["hs_ad_app_id"]
+    ad_tenant_id = None # Azure AD tenant id
+    if "HS_AD_TENANT_ID" in os.environ:
+        ad_tenant_id = os.environ["HS_AD_TENANT_ID"]
+    elif "hs_ad_tenant_id" in cfg:
+        ad_tenant_id = cfg["hs_ad_tenant_id"]
+
+    ad_resource_id = None # Azure AD resource id
+    if "HS_AD_RESOURCE_ID" in os.environ:
+        ad_resource_id = os.environ["HS_AD_RESOURCE_ID"]
+    elif "hs_ad_resource_id" in cfg:
+        ad_resource_id = cfg["hs_ad_resource_id"]
+
+    ad_client_secret = None # Azure client secret
+    if "HS_AD_CLIENT_SECRET" in os.environ:
+        ad_client_secret = os.environ["HS_AD_CLIENT_SECRET"]
+    elif "hs_ad_client_secret" in cfg:
+        ad_client_secret = cfg["hs_ad_client_secret"]
+
+    if ad_app_id and ad_tenant_id and ad_resource_id:
+        # contruct dict to pass to HttpConn
+        api_key = {"AD_APP_ID": ad_app_id, 
+                    "AD_TENANT_ID": ad_tenant_id, 
+                    "AD_RESOURCE_ID": ad_resource_id,
+                    "openid_provider": "azure"}
+        # optional config
+        if ad_client_secret:
+            api_key["AD_CLIENT_SECRET"] = ad_client_secret
+    return api_key  # None if AAD not configured
+
+def getKeycloakApiKey():
+    # check for keycloak next
+    cfg = Config() # pulls in state from a .hscfg file (if found).
+    api_key = None
+    # check to see if we are configured for keycloak authentication
+    if "HS_KEYCLOAK_URI" in os.environ:
+        keycloak_uri = os.environ["HS_KEYCLOAK_URI"]
+    elif "hs_keycloak_uri" in cfg:
+        keycloak_uri = cfg["hs_keycloak_uri"]
+    else:
+        keycloak_uri = None
+    if "HS_KEYCLOAK_CLIENT_ID" in os.environ:
+        keycloak_client_id = os.environ["HS_KEYCLOAK_CLIENT_ID"]
+    elif "hs_keycloak_client_id" in cfg:
+        keycloak_client_id = cfg["hs_keycloak_client_id"]
+    else:
+        keycloak_client_id = None
+    if "HS_KEYCLOAK_REALM" in os.environ:
+        keycloak_realm = cfg["HS_KEYCLOAK_REALM"]
+    elif "hs_keycloak_realm" in cfg:
+        keycloak_realm = cfg["hs_keycloak_realm"]
+    else:
+        keycloak_realm = None
+
+    if keycloak_uri and keycloak_client_id and keycloak_uri:
+        api_key = {"keycloak_uri": keycloak_uri,
+                    "keycloak_client_id": keycloak_client_id,
+                    "keycloak_realm": keycloak_realm,
+                     "openid_provider": "keycloak" }
+    return api_key
+ 
+        
 class HttpConn:
     """
     Some utility methods based on equivalents in base class.
@@ -87,6 +157,7 @@ class HttpConn:
         self._domain_json = None
         self._use_session = use_session
         self._retries = retries
+
         if use_cache:
             self._cache = {}
             self._objdb = {}
@@ -138,94 +209,51 @@ class HttpConn:
             api_key = os.environ["HS_API_KEY"]
         if isinstance(api_key, str) and (not api_key or api_key.upper() == "NONE"):
             api_key = None
+        if not api_key:
+            api_key = getAzureApiKey()
+        if not api_key:
+            api_key = getKeycloakApiKey()
 
         # Convert api_key to OpenIDHandler
         if isinstance(api_key, dict):
             # Maintain Azure-defualt backwards compatibility, but allow
             # both environment variable and kwarg override.
             # provider = Config().get('hs_openid_provider', 'azure')
-            provider = api_key.get('openid_provider', provider)
-
+            provider = api_key.get("openid_provider", "azure")
             if provider == 'azure':
+                self.log.debug("creating OpenIDHandler for Azure")
                 api_key = openid.AzureOpenID(endpoint, api_key)
-
             elif provider == 'google':
+                self.log.debug("creating OpenIDHandler for Google")
+
                 config = api_key.get('client_secret', None)
                 scopes = api_key.get('scopes', None)
                 api_key = openid.GoogleOpenID(endpoint, config=config, scopes=scopes)
+            elif provider == 'keycloak':
+                self.log.debug("creating OpenIDHandler for Keycloak")
+
+                # for Keycloak, pass in username and password
+                api_key = openid.KeycloakOpenID(endpoint, config=api_key, username=username, password=password)
+            else:
+                self.log.error("Unknown openid provider: {}".format(provider))
 
         self._api_key = api_key
         self._s = None  # Sessions
-
-    def _getAzureADToken(self, aad_dict):
-        if not aad_dict:
-            return None
-        # expecting argument to be dictionary with keys: AD_APP_ID, AD_TENANT_ID, AD_RESOURCE_ID
-
-        app_id = aad_dict["AD_APP_ID"]
-        tenant_id = aad_dict["AD_TENANT_ID"]
-        resource_id = aad_dict["AD_RESOURCE_ID"]
-        client_secret = None
-        if "AD_CLIENT_SECRET" in aad_dict:
-            client_secret = aad_dict["AD_CLIENT_SECRET"]
-        token_cache_file = os.path.expanduser(f"~/.hsazcfg_{app_id}")
-        if os.path.isfile(token_cache_file):
-            # load this file and see if the token is expired or not
-            mgmt_token = {}
-            with open(token_cache_file, 'r') as f:
-                mgmt_token = json.load(f)
-            if "expiresOn" in mgmt_token and "accessToken" in mgmt_token:
-                expiresOn = mgmt_token["expiresOn"]
-                # expected format: "YYYY-MM-DD HH:MM:SS.163773"
-                expire_dt = datetime.strptime(expiresOn, '%Y-%m-%d %H:%M:%S.%f')
-                expire_ts = expire_dt.timestamp()
-                if time.time() < expire_ts:
-                    # not expired yet!
-                    token = mgmt_token["accessToken"]
-                    return token
-        # didn't get a token or it's expired, get new one
-        authority_uri = MS_AUTHORITY_HOST_URI + '/' + tenant_id
-        context = adal.AuthenticationContext(authority_uri, api_version=None)
-        try:
-            if client_secret:
-                code = context.acquire_token_with_client_credentials(resource_id, app_id, client_secret)
-            else:
-                code = context.acquire_user_code(resource_id, app_id)
-        except AdalError as ae:
-            eprint(f"unable to process AD token: {ae}")
-            return None
-
-        access_token = None
-        if "message" in code:
-            eprint(code["message"])
-            mgmt_token = context.acquire_token_with_device_code(resource_id, code, app_id)
-            if mgmt_token and "accessToken" in mgmt_token:
-                with open(token_cache_file, 'w') as f:
-                    json.dump(mgmt_token, f)
-                access_token = mgmt_token["accessToken"]
-        elif "accessToken" in code:
-            access_token = code["accessToken"]
-        else:
-            eprint("Could not authenticate with AD")
-
-        return access_token
 
 
     def getHeaders(self, username=None, password=None, headers=None):
         if headers is None:
             headers = {}
+        elif "Authorization" in headers:
+            return  headers # already have auth key
         if username is None:
             username = self._username
         if password is None:
             password = self._password
-        if username is not None and password is not None:
-            auth_string = username + ':' + password
-            auth_string = auth_string.encode('utf-8')
-            auth_string = base64.b64encode(auth_string)
-            auth_string = b"Basic " + auth_string
-            headers['Authorization'] = auth_string
 
-        elif self._api_key:
+        if self._api_key:
+            self.log.debug("using api key")
+            # use OpenId handler to get a bearer token
             token = ''
 
             # Get a token, possibly refreshing if needed.
@@ -234,11 +262,24 @@ class HttpConn:
 
             # Token was provided as a string.
             elif isinstance(self._api_key, str):
-                token = self._api_key
+                token = self._api_key     
+
+            # print(token)       
 
             if token:
                 auth_string = b"Bearer " + token.encode('ascii')
                 headers['Authorization'] = auth_string
+        elif username is not None and password is not None:
+            self.log.debug("use basic auth with username: {}".format(username))
+            auth_string = username + ':' + password
+            auth_string = auth_string.encode('utf-8')
+            auth_string = base64.b64encode(auth_string)
+            auth_string = b"Basic " + auth_string
+            headers['Authorization'] = auth_string
+        else:
+            self.log.debug("no auth header")
+            # no auth header
+            pass
 
         return headers
 
@@ -267,12 +308,10 @@ class HttpConn:
 
         if self._objdb:
             pass
-            #raise IOError("test extra GET")
 
         rsp = None
 
-        if not headers:
-            headers = self.getHeaders()
+        headers = self.getHeaders(headers=headers)
 
         if params is None:
             params = {}
@@ -288,7 +327,6 @@ class HttpConn:
             headers['accept'] = 'application/octet-stream'
 
         if self._cache is not None and use_cache and format == "json" and params["domain"] == self._domain:
-
             self.log.debug("httpcon - checking cache")
             if req in self._cache:
                 self.log.debug("httpcon - returning cache result")
@@ -300,13 +338,10 @@ class HttpConn:
             if k != "domain":
                 v = params[k]
                 self.log.debug(f"GET params {k}:{v}")
-        if self._username and self._password:
-            auth = (self._username, self._password)
-        else:
-            auth = None
+     
         try:
             s = self.session
-            rsp = s.get(self._endpoint + req, params=params, headers=headers, auth=auth, verify=self.verifyCert())
+            rsp = s.get(self._endpoint + req, params=params, headers=headers, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))
@@ -364,8 +399,7 @@ class HttpConn:
 
         # try to do a PUT to the domain
 
-        if not headers:
-            headers = self.getHeaders()
+        headers = self.getHeaders(headers=headers)
 
         if format=="binary":
             headers['Content-Type'] = "application/octet-stream"
@@ -374,13 +408,10 @@ class HttpConn:
         else:
             data = json.dumps(body)
         self.log.info("PUT: {} format: {} [{} bytes]".format(req, format, len(data)))
-        if self._username and self._password:
-            auth = (self._username, self._password)
-        else:
-            auth = None
+       
         try:
             s = self.session
-            rsp = s.put(self._endpoint + req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
+            rsp = s.put(self._endpoint + req, data=data, headers=headers, params=params, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))
@@ -421,8 +452,7 @@ class HttpConn:
 
         # try to do a POST to the domain
 
-        if not headers:
-            headers = self.getHeaders()
+        headers = self.getHeaders(headers=headers)
 
         if format=="binary":
             # For POST, binary we send and recieve data as binary
@@ -434,15 +464,10 @@ class HttpConn:
             data = json.dumps(body)
 
         self.log.info("POST: " + req)
-
-        if self._username and self._password:
-            auth = (self._username, self._password)
-        else:
-            auth = None
   
         try:
             s = self.session
-            rsp = s.post(self._endpoint + req, data=data, headers=headers, params=params, auth=auth, verify=self.verifyCert())
+            rsp = s.post(self._endpoint + req, data=data, headers=headers, params=params, verify=self.verifyCert())
         except ConnectionError as ce:
             self.log.warn("connection error: ", ce)
             raise IOError(str(ce))
@@ -474,17 +499,12 @@ class HttpConn:
 
         # try to do a DELETE of the resource
 
-        if not headers:
-            headers = self.getHeaders()
+        headers = self.getHeaders(headers=headers)
 
         self.log.info("DEL: " + req)
-        if self._username and self._password:
-            auth = (self._username, self._password)
-        else:
-            auth = None
         try:
             s = self.session
-            rsp = s.delete(self._endpoint + req, headers=headers, params=params, auth=auth, verify=self.verifyCert())
+            rsp = s.delete(self._endpoint + req, headers=headers, params=params, verify=self.verifyCert())
             self.log.info("status: {}".format(rsp.status_code))
         except ConnectionError as ce:
             self.log.error("connection error: {}".format(ce))

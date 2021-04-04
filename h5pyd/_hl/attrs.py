@@ -23,7 +23,7 @@ import numpy
 import json
 
 from . import base
-from .base import jsonToArray
+from .base import jsonToArray, Empty
 from .datatype import Datatype
 from .objectid import GroupID, DatasetID, TypeID
 from .h5type import getTypeItem, createDataType, special_dtype, Reference
@@ -81,7 +81,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         Convert list that may contain bytes type elements to list of string
         elements
         """
-
         text_types = (bytes, str)
         if isinstance(data, text_types):
             is_list = False
@@ -130,11 +129,10 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         shape_json = attr_json['shape']
         type_json = attr_json['type']
-        if shape_json['class'] == 'H5S_NULL':
-            raise IOError("Empty attributes cannot be read")
-        value_json = attr_json['value']
-
         dtype = createDataType(type_json)
+        if shape_json['class'] == 'H5S_NULL':
+            return Empty(dtype)
+        value_json = attr_json['value']
 
         if 'dims' in shape_json:
             shape = shape_json['dims']
@@ -195,9 +193,10 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         # type conversion for HDF5 to perform.
         if isinstance(data, Reference):
             dtype = special_dtype(ref=Reference)
-        data = numpy.asarray(data, dtype=dtype, order='C')
+        if not isinstance(data, Empty):
+            data = numpy.asarray(data, dtype=dtype, order='C')
 
-        if shape is None:
+        if shape is None and not isinstance(data, Empty):
             shape = data.shape
 
         use_htype = None    # If a committed type is given, we must use it
@@ -228,29 +227,31 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         # Where a top-level array type is requested, we have to do some
         # fiddling around to present the data as a smaller array of
         # subarrays.
-        if dtype.subdtype is not None:
+        if not isinstance(data, Empty):
+            if dtype.subdtype is not None:
 
-            subdtype, subshape = dtype.subdtype
+                subdtype, subshape = dtype.subdtype
 
-            # Make sure the subshape matches the last N axes' sizes.
-            if shape[-len(subshape):] != subshape:
-                raise ValueError("Array dtype shape %s is incompatible with data shape %s" % (subshape, shape))
+                # Make sure the subshape matches the last N axes' sizes.
+                if shape[-len(subshape):] != subshape:
+                    raise ValueError("Array dtype shape %s is incompatible with data shape %s" % (subshape, shape))
 
-            # New "advertised" shape and dtype
-            shape = shape[0:len(shape) - len(subshape)]
-            dtype = subdtype
+                # New "advertised" shape and dtype
+                shape = shape[0:len(shape) - len(subshape)]
+                dtype = subdtype
 
-        # Not an array type; make sure to check the number of elements
-        # is compatible, and reshape if needed.
-        else:
-            if numpy.product(shape) != numpy.product(data.shape):
-                raise ValueError("Shape of new attribute conflicts with shape of data")
+            # Not an array type; make sure to check the number of elements
+            # is compatible, and reshape if needed.
+            else:
+                if numpy.product(shape) != numpy.product(data.shape):
+                    raise ValueError("Shape of new attribute conflicts with shape of data")
 
-            if shape != data.shape:
-                data = data.reshape(shape)
+                if shape != data.shape:
+                    data = data.reshape(shape)
 
-        # We need this to handle special string types.
-        data = numpy.asarray(data, dtype=dtype)
+            # We need this to handle special string types.
+        
+                data = numpy.asarray(data, dtype=dtype)
 
         # Make HDF5 datatype and dataspace for the H5A calls
         if use_htype is None:
@@ -263,16 +264,19 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         req = self._req_prefix + name
         body = {}
         body['type'] = type_json
-        body['shape'] = shape
-        if data.dtype.kind != 'c':
-            body['value'] = self._bytesArrayToList(data)
+        if isinstance(data, Empty):
+            body['shape'] = 'H5S_NULL'
         else:
-            # Special case: complex numbers
-            special_dt = createDataType(type_json)
-            tmp = numpy.empty(shape=data.shape, dtype=special_dt)
-            tmp['r'] = data.real
-            tmp['i'] = data.imag
-            body['value'] = json.loads(json.dumps(tmp.tolist()))
+            body['shape'] = shape
+            if data.dtype.kind != 'c':
+                body['value'] = self._bytesArrayToList(data)
+            else:
+                # Special case: complex numbers
+                special_dt = createDataType(type_json)
+                tmp = numpy.empty(shape=data.shape, dtype=special_dt)
+                tmp['r'] = data.real
+                tmp['i'] = data.imag
+                body['value'] = json.loads(json.dumps(tmp.tolist()))
 
         try:
             self._parent.PUT(req, body=body)

@@ -44,6 +44,13 @@ class TestFile(TestCase):
             self.assertTrue("endpoint" in info)
             self.assertTrue("username" in info)
             self.assertTrue("password" in info)
+            if "hsds_version" in info:
+                # server is HSDS
+                self.assertTrue("node_count" in info)
+                node_count = info["node_count"]
+                self.assertTrue(node_count >= 1)
+                self.assertTrue("isadmin" in info)
+
 
     def test_create(self):
         filename = self.getFileName("new_file")
@@ -55,6 +62,7 @@ class TestFile(TestCase):
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 0)
         self.assertEqual(f.mode, 'r+')
+        self.assertTrue(h5py.is_hdf5(filename))
         is_hsds = False
         if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
             is_hsds = True  # HSDS has different permission defaults
@@ -62,6 +70,8 @@ class TestFile(TestCase):
             self.assertTrue(f.id.http_conn.endpoint.startswith("http"))
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
+        # should not see id as a file
+        self.assertFalse(h5py.is_hdf5(f.id.id))
         # Check domain's timestamps
         if h5py.__name__ == "h5pyd" and is_hsds:
             # TBD: remove is_hsds when h5serv timestamp changed to float
@@ -112,6 +122,10 @@ class TestFile(TestCase):
         self.assertEqual(f.id.id, 0)
 
         # re-open as read-only
+        if is_hsds:
+            wait_time = 90
+            print("waiting {} seconds for root scan sync".format(wait_time))
+            time.sleep(wait_time)  # let async process update obj number
         f = h5py.File(filename, 'r')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
@@ -145,7 +159,6 @@ class TestFile(TestCase):
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously
             if is_hsds:
-                time.sleep(20)  # let async process update obj number
                 self.assertEqual(f.num_objects, 2)
                 self.assertEqual(f.num_groups, 2)
             else:
@@ -281,7 +294,6 @@ class TestFile(TestCase):
             f.close()
         except IOError as ioe:
             self.assertTrue(False)
-
 
         # test_user2 has read access, but opening in write mode should fail
         try:

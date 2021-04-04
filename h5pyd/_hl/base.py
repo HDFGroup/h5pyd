@@ -14,6 +14,7 @@ from __future__ import absolute_import
 
 import posixpath
 import os
+import six
 import json
 import base64
 import numpy as np
@@ -24,6 +25,7 @@ from collections.abc import (
 )
 from .objectid import GroupID
 from .h5type import Reference, check_dtype
+from .config import Config
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
 numpy_float_types = (np.float16, np.float32, np.float64)
@@ -105,21 +107,6 @@ def _decode(item, encoding="ascii"):
         return ret_val
 
 
-def getHeaders(domain, username=None, password=None, headers=None):
-        if headers is None:
-            headers = {}
-        headers['host'] = domain
-
-        if username is not None and password is not None:
-            auth_string = username + ':' + password
-            auth_string = auth_string.encode('utf-8')
-            auth_string = base64.b64encode(auth_string)
-            auth_string = b"Basic " + auth_string
-            headers['Authorization'] = auth_string
-        return headers
-
-
-
 """
 Convert a list to a tuple, recursively.
 Example. [[1,2],[3,4]] -> ((1,2),(3,4))
@@ -164,10 +151,15 @@ def copyToArray(arr, rank, index, data, vlen_base=None):
             copyToArray(arr, rank+1, index, data[i], vlen_base=vlen_base)
         else:
             if vlen_base:
-                e = np.array(data[i], dtype=vlen_base)
-                if len(e.shape) > 1:
-                    # squeeze dimensions, but don't convert a 1-d to 0-d
-                    e = e.squeeze()
+                if six.PY2 and vlen_base == unicode:
+                    e = unicode(data[i])
+                elif vlen_base == str:
+                    e = str(data[i])
+                else:
+                    e = np.array(data[i], dtype=vlen_base)
+                    if len(e.shape) > 1:
+                        # squeeze dimensions, but don't convert a 1-d to 0-d
+                        e = e.squeeze()
                 arr[tuple(index)] = e
             else:
                 arr[tuple(index)] = data[i]
@@ -295,8 +287,11 @@ def getElementSize(e, dt):
                     count += getElementSize(item, dt)
             count += 4  # byte count
         elif isinstance(e, list) or isinstance(e, tuple):
-            #print("got list for e:", e)
-            count = len(e) * vlen.itemsize + 4  # +4 for byte count
+            if not e:
+                # empty list, just add byte count
+                count = 4
+            else:
+                count = len(e) * vlen.itemsize + 4  # +4 for byte count
         else:
 
             raise TypeError("unexpected type: {}".format(type(e)))
@@ -330,13 +325,15 @@ def copyBuffer(src, des, offset):
 """
 Copy element to bytearray
 """
-def copyElement(e, dt, buffer, offset):
+def copyElement(e, dt, buffer, offset, vlen=None):
+    if vlen is None and dt.metadata and "vlen" in dt.metadata:
+        vlen = dt.metadata["vlen"]
     if len(dt) > 1:
         for name in dt.names:
             field_dt = dt[name]
             field_val = e[name]
             offset = copyElement(field_val, field_dt, buffer, offset)
-    elif not dt.metadata or "vlen" not in dt.metadata:
+    elif not vlen:
         #print("e no vlen: {} type: {}".format(e, type(e)))
         e_buf = e.tobytes()
         if len(e_buf) < dt.itemsize:
@@ -349,7 +346,6 @@ def copyElement(e, dt, buffer, offset):
         offset = copyBuffer(e_buf, buffer, offset)
     else:
         # variable length element
-        vlen = dt.metadata["vlen"]
         if isinstance(e, int):
             if e == 0:
                 # write 4-byte integer 0 to buffer
@@ -426,10 +422,12 @@ def readElement(buffer, offset, arr, index, dt):
         count = dt.itemsize
         e_buffer = buffer[offset:(offset+count)]
         offset += count
-        if dt.kind == 'S':
-            arr[index] = e_buffer
-        else:
-            arr[index] = np.frombuffer(bytes(e_buffer), dtype=dt)
+        try:
+            e = np.frombuffer(bytes(e_buffer), dtype=dt)
+            arr[index] = e[0]
+        except ValueError:
+            print(f"ERROR: ValueError setting {e_buffer} and dtype: {dt}")
+            raise
     else:
         # variable length element
         vlen = dt.metadata["vlen"]
@@ -454,10 +452,12 @@ def readElement(buffer, offset, arr, index, dt):
                     s = e_buffer.decode("utf-8")
                     arr[index] = s
                 else:
-                    e = np.frombuffer(bytes(e_buffer), dtype=vlen)
+                    try:
+                        e = np.frombuffer(bytes(e_buffer), dtype=vlen)
+                    except ValueError:
+                        print("ValueError -- e_buffer:", e_buffer, "dtype:", vlen)
+                        raise
                     arr[index] = e
-            else:
-                arr[index] = vlen(0)
 
     return offset
 
@@ -465,9 +465,8 @@ def readElement(buffer, offset, arr, index, dt):
 """
 Return byte representation of numpy array
 """
-def arrayToBytes(arr):
-    #print("arrayToBytes: ", arr)
-    if not isVlen(arr.dtype):
+def arrayToBytes(arr, vlen=None):
+    if not isVlen(arr.dtype) and vlen is None:
         # can just return normal numpy bytestream
         return arr.tobytes()
 
@@ -477,8 +476,7 @@ def arrayToBytes(arr):
     nElements = int(np.prod(arr.shape))
     arr1d = arr.reshape((nElements,))
     for e in arr1d:
-        offset = copyElement(e, arr1d.dtype, buffer, offset)
-    #print("arrayToBytes buffer size: ", len(buffer))
+        offset = copyElement(e, arr1d.dtype, buffer, offset, vlen=vlen)
     return buffer
 
 """
@@ -486,6 +484,10 @@ Create numpy array based on byte representation
 """
 def bytesToArray(data, dt, shape):
     nelements = getNumElements(shape)
+    if len(dt) > 0:
+        names = dt.names
+        for name in names:
+            dt_sub = dt[name]
     if not isVlen(dt):
         # regular numpy from string
         arr = np.frombuffer(data, dtype=dt)
@@ -879,13 +881,12 @@ class HLObject(CommonStateObject):
                 return False
         return True
 
-
     def GET(self, req, params=None, use_cache=True, format="json"):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
         # This should be the default - but explictly set anyway
         headers = {"Accept-Encoding": "deflate, gzip"}
-
+        
         rsp = self.id._http_conn.GET(req, params=params, headers=headers, format=format, use_cache=use_cache)
         if rsp.status_code != 200:
             self.log.info("Got response: {}".format(rsp.status_code))
@@ -1110,3 +1111,22 @@ class MutableMappingHDF5(MappingHDF5, MutableMapping):
     """
 
     pass
+
+class Empty(object):
+
+    """
+        Proxy object to represent empty/null dataspaces (a.k.a H5S_NULL).
+        This can have an associated dtype, but has no shape or data. This is not
+        the same as an array with shape (0,).
+    """
+
+    def __init__(self, dtype):
+        self.dtype = np.dtype(dtype)
+
+    def __eq__(self, other):
+        if isinstance(other, Empty) and self.dtype == other.dtype:
+            return True
+        return False
+
+    def __repr__(self):
+        return "Empty(dtype={0!r})".format(self.dtype)

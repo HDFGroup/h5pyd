@@ -19,7 +19,7 @@ import time
 import base64
 import numpy
 
-from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes
+from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes, Empty
 from .h5type import Reference, RegionReference
 from .base import  _decode
 from .objectid import DatasetID
@@ -106,30 +106,30 @@ def make_new_dset(parent, shape=None, dtype=None,
 
     # Validate shape
     if shape is None:
-        raise TypeError("shape must be specified")
+        body['shape'] = 'H5S_NULL' # null space dataset
     else:
         shape = tuple(shape)
         #if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
         #    raise ValueError("Shape tuple is incompatible with data")
-    body['shape'] = shape
+        body['shape'] = shape
 
-    # Validate chunk shape
-    if isinstance(chunks, bool):
-        # ignore boolean value, as we always chunkify datasets anyway
-        chunks = None
+        # Validate chunk shape
+        if isinstance(chunks, bool):
+            # ignore boolean value, as we always chunkify datasets anyway
+            chunks = None
 
-    if chunks is not None and not isinstance(chunks, dict):
-         errmsg = "Chunk shape must not be greater than data shape in any dimension. "\
+        if chunks is not None and not isinstance(chunks, dict):
+            errmsg = "Chunk shape must not be greater than data shape in any dimension. "\
                   "{} is not compatible with {}".format(chunks, shape)
-         if len(chunks) != len(shape):
-             raise ValueError("chunk is of wrong dimension")
-         for i in range(len(shape)):
-             if maxshape is not None:
-                 if maxshape[i] is not None and maxshape[i] < chunks[i]:
-                     raise ValueError(errmsg)
-             else:
-                 if shape[i] < chunks[i]:
-                     raise ValueError(errmsg)
+            if len(chunks) != len(shape):
+                raise ValueError("chunk is of wrong dimension")
+            for i in range(len(shape)):
+                if maxshape is not None:
+                    if maxshape[i] is not None and maxshape[i] < chunks[i]:
+                        raise ValueError(errmsg)
+                else:
+                    if shape[i] < chunks[i]:
+                        raise ValueError(errmsg)
 
     layout = None
     if chunks is not None and isinstance(chunks, dict):
@@ -140,7 +140,6 @@ def make_new_dset(parent, shape=None, dtype=None,
     if isinstance(dtype, Datatype):
         # Named types are used as-is
         type_json = dtype.id.type_json
-
     else:
         # Validate dtype
         if dtype is None:
@@ -210,13 +209,9 @@ def make_new_dset(parent, shape=None, dtype=None,
             body['maxdims'] = maxshape
         else:
             print("Warning: maxshape provided but no shape")
-    #sid = h5s.create_simple(shape, maxshape)
 
-
-    #dset_id = h5d.create(parent.id, None, tid, sid, dcpl=dcpl)
     req = "/datasets"
 
-    body['shape'] = shape
     rsp = parent.POST(req, body=body)
     json_rep = {}
     json_rep['id'] = rsp['id']
@@ -289,7 +284,9 @@ class Dataset(HLObject):
         # this version will optionally refetch the shape from the server
         # (if the dataset is resiable)
         shape_json = self.id.shape_json
-        if shape_json['class'] in ('H5S_NULL', 'H5S_SCALAR'):
+        if shape_json['class'] == 'H5S_NULL':
+            return None
+        if shape_json['class'] == 'H5S_SCALAR':
             return ()  # return empty
 
         if 'maxdims' not in shape_json or not check_server:
@@ -997,11 +994,7 @@ class Dataset(HLObject):
         match.
         """
         self.log.info("Dataset __setitem__, args: {}".format(args))
-        #if self._item_size != "H5T_VARIABLE":
         use_base64 = True   # may need to set this to false below for some types
-        #else:
-        #    use_base64 = False  # never use for variable length types
-        #    self.log.debug("Using JSON since type is variable length")
 
         args = args if isinstance(args, tuple) else (args,)
 
@@ -1009,11 +1002,24 @@ class Dataset(HLObject):
         val_dtype = None
         try:
             val_dtype = val.dtype
+            self.log.debug("val dtype: {}, metadata: {}".format(val_dtype, val_dtype.metadata))
         except AttributeError:
+            self.log.debug("val not ndarray")
             pass # not a numpy object, just leave dtype as None
+
+        if self._shape is None:
+            # null space dataset
+            if isinstance(val, Empty):
+                return  # nothing to do
+            else:
+                raise TypeError("Unable to assign values to dataset with null shape")
+
+        elif isinstance(val, Empty):
+            pass #  no data
 
         if isinstance(val, Reference):
             # h5pyd References are just strings
+            self.log.info("converting Reference to string")
             val = val.tolist()
 
         # Sort field indices from the slicing
@@ -1025,24 +1031,16 @@ class Dataset(HLObject):
         # For h5pyd, do extra check and convert type on client side for efficiency
         vlen = check_dtype(vlen=self.dtype)
         if vlen is not None and vlen not in (bytes, str):
-            self.log.debug("converting ndarray for vlen data")
-            try:
-                val = numpy.asarray(val, dtype=vlen)
-            except ValueError:
+            if val_dtype and check_dtype(vlen=val_dtype) == vlen:
+                self.log.debug("setting vlen dataset with vlen data of same type: {}".format(vlen))
+            else:
+                self.log.debug("converting val to vlen data type: {}".format(vlen))
                 try:
                     val = numpy.array([numpy.array(x, dtype=vlen)
-                                       for x in val], dtype=self.dtype)
-                except ValueError:
-                    pass
-            if vlen == val_dtype:
-                if val.ndim > 1:
-                    tmp = numpy.empty(shape=val.shape[:-1], dtype=object)
-                    tmp.ravel()[:] = [i for i in val.reshape(
-                        (numpy.product(val.shape[:-1]), val.shape[-1]))]
-                else:
-                    tmp = numpy.array([None], dtype=object)
-                    tmp[0] = val
-                val = tmp
+                                    for x in val], dtype=self.dtype)
+                except ValueError as ve:
+                    self.log.info("ValueError attempting to to convert to vlen data type: {}".format(ve))  
+                    pass       
 
         elif isinstance(val, complex) or \
                 getattr(getattr(val, 'dtype', None), 'kind', None) == 'c':
@@ -1076,7 +1074,6 @@ class Dataset(HLObject):
             val = numpy.asarray(val, dtype=dtype, order='C')
             if cast_compound:
                 val = val.astype(numpy.dtype([(names[0], dtype)]))
-                # val = val.reshape(val.shape[:len(val.shape) - len(dtype.shape)])
 
         elif isinstance(val, numpy.ndarray):
             # convert array if needed
@@ -1181,9 +1178,8 @@ class Dataset(HLObject):
             if self.id.uuid.startswith("d-"):
                 # server is HSDS, use binary data, use param values for selection
                 format = "binary"
-                #body = val.tobytes()
-                body = arrayToBytes(val)
-                self.log.debug("writing binary data, {} bytes".format(len(body)))
+                body = arrayToBytes(val, vlen=vlen)
+                self.log.debug("writing binary data, {} bytes - {}".format(len(body), body))
             else:
                 # h5serv, base64 encode, body json for selection
                 # TBD - replace with above once h5serv supports binary req
