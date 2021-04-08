@@ -251,10 +251,14 @@ def getFolder(domain):
     bucket   = cfg["hs_bucket"]
     pattern = cfg["pattern"]
     query = cfg["query"]
+    if cfg["verbose"]:
+        verbose = True
+    else:
+        verbose = False
     batch_size = 100  # use smaller batchsize for interactively listing of large collections
-    dir = h5py.Folder(domain, endpoint=endpoint, username=username,
+    d = h5py.Folder(domain, endpoint=endpoint, username=username, verbose=verbose,
                       password=password, bucket=bucket, pattern=pattern, query=query, batch_size=batch_size)
-    return dir
+    return d
 
 
 def getFile(domain):
@@ -276,11 +280,11 @@ def visitDomains(domain, depth=1):
         domain = domain[:-1]  # strip off trailing slash
 
     try:
-        dir = getFolder(domain + '/')
+        d = getFolder(domain + '/')
         dir_class = "domain"
         display_name = domain
         num_bytes = ' '
-        if dir.is_folder:
+        if d.is_folder:
             dir_class = "folder"
             display_name += '/'
         elif cfg["verbose"]:
@@ -289,22 +293,22 @@ def visitDomains(domain, depth=1):
             num_bytes = f.total_size
             f.close()
 
-        owner = dir.owner
+        owner = d.owner
         if owner is None:
             owner = ""
-        if dir.modified is None:
+        if d.modified is None:
             timestamp = ""
         else:
-            timestamp = datetime.fromtimestamp(int(dir.modified))
+            timestamp = datetime.fromtimestamp(int(d.modified))
 
         print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
                                               dir_class, timestamp,
                                               display_name))
         count += 1
         if cfg["showacls"]:
-            dumpAcls(dir)
-        for name in dir:
-            item = dir[name]
+            dumpAcls(d)
+        for name in d:
+            item = d[name]
             owner = item["owner"]
             full_path = domain + '/' + name
 
@@ -349,7 +353,7 @@ def visitDomains(domain, depth=1):
 # Usage
 #
 def printUsage():
-    print("usage: {} [-r] [-v] [-h] [--showacls] [--showattrs] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] [--bucket bucketname] domains".format(cfg["cmd"]))
+    print("usage: {} [-v] [-h] [--showacls] [--showattrs] [--recursive|-r] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] [--bucket bucketname] domains".format(cfg["cmd"]))
     print("example: {} -r -e http://hsdshdflab.hdfgroup.org /shared/tall.h5".format(cfg["cmd"]))
     print("")
     print("Options:")
@@ -359,13 +363,14 @@ def printUsage():
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
-    print("     --showacls :: print domain ACLs")
+    print("     --showacls :: prints domain ACLs")
     print("     --showattrs :: print attributes")
     print("     --pattern  :: <regex>  :: list domains that match the given regex")
     print("     --query :: <query> list domains where the attributes of the root group match the given query string")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --bucket <bucket_name> :: Storage bucket")
+    print("     --recursive, -r :: recursively list sub-folders or sub-groups")
     print("     -h | --help    :: This message.")
     sys.exit()
 
