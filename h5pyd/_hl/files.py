@@ -201,6 +201,9 @@ class File(Group):
                     password = os.environ["H5SERV_PASSWORD"]
                 elif "hs_password" in cfg:
                     password = cfg["hs_password"]
+
+            if api_key is None and "hs_api_key" in cfg:
+                api_key = cfg["hs_api_key"]
            
             if bucket is None:
                 if "HS_BUCKET" in os.environ:
@@ -328,7 +331,6 @@ class File(Group):
         self._verboseUpdated = None # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
         self._dn_ids = dn_ids
-
 
         Group.__init__(self, self._id)
 

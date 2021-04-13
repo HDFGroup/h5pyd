@@ -133,6 +133,9 @@ class Folder():
         if password is None and "hs_password" in cfg:
             password = cfg["hs_password"]
 
+        if api_key is None and "hs_api_key" in cfg:
+            api_key = cfg["hs_api_key"]
+
         if bucket is None and "hs_bucket" in cfg:
             bucket = cfg["hs_bucket"]
 
