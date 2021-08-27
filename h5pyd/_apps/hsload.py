@@ -249,7 +249,7 @@ def main():
         if h5py.version.version_tuple.major == 2 and h5py.version.version_tuple.minor < 10:
             sys.stderr.write("link option requires h5py version 2.10 or higher")
             sys.exit(1)
-        if h5py.version.hdf5_version_tuple[0] != 1 or h5py.version.hdf5_version_tuple[1] != 10 or h5py.version.hdf5_version_tuple[2] < 6:
+        if h5py.version.hdf5_version_tuple < (1, 10, 6):
             sys.stderr.write("link option requires hdf5 lib version 1.10.6 or higher")
             sys.exit(1)
 
