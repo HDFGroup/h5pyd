@@ -56,6 +56,7 @@ class H5TypeTest(unittest.TestCase):
         dt = np.dtype('U3')
         try:
             typeItem = h5type.getTypeItem(dt)
+            print(f"got typeItem: {typeItem}")
             self.assertTrue(False)  # expected exception
         except TypeError:
             pass # expected
@@ -187,6 +188,7 @@ class H5TypeTest(unittest.TestCase):
         typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_UTF8', 'length': 32 }
         try:
             dt = h5type.createDataType(typeItem)
+            print(f"got dtype: {dt}")
             self.assertTrue(False)  # expected exception
         except TypeError:
             pass

@@ -19,7 +19,7 @@ import time
 import base64
 import numpy
 
-from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes, Empty
+from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes, getNumElements, Empty
 from .h5type import Reference, RegionReference
 from .base import  _decode
 from .objectid import DatasetID
@@ -683,19 +683,19 @@ class Dataset(HLObject):
         # === Scalar dataspaces =================
 
         if self._shape == ():
-            #fspace = self.id.get_space()
-            #selection = sel2.select_read(fspace, args)
             selection = sel.select(self, args)
             self.log.info("selection.mshape: {}".format(selection.mshape))
 
             # TBD - refactor the following with the code for the non-scalar case
             req = "/datasets/" + self.id.uuid + "/value"
             rsp = self.GET(req, format="binary")
+            
             if type(rsp) is bytes:
                 # got binary response
                 self.log.info("got binary response for scalar selection")
-                arr = numpy.frombuffer(rsp, dtype=new_dtype)
-                #arr = bytesToArray(rsp, new_dtype, self._shape)
+                # arr = numpy.frombuffer(rsp, dtype=new_dtype)
+                arr= bytesToArray(rsp, new_dtype, self._shape)
+
                 if not self.dtype.shape:
                     self.log.debug("reshape arr to: {}".format(self._shape))
                     arr = numpy.reshape(arr, self._shape)
@@ -716,7 +716,12 @@ class Dataset(HLObject):
                 arr[()] = data
             if selection.mshape is None:
                 self.log.info("return scalar selection of: {}, dtype: {}, shape: {}".format(arr, arr.dtype, arr.shape))
-                return arr[()]
+                val = arr[()]
+                if isinstance(val, str):
+                    # h5py always returns bytes, so encode the str
+                    # TBD: what about compound types containing strings?
+                    val = val.encode('utf-8')
+                return val
 
             return arr
 
@@ -801,17 +806,18 @@ class Dataset(HLObject):
 
             arr = numpy.empty(mshape, dtype=mtype)
             params = {}
+            
             if self.id._http_conn.mode == 'r' and self.id._http_conn.cache_on:
                 # enables lambda to be used on server
                 self.log.debug("setting nonstrict parameter")
                 params["nonstrict"] = 1
             else:
                 self.log.debug("not settng nonstrict")
-            done = False
 
+            done = False
             while not done:
                 num_rows = chunks_per_page * chunk_layout[split_dim]
-                self.log.debug("num_rows: {}".format(num_rows))
+                self.log.debug(f"num_rows: {num_rows}")
                 page_start = list(copy(sel_start))
 
                 num_pages = max_chunks // chunks_per_page
@@ -845,6 +851,23 @@ class Dataset(HLObject):
                     page_mshape = tuple(page_mshape)
                     self.log.info("page_mshape: {}".format(page_mshape))
 
+                    
+                    # This could turn  out to be too small for varible length types
+                    # Will get an EntityTooSmall error from HSDS in that case
+                    num_bytes = getNumElements(page_mshape) * mtype.itemsize
+                    MIN_SHARED_MEM_SIZE = 1024*1024  # 1 MB
+                    MAX_SHARED_MEM_SIZE = 1024*1024*100 # 100 MB
+                    if self.id._http_conn.use_shared_mem and num_bytes >= MIN_SHARED_MEM_SIZE and num_bytes <= MAX_SHARED_MEM_SIZE:
+                        self.id._http_conn.get_shm_buffer(min_size=num_bytes)
+                        shm_name = self.id._http_conn.shm_buffer_name
+                    else:
+                        shm_name = None
+
+                    if shm_name:
+                        params["shm_name"] = shm_name
+                    elif "shm_name" in params:
+                        del params["shm_name"]
+
                     params["select"] = self._getQueryParam(page_start, page_stop, sel_step)
                     try:
                         rsp = self.GET(req, params=params, format="binary")
@@ -862,6 +885,21 @@ class Dataset(HLObject):
                         self.log.info("binary response, {} bytes".format(len(rsp)))
                         #arr1d = numpy.frombuffer(rsp, dtype=mtype)
                         arr1d = bytesToArray(rsp, mtype, page_mshape)
+                        page_arr = numpy.reshape(arr1d, page_mshape)
+                    elif "shm_name" in rsp:
+                        # passed a shared memory object
+                        if rsp["shm_name"] != self.id._http_conn.shm_buffer_name:
+                            # not the object we expected to get!
+                            raise IOError("Unexpected shared memory block returned")
+                        self.log.info(f"getting data via shared memory object: {rsp['shm_name']}")
+                        num_bytes = rsp["num_bytes"]
+                        
+                        # shared memory block is generally allocated on page
+                        # boundries, so copy just the bytes we need for the array
+                        des = bytearray(num_bytes)
+                        src = self.id._http_conn.get_shm_buffer()
+                        des[:] = src[:num_bytes]
+                        arr1d = bytesToArray(des, mtype, page_mshape)
                         page_arr = numpy.reshape(arr1d, page_mshape)
                     else:
                         # got JSON response
@@ -982,6 +1020,7 @@ class Dataset(HLObject):
             arr = numpy.asscalar(arr)
         elif single_element:
             arr = arr[0]
+         
         #elif len(arr.shape) > 1:
         #    arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
         return arr

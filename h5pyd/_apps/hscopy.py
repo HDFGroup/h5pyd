@@ -50,12 +50,20 @@ def usage():
     print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
+    print("     --src_endpoint <domain> :: The HDF Server endpoint for src file")
+    print("     --src_user <username>   :: User name credential for src file")
+    print("     --src_password <password> :: Password credential for src file")
+    print("     --des_endpoint <domain> :: The HDF Server endpoint for des file")
+    print("     --des_user <username>   :: User name credential for des file")
+    print("     --des_password <password> :: Password credential for des file")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --bucket <bucket_name> :: Storage bucket")
+    print("     --src_bucket <bucket_name> :: Storage bucket for src file")
+    print("     --des_bucket <bucket_name> :: Storage bucket for des file")
     print("     --nodata :: Do not upload dataset data")
     print("     -h | --help    :: This message.")
     print("")
@@ -75,7 +83,7 @@ def main():
     loglevel = logging.ERROR
     verbose = False
     dataload  = "ingest"
-    deflate = None
+    compressLevel = None
     cfg["cmd"] = sys.argv[0].split('/')[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
@@ -124,14 +132,38 @@ def main():
         elif arg in ("-e", "--endpoint"):
             cfg["hs_endpoint"] = val
             argn += 2
+        elif arg == "--src_endpoint":
+            cfg["src_hs_endpoint"] = val
+            argn += 2
+        elif arg == "--des_endpoint":
+            cfg["des_hs_endpoint"] = val
+            argn += 2
         elif arg in ("-u", "--username"):
             cfg["hs_username"] = val
+            argn += 2
+        elif arg == "--src_username":
+            cfg["src_hs_username"] = val
+            argn += 2
+        elif arg == "--des_username":
+            cfg["des_hs_username"] = val
             argn += 2
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = val
             argn += 2
+        elif arg == "--src_password":
+            cfg["src_hs_password"] = val
+            argn += 2
+        elif arg == "--des_password":
+            cfg["des_hs_password"] = val
+            argn += 2
         elif arg in ("-b", "--bucket"):
             cfg["hs_bucket"] = val
+            argn += 2
+        elif arg == "--src_bucket":
+            cfg["src_hs_bucket"] = val
+            argn += 2
+        elif arg == "--des_bucket":
+            cfg["des_hs_bucket"] = val
             argn += 2
         elif arg == '--cnf-eg':
             print_config_example()
@@ -144,9 +176,9 @@ def main():
                 except ValueError:
                     print("Compression Level must be int between 0 and 9")
                     sys.exit(-1)
-            deflate = compressLevel
             argn += 1
         elif arg[0] == '-':
+            print("got unknown arg:", arg)
             usage()
             sys.exit(-1)
         else:
@@ -158,8 +190,6 @@ def main():
     logging.debug("set log_level to {}".format(loglevel))
 
     # end arg parsing
-    logging.info("username: {}".format(cfg["hs_username"]))
-    logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
     logging.info("verbose: {}".format(verbose))
 
     if len(src_files) < 2:
@@ -182,16 +212,32 @@ def main():
         sys.exit(-1)
 
 
-    if cfg["hs_endpoint"] is None:
+    if cfg["hs_endpoint"]: 
+        logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
+    elif cfg["src_hs_endpoint"] and cfg["des_hs_endpoint"]:
+        logging.info("src_endpoint: {}".format(cfg["src_hs_endpoint"]))
+        logging.info("des_endpoint: {}".format(cfg["des_hs_endpoint"]))
+    else:
         logging.error('No endpoint given, try -h for help\n')
         sys.exit(1)
-    logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
 
     try:
-        username = cfg["hs_username"]
-        password = cfg["hs_password"]
-        endpoint = cfg["hs_endpoint"]
-        bucket = cfg["hs_bucket"]
+        if cfg["src_hs_username"]:
+            username = cfg["src_hs_username"]
+        else:
+            username = cfg["hs_username"]
+        if cfg["src_hs_password"]:
+            password = cfg["src_hs_password"]
+        else:
+            password = cfg["hs_password"]
+        if cfg["src_hs_endpoint"]:
+            endpoint = cfg["src_hs_endpoint"]
+        else:
+            endpoint = cfg["hs_endpoint"]
+        if cfg["src_hs_bucket"]:
+            bucket = cfg["src_hs_bucket"]
+        else:
+            bucket = cfg["hs_bucket"]
         # get a handle to input file
         try:
             fin = h5pyd.File(src_domain, mode='r', endpoint=endpoint, username=username, password=password, bucket=bucket)
@@ -200,8 +246,23 @@ def main():
             sys.exit(1)
 
         # create the output domain
+        if cfg["des_hs_username"]:
+            username = cfg["des_hs_username"]
+        else:
+            username = cfg["hs_username"]
+        if cfg["des_hs_password"]:
+            password = cfg["des_hs_password"]
+        else:
+            password = cfg["hs_password"]
+        if cfg["des_hs_endpoint"]:
+            endpoint = cfg["des_hs_endpoint"]
+        else:
+            endpoint = cfg["hs_endpoint"]
+        if cfg["des_hs_bucket"]:
+            bucket = cfg["des_hs_bucket"]
+        else:
+            bucket = cfg["hs_bucket"]
         try:
-
             fout = h5pyd.File(des_domain, 'x', endpoint=endpoint, username=username, password=password, bucket=bucket)
         except IOError as ioe:
             if ioe.errno == 403:
@@ -210,9 +271,13 @@ def main():
                 logging.error("Error creating file {}: {}".format(des_domain, ioe))
             sys.exit(1)
 
+        if compressLevel is not None:
+            compress_filter = "deflate"  # TBD - add option for other compressors
+        else:
+            compress_filter = None
 
         # do the actual load
-        load_file(fin, fout, verbose=verbose, dataload=dataload, deflate=deflate)
+        load_file(fin, fout, verbose=verbose, dataload=dataload, compression=compress_filter, compression_opts=compressLevel)
 
         msg = "File {} uploaded to domain: {}".format(src_domain, des_domain)
         logging.info(msg)

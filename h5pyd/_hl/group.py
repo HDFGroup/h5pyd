@@ -18,6 +18,7 @@ import collections
 
 from .base import HLObject, MutableMappingHDF5, guess_dtype, Empty
 from .objectid import TypeID, GroupID, DatasetID
+from .h5type import special_dtype
 from . import dataset
 from .dataset import Dataset
 from . import table
@@ -796,7 +797,16 @@ class Group(HLObject, MutableMappingHDF5):
             #htype.commit(self.id, name, lcpl=lcpl)
 
         else:
-            pass #todo
+            if isinstance(obj, numpy.ndarray):
+                arr = obj
+            elif isinstance(obj, str):
+                dt = special_dtype(vlen=str)
+                arr = numpy.array(obj, dtype=dt)
+            else:
+                dt = guess_dtype(obj)
+                arr = numpy.array(obj, dtype=dt)
+            self.create_dataset(name, shape=arr.shape, dtype=arr.dtype, data=arr[...])
+        
             #ds = self.create_dataset(None, data=obj, dtype=base.guess_dtype(obj))
             #h5o.link(ds.id, self.id, name, lcpl=lcpl)
 

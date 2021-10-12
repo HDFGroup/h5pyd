@@ -36,7 +36,7 @@ class TestTable(TestCase):
 
         count = 10
 
-        dt = np.dtype([('real', np.float), ('img', np.float)])
+        dt = np.dtype([('real', float), ('img', float)])
         table = f.create_table('complex', numrows=10, dtype=dt)
 
         elem = table[0]
@@ -142,12 +142,7 @@ class TestTable(TestCase):
         indices = table.update_where(condition, update_val, limit=1)
         self.assertEqual(len(indices), 1)
         self.assertEqual(list(indices), [1])
-
-
-
         f.close()
-
-
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

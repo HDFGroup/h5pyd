@@ -35,7 +35,7 @@ class TestDatasetCompound(TestCase):
 
         count = 10
 
-        dt = np.dtype([('real', np.float), ('img', np.float)])
+        dt = np.dtype([('real', float), ('img', float)])
         dset = f.create_dataset('complex', (count,), dtype=dt)
 
         elem = dset[0]

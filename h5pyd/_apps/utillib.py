@@ -633,7 +633,7 @@ def create_datatype(obj, ctx):
 # create_datatype
 
 #----------------------------------------------------------------------------------
-def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compression=None,compression_opts=None):
+def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compression=None, compression_opts=None):
     logging.info("input file: {}".format(fin.filename))
     logging.info("output file: {}".format(fout.filename))
     if dataload != "ingest":
