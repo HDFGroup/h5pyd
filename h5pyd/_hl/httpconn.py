@@ -257,18 +257,18 @@ class HttpConn:
             provider = api_key.get("openid_provider", "azure")
             if provider == 'azure':
                 self.log.debug("creating OpenIDHandler for Azure")
-                api_key = openid.AzureOpenID(endpoint, api_key)
+                self._api_key = openid.AzureOpenID(endpoint, api_key)
             elif provider == 'google':
                 self.log.debug("creating OpenIDHandler for Google")
 
                 config = api_key.get('client_secret', None)
                 scopes = api_key.get('scopes', None)
-                api_key = openid.GoogleOpenID(endpoint, config=config, scopes=scopes)
+                self._api_key = openid.GoogleOpenID(endpoint, config=config, scopes=scopes)
             elif provider == 'keycloak':
                 self.log.debug("creating OpenIDHandler for Keycloak")
 
                 # for Keycloak, pass in username and password
-                api_key = openid.KeycloakOpenID(endpoint, config=api_key, username=username, password=password)
+                self._api_key = openid.KeycloakOpenID(endpoint, config=api_key, username=username, password=password)
             else:
                 self.log.error("Unknown openid provider: {}".format(provider))
 
@@ -282,12 +282,11 @@ class HttpConn:
             self._s.close()
             self._s = None
 
-
     def getHeaders(self, username=None, password=None, headers=None):
         if headers is None:
             headers = {}
         elif "Authorization" in headers:
-            return  headers # already have auth key
+            return headers  # already have auth key
         if username is None:
             username = self._username
         if password is None:
