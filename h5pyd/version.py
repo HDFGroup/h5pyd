@@ -39,7 +39,7 @@ This is h5pyd **%s**
 """ % (version)
 
 info = """\
-Summary of the h5py configuration
+Summary of the h5pyd configuration
 ---------------------------------
 
 h5pyd    %(h5pyd)s
