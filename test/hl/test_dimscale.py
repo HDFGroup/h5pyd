@@ -42,7 +42,7 @@ class TestDimensionScale(TestCase):
         f.create_dataset('scale_z', data=np.arange(10) * 10e3)
         f.create_dataset('not_scale', data=np.arange(10) * 10e3)
         f.create_dataset('scale_name', data=np.arange(10) * 10e3)
-        f.create_dataset('wrong_dims', shape=(10,10), dtype=np.float64)
+        f.create_dataset('wrong_dims', shape=(10, 10), dtype=np.float64)
 
         self.assertIsInstance(dset.dims, h5py._hl.dims.DimensionManager)
         self.assertEqual(len(dset.dims), len(dset.shape))
@@ -55,15 +55,20 @@ class TestDimensionScale(TestCase):
 
         # Create and name dimension scales
         dset.dims.create_scale(f['scale_x'], 'Simulation X (North) axis')
+        self.assertTrue(h5py.h5ds.is_scale(f['scale_x'].id))
         dset.dims.create_scale(f['scale_y'], 'Simulation Y (East) axis')
+        self.assertTrue(h5py.h5ds.is_scale(f['scale_y'].id))
         dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
+        self.assertTrue(h5py.h5ds.is_scale(f['scale_z'].id))
 
         # Try re-creating the last dimscale
         dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
+        self.assertTrue(h5py.h5ds.is_scale(f['scale_z'].id))
 
         # Attach a non-dimension scale (and in the process make it a dimension
         # scale)
         dset.dims[1].attach_scale(f['not_scale'])
+        self.assertTrue(h5py.h5ds.is_scale(f['not_scale'].id))
 
         # Cannot attach a dimension scale to another dimension scale
         with self.assertRaises(RuntimeError):
@@ -77,13 +82,17 @@ class TestDimensionScale(TestCase):
         self.assertEqual(len(dset.dims[0]), 0)
 
         dset.dims[0].attach_scale(f['scale_x'])
+        self.assertTrue(h5py.h5ds.is_attached(dset.id, f['scale_x'].id, 0))
 
         self.assertEqual(len(dset.dims[0]), 1)
         self.assertEqual(len(dset.dims[1]), 1)
         self.assertEqual(len(dset.dims[2]), 0)
 
         dset.dims[1].attach_scale(f['scale_y'])
+        self.assertTrue(h5py.h5ds.is_attached(dset.id, f['scale_y'].id, 1))
+
         dset.dims[2].attach_scale(f['scale_z'])
+        self.assertTrue(h5py.h5ds.is_attached(dset.id, f['scale_z'].id, 2))
 
         self.assertEqual(len(dset.dims[1]), 2)
         self.assertEqual(len(dset.dims[2]), 1)
@@ -93,8 +102,10 @@ class TestDimensionScale(TestCase):
         self.assertEqual(list(scale_x.dims[0]), [])
 
         dset.dims[1].detach_scale(f['scale_y'])
+        self.assertFalse(h5py.h5ds.is_attached(dset.id, f['scale_y'].id, 1))
         self.assertEqual(len(dset.dims[1]), 1)
         dset.dims[1].detach_scale(f['not_scale'])
+        self.assertFalse(h5py.h5ds.is_attached(dset.id, f['not_scale'].id, 1))
         self.assertEqual(dset.dims[1].items(), [])
 
         self.assertEqual(dset.dims[0].label, '')
@@ -158,9 +169,7 @@ class TestDimensionScale(TestCase):
             self.assertIsInstance(s[0], six.string_types)
             self.assertEqual(s[0], 'Simulation Z (Vertical) axis')
 
-
         f.close()
-
 
 
 if __name__ == '__main__':

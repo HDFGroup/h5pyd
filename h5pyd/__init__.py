@@ -33,20 +33,21 @@ from ._hl.table import Table
 from ._hl.datatype import Datatype
 from ._hl.attrs import AttributeManager
 from ._hl.serverinfo import getServerInfo
- 
+from . import h5ds
+
 
 from .config import Config
-#from . import hsinfo 
+#from . import hsinfo
 __version__ = version.version
 
- 
+
 
 __doc__ = \
 """
     This is the h5pyd package, a Python interface to the HDF REST Server.
 
     Version %s
- 
+
 """ % (version.version)
 
 
