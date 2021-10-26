@@ -127,6 +127,12 @@ def is_compact(dset):
     else:
         return False
 
+def is_scalar(dset):
+    if len(dset.shape) == 0:
+        return True
+    else:
+        return False
+
 def convert_dtype(srcdt, ctx):
     """ Return a dtype based on input dtype, converting any Reference types from
     h5py style to h5pyd and vice-versa.
@@ -353,6 +359,8 @@ def create_dataset(dobj, ctx):
         if chunk_dims:
             num_chunks = dsetid.get_num_chunks(spaceid)
 
+        logging.debug("num_chunks: {}".format(num_chunks))
+
         chunks = {}  # pass a map to create_dataset
 
         if num_chunks == 0:
@@ -428,7 +436,7 @@ def create_dataset(dobj, ctx):
 
     try:
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
-        if dobj.shape is None or len(dobj.shape) == 0 or (is_vlen(dobj.dtype) and is_h5py(fout)):
+        if dobj.shape is None or len(dobj.shape) == 0 or is_scalar(dobj) or (is_vlen(dobj.dtype) and is_h5py(fout)):
             # don't use compression/chunks for scalar datasets
             # or vlen
             compression = None
@@ -458,6 +466,7 @@ def create_dataset(dobj, ctx):
             fletcher32=fletcher32, compression_opts=compression_opts,
             fillvalue=fillvalue, scaleoffset=scaleoffset)
         msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))
+        msg += " chunks: {}".format(chunks)
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
@@ -691,7 +700,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
         logging.debug("object_copy_helper for object: {}".format(obj.name))
 
         if class_name in ("Dataset", "Table"):
-            if ctx["dataload"] == "link" and not is_vlen(obj.dtype) and not is_compact(obj):
+            if ctx["dataload"] == "link" and not is_vlen(obj.dtype) and not is_compact(obj) and not is_scalar(obj):
                 logging.info("skip datacopy for link reference")
             else:
                 logging.debug("calling write_dataset for dataset: {}".format(obj.name))
