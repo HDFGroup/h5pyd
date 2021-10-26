@@ -1,5 +1,4 @@
 import json
-import boto3
 
 # rom .config import Config
 
@@ -46,6 +45,8 @@ class Session:
                    }
 
         payload = json.dumps(req_json).encode('utf-8')
+
+        import boto3  # import here so it's not a global dependency
 
         with boto3.client('lambda') as lambda_client:
             lambda_rsp = lambda_client.invoke(
