@@ -529,7 +529,7 @@ class File(Group):
         """  Tells the service to complete any pending updates to permanent storage
         """
         self.log.debug("flush")
-        if  self.mode == "r+" and self._id.id.startswith("g-"):
+        if self._id.id.startswith("g-"):
             # Currently flush only works with HSDS
             self.log.info("sending PUT flush request")
             req = '/'
@@ -547,12 +547,19 @@ class File(Group):
                     raise IOError(500, "Unexpected Error")
             self.log.info("PUT flush complete")
 
-    def close(self, flush=False):
+    def close(self, flush=None):
         """ Clears reference to remote resource.
         """
         # this will close the socket of the http_conn singleton
 
         self.log.debug("close, mode: {}".format(self.mode))
+        if flush is None:
+            # set flush to true if this is a direct connect and file 
+            # is writable
+            if self.mode == "r+" and self._id._http_conn._hsds:
+                flush = True
+            else:
+                flush = False
         # do a PUT flush if this file is writable and the server is HSDS and flush is set
         if flush:
             self.flush()

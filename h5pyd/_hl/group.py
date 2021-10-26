@@ -44,7 +44,6 @@ class Group(HLObject, MutableMappingHDF5):
         self._req_prefix = "/groups/" + self.id.uuid
         self._link_db = {}  # cache for links
 
-
     def _get_link_json(self, h5path):
         """ Return parent_uuid and json description of link for given path """
         self.log.debug("__get_link_json({})".format(h5path))
@@ -57,13 +56,12 @@ class Group(HLObject, MutableMappingHDF5):
         else:
             in_group = False  # may belong to some other group
 
-
         if h5path[0] == '/':
             #abs path, start with root
             # get root_uuid
             parent_uuid = self.id.http_conn.root_uuid
             # make a fake tgt_json to represent 'link' to root group
-            tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid }
+            tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid}
             if h5path == '/':
                 # asking for the root, just return the root link
                 return parent_uuid, tgt_json
@@ -74,7 +72,6 @@ class Group(HLObject, MutableMappingHDF5):
                 parent_uuid = self.id.id
 
                 return parent_uuid, tgt_json
-
 
         path = h5path.split('/')
 
@@ -123,8 +120,7 @@ class Group(HLObject, MutableMappingHDF5):
 
                 return group_uuid, tgt_json
             else:
-                 raise KeyError("Unable to open object (Component not found)")
-
+                raise KeyError("Unable to open object (Component not found)")
 
         for name in path:
             if not name:
