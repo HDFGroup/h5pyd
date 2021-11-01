@@ -365,7 +365,9 @@ class HttpConn:
         if format == "binary":
             headers['accept'] = 'application/octet-stream'
 
-        if self._cache is not None and use_cache and format == "json" and params["domain"] == self._domain:
+        if self._cache is not None and use_cache and format == "json" and \
+            params["domain"] == self._domain and "select" not in params and \
+            "query" not in params:
             self.log.debug("httpcon - checking cache")
             if req in self._cache:
                 self.log.debug("httpcon - returning cache result")

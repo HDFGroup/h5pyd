@@ -127,8 +127,18 @@ class TestTable(TestCase):
             self.assertEqual(len(row), 4)
             num_rows += 1
         self.assertEqual(num_rows, 4)
-
+ 
+        # try a compound query
+        condition = "(open > 3000) & (open < 3100)" 
+        quotes = table.read_where(condition)
+        self.assertEqual(len(quotes), 5)
+        for i in range(4):
+            quote = quotes[i]
+            self.assertTrue(quote[2] > 3000)
+            self.assertTrue(quote[2] < 3100)
+        
         # try modifying specific rows
+        condition = "symbol == b'AAPL'"
         update_val = {"open": 123}
         indices = table.update_where(condition, update_val)
         self.assertEqual(len(indices), 4)
