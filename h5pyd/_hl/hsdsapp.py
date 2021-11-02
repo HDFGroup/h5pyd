@@ -1,8 +1,9 @@
+import os
+import sys
 import signal
 import subprocess
 import time
 import uuid
-import os
 import queue
 import threading
 import logging
@@ -13,7 +14,7 @@ def _enqueue_output(out, queue, loglevel):
         # filter lines by loglevel
         words = line.split()
         put_line = True
-    
+
         if loglevel != logging.DEBUG:
             if len(words) >= 2:
                 # format should be "node_name log_level> msg"
@@ -27,7 +28,7 @@ def _enqueue_output(out, queue, loglevel):
                 elif loglevel == logging.ERROR:
                     if level != "ERROR":
                         put_line = False
-    
+
         if put_line:
             queue.put(line)
     logging.debug("enqueu_output close()")
@@ -94,7 +95,6 @@ class HsdsApp:
         self._rangeget_url = f"http+unix://{socket_url}rangeget.sock"
         self._socket_paths.append(f"{socket_dir}rangeget.sock")
 
-
     @property
     def endpoint(self):
         return self._endpoint
@@ -102,8 +102,8 @@ class HsdsApp:
     def print_process_output(self):
         """ print any queue output from sub-processes
         """
-        #print("print_process_output")
-        
+        # print("print_process_output")
+
         while True:
             got_output = False
             for q in self._queues:
@@ -113,7 +113,7 @@ class HsdsApp:
                     pass  # no output on this queue yet
                 else:
                     if isinstance(line, bytes):
-                        #self.log.debug(line.decode("utf-8").strip())
+                        # self.log.debug(line.decode("utf-8").strip())
                         print(line.decode("utf-8").strip())
                     else:
                         print(line.strip())
@@ -155,17 +155,21 @@ class HsdsApp:
         common_args = ["--standalone", ]
         # print("setting log_level to:", args.loglevel)
         # common_args.append(f"--log_level={args.loglevel}")
-        common_args.append(f"--dn_urls={dn_urls_arg}") 
+        common_args.append(f"--dn_urls={dn_urls_arg}")
         common_args.append(f"--rangeget_url={self._rangeget_url}")
         common_args.append(f"--hsds_endpoint={self._endpoint}")
         common_args.append("--server_name=Direct Connect (HSDS)")
         common_args.append("--password_file=")
         common_args.append("--use_socket")
 
+        py_exe = sys.executable
+        cmd_dir = os.path.join(sys.exec_prefix, "bin")
         for i in range(count):
             if i == 0:
                 # args for service node
-                pargs = ["hsds-servicenode", "--log_prefix=sn "]
+                pargs = [py_exe,
+                         os.path.join(cmd_dir, "hsds-servicenode"),
+                         "--log_prefix=sn "]
                 if self._username:
                     pargs.append(f"--hs_username={self._username}")
                 if self._password:
@@ -174,10 +178,14 @@ class HsdsApp:
                 pargs.append("--logfile=sn1.log")
             elif i == 1:
                 # args for rangeget node
-                pargs = ["hsds-rangeget", "--log_prefix=rg "]
+                pargs = [py_exe,
+                         os.path.join(cmd_dir, "hsds-rangeget"),
+                         "--log_prefix=rg "]
             else:
                 node_number = i - 2  # start with 0
-                pargs = ["hsds-datanode", f"--log_prefix=dn{node_number+1} "]
+                pargs = [py_exe,
+                         os.path.join(cmd_dir, "hsds-datanode"),
+                         f"--log_prefix=dn{node_number+1} "]
                 pargs.append(f"--dn_urls={dn_urls_arg}")
                 pargs.append(f"--node_number={node_number}")
             # logging.info(f"starting {pargs[0]}")
@@ -215,7 +223,7 @@ class HsdsApp:
                     msg = f"failed to initialize after {MAX_INIT_TIME} seconds"
                     self.log.error(msg)
                     raise IOError(msg)
-                
+
         self.log.info(f"Ready after: {(time.time()-start_ts):4.2f} s")
 
     def stop(self):
@@ -261,16 +269,4 @@ class HsdsApp:
     def __del__(self):
         """ cleanup class resources """
         self.stop()
-        #self._tempdir.cleanup()
-
-        
-
-        
-
-
-
-
-
-
-
-
+        # self._tempdir.cleanup()
