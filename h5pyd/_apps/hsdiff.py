@@ -378,7 +378,7 @@ def usage():
     print("Options:")
     print("     -v | --verbose :: verbose output")
     print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
-    print("     -u | --user <username>   :: User name credential")
+    print("     -u | --username <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print("     --cnf-eg        :: Print a config file and then exit")

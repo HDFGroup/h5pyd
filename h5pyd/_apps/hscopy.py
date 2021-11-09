@@ -48,7 +48,7 @@ def usage():
     print("Options:")
     print("     -v | --verbose :: verbose output")
     print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
-    print("     -u | --user <username>   :: User name credential")
+    print("     -u | --username <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     --src_endpoint <domain> :: The HDF Server endpoint for src file")
     print("     --src_user <username>   :: User name credential for src file")
