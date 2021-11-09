@@ -53,7 +53,7 @@ def printUsage():
     print("Options:")
     print("     -v | --verbose :: verbose output")
     print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
-    print("     -u | --user <username>   :: User name credential")
+    print("     -u | --username <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
