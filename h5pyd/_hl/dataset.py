@@ -805,18 +805,6 @@ class Dataset(HLObject):
             chunk_size = chunk_layout[split_dim]
             self.log.debug("chunk size for split_dim: {}".format(chunk_size))
 
-            # use <U32 dtype for all strings that could contain non-ascii chars
-            # this is specifically an issue for data from lambda but should
-            # work for all requests
-            if mtype.names is not None and type(rsp) is not bytes:
-                arr_dtypes = []
-                for key in mtype.names:
-                    if np.issubdtype(mtype[key], np.string_):
-                        arr_dtypes.append((key, '<U32'))
-                    else:
-                        arr_dtypes.append((key, mtype[key].str))
-                mtype = np.dtype(arr_dtypes)
-
             arr = numpy.empty(mshape, dtype=mtype)
             params = {}
 
@@ -924,6 +912,8 @@ class Dataset(HLObject):
 
                         data = rsp['value']
                         self.log.debug(data)
+
+                        arr, mtype = self.convert_str_type(arr, mtype)
 
                         page_arr = jsonToArray(page_mshape, mtype, data)
                         self.log.debug("jsontoArray returned: {}".format(page_arr))
@@ -1271,6 +1261,25 @@ class Dataset(HLObject):
             self.id.write(mspace, fspace, val, mtype)
         """
 
+    def convert_str_type(self, arr, mtype):
+        """Use <U32 dtype for all strings that could contain non-ascii chars
+        this is specifically an issue for data from lambda. Reinitialize arr
+        if any non-U32 string dtypes are found.
+        """
+        checks = [False]
+        if mtype.names is not None:
+            checks = [np.issubdtype(mtype[key], np.string_) for key in mtype.names]
+        if any(checks):
+            self.log.info('Modifying dtypes!')
+            arr_dtypes = []
+            for name, check in zip(mtype.names, checks):
+                if check:
+                    arr_dtypes.append((name, '<U32'))
+                else:
+                    arr_dtypes.append((name, mtype[name].str))
+            mtype = np.dtype(arr_dtypes)
+            arr = numpy.empty(arr.shape, dtype=mtype)
+        return arr, mtype
 
     def read_direct(self, dest, source_sel=None, dest_sel=None):
         """ Read data directly from HDF5 into an existing NumPy array.
