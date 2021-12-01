@@ -198,11 +198,24 @@ class HttpConn:
             # save lambda function name
             self._lambda = endpoint[len("lambda:"):]
 
-        elif endpoint == "local":
+        elif endpoint.startswith("local"):
             # create a local hsds server
-            # set the number of nodes equal to number of cores
-            dn_count = multiprocessing.cpu_count() 
-            dn_count = -(-dn_count // 2)  # get the ceiling of count / 2 (don't include hyperthreading cores)
+            # set the number of nodes
+            # if the endpoint is of the form: "local[n]", use n as the number of nodes
+            # else set the number of nodes equal to number of cores
+            bracket_start = endpoint.find('[')
+            bracket_end = endpoint.find(']')
+            dn_count = None
+            if bracket_start > 0 and bracket_end > 0:
+                try:
+                    dn_count = int(endpoint[bracket_start+1:bracket_end])
+                except ValueError:
+                    # if value is '*' or something just drop down to default
+                    # setup based on cpu count
+                    pass 
+            if not dn_count:
+                dn_count = multiprocessing.cpu_count() 
+                dn_count = -(-dn_count // 2)  # get the ceiling of count / 2 (don't include hyperthreading cores)
             if dn_count < 1:
                 dn_count = 1
    

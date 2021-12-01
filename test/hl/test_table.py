@@ -109,6 +109,26 @@ class TestTable(TestCase):
                 # first two columns will come back as bytes, not strs
                 self.assertEqual(row[col], item[col])
 
+        cursor = table.create_cursor()
+        indx = 0
+        for row in cursor:
+            item = data[indx]
+            for col in range(2,3):
+                # first two columns will come back as bytes, not strs
+                self.assertEqual(row[col], item[col])
+            indx += 1
+        self.assertEqual(indx, len(data))
+
+        cursor = table.create_cursor(start=2, stop=5)
+        indx = 2
+        for row in cursor:
+            item = data[indx]
+            for col in range(2,3):
+                # first two columns will come back as bytes, not strs
+                self.assertEqual(row[col], item[col])
+            indx += 1
+        self.assertEqual(indx, 5)
+
         condition = "symbol == b'AAPL'"
         quotes = table.read_where(condition)
         self.assertEqual(len(quotes), 4)

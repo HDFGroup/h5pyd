@@ -23,10 +23,19 @@ from .h5type import check_dtype
 class Cursor():
     """
       Cursor for retreiving rows from a table
+      buffer_rows can be used to control how many rows
+      will be fetched from the server
     """
-    def __init__(self, table, query=None, start=None, stop=None):
+    def __init__(self, table, query=None, start=None, stop=None, buffer_rows=None):
         self._table = table
         self._query = query
+        DEFAULT_BUFFER_BYTES = 1000000
+        if buffer_rows is None:
+            buffer_rows = DEFAULT_BUFFER_BYTES // table.dtype.itemsize
+        if buffer_rows < 1:
+            buffer_rows = 1
+        self._buffer_rows = buffer_rows
+
         if start is None:
             self._start = 0
         else:
@@ -41,33 +50,30 @@ class Cursor():
 
         BEWARE: Modifications to the yielded data are *NOT* written to file.
         """
-        nrows = self._table.nrows
-        # to reduce round trips, grab BUFFER_SIZE items at a time
-        # TBD: set buffersize based on size of each row
-        BUFFER_SIZE = 10000
+        nrows = self._stop - self._start
 
         arr = None
         query_complete = False
 
-        for indx in range(self._start, self._stop):
-            if indx%BUFFER_SIZE == 0:
+        for indx in range(self._stop - self._start):
+            if indx % self._buffer_rows == 0:
                 # grab another buffer
-                read_count = BUFFER_SIZE
+                read_count = self._buffer_rows
                 if nrows - indx < read_count:
                     read_count = nrows - indx
                 if self._query is None:
-
-                    arr = self._table[indx:read_count+indx]
+                    print("read row count:", (read_count+indx+self._start)-(indx+self._start))
+                    arr = self._table[indx+self._start:read_count+indx+self._start]
                 else:
                     # call table to return query result
                     if query_complete:
                         arr = None  # nothing more to fetch
                     else:
-                        arr = self._table.read_where(self._query, start=indx, limit=read_count)
+                        arr = self._table.read_where(self._query, start=indx+self._start, limit=read_count)
                         if arr is not None and arr.shape[0] < read_count:
                             query_complete = True  # we've gotten all the rows
-            if arr is not None and indx%BUFFER_SIZE < arr.shape[0]:
-                yield arr[indx%BUFFER_SIZE]
+            if arr is not None and indx%self._buffer_rows < arr.shape[0]:
+                yield arr[indx%self._buffer_rows]
 
 class Table(Dataset):
 
