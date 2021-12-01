@@ -1270,7 +1270,7 @@ class Dataset(HLObject):
         if mtype.names is not None:
             checks = [np.issubdtype(mtype[key], np.string_) for key in mtype.names]
         if any(checks):
-            self.log.info('Modifying dtypes!')
+            self.log.debug('Modifying dtypes!')
             arr_dtypes = []
             for name, check in zip(mtype.names, checks):
                 if check:
