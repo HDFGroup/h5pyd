@@ -13,6 +13,7 @@
 from __future__ import absolute_import
 
 import posixpath as pp
+import numpy as np
 from copy import copy
 import sys
 import time
@@ -177,7 +178,7 @@ def make_new_dset(parent, shape=None, dtype=None,
             raise TypeError("Conflict in compression options")
         compression_opts = compression
         compression = 'gzip'
-    
+
     if compression and compression not in compressors:
         raise ValueError("expected compression to be one of the following values: {}".format(compressors))
 
@@ -334,7 +335,7 @@ class Dataset(HLObject):
 
     @property
     def compression(self):
-        
+
         """ iterate through list of filters and return compression filter
         or None if none found """
         compressors = self.id.http_conn.compressors
@@ -377,7 +378,7 @@ class Dataset(HLObject):
                     return filter["level"]
                 else:
                     return None
-                
+
         return None
 
 
@@ -689,7 +690,7 @@ class Dataset(HLObject):
             # TBD - refactor the following with the code for the non-scalar case
             req = "/datasets/" + self.id.uuid + "/value"
             rsp = self.GET(req, format="binary")
-            
+
             if type(rsp) is bytes:
                 # got binary response
                 self.log.info("got binary response for scalar selection")
@@ -804,9 +805,21 @@ class Dataset(HLObject):
             chunk_size = chunk_layout[split_dim]
             self.log.debug("chunk size for split_dim: {}".format(chunk_size))
 
+            # use <U32 dtype for all strings that could contain non-ascii chars
+            # this is specifically an issue for data from lambda but should
+            # work for all requests
+            if mtype.names is not None and type(rsp) is not bytes:
+                arr_dtypes = []
+                for key in mtype.names:
+                    if np.issubdtype(mtype[key], np.string_):
+                        arr_dtypes.append((key, '<U32'))
+                    else:
+                        arr_dtypes.append((key, mtype[key].str))
+                mtype = np.dtype(arr_dtypes)
+
             arr = numpy.empty(mshape, dtype=mtype)
             params = {}
-            
+
             if self.id._http_conn.mode == 'r' and self.id._http_conn.cache_on:
                 # enables lambda to be used on server
                 self.log.debug("setting nonstrict parameter")
@@ -851,7 +864,7 @@ class Dataset(HLObject):
                     page_mshape = tuple(page_mshape)
                     self.log.info("page_mshape: {}".format(page_mshape))
 
-                    
+
                     # This could turn  out to be too small for varible length types
                     # Will get an EntityTooSmall error from HSDS in that case
                     num_bytes = getNumElements(page_mshape) * mtype.itemsize
@@ -880,6 +893,7 @@ class Dataset(HLObject):
                             break
                         else:
                             raise IOError("Error retrieving data: {}".format(ioe.errno))
+
                     if type(rsp) is bytes:
                         # got binary response
                         self.log.info("binary response, {} bytes".format(len(rsp)))
@@ -893,7 +907,7 @@ class Dataset(HLObject):
                             raise IOError("Unexpected shared memory block returned")
                         self.log.info(f"getting data via shared memory object: {rsp['shm_name']}")
                         num_bytes = rsp["num_bytes"]
-                        
+
                         # shared memory block is generally allocated on page
                         # boundries, so copy just the bytes we need for the array
                         des = bytearray(num_bytes)
@@ -1020,7 +1034,7 @@ class Dataset(HLObject):
             arr = numpy.asscalar(arr)
         elif single_element:
             arr = arr[0]
-         
+
         #elif len(arr.shape) > 1:
         #    arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
         return arr
@@ -1078,8 +1092,8 @@ class Dataset(HLObject):
                     val = numpy.array([numpy.array(x, dtype=vlen)
                                     for x in val], dtype=self.dtype)
                 except ValueError as ve:
-                    self.log.info("ValueError attempting to to convert to vlen data type: {}".format(ve))  
-                    pass       
+                    self.log.info("ValueError attempting to to convert to vlen data type: {}".format(ve))
+                    pass
 
         elif isinstance(val, complex) or \
                 getattr(getattr(val, 'dtype', None), 'kind', None) == 'c':
