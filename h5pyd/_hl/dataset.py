@@ -19,6 +19,7 @@ import sys
 import time
 import base64
 import numpy
+import re
 
 from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes, getNumElements, Empty
 from .h5type import Reference, RegionReference
@@ -1262,9 +1263,9 @@ class Dataset(HLObject):
         """
 
     def convert_str_type(self, arr, mtype):
-        """Use <U32 dtype for all strings that could contain non-ascii chars
+        """Use unicode dtype for all strings that could contain non-ascii chars
         this is specifically an issue for data from lambda. Reinitialize arr
-        if any non-U32 string dtypes are found.
+        if any non-unicode string dtypes are found.
         """
         checks = [False]
         if mtype.names is not None:
@@ -1274,7 +1275,11 @@ class Dataset(HLObject):
             arr_dtypes = []
             for name, check in zip(mtype.names, checks):
                 if check:
-                    arr_dtypes.append((name, '<U32'))
+                    trailing_digits = re.search(r'\d+$', mtype[name].str)
+                    n = 64
+                    if trailing_digits is not None:
+                        n = int(trailing_digits.group())
+                    arr_dtypes.append((name, '<U{}'.format(n)))
                 else:
                     arr_dtypes.append((name, mtype[name].str))
             mtype = np.dtype(arr_dtypes)
