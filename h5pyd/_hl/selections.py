@@ -30,6 +30,7 @@ H5S_SELECT_NONE = 5
 H5S_SELECT_ALL = 6
 H5S_SELECT_HYPERSLABS = 7
 H5S_SELECT_NOTB = 8
+H5S_SELLECT_COORD = 9
 
 
 def select(obj, args):
@@ -370,6 +371,7 @@ class SimpleSelection(Selection):
         return npoints
 
     def getQueryParam(self):
+        """ Get select param for use with HDF Rest API"""
         param = ''
         rank = len(self._shape)
         if rank == 0:
@@ -448,18 +450,14 @@ class FancySelection(Selection):
     """
 
     @property
-    def mshape(self):
-        return self._mshape
-
-    @property
-    def hyperslabs(self):
-        return self._hyperslabs
+    def slices(self):
+        return self._slices
 
 
     def __init__(self, shape, *args, **kwds):
         Selection.__init__(self, shape, *args, **kwds)
-        self._mshape = self._shape
-        self._hyperslabs = []
+        # self._mshape = self._shape
+        self._slices = []
 
     def __getitem__(self, args):
         #print("args:", args)
@@ -468,70 +466,120 @@ class FancySelection(Selection):
             args = (args,)
 
         args = _expand_ellipsis(args, len(self._shape))
+        print(f"fancyselection getitem - args: {args}")
+        select_type = H5S_SELECT_HYPERSLABS  # will adjust if we have a coord
 
-        # First build up a dictionary of (position:sequence) pairs
-
-        sequenceargs = {}
+        # Create list of slices and/or coordinates
+        slices = []
         for idx, arg in enumerate(args):
-            if not isinstance(arg, slice):
-                if hasattr(arg, 'dtype') and arg.dtype == np.dtype('bool'):
-                    if len(arg.shape) != 1:
-                        raise TypeError("Boolean indexing arrays must be 1-D")
-                    arg = arg.nonzero()[0]
+            length = self._shape[idx]
+            if isinstance(arg, slice):
+                _translate_slice(arg, length)  # raise exception for invalid slice
+                slices.append(arg)
+                
+            elif hasattr(arg, 'dtype') and arg.dtype == np.dtype('bool'):
+                if len(arg.shape) != 1:
+                    raise TypeError("Boolean indexing arrays must be 1-D")
+                arg = arg.nonzero()[0]
                 try:
-                    sequenceargs[idx] = list(arg)
+                    slices.append(list(arg))
                 except TypeError:
                     pass
                 else:
                     if sorted(arg) != list(arg):
                         raise TypeError("Indexing elements must be in increasing order")
+                select_type = H5S_SELLECT_COORD
+            elif isinstance(arg, list):
+                # coordinate selection
+                prev = None
+                for x in arg:
+                    if not isinstance(x, int):
+                        raise TypeError(f'Illegal coordinate index "{arg}" must be a list of integers')
+               
+                    if x < 0 or x >= length:
+                        raise ValueError(f"Index ({arg}) out of range (0-{length-1})")
+                    if prev is not None and x <= prev:
+                        raise TypeError("Indexing elements must be in increasing order")
+                    prev = x
+                slices.append(arg)
+                select_type = H5S_SELLECT_COORD
 
-        if len(sequenceargs) > 1:
-            raise TypeError("Only one indexing vector or array is currently allowed for advanced selection")
-        if len(sequenceargs) == 0:
-            raise TypeError("Advanced selection inappropriate")
+            elif isinstance(arg, int):
+                if arg < 0 or arg >= length:
+                    raise ValueError(f"Index ({arg}) out of range (0-{length-1})")
+                slices.append(arg)
+            else:
+                # TBD - support ellipsis?
+                raise TypeError(f"Unexpected arg type: {arg}")
+        self._slices = slices
+        self._select_type = select_type
 
-        vectorlength = len(list(sequenceargs.values())[0])
-        if not all(len(x) == vectorlength for x in sequenceargs.values()):
-            raise TypeError("All sequence arguments must have the same length %s" % sequenceargs)
+    def getSelectNpoints(self):
+        """Return number of elements in current selection
+        """
+        print("FancySelection.getSelectNPoints")
+        npoints = 1
+        for idx, s in enumerate(self._slices):
+            print("slice:", s)
+            if isinstance(s, slice):
+                if s.start is None:
+                    start = 0
+                else:
+                    start =  s.start
+                if s.stop is None:
+                    stop = self.shape[idx]
+                else:
+                    stop = s.stop
+                if s.step:
+                    step = s.step
+                else:
+                    step = 1
+                count = 1 + (stop - start - 1) // step
+            elif isinstance(s, list):
+                count = len(s)
+            else:
+                # scalar selection
+                count = 1
+            npoints *= count
+         
+        return npoints
 
-        # Now generate a vector of selection lists,
-        # consisting only of slices and ints
-
-        argvector = []
-        for idx in range(vectorlength):
-            entry = list(args)
-            for position, seq in sequenceargs.items():
-                entry[position] = seq[idx]
-            argvector.append(entry)
-
-        # "OR" all these selection lists together to make the final selection
-
-        #self._id.select_none()
-        self._hyperslabs = []
-        count = ()
-        for idx, vector in enumerate(argvector):
-            start, count, step, scalar = _handle_simple(self._shape, vector)
-            #print("select_hyperslab:", start, count, step)
-            #self._id.select_hyperslab(start, count, step, H5S_SELECT_OR)
-            self._hyperslabs.append( {"start": start, "count": count, "step": step} )
-
-        # Final shape excludes scalars, except where
-        # they correspond to sequence entries
-
-        mshape = list(count)
-        for idx in range(len(mshape)):
-            if idx in sequenceargs:
-                mshape[idx] = len(sequenceargs[idx])
-            elif scalar[idx]:
-                mshape[idx] = 0
-
-        self._mshape = tuple(x for x in mshape if x != 0)
+    def getQueryParam(self):
+        """ Get select param for use with HDF Rest API"""
+        query = []
+        query.append('[')
+        rank = len(self._slices)
+        for dim, s in enumerate(self._slices):
+            if isinstance(s, slice):
+                if s.start is None and s.stop is None:
+                    query.append(':')
+                elif s.stop is None:
+                    query.append(f"{s.start}:")
+                else:
+                    query.append(f"{s.start}:{s.stop}")
+                if s.step and s.step != 1:
+                    query.append(f":{s.step}")
+            elif isinstance(s, list):
+                query.append('[')
+                for idx, n in enumerate(s):
+                    query.append(str(n))
+                    if idx+1 < len(s):
+                        query.append(',')
+                query.append(']')
+            else:
+                # scalar selection
+                query.append(str(s))
+            if dim+1 < rank:
+                query.append(',')
+        query.append(']')
+        print("got queryparam:", "".join(query))
+        return "".join(query)
+            
+ 
+  
 
     def broadcast(self, target_shape):
-        if not target_shape == self._mshape:
-            raise TypeError("Broadcasting is not supported for complex selections")
-        yield self._id
+        raise TypeError("Broadcasting is not supported for complex selections")
 
 def _expand_ellipsis(args, rank):
     """ Expand ellipsis objects and fill in missing axes.
@@ -599,7 +647,7 @@ def _translate_int(exp, length):
         exp = length+exp
 
     if not 0<=exp<length:
-        raise ValueError("Index (%s) out of range (0-%s)" % (exp, length-1))
+        raise ValueError(f"Index ({exp}) out of range (0-{length-1})")
 
     return exp, 1, 1
 

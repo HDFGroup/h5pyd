@@ -61,36 +61,6 @@ def readtime_dtype(basetype, names):
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
 
 
-def setSliceQueryParam(params, dims, sel):
-    """
-    Helper method - set query parameter for given shape + selection
-
-        Query arg should be in the form: [<dim1>, <dim2>, ... , <dimn>]
-            brackets are optional for one dimensional arrays.
-            Each dimension, valid formats are:
-                single integer: n
-                start and end: n:m
-                start, end, and stride: n:m:s
-    """
-    # pass dimensions, and selection as query params
-    rank = len(dims)
-    start = list(sel.start)
-    count = list(sel.count)
-    step = list(sel.step)
-    if rank > 0:
-        sel_param="["
-        for i in range(rank):
-            sel_param += str(start[i])
-            sel_param += ':'
-            sel_param += str(start[i] + count[i])
-            if step[i] > 1:
-                sel_param += ':'
-                sel_param += str(step[i])
-            if i < rank - 1:
-                sel_param += ','
-        sel_param += ']'
-        params["select"] = sel_param
-
 
 def make_new_dset(parent, shape=None, dtype=None,
                   chunks=None, compression=None, shuffle=None,
@@ -746,6 +716,15 @@ class Dataset(HLObject):
         # Perfom the actual read
         rsp = None
         req = "/datasets/" + self.id.uuid + "/value"
+        params = {}
+            
+        if self.id._http_conn.mode == 'r' and self.id._http_conn.cache_on:
+            # enables lambda to be used on server
+            self.log.debug("setting nonstrict parameter")
+            params["nonstrict"] = 1
+        else:
+            self.log.debug("not settng nonstrict")
+
         if isinstance(selection, sel.SimpleSelection):
             # Divy up large selections into pages, so no one request
             # to the server will take unduly long to process
@@ -805,14 +784,6 @@ class Dataset(HLObject):
             self.log.debug("chunk size for split_dim: {}".format(chunk_size))
 
             arr = numpy.empty(mshape, dtype=mtype)
-            params = {}
-            
-            if self.id._http_conn.mode == 'r' and self.id._http_conn.cache_on:
-                # enables lambda to be used on server
-                self.log.debug("setting nonstrict parameter")
-                params["nonstrict"] = 1
-            else:
-                self.log.debug("not settng nonstrict")
 
             done = False
             while not done:
@@ -936,7 +907,41 @@ class Dataset(HLObject):
                     self.log.debug("{} rows left".format(rows_remaining))
 
         elif isinstance(selection, sel.FancySelection):
-            raise ValueError("selection type not supported")
+            params["select"] = selection.getQueryParam()
+            try:
+                rsp = self.GET(req, params=params, format="binary")
+            except IOError as ioe:
+                self.log.info(f"got IOError: {ioe.errno}")       
+                raise IOError(f"Error retrieving data: {ioe.errno}")
+            if type(rsp) is bytes:
+                # got binary response
+                self.log.info(f"binary response, {len(rsp)} bytes")
+                arr = bytesToArray(rsp, mtype, mshape)
+            elif "shm_name" in rsp:
+                # passed a shared memory object
+                if rsp["shm_name"] != self.id._http_conn.shm_buffer_name:
+                    # not the object we expected to get!
+                    raise IOError("Unexpected shared memory block returned")
+                num_bytes = rsp["num_bytes"]
+                        
+                # shared memory block is generally allocated on page
+                # boundries, so copy just the bytes we need for the array
+                des = bytearray(num_bytes)
+                src = self.id._http_conn.get_shm_buffer()
+                des[:] = src[:num_bytes]
+                arr = bytesToArray(des, mtype, mshape)
+            else:
+                # got JSON response
+                # need some special conversion for compound types --
+                # each element must be a tuple, but the JSON decoder
+                # gives us a list instead.
+                self.log.info("json response")
+
+                data = rsp['value']
+                # self.log.debug(data)
+
+                arr = jsonToArray(mshape, mtype, data)
+                self.log.debug(f"jsontoArray returned: {arr}")
         elif isinstance(selection, sel.PointSelection):
             format = "json" # default as JSON request since h5serv does not yet support binary
             body= { }
@@ -1237,18 +1242,11 @@ class Dataset(HLObject):
             body['value'] = val
 
         if selection.select_type != sel.H5S_SELECT_ALL:
-            if format == "binary":
-                # set selection using query parameters
-                setSliceQueryParam(params, self._shape, selection)
-            else:
-                # set selection as body keys
-                body['start'] = list(selection.start)
-                stop = list(selection.start)
-                for i in range(len(stop)):
-                    stop[i] += selection.count[i]
-                body['stop'] = stop
-                if selection.step:
-                    body['step'] = list(selection.step)
+            print("sel type:", type(selection))
+            select_param = selection.getQueryParam()
+            self.log.debug(f"got select query param: {select_param}")
+            params["select"] = select_param
+             
 
         self.PUT(req, body=body, format=format, params=params)
         """
