@@ -469,7 +469,6 @@ class FancySelection(Selection):
             args = (args,)
 
         args = _expand_ellipsis(args, len(self._shape))
-        print(f"fancyselection getitem - args: {args}")
         select_type = H5S_SELECT_HYPERSLABS  # will adjust if we have a coord
 
         # Create list of slices and/or coordinates
