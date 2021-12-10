@@ -1242,7 +1242,6 @@ class Dataset(HLObject):
             body['value'] = val
 
         if selection.select_type != sel.H5S_SELECT_ALL:
-            print("sel type:", type(selection))
             select_param = selection.getQueryParam()
             self.log.debug(f"got select query param: {select_param}")
             params["select"] = select_param

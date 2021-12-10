@@ -30,7 +30,7 @@ H5S_SELECT_NONE = 5
 H5S_SELECT_ALL = 6
 H5S_SELECT_HYPERSLABS = 7
 H5S_SELECT_NOTB = 8
-H5S_SELLECT_COORD = 9
+H5S_SELLECT_FANCY = 9
 
 
 def select(obj, args):
@@ -329,8 +329,6 @@ class SimpleSelection(Selection):
         if not isinstance(args, tuple):
             args = (args,)
 
-        #print "__getitem__", args
-
         if self._shape == ():
             if len(args) > 0 and args[0] not in (Ellipsis, ()):
                 raise TypeError("Invalid index for scalar dataset (only ..., () allowed)")
@@ -453,6 +451,11 @@ class FancySelection(Selection):
     def slices(self):
         return self._slices
 
+    @property
+    def mshape(self):
+        """ Shape of current selection """
+        return self._mshape
+
 
     def __init__(self, shape, *args, **kwds):
         Selection.__init__(self, shape, *args, **kwds)
@@ -471,11 +474,13 @@ class FancySelection(Selection):
 
         # Create list of slices and/or coordinates
         slices = []
+        mshape = []
         for idx, arg in enumerate(args):
             length = self._shape[idx]
             if isinstance(arg, slice):
-                _translate_slice(arg, length)  # raise exception for invalid slice
+                _, count, _ = _translate_slice(arg, length)  # raise exception for invalid slice
                 slices.append(arg)
+                mshape.append(count)
                 
             elif hasattr(arg, 'dtype') and arg.dtype == np.dtype('bool'):
                 if len(arg.shape) != 1:
@@ -488,7 +493,8 @@ class FancySelection(Selection):
                 else:
                     if sorted(arg) != list(arg):
                         raise TypeError("Indexing elements must be in increasing order")
-                select_type = H5S_SELLECT_COORD
+                mshape.append(len(arg))
+                select_type = H5S_SELLECT_FANCY
             elif isinstance(arg, list):
                 # coordinate selection
                 prev = None
@@ -502,7 +508,8 @@ class FancySelection(Selection):
                         raise TypeError("Indexing elements must be in increasing order")
                     prev = x
                 slices.append(arg)
-                select_type = H5S_SELLECT_COORD
+                mshape.append(len(arg))
+                select_type = H5S_SELLECT_FANCY
 
             elif isinstance(arg, int):
                 if arg < 0 or arg >= length:
@@ -513,28 +520,16 @@ class FancySelection(Selection):
                 raise TypeError(f"Unexpected arg type: {arg}")
         self._slices = slices
         self._select_type = select_type
+        self._mshape = tuple(mshape)
 
     def getSelectNpoints(self):
         """Return number of elements in current selection
         """
-        print("FancySelection.getSelectNPoints")
         npoints = 1
         for idx, s in enumerate(self._slices):
-            print("slice:", s)
             if isinstance(s, slice):
-                if s.start is None:
-                    start = 0
-                else:
-                    start =  s.start
-                if s.stop is None:
-                    stop = self.shape[idx]
-                else:
-                    stop = s.stop
-                if s.step:
-                    step = s.step
-                else:
-                    step = 1
-                count = 1 + (stop - start - 1) // step
+                length = self._shape[idx]
+                _, count, _ = _translate_slice(s, length)
             elif isinstance(s, list):
                 count = len(s)
             else:
@@ -572,7 +567,6 @@ class FancySelection(Selection):
             if dim+1 < rank:
                 query.append(',')
         query.append(']')
-        print("got queryparam:", "".join(query))
         return "".join(query)
             
  
