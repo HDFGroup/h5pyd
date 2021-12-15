@@ -60,3 +60,9 @@ target/
 
 #Ipython Notebook
 .ipynb_checkpoints
+
+# VSCode stuff
+.vscode
+
+# macOS stuff
+.DS_Store

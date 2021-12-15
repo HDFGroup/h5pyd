@@ -35,16 +35,19 @@ class TestFancySelectDataset(TestCase):
         dset2d = f.create_dataset('dset2d', (10,10), dtype='i4')
         vals = np.zeros((10,10), dtype='i4')
         for i in range(10):
-            vals[i,i] = 1
+            for j in range(10):
+                vals[i,j] = i*10+j
         dset2d[...] = vals
 
-        rows = dset2d[ 5:7, : ]
-        self.assertEqual(len(rows), 2)
-        row1 = rows[0]
-        row2 = rows[1]
-        self.assertEqual(row1[5], 1)
-        self.assertEqual(row2[6], 1)
+        coords = [2,5,6,9]
 
+        arr = dset2d[ 5:7, coords ]
+        self.assertEqual(arr.shape, (2,4))
+        for i in range(2):
+            row = arr[i]
+            for j in range(4):
+                self.assertEqual(row[j], (i+5)*10+coords[j])
+        
         f.close()
 
 
