@@ -12,6 +12,11 @@
 
 from __future__ import absolute_import
 
+try:
+    from functools import cached_property
+except ImportError:
+    from cached_property import cached_property
+
 import posixpath as pp
 from copy import copy
 import sys
@@ -203,8 +208,6 @@ def make_new_dset(parent, shape=None, dtype=None,
 
     return dset_id
 
-
-
 class AstypeContext(object):
     def __init__(self, dset, dtype):
         self._dset = dset
@@ -241,7 +244,10 @@ class Dataset(HLObject):
     @property
     def ndim(self):
         """Numpy-style attribute giving the number of dimensions"""
-        return len(self._shape)
+        if self._shape is None:
+            return 0
+        else:
+            return len(self._shape)
 
     @property
     def shape(self):
@@ -279,8 +285,16 @@ class Dataset(HLObject):
     def size(self):
         """Numpy-style attribute giving the total dataset size"""
         if self._shape is None:
-            return 0
+            return None
         return numpy.prod(self._shape).item()
+
+    @property
+    def nbytes(self):
+        """Numpy-style attribute giving the raw dataset size as the number of bytes"""
+        size = self.size
+        if size is None:  # if we are an empty 0-D array, then there are no bytes in the dataset
+            return 0
+        return self.dtype.itemsize * size
 
     @property
     def dtype(self):
@@ -422,6 +436,11 @@ class Dataset(HLObject):
             arr[()] = fill_value
 
         return arr[()]
+
+    @cached_property
+    def _is_empty(self):
+        """ check if this is a null-space datset """
+        return self._shape is None
 
     @property
     def num_chunks(self):
@@ -645,10 +664,11 @@ class Dataset(HLObject):
         """
 
         # === Check for zero-sized datasets =====
-        if self._shape is None or numpy.product(self._shape) == 0:
+        if self._is_empty:
             # These are the only access methods NumPy allows for such objects
-            if len(args) == 0 or len(args) == 1 and isinstance(args[0], tuple) and args[0] == Ellipsis:
-                return numpy.empty(self._shape, dtype=new_dtype)
+            if len(args) == 0 or (len(args) == 1 and args[0] == Ellipsis):
+                return Empty(self.dtype)
+            raise ValueError("Empty datasets cannot be sliced")
 
         # === Scalar dataspaces =================
 
@@ -907,6 +927,7 @@ class Dataset(HLObject):
                     self.log.debug("{} rows left".format(rows_remaining))
 
         elif isinstance(selection, sel.FancySelection):
+
             params["select"] = selection.getQueryParam()
             try:
                 rsp = self.GET(req, params=params, format="binary")
@@ -965,7 +986,7 @@ class Dataset(HLObject):
                             raise ValueError("invalid point argument")
                         for i in range(rank):
                             if point[i]<0 or point[i]>=self._shape[i]:
-                                raise ValueError("point out of range")
+                                raise IndexError("point out of range")
                         if rank == 1:
                             delistify = True
                             if point[0] <= last_point:
@@ -974,7 +995,7 @@ class Dataset(HLObject):
 
                     elif rank == 1 and isinstance(point, int):
                         if point < 0 or point>self._shape[0]:
-                            raise ValueError("point out of range")
+                            raise IndexError("point out of range")
                         if point <= last_point:
                             raise TypeError("index points must be strictly increasing")
                         last_point = point

@@ -61,11 +61,8 @@ def select(obj, args):
     Indices, slices, ellipses, lists or boolean index arrays
         Returns a FancySelection instance.
     """
-
     if not isinstance(args, tuple):
         args = (args,)
-
-    # TBD - handle NULL Space object
 
     if obj.shape == ():
         # scalar object
@@ -76,7 +73,7 @@ def select(obj, args):
     #print("select, len(args):", len(args))
     # "Special" indexing objects
     if len(args) == 1:
-
+        
         arg = args[0]
 
         if isinstance(arg, Selection):
@@ -99,19 +96,23 @@ def select(obj, args):
         """
 
     for a in args:
-        if not isinstance(a, slice) and a is not Ellipsis:
+        use_fancy = False
+        if isinstance(a, np.ndarray):
+            use_fancy = True
+        if a is []:
+            use_fancy = True
+        elif not isinstance(a, slice) and a is not Ellipsis:
             try:
                 int(a)
             except Exception:
-                sel = FancySelection(obj.shape)
-                sel[args]
-                return sel
-
+                use_fancy = True
+        if use_fancy:
+            sel = FancySelection(obj.shape)
+            sel[args]
+            return sel
     sel = SimpleSelection(obj.shape)
     sel[args]
     return sel
-
-
 
 
 class Selection(object):
@@ -463,7 +464,6 @@ class FancySelection(Selection):
         self._slices = []
 
     def __getitem__(self, args):
-        #print("args:", args)
 
         if not isinstance(args, tuple):
             args = (args,)
@@ -494,32 +494,33 @@ class FancySelection(Selection):
                         raise TypeError("Indexing elements must be in increasing order")
                 mshape.append(len(arg))
                 select_type = H5S_SELLECT_FANCY
-            elif isinstance(arg, list):
+            elif isinstance(arg, list) or hasattr(arg, 'dtype'):
                 # coordinate selection
                 prev = None
                 for x in arg:
-                    if not isinstance(x, int):
-                        raise TypeError(f'Illegal coordinate index "{arg}" must be a list of integers')
+                    #if not isinstance(x, int):
+                    #    raise TypeError(f'Illegal coordinate index "{arg}" must be a list of integers')
                
                     if x < 0 or x >= length:
-                        raise ValueError(f"Index ({arg}) out of range (0-{length-1})")
+                        raise IndexError(f"Index ({arg}) out of range (0-{length-1})")
                     if prev is not None and x <= prev:
                         raise TypeError("Indexing elements must be in increasing order")
                     prev = x
                 slices.append(arg)
                 mshape.append(len(arg))
                 select_type = H5S_SELLECT_FANCY
-
             elif isinstance(arg, int):
                 if arg < 0 or arg >= length:
-                    raise ValueError(f"Index ({arg}) out of range (0-{length-1})")
+                    raise IndexError(f"Index ({arg}) out of range (0-{length-1})")
                 slices.append(arg)
+            elif isinstance(arg, type(Ellipsis)):
+                slices.append(slice(0,length,1))
             else:
-                # TBD - support ellipsis?
-                raise TypeError(f"Unexpected arg type: {arg}")
+                raise TypeError(f"Unexpected arg type: {arg} - {type(arg)}")
         self._slices = slices
         self._select_type = select_type
         self._mshape = tuple(mshape)
+
 
     def getSelectNpoints(self):
         """Return number of elements in current selection
@@ -553,7 +554,7 @@ class FancySelection(Selection):
                     query.append(f"{s.start}:{s.stop}")
                 if s.step and s.step != 1:
                     query.append(f":{s.step}")
-            elif isinstance(s, list):
+            elif isinstance(s, list) or hasattr(s, 'dtype'):
                 query.append('[')
                 for idx, n in enumerate(s):
                     query.append(str(n))
@@ -640,7 +641,7 @@ def _translate_int(exp, length):
         exp = length+exp
 
     if not 0<=exp<length:
-        raise ValueError(f"Index ({exp}) out of range (0-{length-1})")
+        raise IndexError(f"Index ({exp}) out of range (0-{length-1})")
 
     return exp, 1, 1
 
@@ -657,7 +658,7 @@ def _translate_slice(exp, length):
     if step < 1:
         raise ValueError("Step must be >= 1 (got %d)" % step)
     if stop < start:
-        raise ValueError("Reverse-order selections are not allowed")
+        stop = start
 
     count = 1 + (stop - start - 1) // step
 

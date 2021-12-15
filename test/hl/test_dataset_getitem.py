@@ -10,6 +10,7 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 from __future__ import absolute_import
+import sys
 import logging
 import numpy as np
 import config
@@ -65,71 +66,64 @@ class TestEmpty(TestCase):
         TestCase.setUp(self)
         filename = self.getFileName("dataset_testempty")
         print("filename:", filename)
-        """
         self.f = h5py.File(filename, 'w')
-        sid = h5py.h5s.create(h5py.h5s.NULL)
-        tid = h5py.h5t.C_S1.copy()
-        tid.set_size(10)
-        dsid = h5py.h5d.create(self.f.id, b'x', tid, sid)
-        self.dset = h5py.Dataset(dsid)
-        """
+        self.dset = self.f.create_dataset('x',dtype='S10')
+        self.empty_obj = h5py.Empty(np.dtype("S10"))
+        
+    def test_ndim(self):
+        """ Verify number of dimensions """
+        self.assertEqual(self.dset.ndim, 0)
+
+    def test_shape(self):
+        """ Verify shape """
+        self.assertEqual(self.dset.shape, None)
+
+    def test_size(self):
+        """ Verify shape """
+        self.assertEqual(self.dset.size, None)
+
+    def test_nbytes(self):
+        """ Verify nbytes """
+        self.assertEqual(self.dset.nbytes, 0)
 
     def test_ellipsis(self):
-        """ Ellipsis -> IOError """
-        pass
-        """
-        with self.assertRaises(IOError):
-            out = self.dset[...]
-        """
+        self.assertEqual(self.dset[...], self.empty_obj)
 
     def test_tuple(self):
-        """ () -> IOError """
-        pass
-        """
-        with self.assertRaises(IOError):
-            out = self.dset[()]
-        """
+        self.assertEqual(self.dset[()], self.empty_obj)
 
     def test_slice(self):
         """ slice -> ValueError """
-        pass
-        """
         with self.assertRaises(ValueError):
             self.dset[0:4]
-        """
+
+    def test_multi_block_slice(self):
+        """ MultiBlockSlice -> ValueError """
+        """ TBD """
+        #with self.assertRaises(ValueError):
+        #    self.dset[h5py.MultiBlockSlice()]
 
     def test_index(self):
         """ index -> ValueError """
-        pass
-        """
         with self.assertRaises(ValueError):
             self.dset[0]
-        """
 
     def test_indexlist(self):
         """ index list -> ValueError """
-        pass
-        """
         with self.assertRaises(ValueError):
             self.dset[[1,2,5]]
-        """
 
     def test_mask(self):
         """ mask -> ValueError """
-        pass
-        """
         mask = np.array(True, dtype='bool')
         with self.assertRaises(ValueError):
             self.dset[mask]
-        """
 
     def test_fieldnames(self):
         """ field name -> ValueError """
-        pass
-        """
         with self.assertRaises(ValueError):
             self.dset['field']
-        """
+      
 
 class TestScalarFloat(TestCase):
 
@@ -145,6 +139,22 @@ class TestScalarFloat(TestCase):
             self.is_hsds = False
         self.data = np.array(42.5, dtype='f')
         self.dset = self.f.create_dataset('x', data=self.data)
+
+    def test_ndim(self):
+        """ Verify number of dimensions """
+        self.assertEqual(self.dset.ndim, 0)
+
+    def test_size(self):
+        """ Verify size """
+        self.assertEqual(self.dset.size, 1)
+
+    def test_nbytes(self):
+        """ Verify nbytes """
+        self.assertEqual(self.dset.nbytes, self.data.dtype.itemsize)  # not sure if 'f' is always alias for 'f4'
+
+    def test_shape(self):
+        """ Verify shape """
+        self.assertEqual(self.dset.shape, tuple())
 
     def test_ellipsis(self):
         """ Ellipsis -> scalar ndarray """
@@ -205,6 +215,22 @@ class TestScalarCompound(TestCase):
         #self.dset = self.f.create_dataset('x', data=self.data)
         self.dset = self.f.create_dataset('x', (), dtype=[('a', 'f'), ('b', 'i'), ('c', '|S10')])
         self.dset[...] =  (42.5, -118, "Hello")
+
+    def test_ndim(self):
+        """ Verify number of dimensions """
+        self.assertEqual(self.dset.ndim, 0)
+
+    def test_shape(self):
+        """ Verify shape """
+        self.assertEqual(self.dset.shape, tuple())
+
+    def test_size(self):
+        """ Verify size """
+        self.assertEqual(self.dset.size, 1)
+
+    def test_nbytes(self):
+        """ Verify nbytes """
+        self.assertEqual(self.dset.nbytes, self.data.dtype.itemsize)
 
     def test_ellipsis(self):
         """ Ellipsis -> scalar ndarray """
@@ -277,7 +303,7 @@ class TestScalarArray(TestCase):
         try:
             self.dset[...] = self.data
         except (IOError, OSError) as oe:
-            #TBD" this is failing on HSDS
+            #TBD this is failing on HSDS
             if not self.is_hsds:
                 raise oe
 
@@ -330,10 +356,15 @@ class Test1DZeroFloat(TestCase):
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
         self.data = np.ones((0,), dtype='f')
-        # TBD data in initializer not working
-        #self.dset = self.f.create_dataset('x', data=self.data)
-        self.dset = self.f.create_dataset('x', (0,), maxshape=(None,),  dtype='f')
-        self.dset[...] = self.data
+        self.dset = self.f.create_dataset('x', data=self.data)
+
+    def test_ndim(self):
+        """ Verify number of dimensions """
+        self.assertEqual(self.dset.ndim, 1)
+
+    def test_shape(self):
+        """ Verify shape """
+        self.assertEqual(self.dset.shape, (0,))
 
     def test_ellipsis(self):
         """ Ellipsis -> ndarray of matching shape """
@@ -347,24 +378,27 @@ class Test1DZeroFloat(TestCase):
         """ slice -> ndarray of shape (0,) """
         self.assertNumpyBehavior(self.dset, self.data, np.s_[0:4])
 
-    # FIXME: NumPy raises IndexError
+    def test_slice_stop_less_than_start(self):
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[7:5])
+
     def test_index(self):
         """ index -> out of range """
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IndexError):
             self.dset[0]
 
-    # FIXME: Under NumPy this works and returns a shape-(0,) array
-    # Also, at the moment it rasies UnboundLocalError (!)
-    @ut.expectedFailure
     def test_indexlist(self):
         """ index list """
-        with self.assertRaises(ValueError):
-            self.dset[[]]
+        self.assertNumpyBehavior(
+            self.dset,
+            self.data,
+            np.s_[[]]
+        )
 
     def test_mask(self):
         """ mask -> ndarray of matching shape """
         mask = np.ones((0,), dtype='bool')
-        self.assertNumpyBehavior(self.dset, self.data, np.s_[mask])
+        self.assertNumpyBehavior(
+            self.dset, self.data, np.s_[mask])
 
     def test_fieldnames(self):
         """ field name -> ValueError (no fields) """
@@ -383,6 +417,14 @@ class Test1DFloat(TestCase):
         self.dset = self.f.create_dataset('x', data=self.data)
         self.dset[...] = self.data
 
+    def test_ndim(self):
+        """ Verify number of dimensions """
+        self.assertEqual(self.dset.ndim, 1)
+
+    def test_shape(self):
+        """ Verify shape """
+        self.assertEqual(self.dset.shape, (13,))
+
     def test_ellipsis(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[...])
 
@@ -400,6 +442,9 @@ class Test1DFloat(TestCase):
 
     def test_slice_negindexes(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[-8:-2:3])
+
+    def test_slice_stop_less_than_start(self):
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[7:5])
 
     def test_slice_outofrange(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[100:400:3])
@@ -425,7 +470,7 @@ class Test1DFloat(TestCase):
 
     # FIXME: NumPy raises IndexError
     # Also this currently raises UnboundLocalError. :(
-    @ut.expectedFailure
+    #@ut.expectedFailure
     def test_index_illegal(self):
         """ Illegal slicing argument """
         with self.assertRaises(TypeError):
@@ -433,23 +478,26 @@ class Test1DFloat(TestCase):
 
     # FIXME: NumPy raises IndexError
     def test_index_outofrange(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IndexError):
             self.dset[100]
 
     def test_indexlist_simple(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[[1,2,5]])
 
-    # Another UnboundLocalError
-    #@ut.expectedFailure
-    # Fails for h5py, but works for h5pyd
+    def test_indexlist_single_index_ellipsis(self):
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[[0], ...])
+
+    def test_indexlist_numpyarray_single_index_ellipsis(self):
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[np.array([0]), ...])
+
+    def test_indexlist_numpyarray_ellipsis(self):
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[np.array([1, 2, 5]), ...])
+
     def test_indexlist_empty(self):
-        if not config.get('use_h5py'):
-            self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
 
-
-    # FIXME: NumPy has IndexError
     def test_indexlist_outofrange(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IndexError):
             self.dset[[100]]
 
     def test_indexlist_nonmonotonic(self):
@@ -492,35 +540,55 @@ class Test2DZeroFloat(TestCase):
         filename = self.getFileName("dataset_test2dzerofloat")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        if isinstance(self.f.id.id, str):
-            # flag if using server
-            self.is_hsds = True
-        else:
-            self.is_hsds = False
         self.data = np.ones((0,3), dtype='f')
         self.dset = self.f.create_dataset('x', data=self.data)
 
+    def test_ndim(self):
+        """ Verify number of dimensions """
+        self.assertEqual(self.dset.ndim, 2)
+
+    def test_shape(self):
+        """ Verify shape """
+        self.assertEqual(self.dset.shape, (0, 3))
+
     def test_indexlist(self):
-        """ see issue #473 """
-        if not self.is_hsds:
-            # TBD fix for hsds
-            self.assertNumpyBehavior(self.dset, self.data, np.s_[:,[0,1,2]])
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[:,[0,1,2]])
 
 class Test2DFloat(TestCase):
 
     def setUp(self):
         TestCase.setUp(self)
-        filename = self.getFileName("dataset_test2dzerofloat")
+        filename = self.getFileName("dataset_test2dfloat")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        self.data = np.ones((6,8), dtype='f')
+        self.data = np.ones((5,3), dtype='f')
         self.dset = self.f.create_dataset('x', data=self.data)
+         
+    def test_ndim(self):
+        """ Verify number of dimensions """
+        self.assertEqual(self.dset.ndim, 2)
 
-    def test_index_simple(self):
-        self.assertNumpyBehavior(self.dset, self.data, np.s_[2:4,3:6])
+    def test_size(self):
+        """ Verify size """
+        self.assertEqual(self.dset.size, 15)
 
-    def test_squeeze(self):
-        self.assertNumpyBehavior(self.dset, self.data, np.s_[:,:1])
+    def test_nbytes(self):
+        """ Verify nbytes """
+        self.assertEqual(self.dset.nbytes, 15*self.data.dtype.itemsize) 
+
+    def test_shape(self):
+        """ Verify shape """
+        self.assertEqual(self.dset.shape, (5, 3))
+
+    def test_indexlist(self):
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[:,[0,1,2]])
+
+    @ut.expectedFailure
+    def test_index_emptylist(self):
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[:, []])
+        # test with single empty list failing - but results seems compat
+        # with h5py 3.2.1 at least
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
 
 class Test3DFloat(TestCase):
 
@@ -534,6 +602,19 @@ class Test3DFloat(TestCase):
 
     def test_index_simple(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[1,2:4,3:6])
+
+class TestVeryLargeArray(TestCase):
+
+    def setUp(self):
+        TestCase.setUp(self)
+        filename = self.getFileName("dataset_testverylargearray")
+        print("filename:", filename)
+        self.f = h5py.File(filename, 'w')
+        self.dset = self.f.create_dataset('x', shape=(2**15, 2**16))
+
+    @ut.skipIf(sys.maxsize < 2**31, 'Maximum integer size >= 2**31 required')
+    def test_size(self):
+        self.assertEqual(self.dset.size, 2**31)
 
 
 if __name__ == '__main__':

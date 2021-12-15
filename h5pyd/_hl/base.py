@@ -889,7 +889,7 @@ class HLObject(CommonStateObject):
         
         rsp = self.id._http_conn.GET(req, params=params, headers=headers, format=format, use_cache=use_cache)
         if rsp.status_code != 200:
-            self.log.info("Got response: {}".format(rsp.status_code))
+            self.log.info(f"Got response: {rsp.status_code}")
             raise IOError(rsp.status_code, rsp.reason)
         if 'Content-Type' in rsp.headers and rsp.headers['Content-Type'] == "application/octet-stream":
             if 'Content-Length' in rsp.headers:
