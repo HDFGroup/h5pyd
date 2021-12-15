@@ -12,11 +12,6 @@
 
 from __future__ import absolute_import
 
-try:
-    from functools import cached_property
-except ImportError:
-    from cached_property import cached_property
-
 import posixpath as pp
 from copy import copy
 import sys
@@ -437,7 +432,6 @@ class Dataset(HLObject):
 
         return arr[()]
 
-    @cached_property
     def _is_empty(self):
         """ check if this is a null-space datset """
         return self._shape is None

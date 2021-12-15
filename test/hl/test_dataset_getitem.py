@@ -69,7 +69,7 @@ class TestEmpty(TestCase):
         self.f = h5py.File(filename, 'w')
         self.dset = self.f.create_dataset('x',dtype='S10')
         self.empty_obj = h5py.Empty(np.dtype("S10"))
-        
+
     def test_ndim(self):
         """ Verify number of dimensions """
         self.assertEqual(self.dset.ndim, 0)
@@ -468,15 +468,11 @@ class Test1DFloat(TestCase):
         with self.assertRaises(TypeError):
             self.dset[None]
 
-    # FIXME: NumPy raises IndexError
-    # Also this currently raises UnboundLocalError. :(
-    #@ut.expectedFailure
     def test_index_illegal(self):
         """ Illegal slicing argument """
         with self.assertRaises(TypeError):
             self.dset[{}]
 
-    # FIXME: NumPy raises IndexError
     def test_index_outofrange(self):
         with self.assertRaises(IndexError):
             self.dset[100]
@@ -505,9 +501,6 @@ class Test1DFloat(TestCase):
         with self.assertRaises(TypeError):
             self.dset[[1,3,2]]
 
-    # This results in IOError as the argument is not properly validated.
-    # Suggest IndexError be raised.
-    #@ut.expectedFailure  # works for h5pyd
     def test_indexlist_repeated(self):
         """ we forbid repeated index values """
         with self.assertRaises(TypeError):
