@@ -215,6 +215,85 @@ class AstypeContext(object):
         self._dset._local.astype = None
 
 
+class ChunkIterator(object):
+    """
+    Class to iterate through list of chunks of a given dataset
+    """
+    def __init__(self, dset, source_sel=None):
+        self._shape = dset.shape
+        rank = len(dset.shape)
+
+        if not dset.chunks:
+            # can only use with chunked datasets
+            # (currently all datasets are chunked, but check for future compat)
+            raise TypeError("Chunked dataset required")
+
+        if isinstance(dset.chunks, dict):
+            self._layout = dset.chunks["dims"]
+        else:
+            self._layout = dset.chunks
+
+        if source_sel is None:
+            # select over entire dataset
+            slices = []
+            for dim in range(rank):
+                slices.append(slice(0, self._shape[dim]))
+            self._sel = tuple(slices)
+        else:
+            if isinstance(source_sel, slice):
+                self._sel = (source_sel,)
+            else:
+                self._sel = source_sel
+        if len(self._sel) != rank:
+            raise ValueError("Invalid selection - selection region must have same rank as dataset")
+        self._chunk_index = []
+        for dim in range(rank):
+            s = self._sel[dim]
+            if s.start < 0 or s.stop > self._shape[dim] or s.stop <= s.start:
+                raise ValueError("Invalid selection - selection region must be within dataset space")
+            index = s.start // self._layout[dim]
+            self._chunk_index.append(index)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        rank = len(self._shape)
+        slices = []
+        if rank == 0 or self._chunk_index[0] * self._layout[0] >= self._sel[0].stop:
+            # ran past the last chunk, end iteration
+            raise StopIteration()
+
+        for dim in range(rank):
+            s = self._sel[dim]
+            start = self._chunk_index[dim] * self._layout[dim]
+            stop = (self._chunk_index[dim] + 1) * self._layout[dim]
+            # adjust the start if this is an edge chunk
+            if start < s.start:
+                start = s.start
+            if stop > s.stop:
+                stop = s.stop  # trim to end of the selection
+            s = slice(start, stop, 1)
+            slices.append(s)
+
+        # bump up the last index and carry forward if we run outside the selection
+        dim = rank - 1
+        while dim >= 0:
+            s = self._sel[dim]
+            self._chunk_index[dim] += 1
+
+            chunk_end = self._chunk_index[dim] * self._layout[dim]
+            if chunk_end < s.stop:
+                # we still have room to extend along this dimensions
+                return tuple(slices)
+
+            if dim > 0:
+                # reset to the start and continue iterating with higher dimension
+                self._chunk_index[dim] = 0
+            dim -= 1
+        return tuple(slices)
+
+
 class Dataset(HLObject):
 
     """
@@ -432,6 +511,11 @@ class Dataset(HLObject):
 
         return arr[()]
 
+    def _is_empty(self):
+        """ check if this is a null-space datset """
+        return self._shape is None
+
+    @property
     def _is_empty(self):
         """ check if this is a null-space datset """
         return self._shape is None
