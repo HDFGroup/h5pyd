@@ -511,6 +511,7 @@ class Dataset(HLObject):
 
         return arr[()]
 
+    @property
     def _is_empty(self):
         """ check if this is a null-space datset """
         return self._shape is None
