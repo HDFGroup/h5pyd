@@ -20,7 +20,7 @@ from .base import HLObject, MutableMappingHDF5, guess_dtype, Empty
 from .objectid import TypeID, GroupID, DatasetID
 from .h5type import special_dtype
 from . import dataset
-from .dataset import Dataset
+from .dataset import Dataset, make_new_dset
 from . import table
 from .table import Table
 from .datatype import Datatype
@@ -172,6 +172,9 @@ class Group(HLObject, MutableMappingHDF5):
         exists.
         """
 
+        if isinstance(h5path, bytes):
+            h5path = h5path.decode('utf-8')
+
         #if self.__contains__(name):
         #    raise ValueError("Unable to create link (Name alredy exists)")
         if h5path[-1] == '/':
@@ -302,8 +305,29 @@ class Group(HLObject, MutableMappingHDF5):
         if self.id.http_conn.mode == 'r':
             raise ValueError("Unable to create dataset (No write intent on file)")
 
+        if isinstance(name, bytes):
+            # convert byte input to string
+            name = name.decode("utf-8")
+
+        group = self
+        if name:
+            if '/' in name.lstrip('/'):
+                parent_path, name = name.rsplit('/', 1)
+                group = self.require_group(parent_path)
+
+        dset = dataset.make_new_dset(group, shape, dtype, data, name, **kwds)
+        # dset = dataset.Dataset(dsid)
+        return dset
+
+        if isinstance(shape, int):
+            # convert to a one-element list
+            shape = (shape,)
+
         # Convert data to a C-contiguous ndarray
-        if data is not None:
+        if data is None:
+            if shape is None:
+                raise TypeError("One of data, shape or dtype must be specified")
+        else:
             if isinstance(data, Empty):
                 if dtype is None:
                     dtype = data.dtype
@@ -313,7 +337,7 @@ class Group(HLObject, MutableMappingHDF5):
                 if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
                     data = numpy.asarray(data, order="C", dtype=dtype)
                     dtype = data.dtype
-                self.log.info("data dtype: {}".format(data.dtype))
+                self.log.info(f"data dtype: {data.dtype}")
 
         # Validate shape
         if isinstance(data, Empty):

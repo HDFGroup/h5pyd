@@ -14,7 +14,6 @@ from __future__ import absolute_import
 
 import posixpath
 import os
-import six
 import json
 import numpy as np
 import logging
@@ -23,7 +22,7 @@ from collections.abc import (
     Mapping, MutableMapping, KeysView, ValuesView, ItemsView
 )
 from .objectid import GroupID
-from .h5type import Reference, check_dtype
+from .h5type import Reference, check_dtype, special_dtype
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
 numpy_float_types = (np.float16, np.float32, np.float64)
@@ -59,6 +58,36 @@ def with_phil(func):
     functools.update_wrapper(wrapper, func, ('__name__', '__doc__'))
     return wrapper
 
+def find_item_type(data):
+    """Find the item type of a simple object or collection of objects.
+
+    E.g. [[['a']]] -> str
+
+    The focus is on collections where all items have the same type; we'll return
+    None if that's not the case.
+
+    The aim is to treat numpy arrays of Python objects like normal Python
+    collections, while treating arrays with specific dtypes differently.
+    We're also only interested in array-like collections - lists and tuples,
+    possibly nested - not things like sets or dicts.
+    """
+    if isinstance(data, np.ndarray):
+        if (
+            data.dtype.kind == 'O'
+            and not check_dtype(vlen=data.dtype)
+        ):
+            item_types = {type(e) for e in data.flat}
+        else:
+            return None
+    elif isinstance(data, (list, tuple)):
+        item_types = {find_item_type(e) for e in data}
+    else:
+        return type(data)
+
+    if len(item_types) != 1:
+        return None
+    return item_types.pop()
+
 
 def guess_dtype(data):
     """ Attempt to guess an appropriate dtype for the object, returning None
@@ -66,9 +95,13 @@ def guess_dtype(data):
     constructor to figure out)
     """
 
-    # todo - handle RegionReference, Reference, vlen dtypes
-    if isinstance(data, np.ndarray):
-        return data.dtype
+    # todo - handle RegionReference, Reference
+    item_type = find_item_type(data)
+    if item_type is bytes:
+        return special_dtype(vlen=bytes)
+    if item_type is str:
+        return special_dtype(vlen=str)
+
     return None
 
 
@@ -149,9 +182,7 @@ def copyToArray(arr, rank, index, data, vlen_base=None):
             copyToArray(arr, rank+1, index, data[i], vlen_base=vlen_base)
         else:
             if vlen_base:
-                if six.PY2 and vlen_base == unicode:
-                    e = unicode(data[i])
-                elif vlen_base == str:
+                if vlen_base == str:
                     e = str(data[i])
                 else:
                     e = np.array(data[i], dtype=vlen_base)

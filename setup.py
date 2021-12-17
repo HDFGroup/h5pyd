@@ -31,7 +31,6 @@ setup(name='h5pyd',
       packages=['h5pyd', 'h5pyd._hl', 'h5pyd._apps'],
       install_requires=[
           'numpy >= 1.17.3',
-          'six >= 1.13.0',
           'requests_unixsocket',
           'pytz',
           'pyjwt',
