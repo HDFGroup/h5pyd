@@ -19,7 +19,8 @@ import time
 import base64
 import numpy
 
-from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes, getNumElements, Empty
+from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes
+from .base import getNumElements, Empty, guess_dtype
 from .h5type import Reference, RegionReference
 from .base import  _decode
 from .objectid import DatasetID
@@ -62,7 +63,7 @@ def readtime_dtype(basetype, names):
 
 
 
-def make_new_dset(parent, shape=None, dtype=None,
+def make_new_dset(parent, shape=None, dtype=None, data=None,
                   chunks=None, compression=None, shuffle=None,
                   fletcher32=None, maxshape=None, compression_opts=None,
                   fillvalue=None, scaleoffset=None, track_times=None):
@@ -71,36 +72,98 @@ def make_new_dset(parent, shape=None, dtype=None,
     Only creates anonymous datasets.
     """
 
+
     # fill in fields for the body of the POST request as we got
     body = {}
 
+    # Convert data to a C-contiguous ndarray
+    if data is not None and not isinstance(data, Empty):
+        from . import base
+        data = base.array_for_new_object(data, specified_dtype=dtype)
+
     # Validate shape
     if shape is None:
-        body['shape'] = 'H5S_NULL' # null space dataset
+        if data is None:
+            if dtype is None:
+                raise TypeError("One of data, shape or dtype must be specified")
+            data = Empty(dtype)
+        shape = data.shape
     else:
-        shape = tuple(shape)
-        #if data is not None and (numpy.product(shape) != numpy.product(data.shape)):
-        #    raise ValueError("Shape tuple is incompatible with data")
-        body['shape'] = shape
+        shape = (shape,) if isinstance(shape, int) else tuple(shape)
+        if data is not None and (numpy.product(shape, dtype=numpy.ulonglong) != numpy.product(data.shape, dtype=numpy.ulonglong)):
+            raise ValueError("Shape tuple is incompatible with data")
 
-        # Validate chunk shape
-        if isinstance(chunks, bool):
-            # ignore boolean value, as we always chunkify datasets anyway
-            chunks = None
+    if shape is None:
+        body["shape"] = 'H5S_NULL'
+    else:
+        body["shape"] = shape
 
-        if chunks is not None and not isinstance(chunks, dict):
-            errmsg = "Chunk shape must not be greater than data shape in any dimension. "\
-                  "{} is not compatible with {}".format(chunks, shape)
-            if len(chunks) != len(shape):
-                raise ValueError("chunk is of wrong dimension")
-            for i in range(len(shape)):
-                if maxshape is not None:
-                    if maxshape[i] is not None and maxshape[i] < chunks[i]:
-                        raise ValueError(errmsg)
+    if track_times is not None:
+        if track_times not in (True, False):
+            raise TypeError("invalid track_times")
+
+    if isinstance(maxshape, int):
+        maxshape = (maxshape,)
+    tmp_shape = maxshape if maxshape is not None else shape
+
+    # Validate chunk shape
+    if isinstance(chunks, int) and not isinstance(chunks, bool):
+        chunks = (chunks,)
+    if isinstance(chunks, tuple) and any(
+        chunk > dim for dim, chunk in zip(tmp_shape, chunks) if dim is not None
+    ):
+        errmsg = "Chunk shape must not be greater than data shape in any dimension. "\
+                 "{} is not compatible with {}".format(chunks, shape)
+        raise ValueError(errmsg)
+
+    # validate chunks is not False if maxshape or compression is set
+    if chunks is False:
+        if maxshape is not None:
+            raise ValueError("chunks must not be False with extendible datasets")
+        if compression is not None:
+            raise ValueError("chunks must not be False with compression")
+     
+    if chunks and shape is None and (data is None or isinstance(data, Empty)):
+        raise TypeError("Chunk layout may not be specified with empty dataset")
+
+    if isinstance(dtype, Datatype):
+        # Named types are used as-is
+        type_json = dtype.id.type_json
+    else:
+        # Validate dtype
+        if dtype is None and data is None:
+            dtype = numpy.dtype("=f4")
+        elif data is not None:
+            if dtype is None:
+                if hasattr(data, "dtype"):
+                    dtype = data.dtype
                 else:
-                    if shape[i] < chunks[i]:
-                        raise ValueError(errmsg)
+                    dtype = guess_dtype(data)
+            else:
+                dtype = numpy.dtype(dtype)
+                if dtype.kind == 'O' and data.dtype.kind == 'O' and not dtype.metadata:
+                    # use metadata fields from data.dtype if not set in dtype
+                    dtype = data.dtype
+                else:
+                    pass  # just use given dtype
+        else:
+            dtype = numpy.dtype(dtype)
 
+        if dtype.kind == 'O' and dtype.metadata and 'ref' in dtype.metadata:
+            type_json = {}
+            type_json["class"] = "H5T_REFERENCE"
+            meta_type = dtype.metadata['ref']
+            if meta_type is Reference:
+                type_json["base"] = "H5T_STD_REF_OBJ"
+            elif meta_type is RegionReference:
+                type_json["base"] = "H5T_STD_REF_DSETREG"
+            else:
+                errmsg = "Unexpected metadata type"
+                raise ValueError(errmsg)
+        else:
+            type_json = getTypeItem(dtype)
+    body['type'] = type_json
+ 
     layout = None
     if chunks is not None and isinstance(chunks, dict):
         # use the given chunk layout
@@ -135,6 +198,7 @@ def make_new_dset(parent, shape=None, dtype=None,
 
     compressors = parent.id.http_conn.compressors
 
+
     # Legacy
     if compression is True:
         if compression_opts is None:
@@ -148,19 +212,39 @@ def make_new_dset(parent, shape=None, dtype=None,
         compression_opts = compression
         compression = 'gzip'
     
-    if compression and compression not in compressors:
-        raise ValueError("expected compression to be one of the following values: {}".format(compressors))
+    if compression:
+        if isinstance(compression, int):
+            if compression < 0:
+                raise ValueError(f"Invalid filter: {compression}")
+            if compression not in range(0,10):
+                raise ValueError(f"Unknown compression: {compression}")
+            compression_opts = compression
+            compression = 'gzip'
+        elif compression not in compressors:
+            msg = "Unknown compression, expect one of the following "
+            msg += f"values: {compressors}"
+            raise ValueError(msg)
 
     dcpl = filters.generate_dcpl(shape, dtype, chunks, compression, compression_opts,
                      shuffle, fletcher32, maxshape, scaleoffset, layout)
 
     if fillvalue is not None:
         # is it compatible with the array type?
-        fillvalue = numpy.asarray(fillvalue,dtype=dtype)
         if fillvalue:
-            fillvalue_list = fillvalue.tolist()
-            fillvalue_list = _decode(fillvalue_list) # convert any byte strings to unicode
-            dcpl["fillValue"] = fillvalue_list
+            if hasattr(fillvalue, "tolist"):
+                # convert numpy object to list
+                fillvalue = fillvalue.tolist()
+            fillvalue = _decode(fillvalue)
+            if not isinstance(fillvalue, str) and hasattr(fillvalue, "__iter__"):
+                # fill value is a list, or similar: check that dtype is compound
+                if len(fillvalue) != len(dtype):
+                    raise ValueError("Invalid fill value for non-compound type dataset")
+                fillvalue = list(fillvalue)
+            else:
+                if len(dtype) > 1:
+                    raise ValueError("Invalid fill value for compound type dataset")
+
+            dcpl["fillValue"] = fillvalue
 
     if chunks and isinstance(chunks, dict):
         dcpl["layout"] = chunks
@@ -183,6 +267,8 @@ def make_new_dset(parent, shape=None, dtype=None,
     req = "/datasets"
 
     rsp = parent.POST(req, body=body)
+
+
     json_rep = {}
     json_rep['id'] = rsp['id']
 
@@ -200,6 +286,11 @@ def make_new_dset(parent, shape=None, dtype=None,
         json_rep['layout'] = rsp['layout']
 
     dset_id = DatasetID(parent, json_rep)
+
+    if data is not None:
+        # init data
+        dset = Dataset(dset_id)
+        dset[...] = data
 
     return dset_id
 
@@ -503,17 +594,18 @@ class Dataset(HLObject):
     def fillvalue(self):
         """Fill value for this dataset (0 by default)"""
         dcpl = self.id.dcpl_json
-        arr = numpy.zeros((), dtype=self._dtype)
-        fill_value = None
         if "fillValue" in dcpl:
             fill_value = dcpl["fillValue"]
-            arr[()] = fill_value
-
-        return arr[()]
-
-    def _is_empty(self):
-        """ check if this is a null-space datset """
-        return self._shape is None
+            if isinstance(fill_value, list):
+                # convert to tuple so numpy will do the proper thing for 
+                # compound types
+                fill_value = tuple(fill_value)
+            arr = numpy.asarray([fill_value,], dtype=self._dtype)
+        else:
+            # create default array
+            arr = numpy.zeros((1,), dtype=self.dtype)
+         
+        return arr[0]
 
     @property
     def _is_empty(self):
@@ -660,6 +752,24 @@ class Dataset(HLObject):
                 arr = self[i:numrows+i]
 
             yield arr[i%BUFFER_SIZE]
+
+    def iter_chunks(self, sel=None):
+        """ Return chunk iterator.  If set, the sel argument is a slice or
+        tuple of slices that defines the region to be used. If not set, the
+        entire dataspace will be used for the iterator.
+
+        For each chunk within the given region, the iterator yields a tuple of
+        slices that gives the intersection of the given chunk with the
+        selection area.
+
+        A TypeError will be raised if the dataset is not chunked.
+
+        A ValueError will be raised if the selection region is invalid.
+
+        """
+        if self.ndim < 1:
+            raise TypeError("iter_chunks not supported for zero-dimension datasets")
+        return ChunkIterator(self, sel)
 
     def _getQueryParam(self, start, stop, step=None):
         param = ''
@@ -843,7 +953,7 @@ class Dataset(HLObject):
             sel_step = selection.step
             sel_stop = []
 
-            self.log.debug("selection._sel: {}".format(selection._sel))
+            self.log.debug(f"selection._sel: {selection._sel}")
             scalar_selection = selection._sel[3]
             chunks_per_page = 1
             # determine the dimension for paging
@@ -1145,7 +1255,9 @@ class Dataset(HLObject):
         val_dtype = None
         try:
             val_dtype = val.dtype
-            self.log.debug("val dtype: {}, metadata: {}".format(val_dtype, val_dtype.metadata))
+            self.log.debug(f"val dtype: {val.dtype}, shape: {val.shape} metadata: {val.dtype.metadata}")
+            if numpy.product(val.shape) == 0:
+                self.log.info("no elements in numpy array, skipping write")
         except AttributeError:
             self.log.debug("val not ndarray")
             pass # not a numpy object, just leave dtype as None
@@ -1174,16 +1286,26 @@ class Dataset(HLObject):
         # For h5pyd, do extra check and convert type on client side for efficiency
         vlen = check_dtype(vlen=self.dtype)
         if vlen is not None and vlen not in (bytes, str):
-            if val_dtype and check_dtype(vlen=val_dtype) == vlen:
-                self.log.debug("setting vlen dataset with vlen data of same type: {}".format(vlen))
-            else:
-                self.log.debug("converting val to vlen data type: {}".format(vlen))
+            try:
+                val = numpy.asarray(val, dtype=vlen)
+                
+            except ValueError:
                 try:
-                    val = numpy.array([numpy.array(x, dtype=vlen)
-                                    for x in val], dtype=self.dtype)
-                except ValueError as ve:
-                    self.log.info("ValueError attempting to to convert to vlen data type: {}".format(ve))  
-                    pass       
+                    val = numpy.array([numpy.array(x, dtype=self.dtype)
+                                       for x in val], dtype=self.dtype)
+                except ValueError as e:
+                    self.log.debug(f"valueError converting value element by element: {e} ")
+            if vlen == val.dtype:
+                if val.ndim > 1:
+                    tmp = numpy.empty(shape=val.shape[:-1], dtype=self.dtype)
+                    tmp.ravel()[:] = [i for i in val.reshape(
+                        (numpy.product(val.shape[:-1], dtype=numpy.ulonglong), val.shape[-1]))]
+                else:
+                    tmp = numpy.array([None], dtype=self.dtype)
+                    tmp[0] = val
+                val = tmp
+             
+
 
         elif isinstance(val, complex) or \
                 getattr(getattr(val, 'dtype', None), 'kind', None) == 'c':
@@ -1278,19 +1400,18 @@ class Dataset(HLObject):
             #mtype = None
         """
         mshape = val.shape
-        self.log.debug("mshape: {}".format(mshape))
-        self.log.debug("data dtype: {}".format(val.dtype))
+        self.log.debug(f"mshape: {mshape}")
+        self.log.debug(f"data dtype: {val.dtype}")
 
         # Perform the dataspace selection
         selection = sel.select(self, args)
-        self.log.debug("selection.mshape: {}".format(selection.mshape))
+        self.log.debug(f"selection.mshape: {selection.mshape}")
         if selection.nselect == 0:
             return
 
         # Broadcast scalars if necessary.
         if (mshape == () and selection.mshape != None and selection.mshape != ()):
             self.log.debug("broadcast scalar")
-            self.log.debug("selection.mshape: {}".format(selection.mshape))
             if self.dtype.subdtype is not None:
                 raise TypeError("Scalar broadcasting is not supported for array dtypes")
             val2 = numpy.empty(selection.mshape, dtype=val.dtype)
@@ -1363,23 +1484,42 @@ class Dataset(HLObject):
         Broadcasting is supported for simple indexing.
         """
 
-        """
-        #todo
-        with phil:
-            if source_sel is None:
-                source_sel = sel.SimpleSelection(self._shape)
-            else:
-                source_sel = sel.select(self._shape, source_sel, self.id)  # for numpy.s_
-            fspace = source_sel._id
+        # TBD: avoid data copy
+        # TBD: support broadcast
+        if self._is_empty:
+            raise TypeError("Empty datasets have no numpy representation")
+        if not isinstance(dest, numpy.ndarray):
+            raise TypeError("Dest must be ndarray")
+        if not dest.flags["C_CONTIGUOUS"]:
+            raise TypeError("Dest must be C-contiguous array")
+        
+        if source_sel is None:
+            source_sel = sel.SimpleSelection(self.shape)
+        else:
+            source_sel = sel.select(self.shape, source_sel)  # for numpy.s_
+        
+        if dest_sel is None:
+            dest_sel = sel.SimpleSelection(dest.shape)
+        else:
+            dest_sel = sel.select(dest.shape, dest_sel)
+        
+        slices = []
+        for i in range(len(dest.shape)):
+            start = dest_sel.start[i]
+            stop = start + dest_sel.count[i]
+            step = dest_sel.step[i]
+            slices.append(slice(start, stop, step))
+        slices = tuple(slices)
+        
+        if source_sel.getSelectNpoints() != dest_sel.getSelectNpoints():
+            raise TypeError("Invalid shape")
 
-            if dest_sel is None:
-                dest_sel = sel.SimpleSelection(dest.shape)
-            else:
-                dest_sel = sel.select(dest.shape, dest_sel, self.id)
 
-            for mspace in dest_sel.broadcast(source_sel.mshape):
-                self.id.read(mspace, fspace, dest)
-        """
+        arr = self.__getitem__(source_sel)
+        dest.__setitem__(slices, arr)
+        
+        # TBD - broadcast support
+         
 
     def write_direct(self, source, source_sel=None, dest_sel=None):
         """ Write data directly to HDF5 from a NumPy array.
@@ -1390,23 +1530,40 @@ class Dataset(HLObject):
         Broadcasting is supported for simple indexing.
         """
 
-        """
-        #todo
-        with phil:
-            if source_sel is None:
-                source_sel = sel.SimpleSelection(source.shape)
-            else:
-                source_sel = sel.select(source.shape, source_sel, self.id)  # for numpy.s_
-            mspace = source_sel._id
+        # TBD: avoid data copy
+        if self._is_empty:
+            raise TypeError("Empty datasets cannot be written to")
+        if not isinstance(source, numpy.ndarray):
+            raise TypeError("Source must be ndarray")
+        if not source.flags["C_CONTIGUOUS"]:
+            raise TypeError("Source must be C-contiguous array")
+        
+        
+        if dest_sel is None:
+            dest_sel = sel.SimpleSelection(self.shape)
+        else:
+            dest_sel = sel.select(self.shape, dest_sel)
+        
+        if source_sel is None:
+            source_sel = sel.SimpleSelection(source.shape)
+        else:
+            source_sel = sel.select(source.shape, source_sel)  # for numpy.s_
 
-            if dest_sel is None:
-                dest_sel = sel.SimpleSelection(self._shape)
-            else:
-                dest_sel = sel.select(self._shape, dest_sel, self.id)
+        slices = []
+        for i in range(len(source.shape)):
+            start = source_sel.start[i]
+            stop = start + source_sel.count[i]
+            step = source_sel.step[i]
+            slices.append(slice(start, stop, step))
+        slices = tuple(slices)
+        
+        if source_sel.getSelectNpoints() != dest_sel.getSelectNpoints():
+            raise TypeError("Invalid shape")
 
-            for fspace in dest_sel.broadcast(source_sel.mshape):
-                self.id.write(mspace, fspace, source)
-        """
+        data = source.__getitem__(slices)
+        self.__setitem__(dest_sel, data)
+
+        # TBD: support broadcast
 
     def __array__(self, dtype=None):
         """ Create a Numpy array containing the whole dataset.  DON'T THINK
@@ -1419,8 +1576,7 @@ class Dataset(HLObject):
         if self._shape is None or numpy.product(self._shape) == 0:
             return arr
 
-        # todo
-        #self.read_direct(arr)
+        self.read_direct(arr)
         return arr
 
     def __repr__(self):

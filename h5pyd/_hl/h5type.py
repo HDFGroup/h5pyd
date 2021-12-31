@@ -12,10 +12,14 @@
 
 from __future__ import absolute_import
 
+
 import numpy as np
 # trying to import these results in circular references, so just use is_reference, is_regionreference helpers to identify
 #from .base import Reference, RegionReference
 import weakref
+import codecs
+from collections import namedtuple
+
 
 def is_reference(val):
     try:
@@ -163,6 +167,69 @@ def special_dtype(**kwds):
 
     raise TypeError('Unknown special type "%s"' % name)
 
+def check_vlen_dtype(dt):
+    """If the dtype represents an HDF5 vlen, returns the Python base class.
+
+    Returns None if the dtype does not represent an HDF5 vlen.
+    """
+    try:
+        return dt.metadata.get('vlen', None)
+    except AttributeError:
+        return None
+
+string_info = namedtuple('string_info', ['encoding', 'length'])
+
+def check_string_dtype(dt):
+    """If the dtype represents an HDF5 string, returns a string_info object.
+
+    The returned string_info object holds the encoding and the length.
+    The encoding can only be 'utf-8' or 'ascii'. The length may be None
+    for a variable-length string, or a fixed length in bytes.
+
+    Returns None if the dtype does not represent an HDF5 string.
+    """
+    vlen_kind = check_vlen_dtype(dt)
+    if vlen_kind is str:
+        return string_info('utf-8', None)
+    elif vlen_kind is bytes:
+        return string_info('ascii', None)
+    elif dt.kind == 'S':
+        enc = (dt.metadata or {}).get('h5py_encoding', 'ascii')
+        return string_info(enc, dt.itemsize)
+    else:
+        return None
+
+def check_enum_dtype(dt):
+    """If the dtype represents an HDF5 enumerated type, returns the dictionary
+    mapping string names to integer values.
+
+    Returns None if the dtype does not represent an HDF5 enumerated type.
+    """
+    try:
+        return dt.metadata.get('enum', None)
+    except AttributeError:
+        return None
+
+def check_opaque_dtype(dt):
+    """Return True if the dtype given is tagged to be stored as HDF5 opaque data
+    """
+    try:
+        return dt.metadata.get('h5py_opaque', False)
+    except AttributeError:
+        return False
+
+def check_ref_dtype(dt):
+    """If the dtype represents an HDF5 reference type, returns the reference
+    class (either Reference or RegionReference).
+
+    Returns None if the dtype does not represent an HDF5 reference type.
+    """
+    try:
+        return dt.metadata.get('ref', None)
+    except AttributeError:
+        return None
+
+
 def check_dtype(**kwds):
     """ Check a dtype for h5py special type "hint" information.  Only one
     keyword may be given.
@@ -197,6 +264,60 @@ def check_dtype(**kwds):
         return None
     except KeyError:
         return None
+
+
+def vlen_dtype(basetype):
+    """Make a numpy dtype for an HDF5 variable-length datatype
+
+    For variable-length string dtypes, use :func:`string_dtype` instead.
+    """
+    return np.dtype('O', metadata={'vlen': basetype})
+
+def string_dtype(encoding='utf-8', length=None):
+    """Make a numpy dtype for HDF5 strings
+
+    encoding may be 'utf-8' or 'ascii'.
+
+    length may be an integer for a fixed length string dtype, or None for
+    variable length strings. String lengths for HDF5 are counted in bytes,
+    not unicode code points.
+
+    For variable length strings, the data should be passed as Python str objects
+    (unicode in Python 2) if the encoding is 'utf-8', and bytes if it is 'ascii'.
+    For fixed length strings, the data should be numpy fixed length *bytes*
+    arrays, regardless of the encoding. Fixed length unicode data is not
+    supported.
+    """
+    # Normalise encoding name:
+    try:
+        encoding = codecs.lookup(encoding).name
+    except LookupError:
+        pass  # Use our error below
+
+    if encoding not in {'ascii', 'utf-8'}:
+        raise ValueError("Invalid encoding (%r); 'utf-8' or 'ascii' allowed"
+                         % encoding)
+
+    if isinstance(length, int):
+        # Fixed length string
+        return np.dtype("|S" + str(length), metadata={'h5py_encoding': encoding})
+    elif length is None:
+        vlen = str if (encoding == 'utf-8') else bytes
+        return np.dtype('O', metadata={'vlen': vlen})
+    else:
+        raise TypeError("length must be integer or None (got %r)" % length)
+
+def enum_dtype(values_dict, basetype=np.uint8):
+    """Create a NumPy representation of an HDF5 enumerated type
+
+    *values_dict* maps string names to integer values. *basetype* is an
+    appropriate integer base dtype large enough to hold the possible options.
+    """
+    dt = np.dtype(basetype)
+    if not np.issubdtype(dt, np.integer):
+        raise TypeError("Only integer types can be used as enums")
+
+    return np.dtype(dt, metadata={'enum': values_dict})
 
 
 """
@@ -296,7 +417,9 @@ def getTypeItem(dt):
         vlen_check = check_dtype(vlen=dt.base)
         if vlen_check is not None and isinstance(vlen_check, np.dtype):
             vlen_check = np.dtype(vlen_check)
-        ref_check = check_dtype(ref=dt.base)
+        if vlen_check is None:
+            vlen_check = str  # default to bytes
+        ref_check = check_dtype(ref=dt.base)      
         if vlen_check == bytes:
             type_info['class'] = 'H5T_STRING'
             type_info['length'] = 'H5T_VARIABLE'
@@ -307,6 +430,14 @@ def getTypeItem(dt):
             type_info['length'] = 'H5T_VARIABLE'
             type_info['charSet'] = 'H5T_CSET_UTF8'
             type_info['strPad'] = 'H5T_STR_NULLTERM'
+        elif vlen_check == int:
+            type_info['class'] = 'H5T_VLEN'
+            type_info['size'] = 'H5T_VARIABLE'
+            type_info['base'] = 'H5T_STD_I64'
+        elif vlen_check in (float, np.float64):
+            type_info['class'] = 'H5T_VLEN'
+            type_info['size'] = 'H5T_VARIABLE'
+            type_info['base'] = 'H5T_IEEE_F64'
         elif isinstance(vlen_check, np.dtype):
             # vlen data
             type_info['class'] = 'H5T_VLEN'

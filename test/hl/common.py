@@ -256,3 +256,15 @@ class TestCase(ut.TestCase):
                  path += '/'
         path = path[:-1]  # strip trailing slash
         return path
+
+    def is_hsds(self, id=None):
+        """ Return True if the given identifier is HSDS (i.e. a string),
+            of False if not. (HDF5Lib uses integer identifiers).
+            If no id, use self.f.id.id
+        """
+        if id is None:
+            id = self.f.id.id
+        if isinstance(id, str):
+            return True
+        else:
+            return False

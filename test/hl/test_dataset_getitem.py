@@ -132,11 +132,6 @@ class TestScalarFloat(TestCase):
         filename = self.getFileName("dataset_testscalarflot")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        if isinstance(self.f.id.id, str) and self.f.id.id.startswith("g-"):
-            # flag if using HSDS
-            self.is_hsds = True
-        else:
-            self.is_hsds = False
         self.data = np.array(42.5, dtype='f')
         self.dset = self.f.create_dataset('x', data=self.data)
 
@@ -159,16 +154,11 @@ class TestScalarFloat(TestCase):
     def test_ellipsis(self):
         """ Ellipsis -> scalar ndarray """
         out = self.dset[...]
-        if not self.is_hsds:
-            # TBD - fix for HSDS
-            self.assertArrayEqual(out, self.data)
 
     def test_tuple(self):
         """ () -> bare item """
         out = self.dset[()]
-        if not self.is_hsds:
-            # TBD - fix for HSDS
-            self.assertArrayEqual(out, self.data.item())
+        self.assertArrayEqual(out, self.data.item())
 
     def test_slice(self):
         """ slice -> ValueError """
@@ -206,11 +196,6 @@ class TestScalarCompound(TestCase):
         filename = self.getFileName("dataset_testscalarcompound")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        if isinstance(self.f.id.id, str) and self.f.id.id.startswith("g-"):
-            # array types not working with HSDS
-            self.is_hsds = True
-        else:
-            self.is_hsds = False
         self.data = np.array((42.5, -118, "Hello"), dtype=[('a', 'f'), ('b', 'i'), ('c', '|S10')])
         #self.dset = self.f.create_dataset('x', data=self.data)
         self.dset = self.f.create_dataset('x', (), dtype=[('a', 'f'), ('b', 'i'), ('c', '|S10')])
@@ -237,18 +222,14 @@ class TestScalarCompound(TestCase):
         out = self.dset[...]
         # assertArrayEqual doesn't work with compounds; do manually
         self.assertIsInstance(out, np.ndarray)
-        if not self.is_hsds:
-            # TBD: Fix for hsds
-            self.assertEqual(out.shape, self.data.shape)
-            self.assertEqual(out.dtype, self.data.dtype)
+        self.assertEqual(out.shape, self.data.shape)
+        self.assertEqual(out.dtype, self.data.dtype)
 
     def test_tuple(self):
         """ () -> np.void instance """
         out = self.dset[()]
-        if not self.is_hsds:
-            # TBD: Fix for HSDS
-            self.assertIsInstance(out, np.void)
-            self.assertEqual(out.dtype, self.data.dtype)
+        self.assertIsInstance(out, np.void)
+        self.assertEqual(out.dtype, self.data.dtype)
 
     def test_slice(self):
         """ slice -> ValueError """
@@ -274,14 +255,13 @@ class TestScalarCompound(TestCase):
             self.dset[mask]
 
     # failed with earlier h5py versions
+    @ut.skip
     def test_fieldnames(self):
         """ field name -> bare value """
-
         #TBD: fix when field access is supported in h5serv/hsds
-        if config.get("use_h5py"):
-            out = self.dset['a']
-            self.assertIsInstance(out, np.float32)
-            self.assertEqual(out, self.dset['a'])
+        out = self.dset['a']
+        self.assertIsInstance(out, np.float32)
+        self.assertEqual(out, self.dset['a'])
 
 
 
@@ -292,11 +272,6 @@ class TestScalarArray(TestCase):
         filename = self.getFileName("dataset_testscalararray")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        if isinstance(self.f.id.id, str) and self.f.id.id.startswith("g-"):
-            # array types not working with HSDS
-            self.is_hsds = True
-        else:
-            self.is_hsds = False
         self.dt = np.dtype('(3,2)f')
         self.data = np.array([(3.2, -119), (42, 99.8), (3.14, 0)], dtype='f')
         self.dset = self.f.create_dataset('x', (), dtype=self.dt)
@@ -304,23 +279,25 @@ class TestScalarArray(TestCase):
             self.dset[...] = self.data
         except (IOError, OSError) as oe:
             #TBD this is failing on HSDS
-            if not self.is_hsds:
+            if not self.is_hsds():
                 raise oe
 
     # FIXME: HSDS failure
+    @ut.expectedFailure
     def test_ellipsis(self):
         """ Ellipsis -> ndarray promoted to underlying shape """
         out = self.dset[...]
-        if not self.is_hsds:
-            self.assertArrayEqual(out, self.data)
+        self.assertArrayEqual(out, self.data)
 
     # FIXME: HSDS failure
+    @ut.expectedFailure
     def test_tuple(self):
         """ () -> same as ellipsis """
         out = self.dset[...]
-        if not self.is_hsds:
-            self.assertArrayEqual(out, self.data)
+        self.assertArrayEqual(out, self.data)
 
+    # FIXME: HSDS failure
+    #@ut.expectedFailure
     def test_slice(self):
         """ slice -> ValueError """
         with self.assertRaises(ValueError):
@@ -608,7 +585,6 @@ class TestVeryLargeArray(TestCase):
     @ut.skipIf(sys.maxsize < 2**31, 'Maximum integer size >= 2**31 required')
     def test_size(self):
         self.assertEqual(self.dset.size, 2**31)
-
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

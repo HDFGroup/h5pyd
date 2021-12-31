@@ -14,6 +14,7 @@ from __future__ import absolute_import
 from datetime import datetime
 import pytz
 import time
+from .h5type import createDataType
 
 def parse_lastmodified(datestr):
     """Turn last modified datetime string into a datetime object."""
@@ -142,6 +143,11 @@ class TypeID(ObjectID):
     def type_json(self):
         return self.obj_json['type']
 
+    def get_type(self):
+        type_json = self._obj_json["type"]
+        dtype = createDataType(type_json)
+        return dtype
+
     def __init__(self, parent, item, **kwds):
         """Create a new TypeID.
         """
@@ -158,6 +164,11 @@ class DatasetID(ObjectID):
     @property
     def shape_json(self):
         return self._obj_json['shape']
+
+    def get_type(self):
+        type_json = self._obj_json["type"]
+        dtype = createDataType(type_json)
+        return dtype
 
     @property
     def dcpl_json(self):

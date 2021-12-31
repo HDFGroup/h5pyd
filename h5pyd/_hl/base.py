@@ -104,6 +104,39 @@ def guess_dtype(data):
 
     return None
 
+def is_float16_dtype(dt):
+    if dt is None:
+        return False
+
+    dt = np.dtype(dt)  # normalize strings -> np.dtype objects
+    return dt.kind == 'f' and dt.itemsize == 2
+
+def array_for_new_object(data, specified_dtype=None):
+    """Prepare an array from data used to create a new dataset or attribute"""
+
+    # We mostly let HDF5 convert data as necessary when it's written.
+    # But if we are going to a float16 datatype, pre-convert in python
+    # to workaround a bug in the conversion.
+    # https://github.com/h5py/h5py/issues/819
+    if is_float16_dtype(specified_dtype):
+        as_dtype = specified_dtype
+    elif not isinstance(data, np.ndarray) and (specified_dtype is not None):
+        # If we need to convert e.g. a list to an array, don't leave numpy
+        # to guess a dtype we already know.
+        as_dtype = specified_dtype
+    else:
+        as_dtype = guess_dtype(data)
+
+    data = np.asarray(data, order="C", dtype=as_dtype)
+
+    # In most cases, this does nothing. But if data was already an array,
+    # and as_dtype is a tagged h5py dtype (e.g. for an object array of strings),
+    # asarray() doesn't replace its dtype object. This gives it the tagged dtype:
+    if as_dtype is not None:
+        data = data.view(dtype=as_dtype)
+
+    return data
+
 
 def _decode(item, encoding="ascii"):
         """decode any byte items to python 3 strings
@@ -281,10 +314,10 @@ def isVlen(dt):
     return is_vlen
 
 """
-Get number of byte needed to given element as a bytestream
+Get number of byte needed for given element as a bytestream
 """
 def getElementSize(e, dt):
-    #print("getElementSize - e: {}  dt: {}".format(e, dt))
+    # print(f"getElementSize - e: {e}  dt: {dt} itemsize: {dt.itemsize}")
     if len(dt) > 1:
         count = 0
         for name in dt.names:
@@ -300,7 +333,7 @@ def getElementSize(e, dt):
             if e == 0:
                 count = 4  # non-initialized element
             else:
-                raise ValueError("Unexpected value: {}".format(e))
+                raise ValueError(f"Unexpected value: {e}")
         elif isinstance(e, bytes):
             count = len(e) + 4
         elif isinstance(e, str):
@@ -310,10 +343,7 @@ def getElementSize(e, dt):
             if e.dtype.kind != 'O':
                 count = e.dtype.itemsize * nElements
             else:
-                arr1d = e.reshape((nElements,))
-                count = 0
-                for item in arr1d:
-                    count += getElementSize(item, dt)
+                count = nElements * vlen.itemsize # tbd - special case for strings?
             count += 4  # byte count
         elif isinstance(e, list) or isinstance(e, tuple):
             if not e:
@@ -323,7 +353,7 @@ def getElementSize(e, dt):
                 count = len(e) * vlen.itemsize + 4  # +4 for byte count
         else:
 
-            raise TypeError("unexpected type: {}".format(type(e)))
+            raise TypeError(f"unexpected type: {type(e)}")
     return count
 
 
@@ -331,7 +361,8 @@ def getElementSize(e, dt):
 Get number of bytes needed to store given numpy array as a bytestream
 """
 def getByteArraySize(arr):
-    if not isVlen(arr.dtype):
+    if not isVlen(arr.dtype) and arr.dtype.kind != 'O':
+        print("not isVlen")
         return arr.itemsize * np.prod(arr.shape)
     nElements = int(np.prod(arr.shape))
     # reshape to 1d for easier iteration
@@ -399,10 +430,15 @@ def copyElement(e, dt, buffer, offset, vlen=None):
                 offset = copyBuffer(e.tobytes(), buffer, offset)
             else:
                 arr1d = e.reshape((nElements,))
-                for item in arr1d:
-                    offset = copyElement(item, dt, buffer, offset)
+                count = np.int32(nElements * vlen.itemsize)
+                offset = copyBuffer(count.tobytes(), buffer, offset)
+                arr = np.asarray(arr1d, dtype=vlen)
+                offset = copyBuffer(arr.tobytes(), buffer, offset)
 
-        elif False and isinstance(e, list) or isinstance(e, tuple):
+                #for item in arr1d:
+                #    offset = copyElement(item, dt, buffer, offset)
+
+        elif isinstance(e, list) or isinstance(e, tuple):
             count = np.int32(len(e) * vlen.itemsize)
             offset = copyBuffer(count.tobytes(), buffer, offset)
             if isinstance(e, np.ndarray):
@@ -440,7 +476,7 @@ def getElementCount(buffer, offset):
 Read element from bytearrray
 """
 def readElement(buffer, offset, arr, index, dt):
-    #print("readElement, offset: {}, index: {} dt: {}".format(offset, index, dt))
+    # print(f"readElement, offset: {offset}, index: {index} dt: {dt}")
 
     if len(dt) > 1:
         e = arr[index]
@@ -471,22 +507,23 @@ def readElement(buffer, offset, arr, index, dt):
         else:
             count = getElementCount(buffer, offset)
             offset += 4
-            if count > 0:
-                e_buffer = buffer[offset:(offset+count)]
-                offset += count
+            if count < 0:
+                raise ValueError("Unexpected variable length data format")
+            e_buffer = buffer[offset:(offset+count)]
+            offset += count
 
-                if vlen is bytes:
-                    arr[index] = bytes(e_buffer)
-                elif vlen is str:
-                    s = e_buffer.decode("utf-8")
-                    arr[index] = s
-                else:
-                    try:
-                        e = np.frombuffer(bytes(e_buffer), dtype=vlen)
-                    except ValueError:
-                        print("ValueError -- e_buffer:", e_buffer, "dtype:", vlen)
-                        raise
-                    arr[index] = e
+            if vlen is bytes:
+                arr[index] = bytes(e_buffer)
+            elif vlen is str:
+                s = e_buffer.decode("utf-8")
+                arr[index] = s
+            else:
+                try:
+                    e = np.frombuffer(bytes(e_buffer), dtype=vlen)
+                except ValueError:
+                    print("ValueError -- e_buffer:", e_buffer, "dtype:", vlen)
+                    raise
+                arr[index] = e        
 
     return offset
 
@@ -1150,6 +1187,9 @@ class Empty(object):
         This can have an associated dtype, but has no shape or data. This is not
         the same as an array with shape (0,).
     """
+
+    shape = None
+    size = None
 
     def __init__(self, dtype):
         self.dtype = np.dtype(dtype)

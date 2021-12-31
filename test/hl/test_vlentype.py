@@ -325,7 +325,7 @@ class TestVlenTypes(TestCase):
         else:
             self.assertEqual(dset.fillvalue, 0)
 
-        self.assertEqual(dset[0], 0)
+        self.assertEqual(dset[0], b'')
 
         words = (b"one", b"two", b"three", b"four", b"five", b"six", b"seven", b"eight", b"nine", b"ten")
         dset[:] = words
@@ -377,7 +377,7 @@ class TestVlenTypes(TestCase):
             self.assertEqual(dset[0], '')
         else:
             # TBD: HSDS is converteing null values to zeros
-            self.assertEqual(dset[0], 0)
+            self.assertEqual(dset[0], '')
 
 
         words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94", u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")

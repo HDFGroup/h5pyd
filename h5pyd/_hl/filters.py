@@ -160,11 +160,15 @@ def generate_dcpl(shape, dtype, chunks, compression, compression_opts,
         #plist.set_deflate(gzip_level)
         gzip_level = DEFAULT_GZIP
         if compression_opts:
+            if isinstance(compression_opts, tuple):
+                compression_opts = compression_opts[0]
             if compression_opts in range(10):
                 gzip_level = compression_opts
             else:
-                raise ValueError("GZIP setting must be an integer from 0-9, not %r" % compression_opts)
-
+                msg = "Invalid filter: compression setting must be an integer from "
+                msg += f"0-9, not {compression_opts}"
+                raise ValueError(msg)
+                
         filter_gzip = { 'class': 'H5Z_FILTER_DEFLATE' }
         filter_gzip['id'] = 1
         filter_gzip['level'] = gzip_level
