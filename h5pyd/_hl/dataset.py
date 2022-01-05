@@ -1166,7 +1166,6 @@ class Dataset(HLObject):
                         # each element must be a tuple, but the JSON decoder
                         # gives us a list instead.
                         self.log.info("json response")
-                        print("json:", rsp)
 
                         data = rsp['value']
                         self.log.debug(data)
