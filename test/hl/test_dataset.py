@@ -733,8 +733,10 @@ class TestCreateScaleOffset(BaseDataset):
         with self.assertRaises(TypeError):
             self.f.create_dataset('foo', (20, 30), dtype=bool, scaleoffset=True)
 
+    @ut.expectedFailure
     def test_float(self):
         """ Scaleoffset filter works for floating point data """
+        # TBD: Add support for scale offset filter
 
         scalefac = 4
         shape = (100, 300)
@@ -742,7 +744,7 @@ class TestCreateScaleOffset(BaseDataset):
         testdata = (np.random.rand(*shape) - 0.5) * range
 
         dset = self.f.create_dataset('foo', shape, dtype=float, scaleoffset=scalefac)
-        """
+
         # Dataset reports that scaleoffset is in use
         assert dset.scaleoffset is not None
 
@@ -762,8 +764,8 @@ class TestCreateScaleOffset(BaseDataset):
             assert (readdata == testdata).all()
         else:
             assert not (readdata == testdata).all()
-        """
-
+        
+    @ut.expectedFailure
     def test_int(self):
         """ Scaleoffset filter works for integer data with default precision """
 
@@ -785,6 +787,7 @@ class TestCreateScaleOffset(BaseDataset):
         readdata = self.f['foo'][...]
         self.assertArrayEqual(readdata, testdata)
 
+    @ut.expectedFailure
     def test_int_with_minbits(self):
         """ Scaleoffset filter works for integer data with specified precision """
 
@@ -805,6 +808,7 @@ class TestCreateScaleOffset(BaseDataset):
         readdata = self.f['foo'][...]
         self.assertArrayEqual(readdata, testdata)
 
+    @ut.expectedFailure
     def test_int_with_minbits_lossy(self):
         """ Scaleoffset filter works for integer data with specified precision """
 
