@@ -94,23 +94,13 @@ class TestScalarDataset(TestCase):
         # try will ellipsis
         val = dset[...]
 
-        if config.get("use_h5py"):
-            # h5py is returning bytes
-            expected = str2.encode("utf-8")
-        else:
-            expected = str2
-
         self.assertTrue(isinstance(val, np.ndarray))
-        self.assertEqual(val, expected)
+        self.assertEqual(val, str2.encode("ascii"))
 
         # try setting value using tuple
         dset[()] = str3
         val = dset[()]
-        if config.get("use_h5py"):
-            # h5py is returning bytes
-            expected = str2.encode("utf-8")
-        else:
-            expected = str2
+    
         self.assertEqual(val, str3.encode("utf-8"))
 
         # try creating dataset implicitly

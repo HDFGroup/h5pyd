@@ -417,7 +417,11 @@ def copyElement(e, dt, buffer, offset, vlen=None):
             offset = copyBuffer(count.tobytes(), buffer, offset)
             offset = copyBuffer(e, buffer, offset)
         elif isinstance(e, str):
-            text = e.encode('utf-8')
+            if vlen == str:
+                encoding = "utf-8"
+            else:
+                encoding = "ascii"
+            text = e.encode(encoding)
             count = np.int32(len(text))
             offset = copyBuffer(count.tobytes(), buffer, offset)
             offset = copyBuffer(text, buffer, offset)
@@ -512,11 +516,8 @@ def readElement(buffer, offset, arr, index, dt):
             e_buffer = buffer[offset:(offset+count)]
             offset += count
 
-            if vlen is bytes:
+            if vlen in (bytes, str):
                 arr[index] = bytes(e_buffer)
-            elif vlen is str:
-                s = e_buffer.decode("utf-8")
-                arr[index] = s
             else:
                 try:
                     e = np.frombuffer(bytes(e_buffer), dtype=vlen)

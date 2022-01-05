@@ -1252,19 +1252,17 @@ class TestStrings(BaseDataset):
         self.assertEqual(type(out), np.string_)
         self.assertEqual(out, data)
 
-    @ut.expectedFailure
     def test_retrieve_vlen_unicode(self):
-        #TBD: investigate
         dt = h5py.string_dtype()
         ds = self.f.create_dataset('x', (10,), dtype=dt)
         data = "fàilte"
         ds[0] = data
         self.assertIsInstance(ds[0], bytes)
+
         out = ds.asstr()[0]
         self.assertIsInstance(out, str)
         self.assertEqual(out, data)
 
-    @ut.expectedFailure
     def test_asstr(self):
         # TBD: asstr method on dataset not defined
         ds = self.f.create_dataset('x', (10,), dtype=h5py.string_dtype())
@@ -1290,9 +1288,7 @@ class TestStrings(BaseDataset):
             ds.asstr()[:1], np.array([data], dtype=object)
         )
 
-    @ut.expectedFailure
     def test_asstr_fixed(self):
-        # TBD: no asstr method on dataset
         dt = h5py.string_dtype(length=5)
         ds = self.f.create_dataset('x', (10,), dtype=dt)
         data = 'cù'
@@ -1314,7 +1310,6 @@ class TestStrings(BaseDataset):
             ds.asstr()[:1], np.array([data], dtype=object)
         )
 
-    @ut.expectedFailure
     def test_unicode_write_error(self):
         """Encoding error when writing a non-ASCII string to an ASCII vlen dataset"""
         # TBD: investigate how to trigger exception
@@ -1324,7 +1319,6 @@ class TestStrings(BaseDataset):
         with self.assertRaises(UnicodeEncodeError):
             ds[0] = data
 
-    @ut.expectedFailure
     def test_unicode_write_bytes(self):
         """ Writing valid utf-8 byte strings to a unicode vlen dataset is OK
         """
@@ -1593,10 +1587,11 @@ class TestRegionRefs(BaseDataset):
         self.assertEqual(self.dset.regionref.selection(ref), (10, 18))
 
 
-@ut.skip("astype not supported")
 class TestAstype(BaseDataset):
     """.astype() wrapper & context manager
     """
+
+    @ut.expectedFailure
     def test_astype_ctx(self):
         dset = self.f.create_dataset('x', (100,), dtype='i2')
         dset[...] = np.arange(100)
@@ -1612,12 +1607,12 @@ class TestAstype(BaseDataset):
 
         assert [w.category for w in warn_rec] == [H5pyDeprecationWarning] * 2
 
+    @ut.expectedFailure
     def test_astype_wrapper(self):
         dset = self.f.create_dataset('x', (100,), dtype='i2')
         dset[...] = np.arange(100)
         arr = dset.astype('f4')[:]
         self.assertArrayEqual(arr, np.arange(100, dtype='f4'))
-
 
     def test_astype_wrapper_len(self):
         dset = self.f.create_dataset('x', (100,), dtype='i2')

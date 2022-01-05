@@ -294,16 +294,67 @@ def make_new_dset(parent, shape=None, dtype=None, data=None,
 
     return dset_id
 
-class AstypeContext(object):
+class AstypeWrapper(object):
+    """Wrapper to convert data on reading from a dataset.
+    """
     def __init__(self, dset, dtype):
         self._dset = dset
         self._dtype = numpy.dtype(dtype)
 
+    def __getitem__(self, args):
+        return self._dset.__getitem__(args, new_dtype=self._dtype)
+
     def __enter__(self):
+        # pylint: disable=protected-access
+        print(
+            "Using astype() as a context manager is deprecated. "
+            "Slice the returned object instead, like: ds.astype(np.int32)[:10]")
         self._dset._local.astype = self._dtype
+        return self
 
     def __exit__(self, *args):
+        # pylint: disable=protected-access
         self._dset._local.astype = None
+
+    def __len__(self):
+        """ Get the length of the underlying dataset
+
+        >>> length = len(dataset.astype('f8'))
+        """
+        return len(self._dset)
+
+
+class AsStrWrapper:
+    """Wrapper to decode strings on reading the dataset"""
+    def __init__(self, dset, encoding, errors='strict'):
+        self._dset = dset
+        if encoding is None:
+            encoding = 'ascii'
+        self.encoding = encoding
+        self.errors = errors
+
+    def __getitem__(self, args):
+        bytes_arr = self._dset[args]
+        # numpy.char.decode() seems like the obvious thing to use. But it only
+        # accepts numpy string arrays, not object arrays of bytes (which we
+        # return from HDF5 variable-length strings). And the numpy
+        # implementation is not faster than doing it with a loop; in fact, by
+        # not converting the result to a numpy unicode array, the
+        # naive way can be faster! (Comparing with numpy 1.18.4, June 2020)
+        if numpy.isscalar(bytes_arr):
+            return bytes_arr.decode(self.encoding, self.errors)
+
+        return numpy.array([
+            b.decode(self.encoding, self.errors) for b in bytes_arr.flat
+        ], dtype=object).reshape(bytes_arr.shape)
+
+    def __len__(self):
+        """ Get the length of the underlying dataset
+
+        >>> length = len(dataset.asstr())
+        """
+        return len(self._dset)
+
 
 
 class ChunkIterator(object):
@@ -398,8 +449,35 @@ class Dataset(HLObject):
         >>> with dataset.astype('f8'):
         ...     double_precision = dataset[0:100:2]
         """
-        pass
-        #return AstypeContext(self, dtype)
+        return AstypeWrapper(self, dtype)
+
+    def asstr(self, encoding=None, errors='strict'):
+        """Get a wrapper to read string data as Python strings:
+
+        >>> str_array = dataset.asstr()[:]
+
+        The parameters have the same meaning as in ``bytes.decode()``.
+        If ``encoding`` is unspecified, it will use the encoding in the HDF5
+        datatype (either ascii or utf-8).
+        """
+        type_json = self.id.type_json
+        if type_json["class"] != 'H5T_STRING':
+            raise TypeError(
+                "dset.asstr() can only be used on datasets with "
+                "an HDF5 string datatype"
+            )
+        if encoding is None:
+            if 'length' in type_json and type_json['length'] != 'H5T_VARIABLE':
+                encoding = 'utf-8'  # default to utf-8 for fixed length string types
+            elif 'charSet' in type_json:
+                charSet = type_json['charSet']
+                if charSet == 'H5T_CSET_UTF8':
+                    encoding = 'utf-8'
+            else:
+                # default to ascii for variable length strings
+                encoding = 'ascii' 
+    
+        return AsStrWrapper(self, encoding, errors=errors)
 
     @property
     def dims(self):
@@ -787,7 +865,7 @@ class Dataset(HLObject):
         param += ']'
         return param
 
-    def __getitem__(self, args):
+    def __getitem__(self, args, new_dtype=None):
         """ Read a slice from the HDF5 dataset.
 
         Takes slices and recarray-style field names (more than one is
@@ -798,6 +876,8 @@ class Dataset(HLObject):
 
         * Boolean "mask" array indexing
         """
+        if new_dtype is not None:
+            self.log.warning("new_dtype is not supported")
         args = args if isinstance(args, tuple) else (args,)
         self.log.debug("dataset.__getitem__")
         for arg in args:
@@ -1086,6 +1166,7 @@ class Dataset(HLObject):
                         # each element must be a tuple, but the JSON decoder
                         # gives us a list instead.
                         self.log.info("json response")
+                        print("json:", rsp)
 
                         data = rsp['value']
                         self.log.debug(data)
