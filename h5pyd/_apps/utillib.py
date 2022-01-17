@@ -694,7 +694,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
         logging.debug("object_copy_helper for object: {}".format(obj.name))
 
         if class_name in ("Dataset", "Table"):
-            if ctx["dataload"] == "link" and not is_vlen(obj.dtype) and not is_compact(obj) and len(obj.shape) > 0:
+            if ctx["dataload"] == "link" and not is_vlen(obj.dtype) and not is_compact(obj) and (obj.shape is None or len(obj.shape) > 0):
                 logging.info("skip datacopy for link reference")
             else:
                 logging.debug("calling write_dataset for dataset: {}".format(obj.name))
