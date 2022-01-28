@@ -9,6 +9,7 @@
 # distribution tree.  If you do not have access to this file, you may        #
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
+import logging
 import config
 import numpy as np
 
@@ -26,7 +27,7 @@ class TestCommittedType(TestCase):
         print("filename:", filename)
         f = h5py.File(filename, "w")
         # create a compound numpy type
-        dt = np.dtype([('real', np.float), ('img', np.float)])
+        dt = np.dtype([('real', float), ('img', float)])
         f['complex_type'] = dt
         ctype = f['complex_type']
         self.assertEqual(ctype.dtype.name, dt.name)
@@ -36,4 +37,6 @@ class TestCommittedType(TestCase):
         f.close()
 
 if __name__ == '__main__':
+    loglevel = logging.ERROR
+    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

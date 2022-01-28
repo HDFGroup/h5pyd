@@ -417,7 +417,7 @@ class TestCreateDataset(TestCase):
         f = h5py.File(filename, "w")
 
         dims = (10,)
-        dset = f.create_dataset('bool_dset', dims, dtype=np.bool)
+        dset = f.create_dataset('bool_dset', dims, dtype=bool)
 
         self.assertEqual(dset.name, "/bool_dset")
         self.assertTrue(isinstance(dset.shape, tuple))

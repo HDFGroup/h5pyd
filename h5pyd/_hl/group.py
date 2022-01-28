@@ -18,6 +18,7 @@ import collections
 
 from .base import HLObject, MutableMappingHDF5, guess_dtype, Empty
 from .objectid import TypeID, GroupID, DatasetID
+from .h5type import special_dtype
 from . import dataset
 from .dataset import Dataset
 from . import table
@@ -44,7 +45,6 @@ class Group(HLObject, MutableMappingHDF5):
         self._req_prefix = "/groups/" + self.id.uuid
         self._link_db = {}  # cache for links
 
-
     def _get_link_json(self, h5path):
         """ Return parent_uuid and json description of link for given path """
         self.log.debug("__get_link_json({})".format(h5path))
@@ -57,13 +57,12 @@ class Group(HLObject, MutableMappingHDF5):
         else:
             in_group = False  # may belong to some other group
 
-
         if h5path[0] == '/':
             #abs path, start with root
             # get root_uuid
             parent_uuid = self.id.http_conn.root_uuid
             # make a fake tgt_json to represent 'link' to root group
-            tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid }
+            tgt_json = {'collection': "groups", 'class': "H5L_TYPE_HARD", 'id': parent_uuid}
             if h5path == '/':
                 # asking for the root, just return the root link
                 return parent_uuid, tgt_json
@@ -74,7 +73,6 @@ class Group(HLObject, MutableMappingHDF5):
                 parent_uuid = self.id.id
 
                 return parent_uuid, tgt_json
-
 
         path = h5path.split('/')
 
@@ -123,8 +121,7 @@ class Group(HLObject, MutableMappingHDF5):
 
                 return group_uuid, tgt_json
             else:
-                 raise KeyError("Unable to open object (Component not found)")
-
+                raise KeyError("Unable to open object (Component not found)")
 
         for name in path:
             if not name:
@@ -799,7 +796,16 @@ class Group(HLObject, MutableMappingHDF5):
             #htype.commit(self.id, name, lcpl=lcpl)
 
         else:
-            pass #todo
+            if isinstance(obj, numpy.ndarray):
+                arr = obj
+            elif isinstance(obj, str):
+                dt = special_dtype(vlen=str)
+                arr = numpy.array(obj, dtype=dt)
+            else:
+                dt = guess_dtype(obj)
+                arr = numpy.array(obj, dtype=dt)
+            self.create_dataset(name, shape=arr.shape, dtype=arr.dtype, data=arr[...])
+        
             #ds = self.create_dataset(None, data=obj, dtype=base.guess_dtype(obj))
             #h5o.link(ds.id, self.id, name, lcpl=lcpl)
 

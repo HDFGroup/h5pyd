@@ -16,7 +16,6 @@ import posixpath
 import os
 import six
 import json
-import base64
 import numpy as np
 import logging
 import logging.handlers
@@ -25,7 +24,6 @@ from collections.abc import (
 )
 from .objectid import GroupID
 from .h5type import Reference, check_dtype
-from .config import Config
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
 numpy_float_types = (np.float16, np.float32, np.float64)
@@ -484,10 +482,7 @@ Create numpy array based on byte representation
 """
 def bytesToArray(data, dt, shape):
     nelements = getNumElements(shape)
-    if len(dt) > 0:
-        names = dt.names
-        for name in names:
-            dt_sub = dt[name]
+    
     if not isVlen(dt):
         # regular numpy from string
         arr = np.frombuffer(data, dtype=dt)
@@ -496,7 +491,12 @@ def bytesToArray(data, dt, shape):
         offset = 0
         for index in range(nelements):
             offset = readElement(data, offset, arr, index, dt)
-    arr = arr.reshape(shape)
+    
+    if shape == () and dt.shape:
+        # special case for scalar array with array sub-type
+        arr = arr.reshape(dt.shape)
+    else:
+        arr = arr.reshape(shape)
     return arr
 
 
@@ -889,7 +889,7 @@ class HLObject(CommonStateObject):
         
         rsp = self.id._http_conn.GET(req, params=params, headers=headers, format=format, use_cache=use_cache)
         if rsp.status_code != 200:
-            self.log.info("Got response: {}".format(rsp.status_code))
+            self.log.info(f"Got response: {rsp.status_code}")
             raise IOError(rsp.status_code, rsp.reason)
         if 'Content-Type' in rsp.headers and rsp.headers['Content-Type'] == "application/octet-stream":
             if 'Content-Length' in rsp.headers:

@@ -46,7 +46,8 @@ from __future__ import absolute_import, division
 import numpy as np
 
 DEFAULT_GZIP = 4
-dSO_INT_MINBITS_DEFAULT = 0
+DEFAULT_SZIP = 4
+SO_INT_MINBITS_DEFAULT = 0
 
 
 def generate_dcpl(shape, dtype, chunks, compression, compression_opts,

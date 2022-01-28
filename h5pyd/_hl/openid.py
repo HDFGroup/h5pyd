@@ -8,7 +8,6 @@ from datetime import datetime
 
 # Azure
 import adal
-from adal.adal_error import AdalError
 
 # Google
 try:

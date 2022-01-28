@@ -68,7 +68,7 @@ class Folder():
             return False
 
 
-    def __init__(self, domain_name, pattern=None, query=None, mode=None, endpoint=None,
+    def __init__(self, domain_name, pattern=None, query=None, mode=None, endpoint=None, verbose=False,
         username=None, password=None, bucket=None, api_key=None, logger=None, owner=None, batch_size=1000, retries=3, **kwds):
         """Create a new Folders object.
 
@@ -133,6 +133,9 @@ class Folder():
         if password is None and "hs_password" in cfg:
             password = cfg["hs_password"]
 
+        if api_key is None and "hs_api_key" in cfg:
+            api_key = cfg["hs_api_key"]
+
         if bucket is None and "hs_bucket" in cfg:
             bucket = cfg["hs_bucket"]
 
@@ -143,6 +146,7 @@ class Folder():
         self._subdomains = None
         self._subdomain_marker = None
         self._batch_size = batch_size
+        self._verbose = verbose
 
         self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username,
             password=password, bucket=bucket, api_key=api_key, mode=mode, logger=logger, retries=retries)
@@ -251,7 +255,8 @@ class Folder():
             params = {"domain": '/'}
         else:
             params = {"domain": self._domain + '/'}
-        params["verbose"] = 1  # to get lastModified
+        if self._verbose:
+            params["verbose"] = 1  # to get lastModified
         if not self._query:
             params["Limit"] = self._batch_size  # get 100 at a time
         if self._pattern:

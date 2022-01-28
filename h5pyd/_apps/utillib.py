@@ -353,6 +353,8 @@ def create_dataset(dobj, ctx):
         if chunk_dims:
             num_chunks = dsetid.get_num_chunks(spaceid)
 
+        logging.debug("num_chunks: {}".format(num_chunks))
+
         chunks = {}  # pass a map to create_dataset
 
         if num_chunks == 0:
@@ -458,6 +460,7 @@ def create_dataset(dobj, ctx):
             fletcher32=fletcher32, compression_opts=compression_opts,
             fillvalue=fillvalue, scaleoffset=scaleoffset)
         msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))
+        msg += " chunks: {}".format(chunks)
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
@@ -633,7 +636,7 @@ def create_datatype(obj, ctx):
 # create_datatype
 
 #----------------------------------------------------------------------------------
-def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compression=None,compression_opts=None):
+def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compression=None, compression_opts=None):
     logging.info("input file: {}".format(fin.filename))
     logging.info("output file: {}".format(fout.filename))
     if dataload != "ingest":
@@ -691,7 +694,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
         logging.debug("object_copy_helper for object: {}".format(obj.name))
 
         if class_name in ("Dataset", "Table"):
-            if ctx["dataload"] == "link" and not is_vlen(obj.dtype) and not is_compact(obj):
+            if ctx["dataload"] == "link" and not is_vlen(obj.dtype) and not is_compact(obj) and len(obj.shape) > 0:
                 logging.info("skip datacopy for link reference")
             else:
                 logging.debug("calling write_dataset for dataset: {}".format(obj.name))

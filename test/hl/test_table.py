@@ -36,7 +36,7 @@ class TestTable(TestCase):
 
         count = 10
 
-        dt = np.dtype([('real', np.float), ('img', np.float)])
+        dt = np.dtype([('real', float), ('img', float)])
         table = f.create_table('complex', numrows=10, dtype=dt)
 
         elem = table[0]
@@ -109,6 +109,26 @@ class TestTable(TestCase):
                 # first two columns will come back as bytes, not strs
                 self.assertEqual(row[col], item[col])
 
+        cursor = table.create_cursor()
+        indx = 0
+        for row in cursor:
+            item = data[indx]
+            for col in range(2,3):
+                # first two columns will come back as bytes, not strs
+                self.assertEqual(row[col], item[col])
+            indx += 1
+        self.assertEqual(indx, len(data))
+
+        cursor = table.create_cursor(start=2, stop=5)
+        indx = 2
+        for row in cursor:
+            item = data[indx]
+            for col in range(2,3):
+                # first two columns will come back as bytes, not strs
+                self.assertEqual(row[col], item[col])
+            indx += 1
+        self.assertEqual(indx, 5)
+
         condition = "symbol == b'AAPL'"
         quotes = table.read_where(condition)
         self.assertEqual(len(quotes), 4)
@@ -127,8 +147,18 @@ class TestTable(TestCase):
             self.assertEqual(len(row), 4)
             num_rows += 1
         self.assertEqual(num_rows, 4)
-
+ 
+        # try a compound query
+        condition = "(open > 3000) & (open < 3100)" 
+        quotes = table.read_where(condition)
+        self.assertEqual(len(quotes), 5)
+        for i in range(4):
+            quote = quotes[i]
+            self.assertTrue(quote[2] > 3000)
+            self.assertTrue(quote[2] < 3100)
+        
         # try modifying specific rows
+        condition = "symbol == b'AAPL'"
         update_val = {"open": 123}
         indices = table.update_where(condition, update_val)
         self.assertEqual(len(indices), 4)
@@ -142,12 +172,7 @@ class TestTable(TestCase):
         indices = table.update_where(condition, update_val, limit=1)
         self.assertEqual(len(indices), 1)
         self.assertEqual(list(indices), [1])
-
-
-
         f.close()
-
-
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

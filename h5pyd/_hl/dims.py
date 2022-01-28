@@ -29,7 +29,7 @@ class DimensionProxy(base.CommonStateObject):
         if objdb and objid in objdb:
             dset_json = objdb[objid]
             attrs_json = dset_json["attributes"]
-            if  attr_name not in attrs_json:
+            if attr_name not in attrs_json:
                 return None
             return attrs_json[attr_name]
         # no objdb
@@ -75,7 +75,6 @@ class DimensionProxy(base.CommonStateObject):
             return ''
 
         return label_values[self._dimension]
-
 
     @label.setter
     def label(self, val):
@@ -142,13 +141,14 @@ class DimensionProxy(base.CommonStateObject):
         if isinstance(item, int):
             if item >= len(dimlist_values):
                 # no dimension scale
-                raise IndexError("No dimension scale found for index: {}".format(item))
+                raise IndexError(
+                    "No dimension scale found for index: {}".format(item))
             ref_id = dimlist_values[item]
             if ref_id and not ref_id.startswith("datasets/"):
                 msg = "unexpected ref_id: {}".format(ref_id)
                 raise IOError(msg)
             else:
-                dset_scale_id =  ref_id[len("datasets/"):]
+                dset_scale_id = ref_id[len("datasets/"):]
         else:
             # Iterate through the dimension scales finding one with the
             # correct name
@@ -159,18 +159,19 @@ class DimensionProxy(base.CommonStateObject):
                     msg = "unexpected ref_id: {}".format(ref_id)
                     raise IOError(msg)
                     continue
-                dset_id =  ref_id[len("datasets/"):]
+                dset_id = ref_id[len("datasets/"):]
                 attr_json = self._getAttributeJson('NAME', objid=dset_id)
                 if attr_json["value"] == item:
                     # found it!
                     dset_scale_id = dset_id
                     break
         if not dset_scale_id:
-            raise KeyError('No dimension scale with name"{}" found'.format(item))
+            raise KeyError(
+                'No dimension scale with name"{}" found'.format(item))
         dscale_json = self._getDatasetJson(dset_scale_id)
-        dscale = Dataset(DatasetID(parent=None, item=dscale_json, http_conn=self._id.http_conn))
+        dscale = Dataset(DatasetID(
+            parent=None, item=dscale_json, http_conn=self._id.http_conn))
         return dscale
-
 
     def attach_scale(self, dscale):
         ''' Attach a scale to this dimension.
@@ -352,6 +353,7 @@ class DimensionProxy(base.CommonStateObject):
         if not self._id:
             return '<Dimension of closed HDF5 dataset>'
         return f'<{self.label} dimension {self._dimension} of HDf5 dataset {self._id.id}>'
+
 
 class DimensionManager(base.MappingHDF5, base.CommonStateObject):
     '''

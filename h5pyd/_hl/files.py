@@ -31,7 +31,8 @@ def is_hdf5(domain, **kwargs):
     try:
         # set use_cache to False to avoid extensive load time
         f = File(domain, use_cache=False, **kwargs)
-        found = True
+        if f:
+            found = True
     except IOError:
         pass # ignore any non-200 error
     return found
@@ -104,7 +105,7 @@ class File(Group):
         return self._limits
 
     def __init__(self, domain, mode=None, endpoint=None, username=None, password=None, bucket=None,
-        api_key=None, use_session=True, use_cache=True, logger=None, owner=None, linked_domain=None, retries=10, **kwds):
+        api_key=None, use_session=True, use_cache=True, use_shared_mem=None, logger=None, owner=None, linked_domain=None, retries=10, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -201,6 +202,9 @@ class File(Group):
                     password = os.environ["H5SERV_PASSWORD"]
                 elif "hs_password" in cfg:
                     password = cfg["hs_password"]
+
+            if api_key is None and "hs_api_key" in cfg:
+                api_key = cfg["hs_api_key"]
            
             if bucket is None:
                 if "HS_BUCKET" in os.environ:
@@ -208,15 +212,16 @@ class File(Group):
                 elif "hs_bucket" in cfg:
                     bucket = cfg["hs_bucket"]
 
-            http_conn =  HttpConn(domain, endpoint=endpoint,
+            http_conn = HttpConn(domain, endpoint=endpoint,
                     username=username, password=password, bucket=bucket, mode=mode,
-                    api_key=api_key, use_session=use_session, use_cache=use_cache, logger=logger, retries=retries)
+                    api_key=api_key, use_session=use_session, use_cache=use_cache, use_shared_mem=use_shared_mem, logger=logger, retries=retries)
 
             root_json = None
 
             # try to do a GET from the domain
             req = "/"
-            params =  {"getdnids": 1} # return dn ids if available
+            params = {"getdnids": 1} # return dn ids if available
+
             if use_cache and mode == 'r':
                 params["getobjs"] = "T"
                 params["include_attrs"] = "T"
@@ -328,7 +333,6 @@ class File(Group):
         self._verboseUpdated = None # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
         self._dn_ids = dn_ids
-
 
         Group.__init__(self, self._id)
 
@@ -525,7 +529,7 @@ class File(Group):
         """  Tells the service to complete any pending updates to permanent storage
         """
         self.log.debug("flush")
-        if  self.mode == "r+" and self._id.id.startswith("g-"):
+        if self._id.id.startswith("g-"):
             # Currently flush only works with HSDS
             self.log.info("sending PUT flush request")
             req = '/'
@@ -543,12 +547,19 @@ class File(Group):
                     raise IOError(500, "Unexpected Error")
             self.log.info("PUT flush complete")
 
-    def close(self, flush=False):
+    def close(self, flush=None):
         """ Clears reference to remote resource.
         """
         # this will close the socket of the http_conn singleton
 
         self.log.debug("close, mode: {}".format(self.mode))
+        if flush is None:
+            # set flush to true if this is a direct connect and file 
+            # is writable
+            if self.mode == "r+" and self._id._http_conn._hsds:
+                flush = True
+            else:
+                flush = False
         # do a PUT flush if this file is writable and the server is HSDS and flush is set
         if flush:
             self.flush()

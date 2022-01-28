@@ -97,9 +97,12 @@ def getServerInfo(cfg):
         print("username: {} {}".format(info["username"], admin_tag))
         print("password: {}".format(info["password"]))
         if info['state'] == "READY":
-            home_folder = getHomeFolder()
-            if home_folder:
-                print("home: {}".format(home_folder))
+            try:
+                home_folder = getHomeFolder()
+                if home_folder:
+                    print("home: {}".format(home_folder))
+            except IOError:
+                print("home: NO ACCESS",)
 
         if "hsds_version" in info:
             print("server version: {}".format(info["hsds_version"]))
@@ -298,7 +301,7 @@ def main():
     logging.debug("set log_level to {}".format(cfg["loglevel"]))
 
     endpoint = cfg["hs_endpoint"]
-    if not endpoint or endpoint[-1] == '/' or endpoint[:4] != "http":
+    if not endpoint or endpoint[-1] == '/' or endpoint[:4] not in ("http", "loca"):
         print("WARNING: endpoint: {} doesn't appear to be valid".format(endpoint))
 
     if not domains:

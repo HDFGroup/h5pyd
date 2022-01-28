@@ -50,37 +50,37 @@ class TestFolders(TestCase):
 
         folder_name = op.dirname(filepath)  + '/'
 
-        dir = h5py.Folder(folder_name)  # get folder object
+        d = h5py.Folder(folder_name)  # get folder object    
 
-        self.assertEqual(dir.domain, folder_name)
-        self.assertTrue(dir.modified)
-        self.assertTrue(dir.created)
-        self.assertEqual(str(dir), folder_name)
-        self.assertEqual(dir.owner, self.test_user1["name"])
+        self.assertEqual(d.domain, folder_name)
+        self.assertTrue(d.modified)
+        self.assertTrue(d.created)
+        self.assertEqual(str(d), folder_name)
+        self.assertEqual(d.owner, self.test_user1["name"])
 
-        dir_parent = dir.parent
+        dir_parent = d.parent
         self.assertEqual(dir_parent[:-1], op.dirname(folder_name[:-1]))
 
         # get ACL for dir
-        dir_acl = dir.getACL(self.test_user1["name"])
+        dir_acl = d.getACL(self.test_user1["name"])
         self.assertEqual(len(dir_acl.keys()), 7)
         for k in dir_acl.keys():
             self.assertTrue(dir_acl[k])
 
-        dir_acls = dir.getACLs()
+        dir_acls = d.getACLs()
         self.assertTrue(isinstance(dir_acls, list))
 
-        count = len(dir)
+        count = len(d)
         self.assertTrue(count > 1)
 
         test_domain_found = False
 
         i = 0
-        for name in dir:
+        for name in d:
             if name == op.basename(test_domain):
                 self.assertFalse(test_domain_found)
                 test_domain_found = True
-            item = dir[name]
+            item = d[name]
             #'owner': 'test_user1',
             #'created': 1496729517.2346532,
             #'class': 'domain',
@@ -89,14 +89,83 @@ class TestFolders(TestCase):
             #self.assertTrue("created" in item)
             self.assertTrue("owner" in item)
             self.assertTrue("class" in item)
+            self.assertTrue("name" in item)
             if "root" in item:
                 # non-folder objects will have last modified time
                 self.assertTrue("lastModified" in item)
+                self.assertTrue("created" in item)
+                # shouldn't have total_size, other verbose only,items
+                self.assertFalse("total_size" in item)
 
             i += 1
         self.assertTrue(test_domain_found)
         self.assertEqual(i, count)
-        dir.close()
+        d.close()
+
+        # open in verbose mode
+        d = h5py.Folder(folder_name, verbose=True)  # get folder object     
+
+        self.assertEqual(d.domain, folder_name)
+        self.assertTrue(d.modified)
+        self.assertTrue(d.created)
+        self.assertEqual(str(d), folder_name)
+        self.assertEqual(d.owner, self.test_user1["name"])
+
+        dir_parent = d.parent
+        self.assertEqual(dir_parent[:-1], op.dirname(folder_name[:-1]))
+
+        # get ACL for dir
+        dir_acl = d.getACL(self.test_user1["name"])
+        self.assertEqual(len(dir_acl.keys()), 7)
+        for k in dir_acl.keys():
+            self.assertTrue(dir_acl[k])
+
+        dir_acls = d.getACLs()
+        self.assertTrue(isinstance(dir_acls, list))
+
+        count = len(d)
+        self.assertTrue(count > 1)
+
+        test_domain_found = False
+
+        i = 0
+        for name in d:
+            if name == op.basename(test_domain):
+                self.assertFalse(test_domain_found)
+                test_domain_found = True
+            item = d[name]
+            #'owner': 'test_user1',
+            #'created': 1496729517.2346532,
+            #'class': 'domain',
+            #'name': '/org/hdfgroup/h5pyd_test/bool_dset',
+            #'lastModified': 1496729517.2346532
+            #self.assertTrue("created" in item)
+            self.assertTrue("owner" in item)
+            self.assertTrue("class" in item)
+            self.assertTrue("name" in item)
+            if "root" in item:
+                # non-folder objects will have last modified time
+                self.assertTrue("lastModified" in item)
+                self.assertTrue("created" in item)
+                # these should show up only in verbose mode
+                self.assertTrue("md5_sum" in item)
+                self.assertTrue("num_groups" in item)
+                self.assertTrue("num_datasets" in item)
+                self.assertTrue("num_datatypes" in item)
+                self.assertTrue("num_objects" in item)
+                self.assertTrue("num_chunks" in item)
+                self.assertTrue("num_linked_chunks" in item)
+                self.assertTrue("total_size" in item)
+                self.assertTrue("allocated_bytes" in item)
+                self.assertTrue("metadata_bytes" in item)
+                self.assertTrue("metadata_bytes" in item)
+                self.assertTrue("linked_bytes" in item)
+                self.assertTrue("compressors" in item)
+            i += 1
+        self.assertTrue(test_domain_found)
+        self.assertEqual(i, count)
+        d.close()
+
 
         # try opening a domain object as a folder
         f = h5py.Folder(filepath + '/')
@@ -129,12 +198,12 @@ class TestFolders(TestCase):
         folder_test = self.getFileName("create_folder_test")
         folder_path = self.getPathFromDomain(folder_test) + '/'
 
-        dir = h5py.Folder(folder_path, mode='w')  # create a new folder
-        dir.close()
+        d = h5py.Folder(folder_path, mode='w')  # create a new folder
+        d.close()
         # re-open
-        dir = h5py.Folder(folder_path)
-        self.assertTrue(dir.is_folder)
-        dir.close()
+        d = h5py.Folder(folder_path)
+        self.assertTrue(d.is_folder)
+        d.close()
 
 
     def test_root_folder(self):
@@ -157,18 +226,18 @@ class TestFolders(TestCase):
         path_components = filepath.split('/')
         top_level_domain = path_components[1]
 
-        dir = h5py.Folder('/')  # get folder object for root
+        d = h5py.Folder('/')  # get folder object for root
         found = False
-        self.assertTrue(len(dir) > 0)
-        self.assertTrue(dir.is_folder)
-        self.assertTrue(dir.domain == '/')
-        self.assertTrue(dir.__repr__() == '/')
-        self.assertIsNone(dir.parent)
-        for name in dir:
+        self.assertTrue(len(d) > 0)
+        self.assertTrue(d.is_folder)
+        self.assertTrue(d.domain == '/')
+        self.assertTrue(d.__repr__() == '/')
+        self.assertIsNone(d.parent)
+        for name in d:
             # we should come across the given domain
             if top_level_domain == name:
                 found = True
-        dir.close()
+        d.close()
         self.assertTrue(found)
 
 if __name__ == '__main__':
