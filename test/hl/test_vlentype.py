@@ -12,7 +12,6 @@
 
 import numpy as np
 import logging
-import six
 import config
 
 if config.get("use_h5py"):
@@ -352,10 +351,7 @@ class TestVlenTypes(TestCase):
             return  # variable len types not working with h5serv
 
         dims = (10,)
-        if six.PY2:
-            dt = h5py.special_dtype(vlen=unicode)
-        else:
-            dt = h5py.special_dtype(vlen=str)
+        dt = h5py.special_dtype(vlen=str)
 
         dset = f.create_dataset('variable_len_unicode_dset', dims, dtype=dt)
 
@@ -372,13 +368,7 @@ class TestVlenTypes(TestCase):
         else:
             self.assertEqual(dset.fillvalue, 0)
 
-        # TBD: h5serv and hsds returning different values for null strings
-        if config.get('use_h5py'):
-            self.assertEqual(dset[0], '')
-        else:
-            # TBD: HSDS is converteing null values to zeros
-            self.assertEqual(dset[0], '')
-
+        self.assertEqual(dset[0], b'')
 
         words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94", u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
         dset[:] = words
@@ -387,28 +377,21 @@ class TestVlenTypes(TestCase):
         self.assertTrue("vlen" in vals.dtype.metadata)
 
         for i in range(10):
-            self.assertEqual(vals[i], words[i])
+            word = words[i].encode("utf-8")
+            self.assertEqual(vals[i], word)
 
         f.close()
 
     def test_variable_len_unicode_attr(self):
         filename = self.getFileName("variable_len_unicode_attr")
         print("filename:", filename)
-        """
-        if config.get("use_h5py"):
-            # TBD - skipping as this core dumps in travis for some reason
-            return
-        """
         f = h5py.File(filename, "w")
         if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
             f.close()
             return  # variable len types not working with h5serv
 
         dims = (10,)
-        if six.PY2:
-            dt = h5py.special_dtype(vlen=unicode)
-        else:
-            dt = h5py.special_dtype(vlen=str)
+        dt = h5py.special_dtype(vlen=str)
 
         words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94", u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
 
@@ -420,10 +403,7 @@ class TestVlenTypes(TestCase):
 
         for i in range(10):
             self.assertEqual(vals[i], words[i])
-            if six.PY2:
-                self.assertEqual(type(vals[i]), unicode)
-            else:
-                self.assertEqual(type(vals[i]), str)
+            self.assertEqual(type(vals[i]), str)
 
 
         f.close()

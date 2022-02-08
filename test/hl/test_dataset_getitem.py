@@ -154,6 +154,7 @@ class TestScalarFloat(TestCase):
     def test_ellipsis(self):
         """ Ellipsis -> scalar ndarray """
         out = self.dset[...]
+        self.assertArrayEqual(out, self.data)
 
     def test_tuple(self):
         """ () -> bare item """
@@ -296,8 +297,6 @@ class TestScalarArray(TestCase):
         out = self.dset[...]
         self.assertArrayEqual(out, self.data)
 
-    # FIXME: HSDS failure
-    #@ut.expectedFailure
     def test_slice(self):
         """ slice -> ValueError """
         with self.assertRaises(ValueError):

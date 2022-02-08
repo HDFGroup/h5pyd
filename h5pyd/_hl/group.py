@@ -656,7 +656,7 @@ class Group(HLObject, MutableMappingHDF5):
                 endpoint = self.id.http_conn.endpoint
                 username = self.id.http_conn.username
                 password = self.id.http_conn.password
-                f = File(external_domain, endpoint=endpoint, username=username, password=password, mode='r', use_session=False) 
+                f = File(external_domain, endpoint=endpoint, username=username, password=password, mode='r') 
             except IOError:
                 # unable to find external link
                 raise KeyError("Unable to open file: " + link_json['h5domain'])
