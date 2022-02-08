@@ -891,3 +891,23 @@ def createDataType(typeItem):
     else:
         dtRet = createBaseDataType(typeItem)  # create non-compound dt
     return dtRet
+
+"""
+Return dtype with field added for Index values
+"""
+def getQueryDtype(dt):
+    field_names = dt.names
+    #  make up a index field name that doesn't conflict with existing names
+    index_name = "index"
+    for i in range(len(field_names)):
+        if index_name in field_names:
+            index_name = "_" + index_name
+        else:
+            break
+
+    dt_fields = [(index_name, 'uint64'),]
+    for i in range(len(dt)):
+        dt_fields.append((dt.names[i], dt[i]))
+    query_dt = np.dtype(dt_fields)
+    
+    return query_dt

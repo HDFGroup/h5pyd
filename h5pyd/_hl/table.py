@@ -12,12 +12,14 @@
 
 from __future__ import absolute_import
 import numpy
-from .base import  _decode
+from .base import  _decode   
+from .base import bytesToArray
 from .dataset import Dataset
 from .objectid import DatasetID
 from . import selections as sel
 from .h5type import Reference
 from .h5type import check_dtype
+from .h5type import getQueryDtype   
 
 
 class Cursor():
@@ -128,7 +130,7 @@ class Table(Dataset):
 
 
 
-    def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None, limit=None):
+    def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None, limit=0, include_index=True):
         """Read rows from table using pytable-style condition
         """
         names = ()  # todo
@@ -149,14 +151,15 @@ class Table(Dataset):
 
         new_dtype = getattr(self._local, 'astype', None)
         if new_dtype is not None:
-            new_dtype = readtime_dtype(new_dtype, names)
+            mtype = readtime_dtype(new_dtype, names)
         else:
             # This is necessary because in the case of array types, NumPy
             # discards the array information at the top level.
-            new_dtype = readtime_dtype(self.dtype, names)
+            mtype = readtime_dtype(self.dtype, names)
         # todo - will need the following once we have binary transfers
         # mtype = h5t.py_create(new_dtype)
-        mtype = new_dtype
+        rsp_type = getQueryDtype(mtype)
+        
 
         # Perform the dataspace selection
         if start or stop:
@@ -172,18 +175,21 @@ class Table(Dataset):
         selection = sel.select(self, selection_arg)
 
         if selection.nselect == 0:
-            return numpy.ndarray(selection.mshape, dtype=new_dtype)
+            return numpy.ndarray(selection.mshape, dtype=mtype)
 
         # setup for pagination in case we can't read everthing in one go
-        data = []
+        data = []  # one ndarray for each request response
         cursor = start
         page_size = stop - start
+        total_rows = 0
 
         while True:
             # Perfom the actual read
             req = "/datasets/" + self.id.uuid + "/value"
             params = {}
             params["query"] = condition
+            if limit > 0:
+                params["Limit"] = limit - total_rows
             self.log.info("req - cursor: {} page_size: {}".format(cursor, page_size))
             end_row = cursor+page_size
             if end_row > stop:
@@ -198,18 +204,35 @@ class Table(Dataset):
             try:
                 self.log.debug("params: {}".format(params))
                 rsp = self.GET(req, params=params)
-                values = rsp["value"]
-                count = len(values)
-                self.log.info("got {} rows".format(count))
-                if count > 0:
-                    if limit is None or count + len(data) <= limit:
-                        # add in all the data
-                        data.extend(values)
+                if isinstance(rsp, bytes):
+                    # binary response
+                    arr = bytesToArray(rsp, rsp_type, None) 
+                    count = len(arr)   
+                    self.log.info(f"got {count} rows binary data")
+                else:
+                    values = rsp["value"]
+                    if "index" in rsp:
+                        # older server version that returns index as a seperate key
+                        indices = rsp["index"]
+                        if len(indices != count):
+                            raise ValueError(f"expected {count} indicies, but got: {len(indices)}")
                     else:
-                        # we've hit the limit for number of rows to return
-                        add_count = limit - len(data)
-                        self.log.debug("adding {} from {} to rows".format(add_count, count))
-                        data.extend(values[:add_count])
+                        indices = None
+                    count = len(values)
+                    self.log.info(f"got {count} rows json data")
+                    # convert to numpy array
+                    arr = numpy.empty((count,), dtype=rsp_type)
+                    for i in range(count):
+                        if indices is not None:
+                            e = [indices[i],]
+                            e.extend(values[i])
+                        else:
+                            e = values[i]
+                        arr[i] = tuple(e)
+                        
+                    self.log.info("got {} rows".format(count))
+                total_rows += count
+                data.append(arr)
 
                 # advance to next page
                 cursor += page_size
@@ -224,7 +247,7 @@ class Table(Dataset):
                     # otherwise, just raise the exception
                     self.log.info("Unexpected exception: {}".format(ioe.errno))
                     raise ioe
-            if cursor >= stop or limit and len(data) == limit:
+            if cursor >= stop or (limit > 0 and total_rows == limit):
                 self.log.info("completed iteration, returning: {} rows".format(len(data)))
                 break
 
@@ -232,23 +255,20 @@ class Table(Dataset):
         # each element must be a tuple, but the JSON decoder
         # gives us a list instead.
 
-        mshape = (len(data),)
-        if len(mtype) > 1 and type(data) in (list, tuple):
-            converted_data = []
-            for i in range(len(data)):
-                converted_data.append(self.toTuple(data[i]))
-            data = converted_data
+        if len(data) == 0:
+            raise ValueError("unexpected list size")
+        # combine arrays
+        if len(data) > 1:
+            ret_arr = numpy.empty((total_rows,), dtype=rsp_type)
+            start = 0
+            for arr in data:
+                nrows = len(arr)
+                ret_arr[start:(start+nrows)] = arr[:]
+                start += nrows
+        else:
+            ret_arr = data[0]
 
-        arr = numpy.empty(mshape, dtype=mtype)
-        arr[...] = data
-
-        # Patch up the output for NumPy
-        if len(names) == 1:
-            arr = arr[names[0]]     # Single-field recarray convention
-        if arr.shape == ():
-            arr = numpy.asscalar(arr)
-
-        return arr
+        return ret_arr
 
 
     def update_where(self, condition, value, start=None, stop=None, step=None, limit=None):
@@ -274,7 +294,7 @@ class Table(Dataset):
         params["query"] = condition
         if limit:
             params["Limit"] = limit
-        self.log.debug("query param: {}".format(sel_param))
+        self.log.debug(f"query param: {sel_param}")
         if sel_param:
             params["select"] = sel_param
 
@@ -285,8 +305,15 @@ class Table(Dataset):
         arr = None
         if "index" in rsp:
             indices = rsp["index"]
-            if indices:
-                arr = numpy.array(indices)
+        elif "value" in rsp:
+            # new-style return type - index is first element in each row
+            indices = []
+            for row in rsp["value"]:
+                indices.append(row[0])
+        else:
+            raise ValueError("unexpected response from PUT query")
+        if indices:
+            arr = numpy.array(indices)
 
         return arr
 

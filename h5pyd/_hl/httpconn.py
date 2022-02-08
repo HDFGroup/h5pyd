@@ -219,6 +219,10 @@ class HttpConn:
             if dn_count < 1:
                 dn_count = 1
    
+            try:
+                from hsds.hsds_app import HsdsApp
+            except ImportError:
+                raise IOError("unable to import HSDS package")
             hsds = HsdsApp(username=username, password=password, dn_count=dn_count, logger=self.log)
             hsds.run()
             self._hsds = hsds
