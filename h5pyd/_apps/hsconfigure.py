@@ -121,6 +121,8 @@ def main():
             print("updated api key: [{}]".format(new_api_key))
             hs_api_key = new_api_key
             dirty = True
+        if hs_api_key and hs_api_key.lower() == "none":
+            hs_api_key = None
 
         print("Testing connection...")
         ok = pingServer(hs_username, hs_password, hs_endpoint, hs_api_key)
