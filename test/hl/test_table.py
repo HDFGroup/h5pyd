@@ -132,9 +132,12 @@ class TestTable(TestCase):
         condition = "symbol == b'AAPL'"
         quotes = table.read_where(condition)
         self.assertEqual(len(quotes), 4)
+        expected_indices = [1,4,7,10]
         for i in range(4):
             quote = quotes[i]
-            self.assertEqual(quote[0], b'AAPL')
+            self.assertEqual(len(quote), 5)
+            self.assertEqual(quote[0], expected_indices[i])
+            self.assertEqual(quote[1], b'AAPL')
 
         # read up to 2 rows
         quotes = table.read_where(condition, limit=2)
@@ -144,18 +147,19 @@ class TestTable(TestCase):
         cursor = table.create_cursor(condition=condition)
         num_rows = 0
         for row in cursor:
-            self.assertEqual(len(row), 4)
+            self.assertEqual(len(row), 5)
             num_rows += 1
         self.assertEqual(num_rows, 4)
  
         # try a compound query
         condition = "(open > 3000) & (open < 3100)" 
         quotes = table.read_where(condition)
+
         self.assertEqual(len(quotes), 5)
         for i in range(4):
             quote = quotes[i]
-            self.assertTrue(quote[2] > 3000)
-            self.assertTrue(quote[2] < 3100)
+            self.assertTrue(quote[3] > 3000)
+            self.assertTrue(quote[3] < 3100)
         
         # try modifying specific rows
         condition = "symbol == b'AAPL'"

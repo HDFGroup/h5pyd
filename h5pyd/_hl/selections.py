@@ -64,7 +64,7 @@ def select(obj, args):
     if not isinstance(args, tuple):
         args = (args,)
 
-    if obj.shape == ():
+    if hasattr(obj, "shape") and obj.shape == ():
         # scalar object
         sel = ScalarSelection(obj.shape, args)
         return sel
@@ -110,7 +110,10 @@ def select(obj, args):
             sel = FancySelection(obj.shape)
             sel[args]
             return sel
-    sel = SimpleSelection(obj.shape)
+    if hasattr(obj, "shape"):
+        sel = SimpleSelection(obj.shape)
+    else:
+        sel = SimpleSelection(obj)
     sel[args]
     return sel
 
@@ -193,6 +196,9 @@ class Selection(object):
 
     def __getitem__(self, args):
         raise NotImplementedError("This class does not support indexing")
+
+    def __repr__(self):
+        return f"Selection(shape:{self._shape})"
 
 class PointSelection(Selection):
 
@@ -293,6 +299,9 @@ class PointSelection(Selection):
             # selection with boolean ndarray
         """
         self._perform_selection(points, H5S_SELECT_SET)
+
+    def __repr__(self):
+        return f"PointSelection(shape:{self._shape}, {len(self._points)} points)"
 
 
 class SimpleSelection(Selection):
@@ -434,6 +443,10 @@ class SimpleSelection(Selection):
                 offset = tuple(x*y*z + s for x, y, z, s in zip(np.unravel_index(idx, chunks), tshape, step, start))
                 sid.offset_simple(offset)
                 yield sid
+    def __repr__(self):
+        s = f"SimpleSelection(shape:{self._shape}, start: {self._sel[0]},"
+        s += f" count: {self._sel[1]}, step: {self._sel[2]}"
+        return s
 
 
 class FancySelection(Selection):
@@ -569,11 +582,12 @@ class FancySelection(Selection):
         query.append(']')
         return "".join(query)
             
- 
-  
 
     def broadcast(self, target_shape):
         raise TypeError("Broadcasting is not supported for complex selections")
+
+    def __repr__(self):
+        return f"FancySelection(shape:{self._shape}, slices: {self._slices})"
 
 def _expand_ellipsis(args, rank):
     """ Expand ellipsis objects and fill in missing axes.

@@ -16,7 +16,7 @@ import os.path as op
 import numpy
 import collections
 
-from .base import HLObject, MutableMappingHDF5, guess_dtype, Empty
+from .base import HLObject, MutableMappingHDF5, guess_dtype
 from .objectid import TypeID, GroupID, DatasetID
 from .h5type import special_dtype
 from . import dataset
@@ -173,6 +173,9 @@ class Group(HLObject, MutableMappingHDF5):
         exists.
         """
 
+        if isinstance(h5path, bytes):
+            h5path = h5path.decode('utf-8')
+
         #if self.__contains__(name):
         #    raise ValueError("Unable to create link (Name alredy exists)")
         if h5path[-1] == '/':
@@ -303,8 +306,32 @@ class Group(HLObject, MutableMappingHDF5):
         if self.id.http_conn.mode == 'r':
             raise ValueError("Unable to create dataset (No write intent on file)")
 
+        if isinstance(name, bytes):
+            # convert byte input to string
+            name = name.decode("utf-8")
+        
+        """
+        group = self
+        if name:
+            if '/' in name.lstrip('/'):
+                parent_path, name = name.rsplit('/', 1)
+                group = self.require_group(parent_path)
+
+        dsid = dataset.make_new_dset(group, shape, dtype, data, name, **kwds)
+        dset = dataset.Dataset(dsid)
+        return dset
+        """
+
+        """
+        if isinstance(shape, int):
+            # convert to a one-element list
+            shape = (shape,)
+
         # Convert data to a C-contiguous ndarray
-        if data is not None:
+        if data is None:
+            if shape is None:
+                raise TypeError("One of data, shape or dtype must be specified")
+        else:
             if isinstance(data, Empty):
                 if dtype is None:
                     dtype = data.dtype
@@ -314,7 +341,7 @@ class Group(HLObject, MutableMappingHDF5):
                 if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
                     data = numpy.asarray(data, order="C", dtype=dtype)
                     dtype = data.dtype
-                self.log.info("data dtype: {}".format(data.dtype))
+                self.log.info(f"data dtype: {data.dtype}")
 
         # Validate shape
         if isinstance(data, Empty):
@@ -331,14 +358,16 @@ class Group(HLObject, MutableMappingHDF5):
             
             if data is not None and not isinstance(data, Empty) and (numpy.product(shape) != numpy.product(data.shape)):
                 raise ValueError("Shape tuple is incompatible with data")
-
+        """
         dsid = dataset.make_new_dset(self, shape=shape, dtype=dtype, **kwds)
         dset = dataset.Dataset(dsid)
+
         if data is not None:
             self.log.info("initialize data")
             it = ChunkIterator(dset)
             for chunk in it:
                 dset[chunk] = data[chunk]
+            dset[...] = data
 
         if name is not None:
             items = name.split('/')
@@ -474,18 +503,21 @@ class Group(HLObject, MutableMappingHDF5):
         if not name in self:
             return self.create_dataset(name, *(shape, dtype), **kwds)
 
+        if isinstance(shape, int):
+            shape = (shape,)
+
         dset = self[name]
         if not isinstance(dset, Dataset):
-            raise TypeError("Incompatible object (%s) already exists" % dset.__class__.__name__)
+            raise TypeError(f"Incompatible object ({dset.__class__.__name__}) already exists")
 
         if not shape == dset.shape:
-            raise TypeError("Shapes do not match (existing %s vs new %s)" % (dset.shape, shape))
+            raise TypeError(f"Shapes do not match (existing {dset.shape} vs new {shape})")
 
         if exact:
             if not dtype == dset.dtype:
-                raise TypeError("Datatypes do not exactly match (existing %s vs new %s)" % (dset.dtype, dtype))
+                raise TypeError(f"Datatypes do not exactly match (existing {dset.dtype} vs new {dtype})")
         elif not numpy.can_cast(dtype, dset.dtype):
-            raise TypeError("Datatypes cannot be safely cast (existing %s vs new %s)" % (dset.dtype, dtype))
+            raise TypeError(f"Datatypes cannot be safely cast (existing {dset.dtype} vs new {dtype})")
 
         return dset
 
@@ -626,7 +658,7 @@ class Group(HLObject, MutableMappingHDF5):
                 endpoint = self.id.http_conn.endpoint
                 username = self.id.http_conn.username
                 password = self.id.http_conn.password
-                f = File(external_domain, endpoint=endpoint, username=username, password=password, mode='r', use_session=False) 
+                f = File(external_domain, endpoint=endpoint, username=username, password=password, mode='r') 
             except IOError:
                 # unable to find external link
                 raise KeyError("Unable to open file: " + link_json['h5domain'])

@@ -21,7 +21,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='h5pyd',
-      version='0.9.2',
+      version='0.10.0',
       description='h5py compatible client lib for HDF REST API',
       long_description=long_description,
       url='http://github.com/HDFGroup/h5pyd',
@@ -31,7 +31,6 @@ setup(name='h5pyd',
       packages=['h5pyd', 'h5pyd._hl', 'h5pyd._apps'],
       install_requires=[
           'numpy >= 1.17.3',
-          'six >= 1.13.0',
           'requests_unixsocket',
           'pytz',
           'pyjwt',

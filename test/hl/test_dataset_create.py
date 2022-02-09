@@ -206,7 +206,6 @@ class TestCreateDataset(TestCase):
         filename = self.getFileName("fixed_len_str_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-
         dims = (10,)
         dset = f.create_dataset('fixed_len_str_dset', dims, dtype='|S6')
 
