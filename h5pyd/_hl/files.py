@@ -186,7 +186,7 @@ class File(Group):
                 raise IOError(400, "no domain provided")
             
             if domain[0] != '/':
-                raise IOError(400, "relative paths or not valid")
+                raise IOError(400, "relative paths are not valid")
 
             if endpoint is None:
                 if "H5SERV_ENDPOINT" in os.environ:
