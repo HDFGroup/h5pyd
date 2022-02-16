@@ -64,7 +64,6 @@ class Cursor():
                 if nrows - indx < read_count:
                     read_count = nrows - indx
                 if self._query is None:
-                    print("read row count:", (read_count+indx+self._start)-(indx+self._start))
                     arr = self._table[indx+self._start:read_count+indx+self._start]
                 else:
                     # call table to return query result
@@ -211,10 +210,11 @@ class Table(Dataset):
                     self.log.info(f"got {count} rows binary data")
                 else:
                     values = rsp["value"]
+                    count = len(values)
                     if "index" in rsp:
                         # older server version that returns index as a seperate key
                         indices = rsp["index"]
-                        if len(indices != count):
+                        if len(indices) != count:
                             raise ValueError(f"expected {count} indicies, but got: {len(indices)}")
                     else:
                         indices = None
