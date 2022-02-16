@@ -160,7 +160,6 @@ class TestFolders(TestCase):
                 self.assertTrue("metadata_bytes" in item)
                 self.assertTrue("metadata_bytes" in item)
                 self.assertTrue("linked_bytes" in item)
-                self.assertTrue("compressors" in item)
             i += 1
         self.assertTrue(test_domain_found)
         self.assertEqual(i, count)
