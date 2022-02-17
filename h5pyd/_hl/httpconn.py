@@ -425,10 +425,10 @@ class HttpConn:
                 self.log.debug("adding {} to cache".format(req))
                 self._cache[req] = cache_rsp
 
-            if rsp.status_code == 200 and req == '/':  # and self._domain_json is None:
+            if rsp.status_code == 200 and req == '/':  
+                self.log.info(f"got domain json: {len(rsp.text)} bytes")
                 self._domain_json = json.loads(rsp.text)
-                self.log.info("got domain json: {}".format(self._domain_json))
-
+                
         return rsp
 
     def PUT(self, req, body=None, format="json", params=None, headers=None):
