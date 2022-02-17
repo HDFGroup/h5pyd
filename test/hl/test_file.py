@@ -97,7 +97,6 @@ class TestFile(TestCase):
             for k in ('min_chunk_size', 'max_chunk_size', 'max_request_size', 'max_chunks_per_request'):
                 self.assertTrue(k in limits)
 
-
         r = f['/']
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertEqual(len(f.attrs.keys()), 0)
@@ -120,7 +119,7 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 1)
         f.close()
         self.assertEqual(f.id.id, 0)
-
+         
         # re-open as read-only
         if is_hsds:
             wait_time = 90
@@ -170,8 +169,6 @@ class TestFile(TestCase):
             self.assertEqual(f.num_datatypes, 0)
             self.assertTrue(f.allocated_bytes == 0)
 
-
-
         f.close()
         self.assertEqual(f.id.id, 0)
 
@@ -207,7 +204,6 @@ class TestFile(TestCase):
         self.assertEqual(f.id.id, 0)
 
 
-
     def test_open_notfound(self):
         # verify open of non-existent file throws exception
 
@@ -228,7 +224,6 @@ class TestFile(TestCase):
         print("filename:", filename)
 
         f = h5py.File(filename, 'w')
-
 
         for name in ("g1", "g2", "g1/g1.1"):
             f.create_group(name)
@@ -265,7 +260,6 @@ class TestFile(TestCase):
         # for h5serv a default acl should be available
         # hsds does not create one initially
 
-
         try:
             default_acl = f.getACL("default")
         except IOError as ioe:
@@ -286,7 +280,6 @@ class TestFile(TestCase):
             default_acl["userName"] = "default"
             f.putACL(default_acl)
         f.close()
-
 
         # ooen with test_user2 should succeed for read mode
         try:
@@ -311,7 +304,6 @@ class TestFile(TestCase):
             self.assertTrue(is_hsds)
             self.assertEqual(ioe.errno, 403)  # Forbidden
 
-
         f = h5py.File(filename, 'a')  # open for append with original username
         # add an acl for test_user2 that has only read/update access
         user2_acl = copy(default_acl)
@@ -328,8 +320,6 @@ class TestFile(TestCase):
             f = h5py.File(filename, 'r', username=self.test_user2["name"], password=self.test_user2["password"])
         except IOError as ioe:
             self.assertTrue(False)
-        return
-
 
         # test_user2  opening in write mode should still fail
         try:
@@ -370,8 +360,6 @@ class TestFile(TestCase):
             else:
                 print("set HS_ENDPOINT environment variable to enable test_http_url test")
 
-
-
     def test_close(self):
         filename = self.getFileName("close_file")
         print("filename:", filename)
@@ -379,6 +367,7 @@ class TestFile(TestCase):
         self.assertTrue(f)
         f.close()
         self.assertFalse(f)
+
 
 
 if __name__ == '__main__':
