@@ -491,7 +491,19 @@ class FancySelection(Selection):
             length = self._shape[idx]
             if isinstance(arg, slice):
                 _, count, _ = _translate_slice(arg, length)  # raise exception for invalid slice
-                slices.append(arg)
+                if arg.start is None:
+                    start = 0
+                else:
+                    start = arg.start
+                if arg.stop is None:
+                    stop = length
+                else:
+                    stop = arg.stop
+                if arg.step is None:
+                    step = 1
+                else:
+                    step = arg.step
+                slices.append(slice(start,stop, step))
                 mshape.append(count)
                 
             elif hasattr(arg, 'dtype') and arg.dtype == np.dtype('bool'):
