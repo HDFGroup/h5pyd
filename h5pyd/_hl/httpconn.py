@@ -160,12 +160,14 @@ class HttpConn:
     TBD: Should refactor these to a common base class
     """
     def __init__(self, domain_name, endpoint=None, username=None, password=None, bucket=None,
-            api_key=None, mode='a', use_session=True, use_cache=True, use_shared_mem=None, logger=None, retries=3, **kwds):
+            api_key=None, mode='a', use_session=True, use_cache=True, use_shared_mem=None, 
+            logger=None, retries=3, timeout=DEFAULT_TIMEOUT, **kwds):
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
         self._use_session = use_session
-        self._retries = 1  # for testing retries
+        self._retries = retries
+        self._timeout = timeout
         self._hsds = None
         self._lambda = None
         self._use_shared_mem = use_shared_mem
@@ -610,8 +612,8 @@ class HttpConn:
                     allowed_methods=allowed_methods
                 )
              
-                s.mount('http://', TimeoutHTTPAdapter(max_retries=retry))
-                s.mount('https://', TimeoutHTTPAdapter(max_retries=retry))
+                s.mount('http://', TimeoutHTTPAdapter(max_retries=retry, timeout=self._timeout))
+                s.mount('https://', TimeoutHTTPAdapter(max_retries=retry, timeout=self._timeout))
                 self._s = s
             else:
                 s = self._s
