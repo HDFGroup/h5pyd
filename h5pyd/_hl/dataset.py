@@ -1194,9 +1194,7 @@ class Dataset(HLObject):
                         break
                     self.log.debug("{} rows left".format(rows_remaining))
 
-        elif isinstance(selection, sel.FancySelection):
-
-            
+        elif isinstance(selection, sel.FancySelection):     
             select = selection.getQueryParam()
             params['select'] = select
             MAX_SELECT_QUERY_LEN = 100
@@ -1204,7 +1202,7 @@ class Dataset(HLObject):
                 # use a post method to avoid long query strings
                 self.log.info("using post select")
                 try:
-                    rsp = self.POST(req, body=params, format="json")
+                    rsp = self.POST(req, body=params, format="binary")
                 except IOError as ioe:
                     self.log.info(f"got IOError: {ioe.errno}")       
                     raise IOError(f"Error retrieving data: {ioe.errno}")
