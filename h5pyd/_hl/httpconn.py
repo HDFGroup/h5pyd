@@ -522,14 +522,16 @@ class HttpConn:
 
         headers = self.getHeaders(headers=headers)
 
-        if format=="binary":
-            # For POST, binary we send and recieve data as binary
+        if isinstance(body, bytes):
             headers['Content-Type'] = "application/octet-stream"
-            headers['accept'] = 'application/octet-stream'
-            # binary write
             data = body
         else:
+            # assume json
             data = json.dumps(body)
+
+        if format=="binary":
+            # recieve data as binary
+            headers['accept'] = 'application/octet-stream'
 
         self.log.info("POST: " + req)
   
