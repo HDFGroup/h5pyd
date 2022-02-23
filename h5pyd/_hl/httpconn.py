@@ -160,12 +160,14 @@ class HttpConn:
     TBD: Should refactor these to a common base class
     """
     def __init__(self, domain_name, endpoint=None, username=None, password=None, bucket=None,
-            api_key=None, mode='a', use_session=True, use_cache=True, use_shared_mem=None, logger=None, retries=3, **kwds):
+            api_key=None, mode='a', use_session=True, use_cache=True, use_shared_mem=None, 
+            logger=None, retries=3, timeout=DEFAULT_TIMEOUT, **kwds):
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
         self._use_session = use_session
-        self._retries = 1  # for testing retries
+        self._retries = retries
+        self._timeout = timeout
         self._hsds = None
         self._lambda = None
         self._use_shared_mem = use_shared_mem
@@ -429,10 +431,10 @@ class HttpConn:
                 self.log.debug("adding {} to cache".format(req))
                 self._cache[req] = cache_rsp
 
-            if rsp.status_code == 200 and req == '/':  # and self._domain_json is None:
+            if rsp.status_code == 200 and req == '/':  
+                self.log.info(f"got domain json: {len(rsp.text)} bytes")
                 self._domain_json = json.loads(rsp.text)
-                self.log.info("got domain json: {}".format(self._domain_json))
-
+                
         return rsp
 
     def PUT(self, req, body=None, format="json", params=None, headers=None):
@@ -520,14 +522,16 @@ class HttpConn:
 
         headers = self.getHeaders(headers=headers)
 
-        if format=="binary":
-            # For POST, binary we send and recieve data as binary
+        if isinstance(body, bytes):
             headers['Content-Type'] = "application/octet-stream"
-            headers['accept'] = 'application/octet-stream'
-            # binary write
             data = body
         else:
+            # assume json
             data = json.dumps(body)
+
+        if format=="binary":
+            # recieve data as binary
+            headers['accept'] = 'application/octet-stream'
 
         self.log.info("POST: " + req)
   
@@ -610,8 +614,8 @@ class HttpConn:
                     allowed_methods=allowed_methods
                 )
              
-                s.mount('http://', TimeoutHTTPAdapter(max_retries=retry))
-                s.mount('https://', TimeoutHTTPAdapter(max_retries=retry))
+                s.mount('http://', TimeoutHTTPAdapter(max_retries=retry, timeout=self._timeout))
+                s.mount('https://', TimeoutHTTPAdapter(max_retries=retry, timeout=self._timeout))
                 self._s = s
             else:
                 s = self._s

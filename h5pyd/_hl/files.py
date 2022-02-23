@@ -105,7 +105,8 @@ class File(Group):
         return self._limits
 
     def __init__(self, domain, mode=None, endpoint=None, username=None, password=None, bucket=None,
-        api_key=None, use_session=True, use_cache=True, use_shared_mem=None, logger=None, owner=None, linked_domain=None, retries=10, **kwds):
+        api_key=None, use_session=True, use_cache=True, use_shared_mem=None, logger=None, owner=None, 
+        linked_domain=None, retries=10, timeout=180, **kwds):
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -139,6 +140,8 @@ class File(Group):
             Create new domain using the root of the linked domain
         retries
             Number of retry attempts to be used if a server request fails
+        timeout
+            Timeout value in seconds
         """
 
         groupid = None
@@ -182,8 +185,11 @@ class File(Group):
                     else:  # hdf5://
                         domain = domain[(len(protocol)-1):]
 
-            if domain.find('/') > 0:
-                raise IOError(400, "relative paths or not valid")
+            if not domain:
+                raise IOError(400, "no domain provided")
+            
+            if domain[0] != '/':
+                raise IOError(400, "relative paths are not valid")
 
             if endpoint is None:
                 if "H5SERV_ENDPOINT" in os.environ:
@@ -214,7 +220,9 @@ class File(Group):
 
             http_conn = HttpConn(domain, endpoint=endpoint,
                     username=username, password=password, bucket=bucket, mode=mode,
-                    api_key=api_key, use_session=use_session, use_cache=use_cache, use_shared_mem=use_shared_mem, logger=logger, retries=retries)
+                    api_key=api_key, use_session=use_session, use_cache=use_cache, 
+                    use_shared_mem=use_shared_mem, logger=logger, retries=retries,
+                    timeout=timeout)
 
             root_json = None
 
