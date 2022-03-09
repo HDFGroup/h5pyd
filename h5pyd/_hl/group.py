@@ -359,6 +359,9 @@ class Group(HLObject, MutableMappingHDF5):
             if data is not None and not isinstance(data, Empty) and (numpy.product(shape) != numpy.product(data.shape)):
                 raise ValueError("Shape tuple is incompatible with data")
         """
+        if data is not None and (shape is None or dtype is None):
+            shape = data.shape
+            dtype = data.dtype 
         dsid = dataset.make_new_dset(self, shape=shape, dtype=dtype, **kwds)
         dset = dataset.Dataset(dsid)
 
@@ -367,7 +370,6 @@ class Group(HLObject, MutableMappingHDF5):
             it = ChunkIterator(dset)
             for chunk in it:
                 dset[chunk] = data[chunk]
-            dset[...] = data
 
         if name is not None:
             items = name.split('/')
