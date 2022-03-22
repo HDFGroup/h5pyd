@@ -104,7 +104,7 @@ class DimensionProxy(base.CommonStateObject):
 
     def __init__(self, id_, dimension):
         self._id = id_
-        self._dimension = dimension
+        self._dimension = int(dimension)
 
     def __hash__(self):
         return hash((type(self), self._id, self._dimension))
