@@ -171,6 +171,12 @@ def convert_dtype(srcdt, ctx):
                 tgt_dt = h5py.special_dtype(vlen=tgt_base)
             else:
                 tgt_dt = h5pyd.special_dtype(vlen=tgt_base)
+        elif srcdt.kind == 'U':
+            # use vlen for unicode strings
+            if is_h5py(ctx['fout']):
+                tgt_dt = h5py.special_dtype(vlen=str)
+            else:
+                tgt_dt = h5pyd.special_dtype(vlen=str)
         else:
             tgt_dt = srcdt
     return tgt_dt
@@ -292,6 +298,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
 
     msg = "creating attribute {} in {}".format(name, srcobj.name)
     logging.debug(msg)
+
     if ctx["verbose"]:
         print(msg)
 
