@@ -459,8 +459,11 @@ def create_dataset(dobj, ctx):
             fletcher32 = dobj.fletcher32
             maxshape = dobj.maxshape
             scaleoffset = dobj.scaleoffset
-
-        fillvalue=get_fillvalue(dobj)
+        # setting the fillvalue is failing in some cases
+        # see: https://github.com/HDFGroup/h5pyd/issues/119
+        # just setting to None for now
+        # fillvalue=get_fillvalue(dobj)
+        fillvalue = None
         dset = fout.create_dataset(
             dobj.name, shape=dobj.shape, dtype=tgt_dtype, chunks=chunks,
             compression=compression, shuffle=shuffle, maxshape=maxshape,
