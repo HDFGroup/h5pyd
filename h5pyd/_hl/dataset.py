@@ -1531,7 +1531,7 @@ class Dataset(HLObject):
                 # server is HSDS, use binary data, use param values for selection
                 format = "binary"
                 body = arrayToBytes(val, vlen=vlen)
-                self.log.debug("writing binary data, {} bytes - {}".format(len(body), body))
+                self.log.debug(f"writing binary data, {len(body)}")
             else:
                 # h5serv, base64 encode, body json for selection
                 # TBD - replace with above once h5serv supports binary req
