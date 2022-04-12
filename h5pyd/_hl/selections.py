@@ -69,8 +69,6 @@ def select(obj, args):
         sel = ScalarSelection(obj.shape, args)
         return sel
 
-
-    #print("select, len(args):", len(args))
     # "Special" indexing objects
     if len(args) == 1:
         
@@ -344,7 +342,7 @@ class SimpleSelection(Selection):
                 raise TypeError("Invalid index for scalar dataset (only ..., () allowed)")
             self._select_type = H5S_SELECT_ALL
             return self
-
+        
         start, count, step, scalar = _handle_simple(self._shape,args)
         self._sel = (start, count, step, scalar)
 
@@ -358,7 +356,6 @@ class SimpleSelection(Selection):
     def getSelectNpoints(self):
         """Return number of elements in current selection
         """
-        #print("SimpleSelection.getSelectNPoints")
         npoints = None
         if self._select_type == H5S_SELECT_NONE:
             npoints = 0
@@ -368,7 +365,6 @@ class SimpleSelection(Selection):
             for nextent in dims:
                 npoints *= nextent
         elif self._select_type == H5S_SELECT_HYPERSLABS:
-            #print("sel hyperslabs, count:", self.count, "step:", self.step)
             dims = self._shape
             npoints = 1
             rank = len(dims)
@@ -642,7 +638,6 @@ def _handle_simple(shape, args):
 
     for arg, length in zip(args, shape):
         if isinstance(arg, slice):
-            #print "translate slice"
             x,y,z = _translate_slice(arg, length)
             s = False
         else:
@@ -650,7 +645,7 @@ def _handle_simple(shape, args):
                 x,y,z = _translate_int(int(arg), length)
                 s = True
             except TypeError:
-                raise TypeError('Illegal index "%s" (must be a slice or number)' % arg)
+                raise TypeError(f'Illegal index "{arg}" (must be a slice or number)')
         start.append(x)
         count.append(y)
         step.append(z)
