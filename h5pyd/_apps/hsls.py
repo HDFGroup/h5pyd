@@ -315,6 +315,9 @@ def visitDomains(domain, depth=1):
             num_bytes = " "
             if cfg["verbose"] and "total_size" in item:
                 num_bytes = item["total_size"]
+                if "total_size" not in cfg:
+                    cfg["total_size"] = 0
+                cfg["total_size"] += item["total_size"]
             else:
                  num_bytes = " "
             dir_class = item["class"]
@@ -326,6 +329,13 @@ def visitDomains(domain, depth=1):
             print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
                                               dir_class, timestamp,
                                               full_path))
+            if cfg["showacls"]:
+                if dir_class == "folder":
+                    with getFolder(domain + '/' + name + '/') as f:
+                        dumpAcls(f)
+                else:
+                    with getFile(domain + '/' + name) as f:
+                        dumpAcls(f)
             count += 1
 
             if dir_class == "folder":
@@ -335,11 +345,10 @@ def visitDomains(domain, depth=1):
 
     except IOError as oe:
         if oe.errno in (403, 404, 410):
-            # TBD: recently created domains may not be immediately visible to
-            # the service Once the flush operation is implemented, this should
-            # be an issue for h5pyd apps
-            #
-            # Also, ignore domains for which we don't have permsssions (403)
+            # Ignore domains for which:
+            #   * we don't have permsssions (403)
+            #   * not found error (404)
+            #   * recently deleted (410)
             pass
         else:
             print("error getting domain:", domain)
@@ -520,6 +529,13 @@ def main():
             if cfg["showacls"]:
                 dumpAcls(grp)
             grp.file.close()
+    if "total_size" in cfg and cfg["total_size"] > 0:
+        # print aggregate size
+        total_size = cfg["total_size"]
+        s = format_size(total_size)
+        s = s.strip()
+
+        print(f"{s} bytes")
 
 
 if __name__ == "__main__":
