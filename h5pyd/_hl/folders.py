@@ -107,6 +107,12 @@ class Folder():
         if len(domain_name) == 0:
             raise ValueError("Invalid folder name")
 
+        # strip prefix is any
+        for protocol in ("http://", "https://", "hdf5://"):
+            if domain_name.startswith(protocol):
+                n = len(protocol) - 1
+                domain_name = domain_name[n:]
+
         if domain_name[0] != '/':
             raise ValueError("Folder name must start with '/'")
 

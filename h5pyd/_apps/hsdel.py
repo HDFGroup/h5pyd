@@ -151,9 +151,6 @@ def main():
     logging.debug("set log_level to {}".format(loglevel))
 
     for domain in domains:
-        if not domain.startswith('/'):
-            sys.exit("domain: {} must start with a slash".format(domain))
-
         deleteDomain(domain)
 
 
