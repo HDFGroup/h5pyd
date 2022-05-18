@@ -413,9 +413,6 @@ class HttpConn:
             raise IOError("Connection Error")
         if rsp.status_code == 200 and self._cache is not None:
             rsp_headers = rsp.headers
-            for k in rsp_headers:
-                v = rsp_headers[k]
-                self.log.debug(f"rsp_headers[{k}] = {v}")
             content_length = 0
             if "Content-Length" in rsp_headers:
                 try:
