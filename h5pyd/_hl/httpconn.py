@@ -413,22 +413,25 @@ class HttpConn:
             raise IOError("Connection Error")
         if rsp.status_code == 200 and self._cache is not None:
             rsp_headers = rsp.headers
+            for k in rsp_headers:
+                v = rsp_headers[k]
+                self.log.debug(f"rsp_headers[{k}] = {v}")
             content_length = 0
-            self.log.debug("conent_length: {}".format(content_length))
             if "Content-Length" in rsp_headers:
                 try:
                     content_length = int(rsp_headers['Content-Length'])
                 except ValueError:
                     content_length = MAX_CACHE_ITEM_SIZE + 1
+            self.log.debug(f"content_length: {content_length}")
             content_type = None
             if "Content-Type" in rsp_headers:
                 content_type = rsp_headers['Content-Type']
-            self.log.debug("content_type: {}".format(content_type))
+            self.log.debug(f"content_type: {content_type}")
 
-            if content_type.startswith('application/json') and content_length < MAX_CACHE_ITEM_SIZE:
+            if content_type and content_type.startswith('application/json') and content_length < MAX_CACHE_ITEM_SIZE:
                 # add to our _cache
                 cache_rsp = CacheResponse(rsp)
-                self.log.debug("adding {} to cache".format(req))
+                self.log.debug(f"adding {req} to cache")
                 self._cache[req] = cache_rsp
 
             if rsp.status_code == 200 and req == '/':  
