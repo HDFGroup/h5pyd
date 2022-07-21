@@ -966,8 +966,30 @@ class HLObject(CommonStateObject):
                 # not available when http compression is used
                 self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
             else:
-                self.log.info("returning binary compressed content")
-            return rsp.content
+                self.log.info("returning binary content - length unknown")
+            HTTP_CHUNK_SIZE=4096
+            http_chunks = []
+            downloaded_bytes = 0
+            for http_chunk in rsp.iter_content(chunk_size=HTTP_CHUNK_SIZE):
+                if http_chunk:  # filter out keep alive chunks
+                    self.log.info(f"got http_chunk - {len(http_chunk)} bytes")
+                    downloaded_bytes += len(http_chunk)
+                    http_chunks.append(http_chunk)
+            if len(http_chunks) == 0:
+                raise IOError("no data returned")
+            if len(http_chunks) == 1:
+                # can return first and only chunk as response
+                rsp_content = http_chunks[0]
+            else:
+                msg = f"retrieved {len(http_chunks)} http_chunks "
+                msg += f" {downloaded_bytes} total bytes"
+                self.log.info(msg)
+                rsp_content = bytearray(downloaded_bytes)
+                index = 0
+                for http_chunk in http_chunks:
+                    rsp_content[index:(index+len(http_chunk))] = http_chunk
+                    index += len(http_chunk)
+            return rsp_content
         else:
             # assume JSON
             rsp_json = json.loads(rsp.text)
