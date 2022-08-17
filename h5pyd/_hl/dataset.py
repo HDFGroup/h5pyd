@@ -20,7 +20,7 @@ import base64
 import numpy
 
 from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes
-from .base import getNumElements, Empty, guess_dtype
+from .base import Empty, guess_dtype
 from .h5type import Reference, RegionReference
 from .base import _decode
 from .objectid import DatasetID
@@ -1172,26 +1172,6 @@ class Dataset(HLObject):
                     page_mshape = tuple(page_mshape)
                     self.log.info(f"page_mshape: {page_mshape}")
 
-                    # This could turn  out to be too small for varible length types
-                    # Will get an EntityTooSmall error from HSDS in that case
-                    num_bytes = getNumElements(page_mshape) * mtype.itemsize
-                    MIN_SHARED_MEM_SIZE = 1024 * 1024  # 1 MB
-                    MAX_SHARED_MEM_SIZE = 1024 * 1024 * 100  # 100 MB
-                    if (
-                        self.id._http_conn.use_shared_mem
-                        and num_bytes >= MIN_SHARED_MEM_SIZE
-                        and num_bytes <= MAX_SHARED_MEM_SIZE
-                    ):
-                        self.id._http_conn.get_shm_buffer(min_size=num_bytes)
-                        shm_name = self.id._http_conn.shm_buffer_name
-                    else:
-                        shm_name = None
-
-                    if shm_name:
-                        params["shm_name"] = shm_name
-                    elif "shm_name" in params:
-                        del params["shm_name"]
-
                     params["select"] = self._getQueryParam(
                         page_start, page_stop, sel_step
                     )
@@ -1265,23 +1245,10 @@ class Dataset(HLObject):
                 except IOError as ioe:
                     self.log.info(f"got IOError: {ioe.errno}")
                     raise IOError(f"Error retrieving data: {ioe.errno}")
-            if type(rsp) is bytes:
+            if type(rsp) in (bytes, bytearray):
                 # got binary response
                 self.log.info(f"binary response, {len(rsp)} bytes")
                 arr = bytesToArray(rsp, mtype, mshape)
-            elif "shm_name" in rsp:
-                # passed a shared memory object
-                if rsp["shm_name"] != self.id._http_conn.shm_buffer_name:
-                    # not the object we expected to get!
-                    raise IOError("Unexpected shared memory block returned")
-                num_bytes = rsp["num_bytes"]
-
-                # shared memory block is generally allocated on page
-                # boundries, so copy just the bytes we need for the array
-                des = bytearray(num_bytes)
-                src = self.id._http_conn.get_shm_buffer()
-                des[:] = src[:num_bytes]
-                arr = bytesToArray(des, mtype, mshape)
             else:
                 # got JSON response
                 # need some special conversion for compound types --
@@ -1362,7 +1329,7 @@ class Dataset(HLObject):
                     body["points"] = points
                 self.log.info("sending point selection request: {}".format(body))
             rsp = self.POST(req, format=format, body=body)
-            if type(rsp) is bytes:
+            if type(rsp) in (bytes, bytearray):
                 if len(rsp) // mtype.itemsize != selection.mshape[0]:
                     raise IOError(
                         "Expected {} elements, but got {}".format(
