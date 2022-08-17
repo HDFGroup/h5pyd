@@ -1206,29 +1206,12 @@ class Dataset(HLObject):
                             break
                         else:
                             raise IOError(f"Error retrieving data: {ioe.errno}")
-                    if type(rsp) is bytes:
+                    if type(rsp) in (bytes, bytearray):
                         # got binary response
                         # TBD - check expected number of bytes
                         self.log.info(f"binary response, {len(rsp)} bytes")
                         # arr1d = numpy.frombuffer(rsp, dtype=mtype)
                         arr1d = bytesToArray(rsp, mtype, page_mshape)
-                        page_arr = numpy.reshape(arr1d, page_mshape)
-                    elif "shm_name" in rsp:
-                        # passed a shared memory object
-                        if rsp["shm_name"] != self.id._http_conn.shm_buffer_name:
-                            # not the object we expected to get!
-                            raise IOError("Unexpected shared memory block returned")
-                        self.log.info(
-                            f"getting data via shared memory object: {rsp['shm_name']}"
-                        )
-                        num_bytes = rsp["num_bytes"]
-
-                        # shared memory block is generally allocated on page
-                        # boundries, so copy just the bytes we need for the array
-                        des = bytearray(num_bytes)
-                        src = self.id._http_conn.get_shm_buffer()
-                        des[:] = src[:num_bytes]
-                        arr1d = bytesToArray(des, mtype, page_mshape)
                         page_arr = numpy.reshape(arr1d, page_mshape)
                     else:
                         # got JSON response

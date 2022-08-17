@@ -94,7 +94,7 @@ class TestFile(TestCase):
             n = version.find(".")
             self.assertTrue(n>=1)
             limits = f.limits
-            for k in ('min_chunk_size', 'max_chunk_size', 'max_request_size', 'max_chunks_per_request'):
+            for k in ('min_chunk_size', 'max_chunk_size', 'max_request_size'):
                 self.assertTrue(k in limits)
 
         r = f['/']

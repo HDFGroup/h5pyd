@@ -28,6 +28,9 @@ def visit_item_obj(name, obj):
 
 print("version:", h5py.version.version)
 
+# this is the path specified in the "post-install instructions"
+# see:  "Test Data Setup" in:
+#  https://github.com/HDFGroup/hsds/blob/master/docs/post_install.md
 DOMAIN_PATH="/home/test_user1/test/tall.h5"
 print("opening domain:", DOMAIN_PATH)
 
