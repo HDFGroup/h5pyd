@@ -16,27 +16,27 @@ from distutils.version import StrictVersion as _sv
 import sys
 import numpy
 
-version = "0.10.1"
+version = "0.10.2"
 
 hdf5_version = "REST"
 
 _exp = _sv(version)
 
-version_tuple = (
-    _exp.version +
-    (
-        (''.join(str(x) for x in _exp.prerelease),)
-        if _exp.prerelease is not None else ('',)
-    )
+version_tuple = _exp.version + (
+    ("".join(str(x) for x in _exp.prerelease),)
+    if _exp.prerelease is not None
+    else ("",)
 )
 
-api_version_tuple = (0, 10, 1)
-api_version = "0.10.1"
+api_version_tuple = (0, 10, 2)
+api_version = "0.10.2"
 
 __doc__ = """\
 This is h5pyd **%s**
 
-""" % (version)
+""" % (
+    version
+)
 
 info = """\
 Summary of the h5pyd configuration
@@ -47,8 +47,10 @@ Python  %(python)s
 sys.platform    %(platform)s
 sys.maxsize     %(maxsize)s
 numpy   %(numpy)s
-""" % {'h5pyd': version,
-       'python': sys.version,
-       'platform': sys.platform,
-       'maxsize': sys.maxsize,
-       'numpy': numpy.__version__}
+""" % {
+    "h5pyd": version,
+    "python": sys.version,
+    "platform": sys.platform,
+    "maxsize": sys.maxsize,
+    "numpy": numpy.__version__,
+}
