@@ -16,7 +16,7 @@ from distutils.version import StrictVersion as _sv
 import sys
 import numpy
 
-version = "0.10.2"
+version = "0.10.3"
 
 hdf5_version = "REST"
 
@@ -28,8 +28,8 @@ version_tuple = _exp.version + (
     else ("",)
 )
 
-api_version_tuple = (0, 10, 2)
-api_version = "0.10.2"
+api_version_tuple = (0, 10, 3)
+api_version = "0.10.3"
 
 __doc__ = """\
 This is h5pyd **%s**
