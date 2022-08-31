@@ -16,7 +16,8 @@ import json
 from .httpconn import HttpConn
 from .config import Config
 
-def getServerInfo( endpoint=None, username=None, password=None, api_key=None, **kwds):
+
+def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **kwds):
 
     cfg = Config()  # get credentials from .hscfg file (if found)
 
@@ -33,7 +34,9 @@ def getServerInfo( endpoint=None, username=None, password=None, api_key=None, **
         api_key = cfg["hs_api_key"]
 
     # http_conn without a domain
-    http_conn = HttpConn(None, endpoint=endpoint, username=username, password=password, api_key=api_key)
+    http_conn = HttpConn(
+        None, endpoint=endpoint, username=username, password=password, api_key=api_key
+    )
 
     rsp = http_conn.GET("/about")
     if rsp.status_code == 400:
@@ -43,7 +46,7 @@ def getServerInfo( endpoint=None, username=None, password=None, api_key=None, **
     if rsp.status_code != 200:
         raise IOError(rsp.status_code, rsp.reason)
 
-    rspJson = json.loads(rsp.text)
+    rspJson = rsp.json()
 
     # mix in client connect info
     rspJson["endpoint"] = endpoint
@@ -52,15 +55,11 @@ def getServerInfo( endpoint=None, username=None, password=None, api_key=None, **
     else:
         rspJson["username"] = username
     if not password:
-        rspJson["password"] = ''
+        rspJson["password"] = ""
     else:
-        rspJson["password"] = '*'*len(password)        
+        rspJson["password"] = "*" * len(password)
 
     http_conn.close()
     http_conn = None
 
     return rspJson
-
-
-
-

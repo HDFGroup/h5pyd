@@ -214,9 +214,11 @@ class HttpConn:
             msg = "no endpoint set"
             raise ValueError(msg)
 
-        if endpoint.startswith("lambda:"):
+        lambda_prefix = requests_lambda.LAMBDA_REQ_PREFIX
+
+        if endpoint.startswith(lambda_prefix):
             # save lambda function name
-            self._lambda = endpoint[len("lambda:") :]
+            self._lambda = endpoint[len(lambda_prefix) :]
 
         elif endpoint.startswith("local"):
             # create a local hsds server
@@ -435,11 +437,15 @@ class HttpConn:
                 self._hsds.run()
 
             s = self.session
+            if self._lambda:
+                stream = False
+            else:
+                stream = True
             rsp = s.get(
                 self._endpoint + req,
                 params=params,
                 headers=headers,
-                stream=True,
+                stream=stream,
                 timeout=self._timeout,
                 verify=self.verifyCert(),
             )
@@ -655,6 +661,7 @@ class HttpConn:
         retries = self._retries
         backoff_factor = 1
         status_forcelist = (500, 502, 503, 504)
+        lambda_prefix = requests_lambda.LAMBDA_REQ_PREFIX
         allowed_methods = [
             "HEAD",
             "GET",
@@ -669,7 +676,7 @@ class HttpConn:
                 if self._endpoint.startswith("http+unix://"):
                     self.log.debug("create unixsocket session")
                     s = requests_unixsocket.Session()
-                elif self._endpoint.startswith("http+lambda://"):
+                elif self._endpoint.startswith(lambda_prefix):
                     s = requests_lambda.Session()
                 else:
                     # regular request session
