@@ -14,24 +14,25 @@ from __future__ import absolute_import
 
 import os.path as op
 import json
+import time
 import logging
 from .httpconn import HttpConn
 from .config import Config
 
 
-class Folder():
+class Folder:
 
     """
-        Represents a folder of domains
+    Represents a folder of domains
     """
 
     @property
     def domain(self):
         domain = self._domain
         if domain is None:
-            domain = ''
+            domain = ""
 
-        r = domain + '/'
+        r = domain + "/"
 
         return r
 
@@ -40,8 +41,7 @@ class Folder():
         if self._domain is None:
             return None
         else:
-            return op.dirname(self._domain) + '/'
-
+            return op.dirname(self._domain) + "/"
 
     @property
     def modified(self):
@@ -55,21 +55,36 @@ class Folder():
 
     @property
     def owner(self):
-        """Username of the owner of the folder """
+        """Username of the owner of the folder"""
         return self._owner
 
     @property
     def is_folder(self):
-        """ is this a proper folder (i.e. domain without root group),
-            or a domain """
+        """is this a proper folder (i.e. domain without root group),
+        or a domain"""
         if self._obj_class == "folder":
             return True
         else:
             return False
 
-
-    def __init__(self, domain_name, pattern=None, query=None, mode=None, endpoint=None, verbose=False,
-        username=None, password=None, bucket=None, api_key=None, logger=None, owner=None, batch_size=1000, retries=3, **kwds):
+    def __init__(
+        self,
+        domain_name,
+        pattern=None,
+        query=None,
+        mode=None,
+        endpoint=None,
+        verbose=False,
+        username=None,
+        password=None,
+        bucket=None,
+        api_key=None,
+        logger=None,
+        owner=None,
+        batch_size=1000,
+        retries=3,
+        **kwds,
+    ):
         """Create a new Folders object.
 
         domain_name
@@ -113,20 +128,20 @@ class Folder():
                 n = len(protocol) - 1
                 domain_name = domain_name[n:]
 
-        if domain_name[0] != '/':
+        if domain_name[0] != "/":
             raise ValueError("Folder name must start with '/'")
 
-        if domain_name[-1] != '/':
+        if domain_name[-1] != "/":
             raise ValueError("Folder name must end with '/'")
 
-        if mode and mode not in ('r', 'r+', 'w', 'w-', 'x', 'a'):
+        if mode and mode not in ("r", "r+", "w", "w-", "x", "a"):
             raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
 
         self._pattern = pattern
         self._query = query
 
         if mode is None:
-            mode = 'r'
+            mode = "r"
 
         cfg = Config()  # pulls in state from a .hscfg file (if found).
 
@@ -154,21 +169,48 @@ class Folder():
         self._batch_size = batch_size
         self._verbose = verbose
 
-        self._http_conn = HttpConn(self._domain, endpoint=endpoint, username=username,
-            password=password, bucket=bucket, api_key=api_key, mode=mode, logger=logger, retries=retries)
+        self._http_conn = HttpConn(
+            self._domain,
+            endpoint=endpoint,
+            username=username,
+            password=password,
+            bucket=bucket,
+            api_key=api_key,
+            mode=mode,
+            logger=logger,
+            retries=retries,
+        )
         self.log = self._http_conn.logging
 
         domain_json = None
 
         # try to do a GET from the domain
-        if domain_name == '/':
+        if domain_name == "/":
             req = "/domains"
         else:
-            req = '/'
+            req = "/"
 
-        rsp = self._http_conn.GET(req)
+        # need some special logic for the first request in local mode
+        # to give the sockets time to initialize
+        if endpoint.startswith("local"):
+            connect_backoff = [0.5, 1, 2, 4, 8, 16]
+        else:
+            connect_backoff = []
 
-        if rsp.status_code in (404, 410) and mode in ('w', 'w-', 'x'):
+        connect_try = 0
+
+        while True:
+            try:
+                rsp = self._http_conn.GET(req)
+                break
+            except IOError:
+                if connect_try < len(connect_backoff):
+                    time.sleep(connect_backoff[connect_try])
+                else:
+                    raise
+                connect_try += 1
+
+        if rsp.status_code in (404, 410) and mode in ("w", "w-", "x"):
             # create folder
             body = {"folder": True}
             if owner:
@@ -197,11 +239,11 @@ class Folder():
             self._obj_class = "folder"
         self._name = domain_name
         if "created" in domain_json:
-            self._created = domain_json['created']
+            self._created = domain_json["created"]
         else:
             self._created = None
         if "lastModified" in domain_json:
-            self._modified = domain_json['lastModified']
+            self._modified = domain_json["lastModified"]
         else:
             self._modified = None
         if "owner" in domain_json:
@@ -212,7 +254,7 @@ class Folder():
     def getACL(self, username):
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
-        req = '/acls/' + username
+        req = "/acls/" + username
         rsp = self._http_conn.GET(req)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
@@ -223,7 +265,7 @@ class Folder():
     def getACLs(self):
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
-        req = '/acls'
+        req = "/acls"
         rsp = self._http_conn.GET(req)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
@@ -234,7 +276,7 @@ class Folder():
     def putACL(self, acl):
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
-        if self._http_conn.mode == 'r':
+        if self._http_conn.mode == "r":
             raise IOError(400, "folder is open as read-onnly")
         if "userName" not in acl:
             raise IOError(404, "ACL has no 'userName' key")
@@ -244,11 +286,10 @@ class Folder():
                 raise IOError(404, "Missing ACL field: {}".format(k))
             perm[k] = acl[k]
 
-        req = '/acls/' + acl['userName']
+        req = "/acls/" + acl["userName"]
         rsp = self._http_conn.PUT(req, body=perm)
         if rsp.status_code != 201:
             raise IOError(rsp.status_code, rsp.reason)
-
 
     def _getSubdomains(self):
         if self._http_conn is None:
@@ -256,11 +297,11 @@ class Folder():
         if self._subdomains is not None and not self._subdomain_marker:
             # we've got all the subdomains, return 0 to indicate none were fetched
             return 0
-        req = '/domains'
+        req = "/domains"
         if self._domain is None:
-            params = {"domain": '/'}
+            params = {"domain": "/"}
         else:
-            params = {"domain": self._domain + '/'}
+            params = {"domain": self._domain + "/"}
         if self._verbose:
             params["verbose"] = 1  # to get lastModified
         if not self._query:
@@ -291,16 +332,14 @@ class Folder():
             self._subdomain_marker = None  # we got all the domains
         return count
 
-
     def close(self):
-        """ Clears reference to remote resource.
-        """
+        """Clears reference to remote resource."""
         self._domain = None
         self._http_conn.close()
         self._http_conn = None
 
     def __getitem__(self, name):
-        """ Get a domain  """
+        """Get a domain"""
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         if self._subdomains is None:
@@ -317,32 +356,32 @@ class Folder():
         return None
 
     def delete_item(self, name, keep_root=False):
-        """ delete domain """
+        """delete domain"""
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
-        if self._http_conn.mode == 'r':
+        if self._http_conn.mode == "r":
             raise IOError(400, "folder is open as read-onnly")
         if self._domain:
-            domain = self._domain + '/' + name
+            domain = self._domain + "/" + name
         else:
-            domain = '/' + name  # top-level delete
+            domain = "/" + name  # top-level delete
         headers = self._http_conn.getHeaders()
-        req = '/'
+        req = "/"
         params = {"domain": domain}
         if keep_root:
             params["keep_root"] = 1
         rsp = self._http_conn.DELETE(req, headers=headers, params=params)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
-        self._subdomains = None # reset the cache list
+        self._subdomains = None  # reset the cache list
         self._subdomain_marker = None
 
     def __delitem__(self, name):
-        """ Delete domain. """
+        """Delete domain."""
         self.delete_item(name)
 
     def __len__(self):
-        """ Number of subdomains of this folder """
+        """Number of subdomains of this folder"""
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         count = 1
@@ -351,9 +390,8 @@ class Folder():
             count = self._getSubdomains()
         return len(self._subdomains)
 
-
     def __iter__(self):
-        """ Iterate over subdomain names """
+        """Iterate over subdomain names"""
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         self._getSubdomains()
@@ -366,11 +404,10 @@ class Folder():
                     break
             domain = self._subdomains[index]
             index += 1
-            yield op.basename(domain['name'])
-
+            yield op.basename(domain["name"])
 
     def __contains__(self, name):
-        """ Test if a member name exists """
+        """Test if a member name exists"""
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
         self._getSubdomains()
@@ -384,11 +421,10 @@ class Folder():
                     break
             domain = self._subdomains[index]
             index += 1
-            if op.basename(domain['name']) == name:
+            if op.basename(domain["name"]) == name:
                 found = True
                 break
         return found
-
 
     def __enter__(self):
         return self

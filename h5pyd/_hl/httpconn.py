@@ -27,9 +27,9 @@ from requests import ConnectionError
 from requests.adapters import HTTPAdapter, Retry
 import json
 import logging
+import time
 
 from . import openid
-from .hsdsapp import HsdsApp
 from .config import Config
 from . import requests_lambda
 
@@ -247,8 +247,19 @@ class HttpConn:
                 from hsds.hsds_app import HsdsApp
             except ImportError:
                 raise IOError("unable to import HSDS package")
+
+            # path created by the python tempdir is too long for use with sockets
+            # just use /tmp for now
+            tmp_dir = "/tmp/hs"
+            if not os.path.isdir(tmp_dir):
+                os.mkdir(tmp_dir)
+            log_dir = os.path.join(tmp_dir, "hs.log")
             hsds = HsdsApp(
-                username=username, password=password, dn_count=dn_count, logger=self.log
+                username=username,
+                password=password,
+                dn_count=dn_count,
+                logfile=log_dir,
+                socket_dir=tmp_dir,
             )
             hsds.run()
             self._hsds = hsds
@@ -458,6 +469,8 @@ class HttpConn:
         except Exception as e:
             self.log.error(f"got {type(e)} exception: {e}")
             raise IOError("Unexpected exception")
+
+        content_type = None
         if rsp.status_code == 200 and self._cache is not None:
             rsp_headers = rsp.headers
             content_length = 0
@@ -467,7 +480,7 @@ class HttpConn:
                 except ValueError:
                     content_length = MAX_CACHE_ITEM_SIZE + 1
             self.log.debug(f"content_length: {content_length}")
-            content_type = None
+
             if "Content-Type" in rsp_headers:
                 content_type = rsp_headers["Content-Type"]
             self.log.debug(f"content_type: {content_type}")
@@ -476,6 +489,7 @@ class HttpConn:
                 content_type
                 and content_type.startswith("application/json")
                 and content_length < MAX_CACHE_ITEM_SIZE
+                and not req.endswith("/value")
             ):
                 # add to our _cache
                 cache_rsp = CacheResponse(rsp)
@@ -485,6 +499,29 @@ class HttpConn:
             if rsp.status_code == 200 and req == "/":
                 self.log.info(f"got domain json: {len(rsp.text)} bytes")
                 self._domain_json = json.loads(rsp.text)
+
+        # when calling AWS Lambda thru API Gatway, the status_code
+        # indicates the Lambda request was successful, but not necessarily
+        # the requested HSDS action was.
+        # Check here and raise IOError is needed.
+        if (
+            rsp.status_code == 200
+            and content_type
+            and content_type.startswith("application/json")
+        ):
+            body = json.loads(rsp.text)
+            if "statusCode" in body:
+                status_code = body["statusCode"]
+                if status_code == 400:
+                    raise IOError("Invalid request")
+                if status_code == 403:
+                    raise IOError("Unauthorize")
+                if status_code == 404:
+                    raise IOError("Not found")
+                if status_code == 410:
+                    raise IOError("Conflict")
+                if status_code == 500:
+                    raise IOError("Unexpected error")
 
         return rsp
 
@@ -674,7 +711,7 @@ class HttpConn:
         if self._use_session:
             if self._s is None:
                 if self._endpoint.startswith("http+unix://"):
-                    self.log.debug("create unixsocket session")
+                    self.log.debug(f"create unixsocket session: {self._endpoint}")
                     s = requests_unixsocket.Session()
                 elif self._endpoint.startswith(lambda_prefix):
                     s = requests_lambda.Session()

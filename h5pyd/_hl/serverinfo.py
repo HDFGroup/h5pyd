@@ -12,7 +12,7 @@
 
 from __future__ import absolute_import
 
-import json
+import time
 from .httpconn import HttpConn
 from .config import Config
 
@@ -38,7 +38,26 @@ def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **k
         None, endpoint=endpoint, username=username, password=password, api_key=api_key
     )
 
-    rsp = http_conn.GET("/about")
+    # need some special logic for the first request in local mode
+    # to give the sockets time to initialize
+    if endpoint.startswith("local"):
+        connect_backoff = [0.5, 1, 2, 4, 8, 16]
+    else:
+        connect_backoff = []
+
+    connect_try = 0
+
+    while True:
+        try:
+            rsp = http_conn.GET("/about")
+            break
+        except IOError as ioe:
+            if connect_try < len(connect_backoff):
+                time.sleep(connect_backoff[connect_try])
+            else:
+                raise
+            connect_try += 1
+
     if rsp.status_code == 400:
         # h5serv uses info for status
         rsp = http_conn.GET("/info")

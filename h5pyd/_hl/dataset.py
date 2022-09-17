@@ -1186,6 +1186,11 @@ class Dataset(HLObject):
                             break
                         else:
                             raise IOError(f"Error retrieving data: {ioe.errno}")
+                    if isinstance(rsp, str):
+                        # hexencoded response?
+                        # this is returned by API Gateway for lamba responses
+                        rsp = bytes.fromhex(rsp)
+                        # from here treat it like a byte responses
                     if type(rsp) in (bytes, bytearray):
                         # got binary response
                         # TBD - check expected number of bytes

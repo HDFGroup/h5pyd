@@ -66,7 +66,6 @@ class LambdaResponse:
         self._content_length = 0
         self._iter_index = 0
         if lambda_rsp and isinstance(lambda_rsp, dict):
-
             if "StatusCode" in lambda_rsp:
                 lambda_status_code = lambda_rsp["StatusCode"]
 
@@ -74,6 +73,11 @@ class LambdaResponse:
                     payload = lambda_rsp["Payload"]
                     rsp_text = payload.read().decode("utf-8")
                     rsp_payload = json.loads(rsp_text)
+                    if rsp_payload.get("isBase64Encoded"):
+                        is_base64_encoded = True
+                    else:
+                        is_base64_encoded = False
+
                     if "statusCode" in rsp_payload:
                         self._status_code = rsp_payload["statusCode"]
                     if "headers" in rsp_payload:
@@ -89,7 +93,7 @@ class LambdaResponse:
                         # otherwise just set the text prop
                         if isinstance(body_text, dict):
                             self._json = body_text
-                        elif "isBase64Encoded" in rsp_payload:
+                        elif is_base64_encoded and body_text:
                             # convert hex encoded to bytes
                             self._text = bytes.fromhex(body_text)
                         else:
@@ -164,7 +168,7 @@ class Session:
         # print(f"requests_lambda mount({protocol})")
         pass
 
-    def _invoke(self, req, method="GET", params=None, headers=None):
+    def _invoke(self, req, method="GET", params=None, headers=None, data=None):
         if not req:
             msg = "no req"
             raise ValueError(msg)
@@ -173,6 +177,9 @@ class Session:
             raise ValueError(msg)
         if method not in ("GET", "PUT", "POST", "DELETE"):
             msg = f"Unexpected method: {method}"
+            raise ValueError(msg)
+        if method in ("GET", "DELETE") and data:
+            msg = f"data not expected for method: {method}"
             raise ValueError(msg)
 
         # Convert uri of the form: http+lambda://FUNC_NAME/REQ
@@ -209,19 +216,31 @@ class Session:
             "path": req_path,
             "params": params,
             "headers": json_headers,
+            "body": data,
         }
 
         payload = json.dumps(req_json).encode("utf-8")
 
         import boto3  # import here so it's not a global dependency
+        from botocore.exceptions import ClientError
 
         # with boto3.client('lambda')
         lambda_client = boto3.client("lambda")
-        lambda_rsp = lambda_client.invoke(
-            FunctionName=function_name,
-            InvocationType="RequestResponse",
-            Payload=payload,
-        )
+        try:
+            lambda_rsp = lambda_client.invoke(
+                FunctionName=function_name,
+                InvocationType="RequestResponse",
+                Payload=payload,
+            )
+        except ClientError as ce:
+            if "Error" in ce.response and "Code" in ce.response["Error"]:
+                error_code = ce.response["Error"]["Code"]
+            else:
+                error_code = "Unknown Lambda error"
+            if error_code == "UnrecognizedClientException":
+                # this happens when the AWS access key not provided
+                error_code += " (are the AWS credentials valid?)"
+            raise ValueError(error_code)
         rsp = LambdaResponse(lambda_rsp)
         return rsp
 
@@ -238,27 +257,27 @@ class Session:
         rsp = self._invoke(req, params=params, headers=headers)
         return rsp
 
-    def put(self, req, params=None, headers=None, timeout=None, verify=None):
+    def put(self, req, params=None, headers=None, data=None, verify=None):
         """
         Lambda PUT request
 
         req should be in form: "http+lambda://function/path"
         """
-        rsp = self._invoke(
-            req, method="PUT", params=params, headers=headers, timeout=None, verify=None
-        )
+        rsp = self._invoke(req, method="PUT", params=params, headers=headers, data=data)
         return rsp
 
-    def post(self, req, params=None, headers=None, timeout=None, verify=None):
+    def post(self, req, params=None, headers=None, data=None, verify=None):
         """
         Lambda POST request
 
         req should be in form: "http+lambda://function/path"
         """
-        rsp = self._invoke(req, method="POST", params=params, headers=headers)
+        rsp = self._invoke(
+            req, method="POST", params=params, headers=headers, data=data
+        )
         return rsp
 
-    def delete(self, req, params=None, headers=None, timeout=None, verify=None):
+    def delete(self, req, params=None, headers=None, verify=None):
         """
         Lambda DELETE request
 
