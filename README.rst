@@ -24,7 +24,7 @@ Websites
 
 * Main website: http://www.hdfgroup.org
 * Source code: https://github.com/HDFGroup/h5pyd
-* Mailing list: hdf-forum@lists.hdfgroup.org <hdf-forum@lists.hdfgroup.org>
+* Forum: https://forum.hdfgroup.org/c/hsds
 * Documentation: TBD (but http://docs.h5py.org/en/latest/ should be helpful)
 
 Related Projects
@@ -56,7 +56,7 @@ to point to an existing HSDS instance.
 h5pyd can all be run in serverless mode with either AWS Lambda or direct mode (storage system accessed directly).
 
 To use with AWS Lambda, set the HS_ENDPOINT to: "http+lambda://hslambda" where "hslambda" is the name
-of the lambda function.  WWhen using AWS Lambda some additional environment variables need to be set:
+of the lambda function.  When using AWS Lambda some additional environment variables need to be set:
 
 * ``AWS_LAMBDA_GATEWAY`` - AWS Lambda endpoint, e.g.: ``https://lambda.us-west-2.amazonaws.com``
 * ``AWS_REGION`` - Region where the Lambda function is installed, e.g.: ``us-west-2``
