@@ -91,12 +91,12 @@ Serveral utility applications are included with this package:
 
 * ``hsconfigure`` - save endpoint, username, and password in config files
 * ``hsacl`` - read/update ACL (access control list) for a given folder or domain
-* ``hscopy`` - copy a Documentation
+* ``hscopy`` - copy a domain
 * ``hsrm`` - delete a domain or folder
-* ``hsdiff`` - compare two domains
+* ``hsdiff`` - compare HDF5 file with HSDS domain
 * ``hsget`` - create an HDF5 file from HSDS domain
 * ``hsinfo`` - get server status or domain details
-* ``hsload`` - upload an HDF5 file to HSDS
+* ``hsload`` - upload an HDF5 file to an HSDS domain
 * ``hsls`` - list contents of domain or folder
 * ``hsmv`` - change the naame of a domain
 * ``hstouch`` - create new domain or folder
