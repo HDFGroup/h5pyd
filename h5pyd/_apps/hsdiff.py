@@ -23,6 +23,7 @@ except ImportError as e:
 
 try:
     import s3fs
+
     S3FS_IMPORT = True
 except ImportError:
     S3FS_IMPORT = False
@@ -36,13 +37,16 @@ else:
 
 cfg = Config()
 
+
 def diff_attrs(src, tgt, ctx):
-    """ compare attributes of src and tgt """
+    """compare attributes of src and tgt"""
     msg = "checking attributes of {}".format(src.name)
     logging.debug(msg)
 
     if len(src.attrs) != len(tgt.attrs):
-        msg = "<{}> have a different number of attribute from <{}>".format(src.name, tgt.name)
+        msg = "<{}> have a different number of attribute from <{}>".format(
+            src.name, tgt.name
+        )
         logging.info(msg)
         if not ctx["quiet"]:
             print(msg)
@@ -55,7 +59,9 @@ def diff_attrs(src, tgt, ctx):
         if ctx["verbose"]:
             print(msg)
         if name not in tgt.attrs:
-            msg = "<{}>  has attribute {} not found in <{}>".format(src.name, name, tgt.name)
+            msg = "<{}>  has attribute {} not found in <{}>".format(
+                src.name, name, tgt.name
+            )
             logging.info(msg)
             if not ctx["quiet"]:
                 print(msg)
@@ -73,7 +79,9 @@ def diff_attrs(src, tgt, ctx):
                 ctx["differences"] += 1
                 return False
             if src_attr.shape != tgt_attr.shape:
-                msg = "Shape of attribute {} of <{}> is different".format(name, src.name)
+                msg = "Shape of attribute {} of <{}> is different".format(
+                    name, src.name
+                )
                 logging.info(msg)
                 if not ctx["quiet"]:
                     print(msg)
@@ -88,7 +96,9 @@ def diff_attrs(src, tgt, ctx):
                 return False
         elif src_attr != tgt_attr:
             # returned as int or string, just compare values
-            msg = "<{}>  has attribute {} different than <{}>".format(src.name, name, tgt.name)
+            msg = "<{}>  has attribute {} different than <{}>".format(
+                src.name, name, tgt.name
+            )
             logging.info(msg)
 
             if not ctx["quiet"]:
@@ -101,8 +111,7 @@ def diff_attrs(src, tgt, ctx):
 
 
 def diff_group(src, ctx):
-    """ compare group in src and tgt
-    """
+    """compare group in src and tgt"""
     msg = "checking group <{}>".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
@@ -123,7 +132,9 @@ def diff_group(src, ctx):
     # printed when there is a difference
     output = "group: <{}> and <{}>".format(src.name, tgt.name)
     if len(src) != len(tgt):
-        msg = "{} group have a different number of links from {}".format(src.name, tgt.name)
+        msg = "{} group have a different number of links from {}".format(
+            src.name, tgt.name
+        )
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
@@ -136,7 +147,9 @@ def diff_group(src, ctx):
         if ctx["verbose"]:
             print("got link: '{}' of group <{}>".format(title, src.name))
         if title not in tgt:
-            msg = "<{}> group has link {} not found in <{}>".format(src.name, title, tgt.name)
+            msg = "<{}> group has link {} not found in <{}>".format(
+                src.name, title, tgt.name
+            )
             logging.info(msg)
             if ctx["verbose"]:
                 print(msg)
@@ -150,7 +163,9 @@ def diff_group(src, ctx):
         lnk_tgt = tgt.get(title, getlink=True)
         lnk_tgt_type = lnk_tgt.__class__.__name__
         if lnk_src_type != lnk_tgt_type:
-            msg = "<{}> group has link {} of different type than found in <{}>".format(src.name, title, tgt.name)
+            msg = "<{}> group has link {} of different type than found in <{}>".format(
+                src.name, title, tgt.name
+            )
             logging.info(msg)
             if ctx["verbose"]:
                 print(msg)
@@ -168,7 +183,9 @@ def diff_group(src, ctx):
                 print(msg)
             logging.info(msg)
             if lnk_src.path != lnk_tgt.path:
-                msg = "<{}> group has link {} with different path than <{}>".format(src.name, title, tgt.name)
+                msg = "<{}> group has link {} with different path than <{}>".format(
+                    src.name, title, tgt.name
+                )
                 if ctx["verbose"]:
                     print(msg)
                 if not ctx["quiet"]:
@@ -176,12 +193,16 @@ def diff_group(src, ctx):
                 ctx["differences"] += 1
                 return False
         elif lnk_src_type == "ExternalLink":
-            msg = "<{}> group has ExternalLink {} ({}, {})".format(src.name, title, lnk_src.filename, lnk_src.path)
+            msg = "<{}> group has ExternalLink {} ({}, {})".format(
+                src.name, title, lnk_src.filename, lnk_src.path
+            )
             if ctx["verbose"]:
                 print(msg)
             logging.info(msg)
             if lnk_src.filename != lnk_tgt.filename:
-                msg = "<{}> group has external link {} with different filename than <{}>".format(src.name, title, tgt.name)
+                msg = "<{}> group has external link {} with different filename than <{}>".format(
+                    src.name, title, tgt.name
+                )
                 if ctx["verbose"]:
                     print(msg)
                 if not ctx["quiet"]:
@@ -189,7 +210,9 @@ def diff_group(src, ctx):
                 ctx["differences"] += 1
                 return False
             if lnk_src.path != lnk_tgt.path:
-                msg = "<{}> group has external link {} with different path than <{}>".format(src.name, title, tgt.name)
+                msg = "<{}> group has external link {} with different path than <{}>".format(
+                    src.name, title, tgt.name
+                )
                 if ctx["verbose"]:
                     print(msg)
                 if not ctx["quiet"]:
@@ -210,10 +233,8 @@ def diff_group(src, ctx):
     return result
 
 
-
 def diff_datatype(src, ctx):
-    """ compare datatype objects in src and tgt
-    """
+    """compare datatype objects in src and tgt"""
     msg = "checking datatype <{}>".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
@@ -246,8 +267,7 @@ def diff_datatype(src, ctx):
 
 
 def diff_dataset(src, ctx):
-    """ compare dataset in src and tgt
-    """
+    """compare dataset in src and tgt"""
     msg = "checking dataset <{}>".format(src.name)
     logging.info(msg)
     if ctx["verbose"]:
@@ -333,7 +353,6 @@ def diff_dataset(src, ctx):
     return result
 
 
-
 def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False):
     ctx = {}
     ctx["fin"] = fin
@@ -343,7 +362,6 @@ def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False)
     ctx["noattr"] = noattr
     ctx["quiet"] = quiet
     ctx["differences"] = 0
-
 
     def object_diff_helper(name, obj):
         class_name = obj.__class__.__name__
@@ -365,7 +383,7 @@ def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False)
     return ctx["differences"]
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def usage():
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  file  domain".format(cfg["cmd"])))
@@ -377,7 +395,9 @@ def usage():
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
-    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
+    print(
+        "     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org"
+    )
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
@@ -390,18 +410,22 @@ def usage():
     print("     --quiet :: Do not produce output")
     print("     -h | --help    :: This message.")
     print("")
-#end print_usage
 
 
-#----------------------------------------------------------------------------------
+# end print_usage
+
+
+# ----------------------------------------------------------------------------------
 def print_config_example():
     print("# default")
     print("hs_username = <username>")
     print("hs_password = <passwd>")
     print("hs_endpoint = http://hsdshdflab.hdfgroup.org")
-#print_config_example
 
-#----------------------------------------------------------------------------------
+
+# print_config_example
+
+# ----------------------------------------------------------------------------------
 def main():
 
     loglevel = logging.ERROR
@@ -409,11 +433,11 @@ def main():
     nodata = False
     noattr = False
     quiet = False
-    cfg["cmd"] = sys.argv[0].split('/')[-1]
+    cfg["cmd"] = sys.argv[0].split("/")[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
     cfg["logfname"] = None
-    logfname=None
+    logfname = None
     rc = 0
     s3 = None  # s3fs instance
 
@@ -423,13 +447,13 @@ def main():
         arg = sys.argv[argn]
         val = None
 
-        if arg[0] == '-' and len(src_files) > 0:
+        if arg[0] == "-" and len(src_files) > 0:
             # options must be placed before filenames
             print("options must precead source files")
             usage()
             sys.exit(-1)
         if len(sys.argv) > argn + 1:
-            val = sys.argv[argn+1]
+            val = sys.argv[argn + 1]
         if arg in ("-v", "--verbose"):
             verbose = True
             argn += 1
@@ -456,7 +480,7 @@ def main():
                 usage()
                 sys.exit(-1)
             argn += 2
-        elif arg == '--logfile':
+        elif arg == "--logfile":
             logfname = val
             argn += 2
         elif arg in ("-b", "--bucket"):
@@ -474,10 +498,10 @@ def main():
         elif arg in ("-p", "--password"):
             cfg["hs_password"] = val
             argn += 2
-        elif arg == '--cnf-eg':
+        elif arg == "--cnf-eg":
             print_config_example()
             sys.exit(0)
-        elif arg[0] == '-':
+        elif arg[0] == "-":
             usage()
             sys.exit(-1)
         else:
@@ -485,7 +509,11 @@ def main():
             argn += 1
 
     # setup logging
-    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
+    logging.basicConfig(
+        filename=logfname,
+        format="%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s",
+        level=loglevel,
+    )
     logging.debug("set log_level to {}".format(loglevel))
 
     # end arg parsing
@@ -502,14 +530,20 @@ def main():
 
     logging.info("file: {}".format(file_path))
     logging.info("domain: {}".format(domain_path))
-    if domain_path[0] != '/' or domain_path[-1] == '/':
-        print("domain must be an absolute path, non-folder domain")
-        usage()
-        sys.exit(-1)
+    if domain_path.startswith("/") or domain_path.startswith("hdf5://"):
+        logging.debug("domain path is absolute")
+    else:
+        msg = "domain must be an absolute path"
+        logging.error(msg)
+        sys.exit(msg)
 
+    if domain_path[-1] == "/":
+        msg = "domain can't be a folder"
+        logging.error(msg)
+        sys.exit(msg)
 
     if cfg["hs_endpoint"] is None:
-        logging.error('No endpoint given, try -h for help\n')
+        logging.error("No endpoint given, try -h for help\n")
         sys.exit(1)
     logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
 
@@ -531,7 +565,7 @@ def main():
         else:
             # regular h5py open
             try:
-                fin = h5py.File(file_path, mode='r')
+                fin = h5py.File(file_path, mode="r")
             except IOError as ioe:
                 logging.error("Error opening file {}: {}".format(domain_path, ioe))
                 sys.exit(1)
@@ -542,7 +576,14 @@ def main():
             password = cfg["hs_password"]
             endpoint = cfg["hs_endpoint"]
             bucket = cfg["hs_bucket"]
-            fout = h5pyd.File(domain_path, 'r', endpoint=endpoint, username=username, password=password, bucket=bucket)
+            fout = h5pyd.File(
+                domain_path,
+                "r",
+                endpoint=endpoint,
+                username=username,
+                password=password,
+                bucket=bucket,
+            )
         except IOError as ioe:
             if ioe.errno == 404:
                 logging.error("domain: {} not found".format(domain_path))
@@ -552,11 +593,12 @@ def main():
                 logging.error("Error opening file {}: {}".format(domain_path, ioe))
             sys.exit(1)
 
-
         # do the actual load
         if quiet:
             verbose = False
-        rc = diff_file(fin, fout, verbose=verbose, nodata=nodata, noattr=noattr, quiet=quiet)
+        rc = diff_file(
+            fin, fout, verbose=verbose, nodata=nodata, noattr=noattr, quiet=quiet
+        )
 
         if not quiet and rc > 0:
             print("{} differences found".format(rc))
@@ -564,7 +606,7 @@ def main():
         logging.info("diff_file done")
 
     except KeyboardInterrupt:
-        logging.error('Aborted by user via keyboard interrupt.')
+        logging.error("Aborted by user via keyboard interrupt.")
         sys.exit(1)
 
     sys.exit(rc)
