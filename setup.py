@@ -39,7 +39,7 @@ setup(
         "msrestazure",
         "cryptography",
         "google-api-python-client",
-        "google-auth-oauthlib",
+        "google-auth-oauthlib==0.5.3",
         "google-auth<2.0dev",
         "adal",
     ],
