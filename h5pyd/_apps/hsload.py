@@ -18,7 +18,7 @@ try:
     import h5py
     import h5pyd
 except ImportError as e:
-    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
+    sys.stderr.write(f"ERROR : {e} : install it to use this utility...")
     sys.exit(1)
 
 try:
@@ -42,7 +42,7 @@ else:
 cfg = Config()
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def usage():
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  sourcefile  domain".format(cfg["cmd"])))
@@ -60,6 +60,7 @@ def usage():
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -a | --append <mode>  :: Flag to append to an existing HDF Server domain")
+    print("     --extend <dimscale> :: extend along given dimension scale in append mode")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
     print("     --compression blosclz|lz4|lz4hc|snappy|gzip|zstd :: use the given compression algorithm for -z option (lz4 is default)")
@@ -88,19 +89,19 @@ def usage():
     print("     Also, the --link option requires hdf5lib 1.10.6 or higher and h5py 2.10 or higher.")
     print("     The docker image: 'hdfgroup/hdf5lib:1.10.6' includes these versions as well as h5pyd.")
     print("     E.g.: 'docker run --rm -v ~/.hscfg:/root/.hscfg  -v ~/data:/data -it hdfgroup/hdf5lib:1.10.6 bash'")
-#end print_usage
+# end print_usage
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def print_config_example():
     print("# default")
     print("hs_username = <username>")
     print("hs_password = <passwd>")
     print("hs_endpoint = http://hsdshdflab.hdfgroup.org")
-#print_config_example
+# print_config_example
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def main():
 
     COMPRESSION_FILTERS = ('blosclz', 'lz4', 'lz4hc', 'snappy', 'gzip', 'zstd')
@@ -108,6 +109,8 @@ def main():
     verbose = False
     compression = None
     compression_opts = None
+    append = False
+    extend_dim = None
     s3path = None
     dataload = "ingest"  # or None, or "link"
     cfg["cmd"] = sys.argv[0].split('/')[-1]
@@ -116,7 +119,6 @@ def main():
     cfg["logfname"] = None
     logfname = None
     s3 = None  # s3fs instance
-    mode = 'w'
     retries = 10  # number of retry attempts for HSDS requests
 
     src_files = []
@@ -182,8 +184,11 @@ def main():
             cfg["hs_password"] = val
             argn += 2
         elif arg in ("-a", "--append"):
-            mode = 'a'
+            append = True
             argn += 1
+        elif arg == "--extend":
+            extend_dim = val
+            argn += 2
         elif arg == '--cnf-eg':
             print_config_example()
             sys.exit(0)
@@ -295,25 +300,38 @@ def main():
 
             # create the output domain
             try:
-                username = cfg["hs_username"]
-                password = cfg["hs_password"]
-                endpoint = cfg["hs_endpoint"]
-                bucket = cfg["hs_bucket"]
+                mode = "a" if append else "w"
+                kwargs = {
+                    "username": cfg["hs_username"],
+                    "password": cfg["hs_password"],
+                    "endpoint": cfg["hs_endpoint"],
+                    "bucket": cfg["hs_bucket"],
+                    "mode": mode,
+                    "retries": retries
+                }
 
-                fout = h5pyd.File(tgt, mode, endpoint=endpoint, username=username, password=password, bucket=bucket, retries=retries)
+                fout = h5pyd.File(tgt, **kwargs)
             except IOError as ioe:
                 if ioe.errno == 404:
-                    logging.error("Domain: {} not found".format(tgt))
+                    logging.error(f"Domain: {tgt} not found")
                 elif ioe.errno == 403:
-                    logging.error("No write access to domain: {}".format(tgt))
+                    logging.error(f"No write access to domain: {tgt}")
                 else:
-                    logging.error("Error creating file {}: {}".format(tgt, ioe))
+                    logging.error(f"Error creating file {tgt}: {ioe}")
                 sys.exit(1)
 
             # do the actual load
-            load_file(fin, fout, verbose=verbose, dataload=dataload, s3path=s3path, compression=compression, compression_opts=compression_opts)
+            kwargs = {"verbose": verbose,
+                      "dataload": dataload,
+                      "s3path": s3path,
+                      "compression": compression,
+                      "compression_opts": compression_opts,
+                      "append": append,
+                      "extend_dim": extend_dim,
+                      "verbose": verbose}
+            load_file(fin, fout, **kwargs)
 
-            msg = "File {} uploaded to domain: {}".format(src_file, tgt)
+            msg = f"File {src_file} uploaded to domain: {tgt}"
             logging.info(msg)
             if verbose:
                 print(msg)

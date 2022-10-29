@@ -18,7 +18,7 @@ try:
     import h5pyd
     import numpy as np
 except ImportError as e:
-    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
+    sys.stderr.write(f"ERROR : {e} : install it to use this utility...")
     sys.exit(1)
 
 if __name__ == "utillib":
@@ -101,11 +101,13 @@ def has_reference(dtype):
         has_ref = has_reference(basedt)
     return has_ref
 
+
 def is_vlen(dtype):
     if dtype.metadata and 'vlen' in dtype.metadata:
         return True
     else:
         return False
+
 
 def get_fillvalue(dset):
 
@@ -118,6 +120,7 @@ def get_fillvalue(dset):
             pass  # ignore
     return fillvalue
 
+
 def is_compact(dset):
     if isinstance(dset.id.id, str):
         return False  # compact storage not used with HSDS
@@ -126,6 +129,7 @@ def is_compact(dset):
         return True
     else:
         return False
+
 
 def convert_dtype(srcdt, ctx):
     """ Return a dtype based on input dtype, converting any Reference types from
@@ -182,9 +186,12 @@ def convert_dtype(srcdt, ctx):
     return tgt_dt
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def copy_element(val, src_dt, tgt_dt, ctx):
-    logging.debug("copy_element, val: " + str(val) + " val type: " + str(type(val)) + "src_dt: " + dump_dtype(src_dt) + " tgt_dt: " + dump_dtype(tgt_dt))
+    msg = f"copy_element, val: {val} "
+    msg += f"val type: {type(val)} src_dt:  {dump_dtype(src_dt)} "
+    msg += f" tgt_dt: {dump_dtype(tgt_dt)}"
+    logging.debug(msg)
 
     fin = ctx["fin"]
     fout = ctx["fout"]
@@ -267,7 +274,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
     return out
 
 
-#----------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
 def copy_array(src_arr, ctx):
     """ Copy the numpy array to a new array.
     Convert any reference type to point to item in the target's hierarchy.
@@ -293,7 +300,7 @@ def copy_array(src_arr, ctx):
     return tgt_arr
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def copy_attribute(desobj, name, srcobj, ctx):
 
     msg = "creating attribute {} in {}".format(name, srcobj.name)
@@ -318,7 +325,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
         des_empty = h5py.Empty
     else:
         des_empty = h5pyd.Empty
-    
+
     if isinstance(data, src_empty):
         # create Empty object with tgt dtype
         tgt_dt = convert_dtype(src_dt, ctx)
@@ -334,33 +341,48 @@ def copy_attribute(desobj, name, srcobj, ctx):
         print(msg)
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def create_dataset(dobj, ctx):
     """ create a dataset using the properties of the passed in h5py dataset.
         If successful, proceed to copy attributes and data.
     """
-    msg = "creating dataset {}, shape: {}, type: {}".format(dobj.name, dobj.shape, dobj.dtype)
+    chunks = None
+    dset = None
+
+    msg = f"creating dataset {dobj.name}, shape: {dobj.shape}, type: {dobj.dtype}"
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
     fout = ctx["fout"]
 
-    chunks = None
-    dset = None
+    if dobj.name in fout:
+        dset = fout[dobj.name]
+        logging.debug(f"{dobj.name} already exists")
+        if ctx["append"]:
+            msg = f"skipping creation of dataset {dobj.name} since already found"
+            logging.info(msg)
+            if ctx["verbose"]:
+                print(msg)
+        else:
+            logging.error(f"unable to create dataset {dobj.name} already present")
+        return dset
+    else:
+        if ctx["verbose"]:
+            print(f"{dobj.name} not found")
 
     if ctx["dataload"] == "link" and not is_vlen(dobj.dtype) and dobj.shape is not None and not is_compact(dobj):
         dset_dims = dobj.shape
-        logging.debug("dset_dims: {}".format(dset_dims))
+        logging.debug(f"dset_dims: {dset_dims}")
         rank = len(dset_dims)
         chunk_dims = dobj.chunks
-        logging.debug("chunk_dims: {}".format(chunk_dims))
+        logging.debug(f"chunk_dims: {chunk_dims}")
         num_chunks = 0
         dsetid = dobj.id
         spaceid = dsetid.get_space()
         if chunk_dims:
             num_chunks = dsetid.get_num_chunks(spaceid)
 
-        logging.debug("num_chunks: {}".format(num_chunks))
+        logging.debug(f"num_chunks: {num_chunks}")
 
         chunks = {}  # pass a map to create_dataset
 
@@ -395,7 +417,7 @@ def create_dataset(dobj, ctx):
             chunks["file_uri"] = ctx["s3path"]
             chunks["dims"] = dobj.chunks
             chunks["chunks"] = chunk_map
-            logging.info("using chunk layout: {}".format(chunks))
+            logging.info(f"using chunk layout: {chunks}")
 
         else:
             # create anonymous dataset to hold chunk info
@@ -423,8 +445,8 @@ def create_dataset(dobj, ctx):
                 chunkinfo_arr[offset] = (chunk_info.byte_offset, chunk_info.size)
             anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
             anon_dset[...] = chunkinfo_arr
-            logging.debug("anon_dset: {}".format(anon_dset))
-            #logging.debug("anon_values: {}".format(anon_dset[...]))
+            logging.debug(f"anon_dset: {anon_dset}")
+            # logging.debug("anon_values: {}".format(anon_dset[...]))
             chunks["class"] = 'H5D_CHUNKED_REF_INDIRECT'
             chunks["file_uri"] = ctx["s3path"]
             chunks["dims"] = dobj.chunks
@@ -437,55 +459,47 @@ def create_dataset(dobj, ctx):
 
     try:
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
+        kwargs = {"shape": dobj.shape, "dtype": tgt_dtype}
         if dobj.shape is None or len(dobj.shape) == 0 or (is_vlen(dobj.dtype) and is_h5py(fout)):
             # don't use compression/chunks for scalar datasets
             # or vlen
-            compression = None
-            compression_opts = None
-            chunks = None
-            shuffle = None
-            fletcher32 = None
-            maxshape = None
-            scaleoffset = None
+            pass
         else:
-            compression = dobj.compression
-            compression_opts = dobj.compression_opts
-            if ctx["default_compression"] is not None and compression is None:
-                compression = ctx["default_compression"]
-                compression_opts = ctx["default_compression_opts"]
-                if compression and ctx["verbose"]:
-                    print("applying {} filter with level: {}".format(compression, compression_opts))
-            shuffle = dobj.shuffle
-            fletcher32 = dobj.fletcher32
-            maxshape = dobj.maxshape
-            scaleoffset = dobj.scaleoffset
+            kwargs["compression"] = dobj.compression
+            kwargs["compression_opts"] = dobj.compression_opts
+            if ctx["default_compression"] is not None and dobj.compression is None:
+                kwargs["compression"] = ctx["default_compression"]
+                kwargs["compression_opts"] = ctx["default_compression_opts"]
+                if ctx["verbose"]:
+                    print("applying default compression filter")
+            kwargs["shuffle"] = dobj.shuffle
+            kwargs["fletcher32"] = dobj.fletcher32
+            kwargs["maxshape"] = dobj.maxshape
+            kwargs["scaleoffset"] = dobj.scaleoffset
         # setting the fillvalue is failing in some cases
         # see: https://github.com/HDFGroup/h5pyd/issues/119
         # just setting to None for now
         # fillvalue=get_fillvalue(dobj)
-        fillvalue = None
-        dset = fout.create_dataset(
-            dobj.name, shape=dobj.shape, dtype=tgt_dtype, chunks=chunks,
-            compression=compression, shuffle=shuffle, maxshape=maxshape,
-            fletcher32=fletcher32, compression_opts=compression_opts,
-            fillvalue=fillvalue, scaleoffset=scaleoffset)
-        msg = "dataset created, uuid: {}, chunk_size: {}".format(dset.id.id, str(dset.chunks))
-        msg += " chunks: {}".format(chunks)
+        dset = fout.create_dataset(dobj.name, **kwargs)
+
+        msg = f"dataset created, uuid: {dset.id.id}, "
+        msg += f"chunk_size: {str(dset.chunks)}, "
+        msg += f"chunks: {chunks}"
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
-        logging.debug("adding dataset id {} to {} in srcid_desobj_map".format(dobj.id.id, dset))
+        logging.debug(f"adding dataset id {dobj.id.id} to {dset}")
         srcid_desobj_map = ctx["srcid_desobj_map"]
         srcid_desobj_map[dobj.id.__hash__()] = dset
     except (IOError, TypeError, KeyError) as e:
-        msg = "ERROR: failed to create dataset: {}".format(str(e))
+        msg = f"ERROR: failed to create dataset: {e}"
         logging.error(msg)
 
     return dset
 # create_dataset
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def write_dataset(src, tgt, ctx):
     """ write values from src dataset to target dataset.
     """
@@ -511,7 +525,6 @@ def write_dataset(src, tgt, ctx):
             print(msg)
         tgt[()] = x
         return
-
 
     fillvalue = get_fillvalue(src)
 
@@ -614,17 +627,34 @@ def create_links(gsrc, gdes, ctx):
     logging.info("flush fout")
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def create_group(gobj, ctx):
     msg = "creating group {}".format(gobj.name)
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
     fout = ctx["fout"]
-    grp = fout.create_group(gobj.name)
-    srcid_desobj_map = ctx["srcid_desobj_map"]
-    logging.debug("adding group id {} to {} in srcid_desobj_map".format(gobj.id.id, grp))
-    srcid_desobj_map[gobj.id.__hash__()] = grp
+
+    grp = None
+
+    if gobj.name in fout:
+        grp = fout[gobj.name]
+        logging.debug(f"{gobj.name} already exists")
+        if ctx["append"]:
+            msg = f"skipping creation of group {gobj.name} since already found"
+            logging.info(msg)
+            if ctx["verbose"]:
+                print(msg)
+        else:
+            logging.error(f"unable to create group {gobj.name}, already present")
+    else:
+        if ctx["verbose"]:
+            print(f"{dobj.name} not found")
+
+        grp = fout.create_group(gobj.name)
+        srcid_desobj_map = ctx["srcid_desobj_map"]
+        logging.debug("adding group id {} to {} in srcid_desobj_map".format(gobj.id.id, grp))
+        srcid_desobj_map[gobj.id.__hash__()] = grp
 
     return grp
 # create_group
@@ -645,10 +675,19 @@ def create_datatype(obj, ctx):
 
 # create_datatype
 
-#----------------------------------------------------------------------------------
-def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compression=None, compression_opts=None):
-    logging.info("input file: {}".format(fin.filename))
-    logging.info("output file: {}".format(fout.filename))
+# ---------------------------------------------------------------------------------
+def load_file(fin,
+              fout,
+              verbose=False,
+              dataload="ingest",
+              s3path=None,
+              compression=None,
+              compression_opts=None,
+              append=False,
+              extend_dim=None):
+
+    logging.info(f"input file: {fin.filename}")
+    logging.info(f"output file: {fout.filename}")
     if dataload != "ingest":
         if not dataload:
             logging.info("no data load")
@@ -658,7 +697,7 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
                 sys.exit(1)
             logging.info("using s3path")
         else:
-            logging.error("unexpected dataload value:", dataload)
+            logging.error(f"unexpected dataload value: {dataload}")
             sys.exit(1)
 
     # it would be nice to make a class out of these functions, but that
@@ -672,6 +711,8 @@ def load_file(fin, fout, verbose=False, dataload="ingest", s3path=None, compress
     ctx["default_compression"] = compression
     ctx["default_compression_opts"] = compression_opts
     ctx["s3path"] = s3path
+    ctx["append"] = append
+    ctx["extend_dim"] = extend_dim
     ctx["srcid_desobj_map"] = {}
 
     def copy_attribute_helper(name, obj):
