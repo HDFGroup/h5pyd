@@ -459,7 +459,43 @@ def create_dataset(dobj, ctx):
 
     try:
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
-        kwargs = {"shape": dobj.shape, "dtype": tgt_dtype}
+        tgt_shape = list(dobj.shape).copy()
+        tgt_maxshape = list(dobj.maxshape).copy()
+        rank = len(tgt_shape)
+        if rank > 0 and ctx["extend_dim"]:
+            # set maxshape to unlimited for any dimension that is the extend_dim
+            if dobj.name.split('/')[-1] == ctx["extend_dim"]:
+                msg = f"setting {dobj.name} shape to unlimited"
+                logging.info(msg)
+                if ctx["verbose"]:
+                    print(msg)
+                if rank > 1:
+                    msg = "expected extend dataset to be one-dimensional"
+                    logging.warning(msg)
+                    if ctx["verbose"]:
+                        print(msg)
+                for i in range(rank):
+                    tgt_shape[i] = 0
+                    tgt_maxshape[i] = None
+            else:
+                # check to see if any dimension scale refers to the extend dim
+                for dim in range(len(dobj.dims)):
+                    dimscales = dobj.dims[dim]
+                    for i in range(len(dimscales)):
+                        dimscale = dimscales[i]
+                        if not dimscale:
+                            continue
+                        print(f"dimscale for dim: {dim}: {dimscale}, type: {type(dimscale)}")
+                        if dimscale.name.split('/')[-1] == ctx["extend_dim"]:
+                            tgt_shape[dim] = 0
+                            tgt_maxshape[dim] = None
+                            msg = f"setting dimension {dim} of dataset {dobj.name} to unlimited"
+                            logging.info(msg)
+                            if ctx["verbose"]:
+                                print(msg)
+                            break
+
+        kwargs = {"shape": tgt_shape, "maxshape": tgt_maxshape, "dtype": tgt_dtype}
         if dobj.shape is None or len(dobj.shape) == 0 or (is_vlen(dobj.dtype) and is_h5py(fout)):
             # don't use compression/chunks for scalar datasets
             # or vlen
@@ -474,7 +510,6 @@ def create_dataset(dobj, ctx):
                     print("applying default compression filter")
             kwargs["shuffle"] = dobj.shuffle
             kwargs["fletcher32"] = dobj.fletcher32
-            kwargs["maxshape"] = dobj.maxshape
             kwargs["scaleoffset"] = dobj.scaleoffset
         # setting the fillvalue is failing in some cases
         # see: https://github.com/HDFGroup/h5pyd/issues/119
@@ -503,14 +538,14 @@ def create_dataset(dobj, ctx):
 def write_dataset(src, tgt, ctx):
     """ write values from src dataset to target dataset.
     """
-    msg = "write_dataset src: {} to tgt: {}, shape: {}, type: {}".format(src.name, tgt.name, src.shape, src.dtype)
+    msg = "write_dataset src: {src.name} to tgt: {tgt.name}, shape: {src.shape}, type: {src.dtype}"
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
 
     if src.shape is None:
         # null space dataset
-        msg = "no data for null space dataset: {}".format(src.name)
+        msg = f"no data for null space dataset: {src.name}"
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
@@ -519,7 +554,7 @@ def write_dataset(src, tgt, ctx):
     if len(src.shape) == 0:
         # scalar dataset
         x = src[()]
-        msg = "writing for scalar dataset: {}".format(src.name)
+        msg = f"writing for scalar dataset: {src.name}"
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
@@ -528,35 +563,82 @@ def write_dataset(src, tgt, ctx):
 
     fillvalue = get_fillvalue(src)
 
-    msg = "iterating over chunks for {}".format(src.name)
+    rank = len(src.shape)
+
+    offset = [0, ] * rank  # coordinate where we'll copy the source to
+
+    if ctx["extend_dim"]:
+        # resize dataset if a dimension is in the extended dimension
+        if src.name.split('/')[-1] == ctx["extend_dim"]:
+            offset[0] = tgt.shape[0]
+            new_extent = tgt.shape[0] + src.shape[0]
+            msg = f"extending {tgt.name} shape to {new_extent}"
+            logging.info(msg)
+            if ctx["verbose"]:
+                print(msg)
+            tgt.resize(new_extent, axis=0)
+        else:
+            # check to see if any dimension scale refers to the extend dim
+            for dim in range(len(src.dims)):
+                dimscales = src.dims[dim]
+                for i in range(len(dimscales)):
+                    dimscale = dimscales[i]
+                    if not dimscale:
+                        continue
+                    logging.debug(f"dimscale for dim: {dim}: {dimscale}, type: {type(dimscale)}")
+                    if dimscale.name.split('/')[-1] == ctx["extend_dim"]:
+                        new_extent = tgt.shape[dim] + src.shape[dim]
+                        msg = f"extending {tgt.name} shape to {new_extent} "
+                        msg += f"for dimension: {dim}"
+                        logging.info(msg)
+                        if ctx["verbose"]:
+                            print(msg)
+                        offset[dim] = tgt.shape[dim]
+                        tgt.resize(new_extent, axis=dim)
+
+    msg = f"iterating over chunks for {src.name}"
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
     try:
-        it = ChunkIterator(tgt)
+        it = ChunkIterator(src)
 
-        logging.debug("src dtype: {}".format(src.dtype))
-        logging.debug("des dtype: {}".format(tgt.dtype))
+        logging.debug(f"src dtype: {src.dtype}")
+        logging.debug(f"des dtype: {tgt.dtype}")
 
-        for s in it:
-            arr = src[s]
+        for src_s in it:
+            logging.debug(f"src selection: {src_s}")
+            if rank == 1:
+                start = src_s.start + offset[0]
+                stop = src_s.stop + offset[0]
+                tgt_s = slice(start, stop, 1)
+            else:
+                tgt_s = []
+                for dim in range(rank):
+                    start = src_s[dim].start + offset[dim]
+                    stop = src_s[dim].stop + offset[dim]
+                    tgt_s.append(slice(start, stop, 1))
+                tgt_s = tuple(tgt_s)
+            logging.debug(f"tgt selection: {tgt_s}")
+
+            arr = src[src_s]
             # don't write arr if it's all zeros (or the fillvalue if defined)
             empty_arr = np.zeros(arr.shape, dtype=arr.dtype)
             if fillvalue:
                 empty_arr.fill(fillvalue)
             if np.array_equal(arr, empty_arr):
-                msg = "skipping chunk for slice: {}".format(str(s))
+                msg = f"skipping chunk for slice: {src_s}"
             else:
-                msg = "writing dataset data for slice: {}".format(s)
-                tgt[s] = arr
+                msg = f"writing dataset data for slice: {src_s}"
+                tgt[tgt_s] = arr
             logging.info(msg)
             if ctx["verbose"]:
                 print(msg)
     except (IOError, TypeError) as e:
-        msg = "ERROR : failed to copy dataset data : {}".format(str(e))
+        msg = f"ERROR : failed to copy dataset data {src_s}: {e}"
         logging.error(msg)
         print(msg)
-    msg = "done with dataload for {}".format(src.name)
+    msg = f"done with dataload for {src.name}"
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
@@ -649,7 +731,7 @@ def create_group(gobj, ctx):
             logging.error(f"unable to create group {gobj.name}, already present")
     else:
         if ctx["verbose"]:
-            print(f"{dobj.name} not found")
+            print(f"{gobj.name} not found")
 
         grp = fout.create_group(gobj.name)
         srcid_desobj_map = ctx["srcid_desobj_map"]
