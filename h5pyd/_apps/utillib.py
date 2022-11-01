@@ -29,12 +29,12 @@ else:
 
 def dump_dtype(dt):
     if not isinstance(dt, np.dtype):
-        raise TypeError("expected np.dtype, but got: {}".format(type(dt)))
+        raise TypeError(f"expected np.dtype, but got: {type(dt)}")
     if len(dt) > 0:
         out = "{"
         for name in dt.fields:
             subdt = dt.fields[name][0]
-            out += "{}: {} |".format(name, dump_dtype(subdt))
+            out += f"{name}: {dump_dtype(subdt)} |"
         out = out[:-1] + "}"
     else:
         ref = h5py.check_dtype(ref=dt)
@@ -64,7 +64,7 @@ def is_reference(val):
         elif isinstance(val, type) and val.__name__ == "Reference":
             return True
     except AttributeError as ae:
-        msg = "is_reference for {} error: {}".format(val, ae)
+        msg = f"is_reference for {val} error: {ae}"
         logging.error(msg)
 
     return False
@@ -77,7 +77,7 @@ def is_regionreference(val):
         elif isinstance(val, type) and val.__name__ == "RegionReference":
             return True
     except AttributeError as ae:
-        msg = "is_reference for {} error: {}".format(val, ae)
+        msg = f"is_reference for {val} error: {ae}"
         logging.error(msg)
 
     return False
@@ -136,7 +136,7 @@ def convert_dtype(srcdt, ctx):
     h5py style to h5pyd and vice-versa.
     """
 
-    msg = "convert dtype: {}, type: {},".format(srcdt, type(srcdt))
+    msg = f"convert dtype: {srcdt}, type: {type(srcdt)}"
     logging.info(msg)
 
     if len(srcdt) > 0:
@@ -162,7 +162,7 @@ def convert_dtype(srcdt, ctx):
                 else:
                     tgt_dt = h5py.special_dtype(ref=h5py.RegionReference)
             else:
-                msg = "Unexpected ref type: {}".format(srcdt)
+                msg = f"Unexpected ref type: {srcdt}"
                 logging.error(msg)
                 raise TypeError(msg)
         elif srcdt.metadata and 'vlen' in srcdt.metadata:
@@ -209,7 +209,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
             out = tuple(out_fields)
     elif src_dt.metadata and 'ref' in src_dt.metadata:
         if not tgt_dt.metadata or 'ref' not in tgt_dt.metadata:
-            raise TypeError("Expected tgt dtype to be ref, but got: {}".format(tgt_dt))
+            raise TypeError(f"Expected tgt dtype to be ref, but got: {tgt_dt}")
         ref = tgt_dt.metadata['ref']
         if is_reference(ref):
             # initialize out to null ref
@@ -222,7 +222,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                 try:
                     fin_obj = fin[val]
                 except AttributeError as ae:
-                    msg = "Unable able to get obj for ref value: {}".format(ae)
+                    msg = f"Unable able to get obj for ref value: {ae}"
                     logging.error(msg)
                     print(msg)
                     return None
@@ -244,13 +244,13 @@ def copy_element(val, src_dt, tgt_dt, ctx):
         elif is_regionreference(ref):
             out = "tbd"
         else:
-            raise TypeError("Unexpected ref type: {}".format(type(ref)))
+            raise TypeError(f"Unexpected ref type: {type(ref)}")
     elif src_dt.metadata and 'vlen' in src_dt.metadata:
         logging.debug("copy_elment, got vlen element, dt: {}".format(src_dt.metadata["vlen"]))
         if not isinstance(val, np.ndarray):
-            raise TypeError("Expecting ndarray or vlen element, but got: {}".format(type(val)))
+            raise TypeError(f"Expecting ndarray or vlen element, but got: {type(val)}")
         if not tgt_dt.metadata or 'vlen' not in tgt_dt.metadata:
-            raise TypeError("Expected tgt dtype to be vlen, but got: {}".format(tgt_dt))
+            raise TypeError(f"Expected tgt dtype to be vlen, but got: {tgt_dt}")
         src_vlen_dt = src_dt.metadata["vlen"]
         tgt_vlen_dt = tgt_dt.metadata["vlen"]
         if has_reference(src_vlen_dt):
@@ -280,7 +280,7 @@ def copy_array(src_arr, ctx):
     Convert any reference type to point to item in the target's hierarchy.
     """
     if not isinstance(src_arr, np.ndarray):
-        raise TypeError("Expecting ndarray, but got: {}".format(src_arr))
+        raise TypeError(f"Expecting ndarray, but got: {src_arr}")
     tgt_dt = convert_dtype(src_arr.dtype, ctx)
     tgt_arr = np.zeros(src_arr.shape, dtype=tgt_dt)
 
@@ -303,7 +303,7 @@ def copy_array(src_arr, ctx):
 # ----------------------------------------------------------------------------------
 def copy_attribute(desobj, name, srcobj, ctx):
 
-    msg = "creating attribute {} in {}".format(name, srcobj.name)
+    msg = f"creating attribute {name} in {srcobj.name}"
     logging.debug(msg)
 
     if ctx["verbose"]:
@@ -336,7 +336,8 @@ def copy_attribute(desobj, name, srcobj, ctx):
     try:
         desobj.attrs.create(name, tgtarr)
     except (IOError, TypeError) as e:
-        msg = "ERROR: failed to create attribute {} of object {} -- {}".format(name, desobj.name, str(e))
+        msg = f"ERROR: failed to create attribute {name} "
+        msg += f"of object {desobj.naame} -- {e}"
         logging.error(msg)
         print(msg)
 
@@ -410,7 +411,7 @@ def create_dataset(dobj, ctx):
                     chunk_key += str(index[dim] // chunk_dims[dim])
                     if dim < rank - 1:
                         chunk_key += "_"
-                logging.debug("adding chunk_key: {}".format(chunk_key))
+                logging.debug(f"adding chunk_key: {chunk_key}")
                 chunk_map[chunk_key] = (chunk_info.byte_offset, chunk_info.size)
 
             chunks["class"] = 'H5D_CHUNKED_REF'
@@ -427,7 +428,7 @@ def create_dataset(dobj, ctx):
             for dim in range(rank):
                 chunkinfo_arr_dims.append(int(np.ceil(dset_dims[dim] / chunk_dims[dim])))
             chunkinfo_arr_dims = tuple(chunkinfo_arr_dims)
-            logging.debug("creating chunkinfo array of shape: {}".format(chunkinfo_arr_dims))
+            logging.debug(f"creating chunkinfo array of shape: {chunkinfo_arr_dims}")
             chunkinfo_arr = np.zeros(np.prod(chunkinfo_arr_dims), dtype=dt)
             for i in range(num_chunks):
                 chunk_info = dsetid.get_chunk_info(i, spaceid)
@@ -451,7 +452,7 @@ def create_dataset(dobj, ctx):
             chunks["file_uri"] = ctx["s3path"]
             chunks["dims"] = dobj.chunks
             chunks["chunk_table"] = anon_dset.id.id
-            logging.info("using chunk layout: {}".format(chunks))
+            logging.info(f"using chunk layout: {chunks}")
 
     # use the source object layout if we are not using reference mapping
     if chunks is None and dobj.chunks:
@@ -650,49 +651,52 @@ def write_dataset(src, tgt, ctx):
 def create_links(gsrc, gdes, ctx):
     # add soft and external links
     srcid_desobj_map = ctx["srcid_desobj_map"]
+    msg = f"create_links: {gsrc.name}"
+    logging.info(msg)
     if ctx["verbose"]:
-        print("create_links: {}".format(gsrc.name))
+        print(msg)
     for title in gsrc:
-        msg = "got link: {}".format(title)
+        msg = f"got link: {title}"
         if ctx["verbose"]:
             print(msg)
         logging.info(msg)
         lnk = gsrc.get(title, getlink=True)
         link_classname = lnk.__class__.__name__
         if link_classname == "HardLink":
-            logging.debug("Got hardlink: {} gsrc: {} gdes: {}".format(title, gsrc, gdes))
+            msg = f"Got hardlink: {title} gsrc: {gsrc} gdes: {gdes}"
+            logging.debug(msg)
             if title not in gdes:
-                msg = "creating link {} with title: {}".format(gdes, title)
+                msg = f"creating link {gdes} with title: {title}"
                 if ctx["verbose"]:
                     print(msg)
                 logging.info(msg)
                 src_obj_id = gsrc[title].id
                 src_obj_id_hash = src_obj_id.__hash__()
-                logging.debug("got src_obj_id hash: {}".format(src_obj_id_hash))
+                logging.debug(f"got src_obj_id hash: {src_obj_id_hash}")
                 if src_obj_id_hash in srcid_desobj_map:
                     des_obj = srcid_desobj_map[src_obj_id_hash]
-                    logging.debug("creating hardlink to {}".format(des_obj.id.id))
+                    logging.debug(f"creating hardlink to {des_obj.id.id}")
                     gdes[title] = des_obj
                 else:
                     # TBD - in hdf5 1.10 it seems that two references to the same object
                     # can return different id's.  This will cause HDF5 files with
                     # multilinks to not load correctly
-                    msg = "could not find map item to src id: {}".format(src_obj_id_hash)
+                    msg = f"could not find map item to src id: {src_obj_id_hash}"
                     logging.warn(msg)
                     if ctx["verbose"]:
                         print("WARNING: " + msg)
         elif link_classname == "SoftLink":
-            msg = "creating SoftLink({}) with title: {}".format(lnk.path, title)
+            msg = f"creating SoftLink({lnk.path}) with title: {title}"
+            logging.info(msg)
             if ctx["verbose"]:
                 print(msg)
-            logging.info(msg)
             if is_h5py(gdes):
                 soft_link = h5py.SoftLink(lnk.path)
             else:
                 soft_link = h5pyd.SoftLink(lnk.path)
             gdes[title] = soft_link
         elif link_classname == "ExternalLink":
-            msg = "creating ExternalLink({}, {}) with title: {}".format(lnk.filename, lnk.path, title)
+            msg = f"creating ExternalLink({lnk.filename}, {lnk.path}) with title: {title}"
             if ctx["verbose"]:
                 print(msg)
             logging.info(msg)
@@ -702,7 +706,7 @@ def create_links(gsrc, gdes, ctx):
                 ext_link = h5pyd.ExternalLink(lnk.filename, lnk.path)
             gdes[title] = ext_link
         else:
-            msg = "Unexpected link type: {}".format(lnk.__class__.__name__)
+            msg = f"Unexpected link type: {lnk.__class__.__name__}"
             logging.warning(msg)
             if ctx["verbose"]:
                 print(msg)
@@ -711,7 +715,7 @@ def create_links(gsrc, gdes, ctx):
 
 # ----------------------------------------------------------------------------------
 def create_group(gobj, ctx):
-    msg = "creating group {}".format(gobj.name)
+    msg = f"creating group {gobj.name}"
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
@@ -735,7 +739,8 @@ def create_group(gobj, ctx):
 
         grp = fout.create_group(gobj.name)
         srcid_desobj_map = ctx["srcid_desobj_map"]
-        logging.debug("adding group id {} to {} in srcid_desobj_map".format(gobj.id.id, grp))
+        msg = f"adding group id {gobj.id.id} to {grp} in srcid_desobj_map"
+        logging.debug(msg)
         srcid_desobj_map[gobj.id.__hash__()] = grp
 
     return grp
@@ -744,14 +749,15 @@ def create_group(gobj, ctx):
 
 # -----------------------------------------------------------------------------
 def create_datatype(obj, ctx):
-    msg = "creating datatype {}".format(obj.name)
+    msg = f"creating datatype {obj.name}"
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
     fout = ctx["fout"]
     fout[obj.name] = obj.dtype
     srcid_desobj_map = ctx["srcid_desobj_map"]
-    logging.debug("adding datatype id {} to {} in srcid_desobj_map".format(obj.id.id, fout[obj.name]))
+    msg = f"adding datatype id {obj.id.id} to {fout[obj.name]} in srcid_desobj_map"
+    logging.debug(msg)
     srcid_desobj_map[obj.id.__hash__()] = fout[obj.name]
 
 
@@ -815,7 +821,7 @@ def load_file(fin,
 
     def object_link_helper(name, obj):
         class_name = obj.__class__.__name__
-        logging.info("object_link_helper for object: {}".format(obj.name))
+        logging.info(f"object_link_helper for object: {obj.name}")
         if class_name == "Group":
             # create any soft/external links
             fout = ctx["fout"]
@@ -830,15 +836,15 @@ def load_file(fin,
             if ctx["dataload"] == "link" and not is_vlen(obj.dtype) and not is_compact(obj) and len(obj.shape) > 0:
                 logging.info("skip datacopy for link reference")
             else:
-                logging.debug("calling write_dataset for dataset: {}".format(obj.name))
+                logging.debug(f"calling write_dataset for dataset: {obj.name}")
                 tgt = fout[obj.name]
                 write_dataset(obj, tgt, ctx)
         elif class_name == "Group":
-            logging.debug("skip copy for group: {}".format(obj.name))
+            logging.debug(f"skip copy for group: {obj.name}")
         elif class_name == "Datatype":
-            logging.debug("skip copy for datatype: {}".format(obj.name))
+            logging.debug(f"skip copy for datatype: {obj.name}")
         else:
-            logging.error("no handler for object class: {}".format(type(obj)))
+            logging.error(f"fno handler for object class: {type(obj)}")
 
     # build a rough map of the file using the internal function above
     # copy over any attributes
