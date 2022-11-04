@@ -349,6 +349,8 @@ def create_dataset(dobj, ctx):
     """
     chunks = None
     dset = None
+    dset_preappend = None
+    extend = False
 
     msg = f"creating dataset {dobj.name}, shape: {dobj.shape}, type: {dobj.dtype}"
     logging.info(msg)
@@ -360,13 +362,49 @@ def create_dataset(dobj, ctx):
         dset = fout[dobj.name]
         logging.debug(f"{dobj.name} already exists")
         if ctx["append"]:
-            msg = f"skipping creation of dataset {dobj.name} since already found"
-            logging.info(msg)
-            if ctx["verbose"]:
-                print(msg)
+            if ctx["extend_dim"]:
+                msg = f"skipping creation of dataset {dobj.name} since already found"
+                logging.info(msg)
+                if ctx["verbose"]:
+                    print(msg)
+                return dset
+            else:
+                if len(dset.shape) == len(dobj.shape):
+                    if dset.shape != dobj.shape:
+                        msg = f"unable to append {dobj.name}: shape is not compatible"
+                        logging.error(msg)
+                        if ctx["verbose"]:
+                            print(msg)
+                        return None
+                    if len(dset.shape) == 0:
+                        print("skip scalar dataset for append")
+                        # don't try to extend scalar datasets (treat like attributes)
+                        return dset
+
+                    # add an extra dimension to append to
+                    msg = f"re-creating {dobj.name} with extended dimension"
+                    logging.info(msg)
+                    if ctx["verbose"]:
+                        print(msg)
+                    dset_preappend = dset # save to re-add data later
+                    parent = dset.parent
+                    obj_name = dobj.name.split('/')[-1]
+                    logging.debug(f"removing link {dobj.name}")
+                    del parent[obj_name] # remove old link
+                    extend = True # flag to use extra dim in create
+                if len(dset.shape) == len(dobj.shape) + 1:
+                    if dset.shape[1:] != dobj.shape:
+                        msg = f"unable to append {dobj.name}: shape is not compatible"
+                        logging.error(msg)
+                        if ctx["verbose"]:
+                            print(msg)
+                        return None
+                    else:
+                        # compatible shapes, can just return dset
+                        return dset
         else:
             logging.error(f"unable to create dataset {dobj.name} already present")
-        return dset
+            return None
     else:
         if ctx["verbose"]:
             print(f"{dobj.name} not found")
@@ -387,7 +425,46 @@ def create_dataset(dobj, ctx):
 
         chunks = {}  # pass a map to create_dataset
 
-        if num_chunks == 0:
+        if num_chunks > 10 or extend:
+            # create anonymous dataset to hold chunk info
+            dt = np.dtype([('offset', np.int64), ('size', np.int32)])
+
+            if extend:
+                chunkinfo_arr_dims = [1,]
+            else:
+                chunkinfo_arr_dims = []
+            for dim in range(rank):
+                chunkinfo_arr_dims.append(int(np.ceil(dset_dims[dim] / chunk_dims[dim])))
+            chunkinfo_arr_dims = tuple(chunkinfo_arr_dims)
+            logging.debug(f"creating chunkinfo array of shape: {chunkinfo_arr_dims}")
+            chunkinfo_arr = np.zeros(np.prod(chunkinfo_arr_dims), dtype=dt)
+            for i in range(num_chunks):
+                chunk_info = dsetid.get_chunk_info(i, spaceid)
+                index = chunk_info.chunk_offset
+                if not isinstance(index, tuple) or len(index) != rank:
+                    msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
+                    logging.error(msg)
+                    raise IOError(msg)
+                offset = 0
+                stride = 1
+                for i in range(rank):
+                    dim = rank - i - 1
+                    offset += (index[dim] // chunk_dims[dim]) * stride
+                    stride *= chunkinfo_arr_dims[dim]
+                chunkinfo_arr[offset] = (chunk_info.byte_offset, chunk_info.size)
+            anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
+            if extend:
+                anon_dset[0, ...] = chunkinfo_arr
+            else:
+                anon_dset[...] = chunkinfo_arr
+            logging.debug(f"anon_dset: {anon_dset}")
+            # logging.debug("anon_values: {}".format(anon_dset[...]))
+            chunks["class"] = 'H5D_CHUNKED_REF_INDIRECT'
+            chunks["file_uri"] = ctx["s3path"]
+            chunks["dims"] = dobj.chunks
+            chunks["chunk_table"] = anon_dset.id.id
+            logging.info(f"using chunk layout: {chunks}")
+        elif num_chunks == 0:
             chunks["class"] = 'H5D_CONTIGUOUS_REF'
             chunks["file_uri"] = ctx["s3path"]
             chunks["offset"] = dsetid.get_offset()
@@ -395,8 +472,8 @@ def create_dataset(dobj, ctx):
             chunks["size"] = dsetid.get_storage_size()
             logging.info(f"using chunk layout: {chunks}")
 
-        elif num_chunks < 10:
-            # construct map of chunks
+        else:
+            # construct map of chunks if count is less than 10
             chunk_map = {}
             for i in range(num_chunks):
                 chunk_info = dsetid.get_chunk_info(i, spaceid)
@@ -420,48 +497,21 @@ def create_dataset(dobj, ctx):
             chunks["chunks"] = chunk_map
             logging.info(f"using chunk layout: {chunks}")
 
-        else:
-            # create anonymous dataset to hold chunk info
-            dt = np.dtype([('offset', np.int64), ('size', np.int32)])
-
-            chunkinfo_arr_dims = []
-            for dim in range(rank):
-                chunkinfo_arr_dims.append(int(np.ceil(dset_dims[dim] / chunk_dims[dim])))
-            chunkinfo_arr_dims = tuple(chunkinfo_arr_dims)
-            logging.debug(f"creating chunkinfo array of shape: {chunkinfo_arr_dims}")
-            chunkinfo_arr = np.zeros(np.prod(chunkinfo_arr_dims), dtype=dt)
-            for i in range(num_chunks):
-                chunk_info = dsetid.get_chunk_info(i, spaceid)
-                index = chunk_info.chunk_offset
-                if not isinstance(index, tuple) or len(index) != rank:
-                    msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
-                    logging.error(msg)
-                    raise IOError(msg)
-                offset = 0
-                stride = 1
-                for i in range(rank):
-                    dim = rank - i - 1
-                    offset += (index[dim] // chunk_dims[dim]) * stride
-                    stride *= chunkinfo_arr_dims[dim]
-                chunkinfo_arr[offset] = (chunk_info.byte_offset, chunk_info.size)
-            anon_dset = fout.create_dataset(None, shape=chunkinfo_arr_dims, dtype=dt)
-            anon_dset[...] = chunkinfo_arr
-            logging.debug(f"anon_dset: {anon_dset}")
-            # logging.debug("anon_values: {}".format(anon_dset[...]))
-            chunks["class"] = 'H5D_CHUNKED_REF_INDIRECT'
-            chunks["file_uri"] = ctx["s3path"]
-            chunks["dims"] = dobj.chunks
-            chunks["chunk_table"] = anon_dset.id.id
-            logging.info(f"using chunk layout: {chunks}")
-
     # use the source object layout if we are not using reference mapping
     if chunks is None and dobj.chunks:
         chunks = tuple(dobj.chunks)
 
     try:
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
-        tgt_shape = list(dobj.shape).copy()
-        tgt_maxshape = list(dobj.maxshape).copy()
+        if extend:
+            tgt_shape = [1,]
+            tgt_maxshape = [None,]
+        else:
+            tgt_shape = []
+            tgt_maxshape = []
+        
+        tgt_shape.extend(dobj.shape)
+        tgt_maxshape.extend(dobj.maxshape)
         rank = len(tgt_shape)
         if rank > 0 and ctx["extend_dim"]:
             # set maxshape to unlimited for any dimension that is the extend_dim
@@ -486,7 +536,8 @@ def create_dataset(dobj, ctx):
                         dimscale = dimscales[i]
                         if not dimscale:
                             continue
-                        print(f"dimscale for dim: {dim}: {dimscale}, type: {type(dimscale)}")
+                        msg = f"dimscale for dim: {dim}: {dimscale}, type: {type(dimscale)}"
+                        logging.debug(msg)
                         if dimscale.name.split('/')[-1] == ctx["extend_dim"]:
                             tgt_shape[dim] = 0
                             tgt_maxshape[dim] = None
@@ -531,6 +582,13 @@ def create_dataset(dobj, ctx):
         msg = f"ERROR: failed to create dataset: {e}"
         logging.error(msg)
 
+    if dset_preappend is not None:
+        if ctx["dataload"] == "link":
+            print("tbd...")
+        else:
+            dset[0, ...] = dset_preappend[...]
+
+
     return dset
 # create_dataset
 
@@ -539,7 +597,7 @@ def create_dataset(dobj, ctx):
 def write_dataset(src, tgt, ctx):
     """ write values from src dataset to target dataset.
     """
-    msg = "write_dataset src: {src.name} to tgt: {tgt.name}, shape: {src.shape}, type: {src.dtype}"
+    msg = f"write_dataset src: {src.name} to tgt: {tgt.name}, shape: {src.shape}, type: {src.dtype}"
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
@@ -596,6 +654,15 @@ def write_dataset(src, tgt, ctx):
                             print(msg)
                         offset[dim] = tgt.shape[dim]
                         tgt.resize(new_extent, axis=dim)
+    elif len(tgt.shape) > len(src.shape):
+        # append mode - extend first dimension by one
+        
+        new_extent = tgt.shape[0] + 1
+        msg = f"extending first dimension to: {new_extent}"
+        logging.info(msg)
+        if ctx["verbose"]:
+            print(msg)
+        tgt.resize(new_extent, axis=0)
 
     msg = f"iterating over chunks for {src.name}"
     logging.info(msg)
@@ -612,9 +679,20 @@ def write_dataset(src, tgt, ctx):
             if rank == 1:
                 start = src_s.start + offset[0]
                 stop = src_s.stop + offset[0]
-                tgt_s = slice(start, stop, 1)
+                if len(tgt.shape) > rank:
+                    tgt_s = []
+                    n = tgt.shape[0] - 1
+                    tgt_s.append(slice(n, n+1, 1))
+                    tgt_s.append(slice(start, stop, 1))
+                    tgt_s = tuple(tgt_s)
+                else:
+                    tgt_s = slice(start, stop, 1)
             else:
                 tgt_s = []
+                if len(tgt.shape) > rank:
+                    n = tgt.shape[0] - 1
+                    tgt_s.append(slice(n, n+1, 1))
+
                 for dim in range(rank):
                     start = src_s[dim].start + offset[dim]
                     stop = src_s[dim].stop + offset[dim]

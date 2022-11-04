@@ -60,7 +60,7 @@ def usage():
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -a | --append <mode>  :: Flag to append to an existing HDF Server domain")
-    print("     --extend <dimscale> :: extend along given dimension scale in append mode")
+    print("     --extend <dimscale> :: extend along the given dimension scale")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
     print("     --compression blosclz|lz4|lz4hc|snappy|gzip|zstd :: use the given compression algorithm for -z option (lz4 is default)")
@@ -236,24 +236,23 @@ def main():
     domain = src_files[-1]
     src_files = src_files[:-1]
 
-    logging.info("source files: {}".format(src_files))
-    logging.info("target domain: {}".format(domain))
+    logging.info(f"source files: {src_files}")
+    logging.info(f"target domain: {domain}")
     if len(src_files) > 1 and (domain[0] != '/' or domain[-1] != '/'):
         sys.stderr.write("target must be a folder if multiple source files are provided")
         usage()
         sys.exit(-1)
 
     if cfg["hs_endpoint"] is None:
-        sys.stderr.write('No endpoint given, try -h for help\n')
+        sys.stderr.write('No endpoint given, try -h for help')
         sys.exit(1)
     logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
+
 
     # check we have min HDF5 lib version for chunk query
     if dataload == "link":
         logging.info("checking libversion")
-        if extend_dim:
-            sys.stderr.write("link option can't be used with extend option")
-            sys.exit(1)
+         
         if h5py.version.version_tuple.major == 2 and h5py.version.version_tuple.minor < 10:
             sys.stderr.write("link option requires h5py version 2.10 or higher")
             sys.exit(1)
