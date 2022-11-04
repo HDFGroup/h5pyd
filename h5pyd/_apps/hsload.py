@@ -61,6 +61,7 @@ def usage():
     print("     -p | --password <password> :: Password credential")
     print("     -a | --append <mode>  :: Flag to append to an existing HDF Server domain")
     print("     --extend <dimscale> :: extend along the given dimension scale")
+    print("     --extend-offset <n> :: write data at index n along extended dimension")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
     print("     --compression blosclz|lz4|lz4hc|snappy|gzip|zstd :: use the given compression algorithm for -z option (lz4 is default)")
@@ -111,6 +112,7 @@ def main():
     compression_opts = None
     append = False
     extend_dim = None
+    extend_offset = None
     s3path = None
     dataload = "ingest"  # or None, or "link"
     cfg["cmd"] = sys.argv[0].split('/')[-1]
@@ -188,6 +190,9 @@ def main():
             argn += 1
         elif arg == "--extend":
             extend_dim = val
+            argn += 2
+        elif arg == "--extend-offset":
+            extend_offset = int(val)
             argn += 2
         elif arg == '--cnf-eg':
             print_config_example()
@@ -330,6 +335,7 @@ def main():
                       "compression_opts": compression_opts,
                       "append": append,
                       "extend_dim": extend_dim,
+                      "extend_offset": extend_offset,
                       "verbose": verbose}
             load_file(fin, fout, **kwargs)
 

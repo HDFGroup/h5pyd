@@ -350,7 +350,6 @@ def create_dataset(dobj, ctx):
     chunks = None
     dset = None
     dset_preappend = None
-    extend = False
 
     msg = f"creating dataset {dobj.name}, shape: {dobj.shape}, type: {dobj.dtype}"
     logging.info(msg)
@@ -503,7 +502,8 @@ def create_dataset(dobj, ctx):
 
     try:
         tgt_dtype = convert_dtype(dobj.dtype, ctx)
-        if extend:
+        if dset_preappend is not None:
+            # add an extra unlimited dimension
             tgt_shape = [1,]
             tgt_maxshape = [None,]
         else:
@@ -590,7 +590,17 @@ def create_dataset(dobj, ctx):
 
 
     return dset
-# create_dataset
+
+
+# "safe" resize method where new extent can be <= existing extent
+def resize_dataset(dset, extent, axis=0):
+    try:
+        dset.resize(extent, axis=axis)
+    except IOError:
+        # raise this if it's not a case where the extent is already increased
+        if dset.shape[axis] < extent:
+            raise
+       
 
 
 # ----------------------------------------------------------------------------------
@@ -629,13 +639,17 @@ def write_dataset(src, tgt, ctx):
     if ctx["extend_dim"]:
         # resize dataset if a dimension is in the extended dimension
         if src.name.split('/')[-1] == ctx["extend_dim"]:
-            offset[0] = tgt.shape[0]
-            new_extent = tgt.shape[0] + src.shape[0]
-            msg = f"extending {tgt.name} shape to {new_extent}"
-            logging.info(msg)
-            if ctx["verbose"]:
-                print(msg)
-            tgt.resize(new_extent, axis=0)
+            if ctx["extend_offset"] is not None:
+                offset[0] = ctx["extend_offset"]
+            else:
+                offset[0] = tgt.shape[0]
+            new_extent = offset[0] + src.shape[0]
+            if new_extent > tgt.shape[0]:
+                msg = f"extending {tgt.name} shape to {new_extent}"
+                logging.info(msg)
+                if ctx["verbose"]:
+                    print(msg)
+                resize_dataset(tgt, new_extent, axis=0)
         else:
             # check to see if any dimension scale refers to the extend dim
             for dim in range(len(src.dims)):
@@ -646,14 +660,18 @@ def write_dataset(src, tgt, ctx):
                         continue
                     logging.debug(f"dimscale for dim: {dim}: {dimscale}, type: {type(dimscale)}")
                     if dimscale.name.split('/')[-1] == ctx["extend_dim"]:
-                        new_extent = tgt.shape[dim] + src.shape[dim]
-                        msg = f"extending {tgt.name} shape to {new_extent} "
-                        msg += f"for dimension: {dim}"
-                        logging.info(msg)
-                        if ctx["verbose"]:
-                            print(msg)
-                        offset[dim] = tgt.shape[dim]
-                        tgt.resize(new_extent, axis=dim)
+                        if ctx["extend_offset"] is not None:
+                            offset[dim] = ctx["extend_offset"]
+                        else:
+                            offset[dim] = tgt.shape[dim]
+                        new_extent = offset[dim] + src.shape[dim]
+                        if new_extent > tgt.shape[dim]:
+                            msg = f"extending {tgt.name} shape to {new_extent} "
+                            msg += f"for dimension: {dim}"
+                            logging.info(msg)
+                            if ctx["verbose"]:
+                                print(msg)
+                            resize_dataset(tgt, new_extent, axis=dim)
     elif len(tgt.shape) > len(src.shape):
         # append mode - extend first dimension by one
         
@@ -662,7 +680,7 @@ def write_dataset(src, tgt, ctx):
         logging.info(msg)
         if ctx["verbose"]:
             print(msg)
-        tgt.resize(new_extent, axis=0)
+        resize_dataset(tgt, new_extent, axis=0)
 
     msg = f"iterating over chunks for {src.name}"
     logging.info(msg)
@@ -850,7 +868,8 @@ def load_file(fin,
               compression=None,
               compression_opts=None,
               append=False,
-              extend_dim=None):
+              extend_dim=None,
+              extend_offset=0):
 
     logging.info(f"input file: {fin.filename}")
     logging.info(f"output file: {fout.filename}")
@@ -879,6 +898,7 @@ def load_file(fin,
     ctx["s3path"] = s3path
     ctx["append"] = append
     ctx["extend_dim"] = extend_dim
+    ctx["extend_offset"] = extend_offset
     ctx["srcid_desobj_map"] = {}
 
     def copy_attribute_helper(name, obj):
