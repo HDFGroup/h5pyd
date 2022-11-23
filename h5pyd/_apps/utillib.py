@@ -65,7 +65,7 @@ def is_reference(val):
             return True
     except AttributeError as ae:
         msg = f"is_reference for {val} error: {ae}"
-        logging.error(msg)
+        logging.warning(msg)
 
     return False
 
@@ -78,7 +78,7 @@ def is_regionreference(val):
             return True
     except AttributeError as ae:
         msg = f"is_reference for {val} error: {ae}"
-        logging.error(msg)
+        logging.warning(msg)
 
     return False
 
@@ -164,7 +164,8 @@ def convert_dtype(srcdt, ctx):
             else:
                 msg = f"Unexpected ref type: {srcdt}"
                 logging.error(msg)
-                raise TypeError(msg)
+                if not ctx["ignore_error"]:
+                    raise TypeError(msg)
         elif srcdt.metadata and "vlen" in srcdt.metadata:
             src_vlen = srcdt.metadata["vlen"]
             if isinstance(src_vlen, np.dtype):
@@ -224,6 +225,8 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                 except AttributeError as ae:
                     msg = f"Unable able to get obj for ref value: {ae}"
                     logging.error(msg)
+                    if not ctx["ignore_error"]:
+                        raise IOError(msg)
                     return None
 
                 # TBD - for hsget, the name property is not getting set
@@ -342,7 +345,8 @@ def copy_attribute(desobj, name, srcobj, ctx):
         msg = f"ERROR: failed to create attribute {name} "
         msg += f"of object {desobj.naame} -- {e}"
         logging.error(msg)
-        print(msg)
+        if not ctx["ignore_error"]:
+            raise IOError(msg)
 
 # "safe" resize method where new extent can be <= existing extent
 def resize_dataset(dset, extent, axis=0):
@@ -357,12 +361,14 @@ def resize_dataset(dset, extent, axis=0):
 # ----------------------------------------------------------------------------------
 def get_chunk_layout(dset):
     if is_h5py(dset):
-        logging.error("get_chunk_layout called on hdf5 dataset")
-        return None
+        msg = "get_chunk_layout called on hdf5 dataset"
+        logging.error(msg)
+        raise IOError(msg)
     dset_json = dset.id.dcpl_json
     if "layout" not in dset_json:
-        logging.error(f"expect to find layout key in dset_json: {dset_json}")
-        return None
+        msg = f"expect to find layout key in dset_json: {dset_json}"
+        logging.error(msg)
+        raise IOError(msg)
     layout = dset_json["layout"]
     logging.debug(f"got chunk layout for dset id: {dset.id.id}: {layout}")
     return layout
@@ -470,10 +476,16 @@ def create_chunktable(dset, dset_dims, ctx):
         chunks["file_uri"] = ctx["s3path"]
         dset_offset = dset.id.get_offset()
         if dset_offset <= 0:
-            logging.error(f"unexpected dataset_offset: {dset_offset}")
+            msg = f"unexpected dataset_offset: {dset_offset}"
+            logging.error(msg)
+            if not ctx["ignore_error"]:
+                raise IOError(msg)
         dset_size = dset.id.get_storage_size()
         if dset_size <= 0:
-            logging.error(f"unexpeded dataset storage size: {dset_size}")
+            msg = f"unexpected dataset storage size: {dset_size}"
+            logging.error(msg)
+            if not ctx["ignore_error"]:
+                raise IOError(msg)
         chunks["offset"] = dset_offset
         # TBD - check the size is not too large
         chunks["size"] = dset_size
@@ -491,7 +503,8 @@ def create_chunktable(dset, dset_dims, ctx):
                 if not isinstance(index, tuple) or len(index) != rank:
                     msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
                     logging.error(msg)
-                    raise IOError(msg)
+                    if not ctx["ignore_error"]:
+                        raise IOError(msg)
                 chunk_key = ""
                 for dim in range(rank):
                     chunk_key += str(index[dim] // chunk_dims[dim])
@@ -500,7 +513,11 @@ def create_chunktable(dset, dset_dims, ctx):
                 logging.debug(f"adding chunk_key: {chunk_key}")
                 chunk_map[chunk_key] = (chunk_info.byte_offset, chunk_info.size)
         else:
-            logging.error(f"expected {dset} to be a h5py object")
+            msg = f"expected {dset} to be a h5py object"
+            logging.error(msg)
+            if not ctx["ignore_error"]:
+                raise IOError(msg)
+
 
         chunks["class"] = "H5D_CHUNKED_REF"
         if not extend:
@@ -531,6 +548,8 @@ def update_chunktable(src, tgt, ctx):
     if len(chunktable_dims) == len(chunktable.shape):
         if chunktable_dims != chunktable.shape:
             logging.error(msg)
+            if not ctx["ignore_error"]:
+                raise IOError(msg)
             return
     elif len(chunktable_dims) + 1 == len(chunktable.shape):
         if chunktable_dims != chunktable.shape[1:]:
@@ -538,12 +557,16 @@ def update_chunktable(src, tgt, ctx):
             return
     else:
         logging.error(msg)
+        if not ctx["ignore_error"]:
+            raise IOError(msg)
         return
 
     # create a numpy array containing chunk refs for each chunk in src array
     extend = True if rank > len(src.shape) else False
     if extend and not ctx["s3path"]:
         logging.error("expected s3path to be set for extend mode")
+        if not ctx["ignore_error"]:
+            raise IOError(msg)
         return
     # prior to HSDS v0.7.0+, reads failed if str was used for s3path,
     # store as bytes
@@ -570,7 +593,9 @@ def update_chunktable(src, tgt, ctx):
                 if not isinstance(index, tuple) or len(index) != rank:
                     msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
                     logging.error(msg)
-                    raise IOError(msg)
+                    if not ctx["ignore_error"]:
+                        raise IOError(msg)
+                    return
                 e = [chunk_info.byte_offset, chunk_info.size]
                 if extend:
                     e.append(s3path)
@@ -578,7 +603,10 @@ def update_chunktable(src, tgt, ctx):
                 chunkinfo_arr[index] = e
     else:
         if not extend:
-            logging.error("unexpected src type for update_chunktable")
+            msg = "unexpected src type for update_chunktable"
+            logging.error(msg)
+            if not ctx["ignore_error"]:
+                raise IOError(msg)
             return
     
         layout = get_chunk_layout(src)
@@ -614,7 +642,10 @@ def update_chunktable(src, tgt, ctx):
                 e = tuple(e)
                 chunkinfo_arr[index] = e
         else:
-            logging.error(f"expected chunk ref class but got: {layout_class}")
+            msg = f"expected chunk ref class but got: {layout_class}"
+            logging.error(msg)
+            if not ctx["ignore_error"]:
+                raise IOError(msg)
             return
             
     if len(tgt.shape) > len(src.shape):
@@ -655,7 +686,7 @@ def create_dataset(dobj, ctx):
                 if len(dset.shape) == len(dobj.shape):
                     if dset.shape != dobj.shape:
                         msg = f"unable to append {dobj.name}: shape is not compatible"
-                        logging.error(msg)
+                        logging.error(msg)    
                         if ctx["verbose"]:
                             print(msg)
                         return None
@@ -677,14 +708,17 @@ def create_dataset(dobj, ctx):
                     if dset.shape[1:] != dobj.shape:
                         msg = f"unable to append {dobj.name}: shape is not compatible"
                         logging.error(msg)
-                        if ctx["verbose"]:
-                            print(msg)
+                        if not ctx["ignore_error"]:
+                            raise IOError(msg)
                         return None
                     else:
                         # compatible shapes, can just return dset
                         return dset
         else:
-            logging.error(f"unable to create dataset {dobj.name} already present")
+            msg = f"unable to create dataset {dobj.name} already present"
+            logging.error(msg)
+            if not ctx["ignore_error"]:
+                raise IOError(msg)
             return None
     else:
         if ctx["verbose"]:
@@ -791,6 +825,9 @@ def create_dataset(dobj, ctx):
     except (IOError, TypeError, KeyError) as e:
         msg = f"ERROR: failed to create dataset: {e}"
         logging.error(msg)
+        if not ctx["ignore_error"]:
+            raise
+        
 
     if dset_preappend is not None:
         write_dataset(dset_preappend, dset, ctx)
@@ -935,7 +972,8 @@ def write_dataset(src, tgt, ctx):
     except (IOError, TypeError) as e:
         msg = f"ERROR : failed to copy dataset data {src_s}: {e}"
         logging.error(msg)
-        print(msg)
+        if not ctx["ignore_error"]:
+            raise
     msg = f"done with dataload for {src.name}"
     logging.info(msg)
     if ctx["verbose"]:
@@ -1032,7 +1070,10 @@ def create_group(gobj, ctx):
             if ctx["verbose"]:
                 print(msg)
         else:
-            logging.error(f"unable to create group {gobj.name}, already present")
+            msg = f"unable to create group {gobj.name}, already present"
+            logging.error(msg)
+            if not ctx["ignore_error"]:
+                raise IOError(msg)
     else:
         if ctx["verbose"]:
             print(f"{gobj.name} not found")
@@ -1077,6 +1118,7 @@ def load_file(
     append=False,
     extend_dim=None,
     extend_offset=0,
+    ignore_error=False,
 ):
 
     logging.info(f"input file: {fin.filename}")
@@ -1108,6 +1150,7 @@ def load_file(
     ctx["extend_dim"] = extend_dim
     ctx["extend_offset"] = extend_offset
     ctx["srcid_desobj_map"] = {}
+    ctx["ignore_error"] = ignore_error
 
     def copy_attribute_helper(name, obj):
         logging.info(f"copy attribute - name: {name}  obj: {obj.name}")

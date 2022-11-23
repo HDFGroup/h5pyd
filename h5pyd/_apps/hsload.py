@@ -81,6 +81,7 @@ def usage():
     print("     --nodata :: Do not upload dataset data")
     print("     --link :: Link to dataset data (sourcefile given as <bucket>/<path>)")
     print("     --retries <n> :: Set number of server retry attempts")
+    print("     --ignore :: Don't exit on error")
     print("     -h | --help    :: This message.")
     print("")
     print("Note about --link option:")
@@ -157,7 +158,7 @@ def main():
     logfname = None
     s3 = None  # s3fs instance
     retries = 10  # number of retry attempts for HSDS requests
-
+    ignore_error = False
     src_files = []
     argn = 1
     while argn < len(sys.argv):
@@ -253,6 +254,9 @@ def main():
         elif arg == "--retries":
             retries = int(val)
             argn += 2
+        elif arg == "--ignore":
+            ignore_error = True
+            argn += 1
         elif arg[0] == "-":
             usage()
             sys.exit(-1)
@@ -382,6 +386,7 @@ def main():
                 "extend_dim": extend_dim,
                 "extend_offset": extend_offset,
                 "verbose": verbose,
+                "ignore_error": ignore_error,
             }
             load_file(fin, fout, **kwargs)
 
