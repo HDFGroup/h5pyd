@@ -371,15 +371,21 @@ def get_chunk_layout(dset):
 
 # ----------------------------------------------------------------------------------
 def get_chunk_dims(dset):
-    if dset.chunks is None:
-        # define a psuedo-chunk with same dimensions as the dataset
-        chunk_dims = dset.shape
-    elif isinstance(dset.chunks, dict):
-        chunk_dims = dset.chunks["dims"]
-    else:
+    if dset.chunks:
         chunk_dims = dset.chunks
-    chunk_dims = tuple(chunk_dims)
-
+    elif isinstance(dset.id.id, str):
+        # h5pyd datset, check layout
+        layout = dset.id.layout
+        if layout and "dims" in layout:
+            # linked datasets will use chunk shape in source hdf5 file
+            # (or source dataset shape for contiguous datasets)
+            chunk_dims = tuple(layout["dims"])
+        else:
+            # define a psuedo-chunk with same dimensions as the dataset
+            chunk_dims = dset.shape
+    else:
+        # just use dataset shape
+        chunk_dims = dset.shape
     return chunk_dims
 
 # ----------------------------------------------------------------------------------
@@ -398,33 +404,6 @@ def get_chunktable_dims(dset):
         table_dims.append(table_extent)
     table_dims = tuple(table_dims)
     return table_dims
-
-# ----------------------------------------------------------------------------------
-def get_chunk_file_uri(dset):
-    
-    if not is_h5py(dset):
-        logging.error("get_chunk_file_uri only supported for HSDS datasets")
-        return None
-    file_uri = None
-    if isinstance(dset.chunks, dict):
-        # can just return the file_uri key if present
-        if "file_uri" in dset.chunks:
-            file_uri = dset.chunks["file_uri"]
-        else:
-            logging.error(f"expected to find file_uri key in {dset.chunks}")
-    else:
-        # dset.chunks will return None for contiguous ref, 
-        # get the json representatin and use file_uri key in layout class
-        dset_json = dset.id.dcpl_json
-        if "layout" in dset_json:
-            layout = dset_json["layout"]
-            if "file_uri" in layout:
-                file_uri = layout["file_uri"]
-        if file_uri is None:
-            logging.error(f"no file_uri found in: {dset_json}")
-    return file_uri
-
-
 
 # ----------------------------------------------------------------------------------
 def get_num_chunks(dset):
@@ -534,13 +513,14 @@ def create_chunktable(dset, dset_dims, ctx):
 
 # ----------------------------------------------------------------------------------
 def update_chunktable(src, tgt, ctx):
-    if not isinstance(tgt.chunks, dict):
-        raise IOError("expected chunks to be a dict")
-    if tgt.chunks["class"] != "H5D_CHUNKED_REF_INDIRECT":
+    layout = tgt.id.layout
+    if not layout:
+        raise IOError("expected dataset layout to be set")
+    if layout["class"] != "H5D_CHUNKED_REF_INDIRECT":
         logging.info("update_chunktable not supported for this chunk class")
         return
     rank = len(tgt.shape)
-    chunktable_id = tgt.chunks["chunk_table"]
+    chunktable_id = layout["chunk_table"]
 
     fout = ctx["fout"]
 
@@ -768,14 +748,10 @@ def create_dataset(dobj, ctx):
             logging.info(f"using chunk layout: {chunks}")
 
         # use the source object layout if we are not using reference mapping
-        if chunks is None and dobj.chunks:
-            if isinstance(dobj.chunks, dict):
-                # converting hsds dset with linked chunks to h5py dataset
-                # just use the dims field of dobj.chunks as chunk shape
-                chunks = tuple(dobj.chunks["dims"])
-            else:
-                chunks = tuple(dobj.chunks)
-
+        if chunks is None:
+            # converting hsds dset with linked chunks to h5py dataset
+            # just use the dims field of dobj.chunks as chunk shape
+            chunks = get_chunk_dims(dobj)
         if chunks is not None:
             kwargs["chunks"] = chunks
         if (
@@ -901,10 +877,7 @@ def write_dataset(src, tgt, ctx):
 
     if ctx["dataload"] == "link":
         # don't write chunks, but update chunktable for chunk ref indirect
-        if (
-            isinstance(tgt.chunks, dict)
-            and tgt.chunks.get("class") == "H5D_CHUNKED_REF_INDIRECT"
-        ):
+        if tgt.id.layout and tgt.id.layout["class"] == "H5D_CHUNKED_REF_INDIRECT":
             update_chunktable(src, tgt, ctx)
         else:
             pass # skip chunkterator for link option

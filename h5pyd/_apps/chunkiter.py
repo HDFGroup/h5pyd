@@ -80,13 +80,14 @@ class ChunkIterator:
 
     def __init__(self, dset):
         self._shape = dset.shape
-        if dset.chunks is None:
+        if dset.chunks:
+            self.layout = dset.chunks
+        elif isinstance(dset.id.id, str) and "dims" in dset.id.layout:
+            # h5pyd dataset - use dims key in layout
+            self.layout = dset.id.layout["dims"]
+        else:
             # guess a chunk shape
             self._layout = guess_chunk(self._shape, None, dset.dtype.itemsize)
-        elif isinstance(dset.chunks, dict):
-            self._layout = dset.chunks["dims"]
-        else:
-            self._layout = dset.chunks
         self._rank = len(dset.shape)
         if self._rank == 0:
             self._chunk_index = [
