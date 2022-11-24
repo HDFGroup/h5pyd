@@ -18,11 +18,12 @@ try:
     import h5py
     import h5pyd
 except ImportError as e:
-    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
+    sys.stderr.write(f"ERROR : {e} : install it to use this utility...")
     sys.exit(1)
 
 try:
     import s3fs
+
     S3FS_IMPORT = True
 except ImportError:
     S3FS_IMPORT = False
@@ -42,7 +43,7 @@ else:
 cfg = Config()
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def usage():
     print("Usage:\n")
     print(("    {} [ OPTIONS ]  sourcefile  domain".format(cfg["cmd"])))
@@ -56,13 +57,23 @@ def usage():
     print("")
     print("Options:")
     print("     -v | --verbose :: verbose output")
-    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
+    print(
+        "     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org"
+    )
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
-    print("     -a | --append <mode>  :: Flag to append to an existing HDF Server domain")
+    print(
+        "     -a | --append <mode>  :: Flag to append to an existing HDF Server domain"
+    )
+    print("     --extend <dimscale> :: extend along the given dimension scale")
+    print("     --extend-offset <n> :: write data at index n along extended dimension")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
-    print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
-    print("     --compression blosclz|lz4|lz4hc|snappy|gzip|zstd :: use the given compression algorithm for -z option (lz4 is default)")
+    print(
+        "     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]"
+    )
+    print(
+        "     --compression blosclz|lz4|lz4hc|snappy|gzip|zstd :: use the given compression algorithm for -z option (lz4 is default)"
+    )
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
@@ -70,62 +81,91 @@ def usage():
     print("     --nodata :: Do not upload dataset data")
     print("     --link :: Link to dataset data (sourcefile given as <bucket>/<path>)")
     print("     --retries <n> :: Set number of server retry attempts")
+    print("     --ignore :: Don't exit on error")
     print("     -h | --help    :: This message.")
     print("")
     print("Note about --link option:")
-    print("    --link enables just the source HDF5 metadata to be ingested while the dataset data")
+    print(
+        "    --link enables just the source HDF5 metadata to be ingested while the dataset data"
+    )
     print("     is left in the original file and fetched as needed.")
-    print("     When used with files stored in AWS S3, the source file can be specified using the S3")
-    print("     path: 's3://<bucket_name>/<s3_path>'.  Preferably, the bucket should be in the same")
+    print(
+        "     When used with files stored in AWS S3, the source file can be specified using the S3"
+    )
+    print(
+        "     path: 's3://<bucket_name>/<s3_path>'.  Preferably, the bucket should be in the same"
+    )
     print("     region as the HSDS service")
-    print("     For Posix or Azure deployments, the source file needs to be copied to a regular file")
-    print("     system and hsload run from a directory that mirrors the bucket layout.  E.g. if")
-    print("     consider a Posix deployment where the ROOT_DIR is '/mnt/data' and the HSDS default")
-    print("     bucket is 'hsdsdata' (so ingested data will be stored in '/mnt/data/hsdsdata'), the")
-    print("     source HDF5 files could be stored in '/mnt/data/hdf5/' and the file 'myhdf5.h5'")
+    print(
+        "     For Posix or Azure deployments, the source file needs to be copied to a regular file"
+    )
+    print(
+        "     system and hsload run from a directory that mirrors the bucket layout.  E.g. if"
+    )
+    print(
+        "     consider a Posix deployment where the ROOT_DIR is '/mnt/data' and the HSDS default"
+    )
+    print(
+        "     bucket is 'hsdsdata' (so ingested data will be stored in '/mnt/data/hsdsdata'), the"
+    )
+    print(
+        "     source HDF5 files could be stored in '/mnt/data/hdf5/' and the file 'myhdf5.h5'"
+    )
     print("     would be imported as: 'hsload --link data/hdf5/myhdf5.h5 <folder>'")
     print("")
-    print("     Also, the --link option requires hdf5lib 1.10.6 or higher and h5py 2.10 or higher.")
-    print("     The docker image: 'hdfgroup/hdf5lib:1.10.6' includes these versions as well as h5pyd.")
-    print("     E.g.: 'docker run --rm -v ~/.hscfg:/root/.hscfg  -v ~/data:/data -it hdfgroup/hdf5lib:1.10.6 bash'")
-#end print_usage
+    print(
+        "     Also, the --link option requires hdf5lib 1.10.6 or higher and h5py 2.10 or higher."
+    )
+    print(
+        "     The docker image: 'hdfgroup/hdf5lib:1.10.6' includes these versions as well as h5pyd."
+    )
+    print(
+        "     E.g.: 'docker run --rm -v ~/.hscfg:/root/.hscfg  -v ~/data:/data -it hdfgroup/hdf5lib:1.10.6 bash'"
+    )
 
 
-#----------------------------------------------------------------------------------
+# end print_usage
+
+
+# ----------------------------------------------------------------------------------
 def print_config_example():
     print("# default")
     print("hs_username = <username>")
     print("hs_password = <passwd>")
     print("hs_endpoint = http://hsdshdflab.hdfgroup.org")
-#print_config_example
 
 
-#----------------------------------------------------------------------------------
+# print_config_example
+
+
+# ----------------------------------------------------------------------------------
 def main():
 
-    COMPRESSION_FILTERS = ('blosclz', 'lz4', 'lz4hc', 'snappy', 'gzip', 'zstd')
+    COMPRESSION_FILTERS = ("blosclz", "lz4", "lz4hc", "snappy", "gzip", "zstd")
     loglevel = logging.ERROR
     verbose = False
     compression = None
     compression_opts = None
+    append = False
+    extend_dim = None
+    extend_offset = None
     s3path = None
     dataload = "ingest"  # or None, or "link"
-    cfg["cmd"] = sys.argv[0].split('/')[-1]
+    cfg["cmd"] = sys.argv[0].split("/")[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
     cfg["logfname"] = None
     logfname = None
     s3 = None  # s3fs instance
-    mode = 'w'
     retries = 10  # number of retry attempts for HSDS requests
-
+    ignore_error = False
     src_files = []
     argn = 1
     while argn < len(sys.argv):
         arg = sys.argv[argn]
         val = None
 
-        if arg[0] == '-' and len(src_files) > 0:
+        if arg[0] == "-" and len(src_files) > 0:
             # options must be placed before filenames
             sys.stderr.write("options must precede source files")
             usage()
@@ -163,7 +203,7 @@ def main():
                 usage()
                 sys.exit(-1)
             argn += 2
-        elif arg == '--logfile':
+        elif arg == "--logfile":
             logfname = val
             argn += 2
         elif arg in ("-b", "--bucket"):
@@ -182,9 +222,15 @@ def main():
             cfg["hs_password"] = val
             argn += 2
         elif arg in ("-a", "--append"):
-            mode = 'a'
+            append = True
             argn += 1
-        elif arg == '--cnf-eg':
+        elif arg == "--extend":
+            extend_dim = val
+            argn += 2
+        elif arg == "--extend-offset":
+            extend_offset = int(val)
+            argn += 2
+        elif arg == "--cnf-eg":
             print_config_example()
             sys.exit(0)
         elif arg.startswith("-z"):
@@ -196,7 +242,7 @@ def main():
                     sys.stderr.write("Compression Level must be int between 0 and 9")
                     sys.exit(-1)
             if not compression:
-                compression = 'lz4'
+                compression = "lz4"
             argn += 1
         elif arg in ("-c", "--compression"):
             if val not in COMPRESSION_FILTERS:
@@ -208,7 +254,10 @@ def main():
         elif arg == "--retries":
             retries = int(val)
             argn += 2
-        elif arg[0] == '-':
+        elif arg == "--ignore":
+            ignore_error = True
+            argn += 1
+        elif arg[0] == "-":
             usage()
             sys.exit(-1)
         else:
@@ -216,13 +265,17 @@ def main():
             argn += 1
 
     # setup logging
-    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s', level=loglevel)
+    logging.basicConfig(
+        filename=logfname,
+        format="%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s",
+        level=loglevel,
+    )
     logging.debug("set log_level to {}".format(loglevel))
 
     # end arg parsing
     logging.info("username: {}".format(cfg["hs_username"]))
     logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
-    logging.info("verbose: {}".format(verbose))
+    logging.info(f"verbose: {verbose}")
 
     if len(src_files) < 2:
         # need at least a src and destination
@@ -231,22 +284,27 @@ def main():
     domain = src_files[-1]
     src_files = src_files[:-1]
 
-    logging.info("source files: {}".format(src_files))
-    logging.info("target domain: {}".format(domain))
-    if len(src_files) > 1 and (domain[0] != '/' or domain[-1] != '/'):
-        sys.stderr.write("target must be a folder if multiple source files are provided")
+    logging.info(f"source files: {src_files}")
+    logging.info(f"target domain: {domain}")
+    if len(src_files) > 1 and (domain[0] != "/" or domain[-1] != "/"):
+        msg = "target must be a folder if multiple source files are provided"
+        sys.stderr.write(msg)
         usage()
         sys.exit(-1)
 
     if cfg["hs_endpoint"] is None:
-        sys.stderr.write('No endpoint given, try -h for help\n')
+        sys.stderr.write("No endpoint given, try -h for help")
         sys.exit(1)
     logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
 
     # check we have min HDF5 lib version for chunk query
     if dataload == "link":
         logging.info("checking libversion")
-        if h5py.version.version_tuple.major == 2 and h5py.version.version_tuple.minor < 10:
+
+        if (
+            h5py.version.version_tuple.major == 2
+            and h5py.version.version_tuple.minor < 10
+        ):
             sys.stderr.write("link option requires h5py version 2.10 or higher")
             sys.exit(1)
         if h5py.version.hdf5_version_tuple < (1, 10, 6):
@@ -261,7 +319,7 @@ def main():
             logging.debug(src_file_chk)
 
             tgt = domain
-            if tgt[-1] == '/':
+            if tgt[-1] == "/":
                 # folder destination
                 tgt = tgt + op.basename(src_file)
 
@@ -277,49 +335,68 @@ def main():
                 try:
                     fin = h5py.File(s3.open(src_file, "rb"), moe="r")
                 except IOError as ioe:
-                    logging.error("Error opening file {}: {}".format(src_file, ioe))
+                    logging.error(f"Error opening file {src_file}: {ioe}")
                     sys.exit(1)
             else:
                 if dataload == "link":
                     if op.isabs(src_file):
-                        sys.stderr.write("source file must be s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)")
+                        sys.stderr.write(
+                            "source file must be s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)"
+                        )
                         sys.exit(1)
                     s3path = src_file
                 else:
                     s3path = None
                 try:
-                    fin = h5py.File(src_file, mode='r')
+                    fin = h5py.File(src_file, mode="r")
                 except IOError as ioe:
-                    logging.error("Error opening file {}: {}".format(src_file, ioe))
+                    logging.error(f"Error opening file {src_file}: {ioe}")
                     sys.exit(1)
 
             # create the output domain
             try:
-                username = cfg["hs_username"]
-                password = cfg["hs_password"]
-                endpoint = cfg["hs_endpoint"]
-                bucket = cfg["hs_bucket"]
+                mode = "a" if append else "w"
+                kwargs = {
+                    "username": cfg["hs_username"],
+                    "password": cfg["hs_password"],
+                    "endpoint": cfg["hs_endpoint"],
+                    "bucket": cfg["hs_bucket"],
+                    "mode": mode,
+                    "retries": retries,
+                }
 
-                fout = h5pyd.File(tgt, mode, endpoint=endpoint, username=username, password=password, bucket=bucket, retries=retries)
+                fout = h5pyd.File(tgt, **kwargs)
             except IOError as ioe:
                 if ioe.errno == 404:
-                    logging.error("Domain: {} not found".format(tgt))
+                    logging.error(f"Domain: {tgt} not found")
                 elif ioe.errno == 403:
-                    logging.error("No write access to domain: {}".format(tgt))
+                    logging.error(f"No write access to domain: {tgt}")
                 else:
-                    logging.error("Error creating file {}: {}".format(tgt, ioe))
+                    logging.error(f"Error creating file {tgt}: {ioe}")
                 sys.exit(1)
 
             # do the actual load
-            load_file(fin, fout, verbose=verbose, dataload=dataload, s3path=s3path, compression=compression, compression_opts=compression_opts)
+            kwargs = {
+                "verbose": verbose,
+                "dataload": dataload,
+                "s3path": s3path,
+                "compression": compression,
+                "compression_opts": compression_opts,
+                "append": append,
+                "extend_dim": extend_dim,
+                "extend_offset": extend_offset,
+                "verbose": verbose,
+                "ignore_error": ignore_error,
+            }
+            load_file(fin, fout, **kwargs)
 
-            msg = "File {} uploaded to domain: {}".format(src_file, tgt)
+            msg = f"File {src_file} uploaded to domain: {tgt}"
             logging.info(msg)
             if verbose:
                 print(msg)
 
     except KeyboardInterrupt:
-        logging.error('Aborted by user via keyboard interrupt.')
+        logging.error("Aborted by user via keyboard interrupt.")
         sys.exit(1)
 
 

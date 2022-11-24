@@ -188,8 +188,7 @@ class DatasetID(ObjectID):
         return rank
 
     @property
-    def chunks(self):
-        chunks = None
+    def layout(self):
         layout = None
         if "layout" in self._obj_json:
             layout = self._obj_json['layout']
@@ -197,15 +196,18 @@ class DatasetID(ObjectID):
             dcpl = self._obj_json['creationProperties']
             if 'layout' in dcpl:
                 layout = dcpl['layout']
+        return layout
 
+    @property
+    def chunks(self):
+
+        chunks = None
+        layout = self.layout
+         
         if layout and layout['class'] in  ('H5D_CHUNKED', 'H5D_CHUNKED_REF', 'H5D_CHUNKED_REF_INDIRECT'):
-            if layout['class'] == 'H5D_CHUNKED':
-                # ordinary chunked dataset
+            if "dims" in layout:
                 chunks = layout['dims']
-            else:
-                # return dict with other chunk attributes
-                chunks = layout
-
+             
         return chunks
 
     def __init__(self, parent, item, **kwds):

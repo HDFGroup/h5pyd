@@ -142,10 +142,11 @@ def dump(name, obj, visited=None):
     if cfg["verbose"] and is_dataset and obj.shape is not None \
             and obj.chunks is not None:
         chunk_size = obj.dtype.itemsize
-        if isinstance(obj.chunks, dict):
+        
+        if isinstance(obj.id.layout, dict):
             # H5D_CHUNKED_REF layout
-            chunk_dims = obj.chunks["dims"]
-            storage_desc = "Storage " + obj.chunks["class"]
+            chunk_dims = obj.id.layout["dims"]
+            storage_desc = "Storage " + obj.id.layout["class"]
         else:
             chunk_dims = obj.chunks
             storage_desc = "Storage H5D_CHUNKED"

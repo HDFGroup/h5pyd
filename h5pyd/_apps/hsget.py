@@ -50,6 +50,7 @@ def usage():
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not download dataset data")
+    print("     --ignore :: Don't exit on error")
     print("     -h | --help    :: This message.")
     print("")
 
@@ -68,6 +69,7 @@ def main():
 
     loglevel = logging.ERROR
     verbose = False
+    ignore_error = False
     dataload = "ingest"  # or None
 
     cfg["cmd"] = sys.argv[0].split('/')[-1]
@@ -136,6 +138,8 @@ def main():
         elif arg == '--cnf-eg':
             print_config_example()
             sys.exit(0)
+        elif arg == "--ignore":
+            ignore_error = True
         elif arg[0] == '-':
             usage()
             sys.exit(-1)
@@ -195,7 +199,7 @@ def main():
         sys.exit(1)
 
     try:
-        load_file(fin, fout, verbose=verbose, dataload=dataload)
+        load_file(fin, fout, verbose=verbose, ignore_error=ignore_error, dataload=dataload)
         msg = "Domain {} downloaded to file: {}".format(src_domain, des_file)
         logging.info(msg)
         if verbose:

@@ -49,6 +49,27 @@ class TestDatasetCompound(TestCase):
         self.assertEqual(val['real'], 1.0)
         f.close()
 
+    def test_onefield_compound_dset(self):
+        filename = self.getFileName("test_onefield_compound_dset")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+ 
+        count = 10
+
+        dt = np.dtype([('a_field', int),])
+        dset = f.create_dataset('a_field', (count,), dtype=dt)
+
+        elem = dset[0]
+        for i in range(count):
+            elem['a_field'] = i*2
+            dset[i] = elem
+
+        val = dset[5]
+        self.assertEqual(val['a_field'], 10)
+        self.assertEqual(len(dset.dtype), 1)
+        self.assertEqual(dset.dtype.kind, "V")
+        f.close()
+
 if __name__ == '__main__':
     loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)

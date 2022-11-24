@@ -69,6 +69,7 @@ def usage():
     print("     --src_bucket <bucket_name> :: Storage bucket for src file")
     print("     --des_bucket <bucket_name> :: Storage bucket for des file")
     print("     --nodata :: Do not upload dataset data")
+    print("     --ignore :: Don't exit on error")
     print("     -h | --help    :: This message.")
     print("")
 
@@ -90,6 +91,7 @@ def main():
 
     loglevel = logging.ERROR
     verbose = False
+    ignore_error = False
     dataload = "ingest"
     compressLevel = None
     cfg["cmd"] = sys.argv[0].split("/")[-1]
@@ -184,6 +186,9 @@ def main():
                 except ValueError:
                     print("Compression Level must be int between 0 and 9")
                     sys.exit(-1)
+            argn += 1
+        elif arg == "--ignore":
+            ignore_error = True
             argn += 1
         elif arg[0] == "-":
             print("got unknown arg:", arg)
@@ -321,6 +326,7 @@ def main():
             fin,
             fout,
             verbose=verbose,
+            ignore_error=ignore_error,
             dataload=dataload,
             compression=compress_filter,
             compression_opts=compressLevel,
