@@ -841,7 +841,6 @@ def write_dataset(src, tgt, ctx):
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
-
     if src.shape is None:
         # null space dataset
         msg = f"no data for null space dataset: {src.name}"
@@ -859,6 +858,13 @@ def write_dataset(src, tgt, ctx):
             print(msg)
         tgt[()] = x
         return
+
+    if np.prod(src.shape) == 0:
+        msg = f"no data for dataset with zero extent: {src.name}"
+        logging.info(msg)
+        if ctx["verbose"]:
+            print(msg)
+        return  # no data
 
     fillvalue = get_fillvalue(src)
 
