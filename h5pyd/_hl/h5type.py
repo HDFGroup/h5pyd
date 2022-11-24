@@ -392,7 +392,7 @@ def getTypeItem(dt):
     }
 
     type_info = {}
-    if len(dt) > 1:
+    if len(dt) > 0:
         # compound type
         names = dt.names
         type_info['class'] = 'H5T_COMPOUND'
