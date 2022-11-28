@@ -127,8 +127,8 @@ def make_new_dset(
         chunk > dim for dim, chunk in zip(tmp_shape, chunks) if dim is not None
     ):
         errmsg = (
-            "Chunk shape must not be greater than data shape in any dimension. "
-            "{} is not compatible with {}".format(chunks, shape)
+            f"Chunk shape must not be greater than data shape in any dimension. "
+            "{chunks} is not compatible with {shape}"
         )
         raise ValueError(errmsg)
 

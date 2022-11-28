@@ -92,9 +92,9 @@ def generate_dcpl(
         try:
             tpl = tuple(tpl)
         except TypeError:
-            raise TypeError('"%s" argument must be None or a sequence object' % name)
+            raise TypeError(f'"{name}" argument must be None or a sequence object')
         if len(tpl) != len(shape):
-            raise ValueError('"%s" must have same rank as dataset shape' % name)
+            raise ValueError(f'"{name}" must have same rank as dataset shape')
 
     rq_tuple(chunks, "chunks")
     rq_tuple(maxshape, "maxshape")
