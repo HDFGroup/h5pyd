@@ -787,6 +787,11 @@ def create_dataset(dobj, ctx):
             # just use the dims field of dobj.chunks as chunk shape
             chunks = get_chunk_dims(dobj)
         if chunks is not None:
+            if dset_preappend is not None:
+                # need to add an extra dimension to the chunks shape
+                new_chunks = [1,]
+                new_chunks.extend(chunks)
+                chunks = tuple(new_chunks)
             kwargs["chunks"] = chunks
         if (
             dobj.shape is None
