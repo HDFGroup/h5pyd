@@ -1084,6 +1084,9 @@ class HLObject(CommonStateObject):
         else:
             pass
 
+    def __hash__(self):
+        return hash(self.id.id)
+
     def __eq__(self, other):
         if hasattr(other, 'id'):
             return self.id == other.id

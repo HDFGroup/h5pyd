@@ -29,6 +29,9 @@ if "H5PYD_TEST_FOLDER" not in os.environ:
 
 test_folder = os.environ["H5PYD_TEST_FOLDER"]
 
+if test_folder[-1] != "/":
+    test_folder += "/"
+
 data_dir = "data"
 
 s3_http_path = "https://s3.amazonaws.com/hdfgroup/data/hdf5test/"

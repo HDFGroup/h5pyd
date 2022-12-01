@@ -21,9 +21,14 @@ if config.get("use_h5py"):
 if "H5PYD_TEST_FOLDER" not in os.environ:
     sys.exit("set H5PYD_TEST_FOLDER environment not set")
 folder_path = os.environ["H5PYD_TEST_FOLDER"]
+if len(folder_path) <= 1:
+    # should be more than just /...
+    sys.exit("invalid path")
 if not folder_path.startswith("/"):
     # HSDS expects folder paths to start with a slash (as opposed to DNS format)
     sys.exit("not HSDS path")
+if folder_path[-1] != "/":
+    folder_path += "/"
 try:
     h5pyd.Folder(folder_path)  # will trigger error with h5serv
 except Exception:
