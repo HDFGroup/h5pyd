@@ -117,7 +117,7 @@ def get_fillvalue(dset):
             # can trigger a runtime error if fillvalue is undefined
             fillvalue = dset.fillvalue
         except RuntimeError:
-            pass  # ignore
+            logging.warning(f"runtime error getting fillvalue for dataset: {dset.name}")
     return fillvalue
 
 
@@ -823,6 +823,7 @@ def create_dataset(dobj, ctx):
                     new_chunks.extend(chunks)
                     chunks = tuple(new_chunks)
             kwargs["chunks"] = chunks
+
         if (
             dobj.shape is None
             or len(dobj.shape) == 0
@@ -845,7 +846,12 @@ def create_dataset(dobj, ctx):
         # setting the fillvalue is failing in some cases
         # see: https://github.com/HDFGroup/h5pyd/issues/119
         # just setting to None for now
-        # fillvalue=get_fillvalue(dobj)
+        fillvalue = get_fillvalue(dobj)
+        if fillvalue is not None:
+            logging.debug(f"got fillvalue: {fillvalue}")
+            kwargs["fillvalue"] = fillvalue
+
+        # finally, create the dataset    
         dset = fout.create_dataset(dobj.name, **kwargs)
 
         msg = f"dataset created, uuid: {dset.id.id}, "
