@@ -437,6 +437,21 @@ def get_chunktable_dtype(include_file_uri=False):
     return dt
 
 # ----------------------------------------------------------------------------------
+def get_chunk_table_index(chunk_offset, chunk_dims):
+    if len(chunk_offset) != len(chunk_dims):
+        msg = f"Unexptected chunk offset: {chunk_offset}"
+        logging.error(msg)
+        if not ctx["ignore_error"]:
+            raise IOError(msg)
+    rank = len(chunk_offset)
+    chunk_index = []
+    for i in range(rank):
+        chunk_index.append(chunk_offset[i]//chunk_dims[i])
+    return tuple(chunk_index)
+
+
+
+# ----------------------------------------------------------------------------------
 def create_chunktable(dset, dset_dims, ctx):
     logging.debug(f"create_chunktable({dset}, {dset_dims}")
 
@@ -464,7 +479,10 @@ def create_chunktable(dset, dset_dims, ctx):
 
         fout = ctx["fout"]
         anon_dset = fout.create_dataset(None, shape=chunktable_dims, dtype=dt, maxshape=chunktable_maxshape)
-        logging.debug(f"anon_dset: {anon_dset}")
+        msg = f"created chunk table: {anon_dset}"
+        logging.info(msg)
+        if ctx["verbose"]:
+            print(msg)
         chunks["class"] = "H5D_CHUNKED_REF_INDIRECT"
         if not extend:
             chunks["file_uri"] = ctx["s3path"]
@@ -542,6 +560,7 @@ def update_chunktable(src, tgt, ctx):
     fout = ctx["fout"]
 
     chunktable = fout[f"datasets/{chunktable_id}"]
+    chunk_dims = get_chunk_dims(src)
     chunktable_dims = get_chunktable_dims(src)
 
     msg = f"dataset chunk dimensions {chunktable_dims} not compatible with {chunktable.shape}"
@@ -589,7 +608,7 @@ def update_chunktable(src, tgt, ctx):
     
             for i in range(num_chunks):
                 chunk_info = src.id.get_chunk_info(i, spaceid)
-                index = chunk_info.chunk_offset
+                index = get_chunk_table_index(chunk_info.chunk_offset, chunk_dims)
                 if not isinstance(index, tuple) or len(index) != rank:
                     msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
                     logging.error(msg)
@@ -631,16 +650,23 @@ def update_chunktable(src, tgt, ctx):
                 chunkinfo_arr[index] = v
         elif layout_class == "H5D_CHUNKED_REF_INDIRECT":
             file_uri = layout["file_uri"] 
-            orig_chunktable = fout[f"datasets/{chunktable_id}"]
+            orig_chunktable_id = layout["chunk_table"]
+            orig_chunktable = fout[f"datasets/{orig_chunktable_id}"]
             # iterate through contents and add file uri
-            for index, value in orig_chunktable:
+            arr = orig_chunktable[...]
+            it = np.nditer(arr, flags=['multi_index'])
+            for _ in it:
+                value = arr[it.multi_index]
                 if value[1] == 0:
                     # no chunk location set
                     continue
-                e = [file_uri,]
-                e.extend(value)
+                e = list(value)
+                e.append(file_uri)
                 e = tuple(e)
-                chunkinfo_arr[index] = e
+                tgt_index = [0,]
+                tgt_index.extend(it.multi_index)
+                tgt_index = tuple(tgt_index)
+                chunkinfo_arr[it.multi_index] = e
         else:
             msg = f"expected chunk ref class but got: {layout_class}"
             logging.error(msg)
