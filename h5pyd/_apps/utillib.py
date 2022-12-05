@@ -389,9 +389,12 @@ def get_chunk_dims(dset):
         else:
             # define a psuedo-chunk with same dimensions as the dataset
             chunk_dims = dset.shape
-    else:
+    elif len(dset.shape) > 0 and np.prod(dset.shape) > 0:
         # just use dataset shape
         chunk_dims = dset.shape
+    else:
+        # no chunk dims
+        chunk_dims = None
     return chunk_dims
 
 # ----------------------------------------------------------------------------------
