@@ -16,10 +16,6 @@ import os
 import sys
 import multiprocessing
 
-try:
-    from multiprocessing import shared_memory
-except ImportError:
-    pass  # only supported with python 3.8 or greater
 import base64
 import requests
 import requests_unixsocket
@@ -27,7 +23,6 @@ from requests import ConnectionError
 from requests.adapters import HTTPAdapter, Retry
 import json
 import logging
-import time
 
 from . import openid
 from .config import Config
@@ -168,7 +163,6 @@ class HttpConn:
         mode="a",
         use_session=True,
         use_cache=True,
-        use_shared_mem=None,
         logger=None,
         retries=3,
         timeout=DEFAULT_TIMEOUT,
@@ -182,8 +176,6 @@ class HttpConn:
         self._timeout = timeout
         self._hsds = None
         self._lambda = None
-        self._use_shared_mem = use_shared_mem
-        self._shm_block = None
         self._api_key = api_key
         self._s = None  # Sessions
         if use_cache:
@@ -748,10 +740,7 @@ class HttpConn:
         if self._hsds:
             self._hsds.stop()
             self._hsds = None
-        if self._shm_block:
-            self._shm_block.close()
-            self._shm_block.unlink()
-            self._shm_block = None
+    
 
     @property
     def domain(self):
@@ -779,49 +768,7 @@ class HttpConn:
             return False
         else:
             return True
-
-    @property
-    def use_shared_mem(self):
-        if self._use_shared_mem:
-            return True
-        else:
-            return False
-
-        # TBD: use shared mem for socket connections?
-        """
-        is None or not 
-            if self._endpoint.startswith("http+unix"):
-                return True
-            else:
-                return False
-        else:
-            return self._use_shared_mem
-        """
-
-    def get_shm_buffer(self, min_size=None):
-        if not self.use_shared_mem:
-            return None
-        if sys.version_info.major != 3 or sys.version_info.minor < 8:
-            return None  # need at least python 3.8
-        if self._shm_block and (min_size is None or self._shm_block.size >= min_size):
-            # just return existing shared memory block
-            self.log.debug(f"returing shm_block - size: {self._shm_block.size}")
-            return self._shm_block.buf
-        # Free exiting block if any
-        if self._shm_block:
-            self._shm_block.close()
-            self._shm_block.unlink()
-            self._shm_block = None
-        self.log.debug(f"allocating shm block - size: {min_size}")
-        self._shm_block = shared_memory.SharedMemory(create=True, size=min_size)
-        return self._shm_block.buf
-
-    @property
-    def shm_buffer_name(self):
-        if not self._shm_block:
-            return None
-        else:
-            return self._shm_block.name
+ 
 
     @property
     def domain_json(self):
