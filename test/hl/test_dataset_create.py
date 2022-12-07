@@ -549,8 +549,69 @@ class TestCreateDataset(TestCase):
         self.assertEqual(dset2.name, '/dset2')
         check_props(dset2)
 
-         
         f.close()
+
+    def test_creat_anon_dataset(self):
+
+        def validate_dset(dset):
+            self.assertEqual(dset.name, None)
+            self.assertTrue(isinstance(dset.shape, tuple))
+            self.assertEqual(len(dset.shape), 2)
+            self.assertEqual(dset.ndim, 2)
+            self.assertEqual(dset.shape[0], 40)
+            self.assertEqual(dset.shape[1], 80)
+            self.assertEqual(str(dset.dtype), 'float32')
+            self.assertTrue(isinstance(dset.maxshape, tuple))
+            self.assertEqual(len(dset.maxshape), 2)
+            self.assertEqual(dset.maxshape[0], 40)
+            self.assertEqual(dset.maxshape[1], 80)
+            self.assertEqual(dset[0,0], 0)
+
+        filename = self.getFileName("create_anon_dset")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+
+        dims = (40, 80)
+        dset = f.create_dataset(None, dims, dtype='f4')
+
+        validate_dset(dset)
+
+        dset_id = dset.id.id
+        if not config.get("use_h5py"):
+            # Check dataset's last modified time
+            self.assertTrue(isinstance(dset.modified, datetime))
+
+            # test h5pyd extensions
+            if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
+                self.assertEqual(dset.num_chunks, 0)
+                self.assertEqual(dset.allocated_size, 0)
+
+
+        f.close()
+
+        f = h5py.File(filename, "a")  # re-open
+        num_links = len(f)
+        self.assertEqual(num_links, 0)
+        if not config.get("use_h5py"):
+            # can get a reference to the dataset using the dataset id
+            uuid_ref = f"datasets/{dset_id}"
+            dset = f[uuid_ref]
+            validate_dset(dset)
+            self.assertEqual(dset.id.id, dset_id)
+
+            # explictly delete dataset
+            del f[uuid_ref]
+
+            # should not be returned now
+            try:
+                dset = f[uuid_ref]
+                print(f"didn't expect to get: {dset}")
+                self.asertTrue(False)
+            except IOError:
+                pass # expected
+        f.close()     
+
+
         
 if __name__ == '__main__':
     loglevel = logging.ERROR

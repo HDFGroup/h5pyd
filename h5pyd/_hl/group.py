@@ -26,6 +26,22 @@ from .table import Table
 from .datatype import Datatype
 from . import h5type
 
+def isUUID(name):
+    # return True if name looks like an object id
+    # There are some additional checks we could add to reduce false positives
+    # (like checking for hyphens in the right places)
+    if isinstance(name, str) and len(name) >= 38:
+        if name.startswith("groups/") or name.startswith("g-"):
+            return True
+        elif name.startswith("datatypes/") or name.startswith("t-"):
+            return True
+        elif name.startswith("datasets/") or name.startswith("d-"):
+            return True
+        else:
+            return False
+    else:
+        return False
+
 
 class Group(HLObject, MutableMappingHDF5):
 
@@ -534,83 +550,67 @@ class Group(HLObject, MutableMappingHDF5):
         return grp
 
 
+    def getObjByUuid(self, uuid, collection_type=None):
+        """ Utility method to get an obj based on collection type and uuid """
+        self.log.debug(f"getObjByUuid({uuid})")
+        obj_json = None
+        # need to do somee hacky code for h5serv vs hsds compatibility
+        # trim off any collection prefix from the input
+        if uuid.startswith("groups/"):
+            uuid = uuid[len("groups/"):]
+            if collection_type is None:
+                collection_type = 'groups'
+        elif uuid.startswith("datasets/"):
+            uuid = uuid[len("datasets/"):]
+            if collection_type is None:
+                collection_type = 'datasets'
+        elif uuid.startswith("datatypes/"):
+            uuid = uuid[len("datatypes/"):]
+            if collection_type is None:
+                collection_type = 'datatypes'
+        if collection_type is None:
+            if uuid.startswith("g-"):
+                collection_type = "groups"
+            elif uuid.startswith("t-"):
+                collection_type = "datatypes"
+            elif uuid.startswith("d-"):
+                collection_type = "datasets"
+            else:
+                raise IOError(f"Unexpected uuid: {uuid}")
+        objdb = self.id.http_conn.getObjDb()
+        if objdb and uuid in objdb:
+            # we should be able to construct an object from objdb json
+            obj_json = objdb[uuid]
+        else:
+            # will need to get JSON from server
+            req = f"/{collection_type}/{uuid}"
+            # make server request
+            obj_json = self.GET(req)
+
+        if collection_type == 'groups':
+            tgt = Group(GroupID(self, obj_json))
+        elif collection_type == 'datatypes':
+            tgt = Datatype(TypeID(self, obj_json))
+        elif collection_type == 'datasets':
+            # create a Table if the daset is one dimensional and compound
+            shape_json = obj_json["shape"]
+            dtype_json = obj_json["type"]
+            if "dims" in shape_json and len(shape_json["dims"]) == 1 and dtype_json["class"] == 'H5T_COMPOUND':
+                tgt = Table(DatasetID(self, obj_json))
+            else:
+                tgt = Dataset(DatasetID(self, obj_json))
+        else:
+            raise IOError(f"Unexpected collection_type: {collection_type}")
+
+        return tgt
+
+
     def __getitem__(self, name):
         """ Open an object in the file """
         # convert bytes to str for PY3
         if isinstance(name, bytes):
             name = name.decode('utf-8')
-        self.log.debug("group.__getitem__({})".format(name))
-
-        def getObjByUuid(uuid, collection_type=None):
-            """ Utility method to get an obj based on collection type and uuid """
-            self.log.debug("getObjByUuid({})".format(uuid))
-            obj_json = None
-            # need to do somee hacky code for h5serv vs hsds compatibility
-            # trim off any collection prefix from the input
-            if uuid.startswith("groups/"):
-                uuid = uuid[len("groups/"):]
-                if collection_type is None:
-                    collection_type = 'groups'
-            elif uuid.startswith("datasets/"):
-                uuid = uuid[len("datasets/"):]
-                if collection_type is None:
-                    collection_type = 'datasets'
-            elif uuid.startswith("datatypes/"):
-                uuid = uuid[len("datatypes/"):]
-                if collection_type is None:
-                    collection_type = 'datatypes'
-            if collection_type is None:
-                if uuid.startswith("g-"):
-                    collection_type = "groups"
-                elif uuid.startswith("t-"):
-                    collection_type = "datatypes"
-                elif uuid.startswith("d-"):
-                    collection_type = "datasets"
-                else:
-                    raise IOError("Unexpected uuid: {}".format(uuid))
-            objdb = self.id.http_conn.getObjDb()
-            if objdb and uuid in objdb:
-                # we should be able to construct an object from objdb json
-                obj_json = objdb[uuid]
-            else:
-                # will need to get JSON from server
-                req = "/" + collection_type + "/" + uuid
-                # make server request
-                obj_json = self.GET(req)
-
-            if collection_type == 'groups':
-                tgt = Group(GroupID(self, obj_json))
-            elif collection_type == 'datatypes':
-                tgt = Datatype(TypeID(self, obj_json))
-            elif collection_type == 'datasets':
-                # create a Table if the daset is one dimensional and compound
-                shape_json = obj_json["shape"]
-                dtype_json = obj_json["type"]
-                if "dims" in shape_json and len(shape_json["dims"]) == 1 and dtype_json["class"] == 'H5T_COMPOUND':
-                    tgt = Table(DatasetID(self, obj_json))
-                else:
-                    tgt = Dataset(DatasetID(self, obj_json))
-            else:
-                raise IOError("Unexpecrted collection_type: {}".format(collection_type))
-
-            return tgt
-
-        def isUUID(name):
-            # return True if name looks like an object id
-            # There are some additional checks we could add to reduce false positives
-            # (like checking for hyphens in the right places)
-            if isinstance(name, str) and len(name) >= 38:
-                if name.startswith("groups/") or name.startswith("g-"):
-                    return True
-                elif name.startswith("datatypes/") or name.startswith("t-"):
-                    return True
-                elif name.startswith("datasets/") or name.startswith("d-"):
-                    return True
-                else:
-                    return False
-            else:
-                return False
-
+        self.log.debug(f"group.__getitem__({name})")
 
         tgt = None
         if isinstance(name, h5type.Reference):
@@ -618,29 +618,28 @@ class Group(HLObject, MutableMappingHDF5):
             if tgt is not None:
                 return tgt  # ref'd object has not been deleted
             if isinstance(name.id, GroupID):
-                tgt = getObjByUuid(name.id.uuid, collection_type="groups")
+                tgt = self.getObjByUuid(name.id.uuid, collection_type="groups")
             elif isinstance(name.id, DatasetID):
-                tgt = getObjByUuid(name.id.uuid, collection_type="datasets")
+                tgt = self.getObjByUuid(name.id.uuid, collection_type="datasets")
             elif isinstance(name.id, TypeID):
-                tgt = getObjByUuid(name.id.uuid, collection_type="datasets")
+                tgt = self.getObjByUuid(name.id.uuid, collection_type="datasets")
             else:
                 raise IOError("Unexpected Error - ObjectID type: " + name.__class__.__name__)
             return tgt
 
         if isUUID(name):
-            tgt = getObjByUuid(name)
+            tgt = self.getObjByUuid(name)
             return tgt
-
 
         parent_uuid, link_json = self._get_link_json(name)
         link_class = link_json['class']
 
         if link_class == 'H5L_TYPE_HARD':
-            tgt = getObjByUuid(link_json['id'], collection_type=link_json['collection'])
+            tgt = self.getObjByUuid(link_json['id'], collection_type=link_json['collection'])
         elif link_class == 'H5L_TYPE_SOFT':
             h5path = link_json['h5path']
             soft_parent_uuid, soft_json = self._get_link_json(h5path)
-            tgt = getObjByUuid(soft_json['id'], collection_type=soft_json['collection'])
+            tgt = self.getObjByUuid(soft_json['id'], collection_type=soft_json['collection'])
 
         elif link_class == 'H5L_TYPE_EXTERNAL':
             # try to get a handle to the file and return the linked object...
@@ -841,11 +840,29 @@ class Group(HLObject, MutableMappingHDF5):
 
     def __delitem__(self, name):
         """ Delete (unlink) an item from this group. """
-        req = "/groups/" + self.id.uuid + "/links/" + name
+
+        if isUUID(name):
+            tgt = self.getObjByUuid(name)
+            if tgt:
+                if isinstance(tgt.id, GroupID):
+                    req = "/groups/" + tgt.id.uuid
+                elif isinstance(tgt.id, DatasetID):
+                    req = "/datasets/" + tgt.id.uuid
+                elif isinstance(tgt.id, TypeID):
+                    req = "/datatypes/" + tgt.id.uuid
+                else:
+                    raise TypeError(f"unexpected type for object id: {tgt.id}")
+            else:
+                raise IOError("Not found")
+                
+        else:
+            # delete the link, not an object
+            req = "/groups/" + self.id.uuid + "/links/" + name
         self.DELETE(req)
         if name.find('/') == -1 and name in self._link_db:
             # remove from link cache
             del self._link_db[name]
+            
 
     def __len__(self):
         """ Number of members attached to this group """
