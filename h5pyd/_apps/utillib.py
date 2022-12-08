@@ -379,7 +379,7 @@ def get_chunk_layout(dset):
 def get_chunk_dims(dset):
     if dset.chunks:
         chunk_dims = dset.chunks
-    elif isinstance(dset.id.id, str):
+    elif not is_h5py(dset):
         # h5pyd datset, check layout
         layout = dset.id.layout
         if layout and "dims" in layout:
@@ -389,6 +389,8 @@ def get_chunk_dims(dset):
         else:
             # define a psuedo-chunk with same dimensions as the dataset
             chunk_dims = dset.shape
+    elif dset.shape is None:
+        chunk_dims = None
     elif len(dset.shape) > 0 and np.prod(dset.shape) > 0:
         # just use dataset shape
         chunk_dims = dset.shape
@@ -444,15 +446,11 @@ def get_chunk_table_index(chunk_offset, chunk_dims):
     if len(chunk_offset) != len(chunk_dims):
         msg = f"Unexptected chunk offset: {chunk_offset}"
         logging.error(msg)
-        if not ctx["ignore_error"]:
-            raise IOError(msg)
     rank = len(chunk_offset)
     chunk_index = []
     for i in range(rank):
         chunk_index.append(chunk_offset[i]//chunk_dims[i])
     return tuple(chunk_index)
-
-
 
 # ----------------------------------------------------------------------------------
 def create_chunktable(dset, dset_dims, ctx):
@@ -759,13 +757,19 @@ def create_dataset(dobj, ctx):
             # add an extra unlimited dimension
             tgt_shape = [0,]
             tgt_maxshape = [None,]
+        elif dobj.shape is None:
+            tgt_shape = None
+            tgt_maxshape = None
         else:
             tgt_shape = []
             tgt_maxshape = []
 
-        tgt_shape.extend(dobj.shape)
-        tgt_maxshape.extend(dobj.maxshape)
-        rank = len(tgt_shape)
+        if tgt_shape is None:
+            rank = 0
+        else:
+            tgt_shape.extend(dobj.shape)
+            tgt_maxshape.extend(dobj.maxshape)
+            rank = len(tgt_shape)
         if rank > 0 and ctx["extend_dim"]:
             # set maxshape to unlimited for any dimension that is the extend_dim
             if dobj.name.split("/")[-1] == ctx["extend_dim"]:
