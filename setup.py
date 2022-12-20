@@ -21,7 +21,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='h5pyd-redesign',
-      version='0.10.2',
+      version='0.10.3',
       description='h5py compatible client lib for HDF REST API',
       long_description=long_description,
       url='http://github.com/HDFGroup/h5pyd',
@@ -37,7 +37,7 @@ setup(name='h5pyd-redesign',
           'msrestazure',
           'cryptography',
           'google-api-python-client',
-          'google-auth-oauthlib',
+          'google-auth-oauthlib<=0.5.3',
           'google-auth<2.0dev',
           'adal'],
       setup_requires=['pkgconfig'],
