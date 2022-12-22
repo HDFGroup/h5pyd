@@ -459,6 +459,10 @@ def create_chunktable(dset, dset_dims, ctx):
     num_chunks = get_num_chunks(dset)
     rank = len(dset_dims)
     extend = True if rank > len(dset.shape) else False
+    if extend:
+        include_file_uri = True
+    else:
+        include_file_uri = False
 
     logging.debug(f"num_chunks: {num_chunks}")
 
@@ -466,7 +470,7 @@ def create_chunktable(dset, dset_dims, ctx):
 
     if num_chunks > 10 or extend:
         # create anonymous dataset to hold chunk info
-        dt = get_chunktable_dtype(include_file_uri=extend)
+        dt = get_chunktable_dtype(include_file_uri=include_file_uri)
 
         chunktable_dims = [0,] if extend else []
         
