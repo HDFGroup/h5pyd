@@ -19,7 +19,7 @@ try:
     import h5py
     import h5pyd
 except ImportError as e:
-    sys.stderr.write(f"ERROR : {e} : install it to use this utility...")
+    sys.stderr.write(f"ERROR : {e} : install it to use this utility...\n")
     sys.exit(1)
 
 try:
@@ -80,7 +80,8 @@ def usage():
     print("     --loglevel debug|info|warning|error :: Change log level")
     print("     --bucket <bucket_name> :: Storage bucket")
     print("     --nodata :: Do not upload dataset data")
-    print("     --link :: Link to dataset data (sourcefile given as <bucket>/<path>)")
+    print("     --link :: Link to dataset data (sourcefile given as <bucket>/<path>) or s3uri")
+    print("     --linkpath <path>  :: Use the given path for the link references rather than the src path")
     print("     --retries <n> :: Set number of server retry attempts")
     print("     --ignore :: Don't exit on error")
     print("     -h | --help    :: This message.")
@@ -159,6 +160,7 @@ def main():
     logfname = None
     s3 = None  # s3fs instance
     retries = 10  # number of retry attempts for HSDS requests
+    link_path = None
     ignore_error = False
     src_files = []
     argn = 1
@@ -168,7 +170,7 @@ def main():
 
         if arg[0] == "-" and len(src_files) > 0:
             # options must be placed before filenames
-            sys.stderr.write("options must precede source files")
+            sys.stderr.write("options must precede source files\n")
             usage()
             sys.exit(-1)
 
@@ -180,13 +182,16 @@ def main():
             argn += 1
         elif arg == "--link":
             if dataload != "ingest":
-                sys.stderr.write("--nodata flag can't be used with link flag")
+                sys.stderr.write("--nodata flag can't be used with link flag\n")
                 sys.exit(1)
             dataload = "link"
             argn += 1
+        elif arg == "--linkpath":
+            link_path = val
+            argn += 2
         elif arg == "--nodata":
             if dataload != "ingest":
-                sys.stderr.write("--nodata flag can't be used with link flag")
+                sys.stderr.write("--nodata flag can't be used with link flag\n")
                 sys.exit(1)
             dataload = None
             argn += 1
@@ -200,8 +205,7 @@ def main():
             elif val == "error":
                 loglevel = logging.ERROR
             else:
-                sys.stderr.write("unknown loglevel")
-                usage()
+                sys.stderr.write("unknown loglevel\n")
                 sys.exit(-1)
             argn += 2
         elif arg == "--logfile":
@@ -240,14 +244,14 @@ def main():
                 try:
                     compression_opts = int(arg[2:])
                 except ValueError:
-                    sys.stderr.write("Compression Level must be int between 0 and 9")
+                    sys.stderr.write("Compression Level must be int between 0 and 9\n")
                     sys.exit(-1)
             if not compression:
                 compression = "lz4"
             argn += 1
         elif arg in ("-c", "--compression"):
             if val not in COMPRESSION_FILTERS:
-                sys.stderr.write("unknown compression filter")
+                sys.stderr.write("unknown compression filter\n")
                 usage()
                 sys.exit(-1)
             compression = val
@@ -264,6 +268,18 @@ def main():
         else:
             src_files.append(arg)
             argn += 1
+
+    if link_path and dataload != "link":
+        sys.stderr.write("--linkpath option can only be used with --link\n")
+        sys.exit(-1)
+
+    if extend_offset and extend_dim is None:
+        sys.stderr.write("--extend-offset option can only be used with --link\n")
+        sys.exit(-1)
+
+    if extend_dim is not None and dataload == "link":
+        sys.stderr.write("--extend option can't be used with --link\n")
+        sys.exit(-1)
 
     # setup logging
     logging.basicConfig(
@@ -288,13 +304,13 @@ def main():
     logging.info(f"source files: {src_files}")
     logging.info(f"target domain: {domain}")
     if len(src_files) > 1 and (domain[0] != "/" or domain[-1] != "/"):
-        msg = "target must be a folder if multiple source files are provided"
+        msg = "target must be a folder if multiple source files are provided\n"
         sys.stderr.write(msg)
         usage()
         sys.exit(-1)
 
     if cfg["hs_endpoint"] is None:
-        sys.stderr.write("No endpoint given, try -h for help")
+        sys.stderr.write("No endpoint given, try -h for help\n")
         sys.exit(1)
     logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
 
@@ -306,10 +322,10 @@ def main():
             h5py.version.version_tuple.major == 2
             and h5py.version.version_tuple.minor < 10
         ):
-            sys.stderr.write("link option requires h5py version 2.10 or higher")
+            sys.stderr.write("link option requires h5py version 2.10 or higher\n")
             sys.exit(1)
         if h5py.version.hdf5_version_tuple < (1, 10, 6):
-            sys.stderr.write("link option requires hdf5 lib version 1.10.6 or higher")
+            sys.stderr.write("link option requires hdf5 lib version 1.10.6 or higher\n")
             sys.exit(1)
 
     try:
@@ -328,7 +344,7 @@ def main():
             if src_file.startswith("s3://"):
                 s3path = src_file
                 if not S3FS_IMPORT:
-                    sys.stderr.write("Install S3FS package to load s3 files")
+                    sys.stderr.write("Install S3FS package to load s3 files\n")
                     sys.exit(1)
 
                 if not s3:
@@ -347,9 +363,9 @@ def main():
                     sys.exit(1)
             else:
                 if dataload == "link":
-                    if op.isabs(src_file):
+                    if op.isabs(src_file) and not link_path:
                         sys.stderr.write(
-                            "source file must be s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)"
+                            "source file must be s3path (for HSDS using S3 storage) or relative path from server root directory (for HSDS using posix storage)\n"
                         )
                         sys.exit(1)
                     s3path = src_file
@@ -382,6 +398,12 @@ def main():
                 else:
                     logging.error(f"Error creating file {tgt}: {ioe}")
                 sys.exit(1)
+
+            if link_path:
+                # now that we have a handle to the source file,
+                # repurpose s3path to the s3uri that will actually get stored 
+                # in the target domain
+                s3path = link_path
 
             # do the actual load
             kwargs = {
