@@ -30,10 +30,8 @@ except ImportError:
 
 if __name__ == "__main__":
     from config import Config
-    from chunkiter import ChunkIterator
 else:
     from .config import Config
-    from .chunkiter import ChunkIterator
 
 cfg = Config()
 
@@ -319,25 +317,80 @@ def diff_dataset(src, ctx):
         # skip data compare
         return True
 
+    if src.shape is None:
+        # null shape dataset
+        return True
+
+    if len(src.shape) == 0:
+        # scalar dataset
+        if src[()] == tgt[()]:
+            is_equal = True
+        else:
+            is_equal = False
+        if is_equal:
+            return True
+        else:
+            msg = "values for scalar datasets {} differ".format(src.name)
+            logging.info(msg)
+            if not ctx["quiet"]:
+                print(msg)
+            else:
+                print("quiet output differ")
+            ctx["differences"] += 1
+            return False
+        
+
+    if src.chunks is None:
+        # assume that the dataset is small enough that we can 
+        # read all the values into memory.
+        # TBD: use some sort  of psuedo-chunk iteration for large
+        # contiguous datasetsChunkIter
+        arr_src = src[...]
+        arr_tgt = tgt[...]
+        is_equal = np.array_equal(arr_src, arr_tgt)
+        if is_equal:
+            return True
+        else:
+            msg = "values for datasets {} differ".format(src.name)
+            logging.info(msg)
+            if not ctx["quiet"]:
+                print(msg)
+            ctx["differences"] += 1
+            return False
+
+    # chunked datasets, compare chunk by chunk
     try:
-        it = ChunkIterator(src)
+        it = src.iter_chunks()
 
         for s in it:
             msg = "checking dataset data for slice: {}".format(s)
             logging.debug(msg)
 
             arr_src = src[s]
-            msg = "got src array {}".format(arr_src.shape)
-            logging.debug(msg)
+            if len(s) > 0:
+                msg = "got src array {}".format(arr_src.shape)
+                logging.debug(msg)
             arr_tgt = tgt[s]
-            msg = "got tgt array {}".format(arr_tgt.shape)
-            logging.debug(msg)
+            if len(s) > 0:
+                msg = "got tgt array {}".format(arr_tgt.shape)
+                logging.debug(msg)
 
-            if hash(arr_src.tostring()) != hash(arr_tgt.tostring()):
+            is_equal = True
+            if isinstance(arr_src, np.ndarray):
+                if isinstance(arr_tgt, np.ndarray):
+                    is_equal = np.array_equal(arr_src, arr_tgt)
+                else:
+                    is_equal = False # type not the same
+            else:
+                # just compare the objects directly
+                if arr_src != arr_tgt:
+                    is_equal = False
+            
+            if not is_equal:
                 msg = "values for dataset {} differ for slice: {}".format(src.name, s)
                 logging.info(msg)
                 if not ctx["quiet"]:
-                    print(output)
+                    print(msg)
                 ctx["differences"] += 1
                 return False
 

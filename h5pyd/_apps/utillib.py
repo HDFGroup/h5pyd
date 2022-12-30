@@ -21,11 +21,6 @@ except ImportError as e:
     sys.stderr.write(f"ERROR : {e} : install it to use this utility...")
     sys.exit(1)
 
-if __name__ == "utillib":
-    from chunkiter import ChunkIterator
-else:
-    from .chunkiter import ChunkIterator
-
 
 def dump_dtype(dt):
     if not isinstance(dt, np.dtype):
@@ -816,12 +811,13 @@ def create_dataset(dobj, ctx):
             ctx["dataload"] == "link"
             and not is_vlen(dobj.dtype)
             and dobj.shape is not None
+            and len(dobj.shape) > 0
         ):
             chunks = create_chunktable(dobj, tgt_shape, ctx)
             logging.info(f"using chunk layout: {chunks}")
 
         # use the source object layout if we are not using reference mapping
-        if chunks is None:
+        if chunks is None and dobj.shape is not None and len(dobj.shape) > 0:
             # converting hsds dset with linked chunks to h5py dataset
             # just use the dims field of dobj.chunks as chunk shape
             chunks = get_chunk_dims(dobj)
@@ -864,7 +860,7 @@ def create_dataset(dobj, ctx):
             logging.debug(f"got fillvalue: {fillvalue}")
             kwargs["fillvalue"] = fillvalue
 
-        # finally, create the dataset    
+        # finally, create the dataset   
         dset = fout.create_dataset(dobj.name, **kwargs)
 
         msg = f"dataset created, uuid: {dset.id.id}, "
@@ -985,7 +981,21 @@ def write_dataset(src, tgt, ctx):
     if ctx["verbose"]:
         print(msg)
     try:
-        it = ChunkIterator(src)
+        if src.chunks is None:
+            # contiguous dataset, fake an iterator by creating a list
+            # with one slice
+            slices = []
+            for dim in range(rank):
+                extent = src.shape[dim]
+                s = slice(0, extent, 1)
+                slices.append(s)
+            slices = tuple(slices)
+            if rank == 1:
+                it = [slices[0],]
+            else:
+                it = [slices,]
+        else:
+            it = src.iter_chunks()
 
         logging.debug(f"src dtype: {src.dtype}")
         logging.debug(f"des dtype: {tgt.dtype}")
