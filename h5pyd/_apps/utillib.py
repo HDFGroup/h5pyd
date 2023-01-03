@@ -530,7 +530,7 @@ def create_chunktable(dset, dset_dims, ctx):
                         chunk_key += "_"
                 logging.debug(f"adding chunk_key: {chunk_key}")
                 chunk_map[chunk_key] = (chunk_info.byte_offset, chunk_info.size)
-                if chunk_dims % 5000 == 0:
+                if i % 5000 == 0:
                     logging.info(f"{i} chunks indexed")
         else:
             msg = f"expected {dset} to be a h5py object"
