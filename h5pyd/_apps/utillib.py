@@ -694,7 +694,7 @@ def create_dataset(dobj, ctx):
     dset = None
     dset_preappend = None
 
-    msg = f"creating dataset {dobj.name}, shape: {dobj.shape}, type: {dobj.dtype}"
+    msg = f"create_dataset({dobj.name})"
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
@@ -703,6 +703,12 @@ def create_dataset(dobj, ctx):
     if dobj.name in fout:
         dset = fout[dobj.name]
         logging.debug(f"{dobj.name} already exists")
+        if ctx["no_clobber"]:
+            msg = f"skipping creation of dataset {dobj.name} since already exist and no-clobber option is used"
+            logging.info(msg)
+            if ctx["verbose"]:
+                print(msg)
+            return
         if ctx["append"]:
             if ctx["extend_dim"]:
                 msg = f"skipping creation of dataset {dobj.name} since already found"
@@ -860,7 +866,11 @@ def create_dataset(dobj, ctx):
             logging.debug(f"got fillvalue: {fillvalue}")
             kwargs["fillvalue"] = fillvalue
 
-        # finally, create the dataset   
+        # finally, create the dataset  
+        msg = f"creating dataset {dobj.name}, shape: {dobj.shape}, type: {dobj.dtype}"
+        logging.info(msg)
+        if ctx["verbose"]:
+            print(msg) 
         dset = fout.create_dataset(dobj.name, **kwargs)
 
         msg = f"dataset created, uuid: {dset.id.id}, "
@@ -1134,6 +1144,13 @@ def create_group(gobj, ctx):
     if gobj.name in fout:
         grp = fout[gobj.name]
         logging.debug(f"{gobj.name} already exists")
+        if ctx["no_clobber"]:
+            msg = f"skipping creation of group {gobj.name} since already exists and no-clobber mode is used"
+            logging.info(msg)
+            if ctx["verbose"]:
+                print(msg)
+            return
+        
         if ctx["append"]:
             msg = f"skipping creation of group {gobj.name} since already found"
             logging.info(msg)
@@ -1186,6 +1203,7 @@ def load_file(
     compression=None,
     compression_opts=None,
     append=False,
+    no_clobber=False,
     extend_dim=None,
     extend_offset=0,
     ignore_error=False,
@@ -1217,6 +1235,7 @@ def load_file(
     ctx["default_compression_opts"] = compression_opts
     ctx["s3path"] = s3path
     ctx["append"] = append
+    ctx["no_clobber"] = no_clobber
     ctx["extend_dim"] = extend_dim
     ctx["extend_offset"] = extend_offset
     ctx["srcid_desobj_map"] = {}

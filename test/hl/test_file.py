@@ -108,6 +108,15 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
+        for mode in ("w-", "x"):
+            print(mode)
+            try:
+                # re-open is exclusive mode (should fail)
+                h5py.File(filename, mode)
+                self.assertTrue(False)
+            except IOError as ioe:
+                pass 
+
         # re-open as read-write
         f = h5py.File(filename, 'w')
         self.assertTrue(f.id.id is not None)
@@ -119,6 +128,12 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 1)
         f.close()
         self.assertEqual(f.id.id, 0)
+
+        # rre-open in append mode
+        f = h5py.File(filename, "a")
+        f.create_group("foo")
+        del f["foo"]
+        f.close()
          
         # re-open as read-only
         if is_hsds:

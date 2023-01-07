@@ -61,7 +61,8 @@ def usage():
     print("     -c | --conf <file.cnf>  :: A credential and config file")
     print(
         "     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]"
-    )
+    )        
+    print("     -n | --no-clobber :: Do not overwrite existing domains")
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
@@ -94,6 +95,7 @@ def main():
     ignore_error = False
     dataload = "ingest"
     compressLevel = None
+    no_clobber = False
     cfg["cmd"] = sys.argv[0].split("/")[-1]
     if cfg["cmd"].endswith(".py"):
         cfg["cmd"] = "python " + cfg["cmd"]
@@ -175,6 +177,9 @@ def main():
         elif arg == "--des_bucket":
             cfg["des_hs_bucket"] = val
             argn += 2
+        elif arg in ("-n", "--no-clobber"):
+            no_clobber = True
+            argn += 1
         elif arg == "--cnf-eg":
             print_config_example()
             sys.exit(0)
@@ -301,9 +306,13 @@ def main():
         else:
             bucket = cfg["hs_bucket"]
         try:
+            if no_clobber:
+                mode = "x"
+            else:
+                mode = "w"
             fout = h5pyd.File(
                 des_domain,
-                "x",
+                mode=mode,
                 endpoint=endpoint,
                 username=username,
                 password=password,

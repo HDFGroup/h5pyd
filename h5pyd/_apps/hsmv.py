@@ -51,6 +51,7 @@ def usage():
     print("     -u | --user <username>   :: User name credential")
     print("     -p | --password <password> :: Password credential")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
+    print("     -n | --no-clobber :: Do not overwrite existing domains")
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
@@ -88,16 +89,20 @@ def getFile(domain, mode="r"):
                    password=password, bucket=bucket, use_cache=True)
     return fh
 
-def createFile(domain, linked_domain=None):
+def createFile(domain, linked_domain=None, no_clobber=False):
     #print("createFile", domain)
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
     bucket = cfg["hs_bucket"]
     owner = None
+    if no_clobber:
+        mode= "x"
+    else:
+        mode="w"
     if "hs_owner" in cfg:
         owner=cfg["hs_owner"]
-    fh = h5pyd.File(domain, mode='x', endpoint=endpoint, username=username, password=password, bucket=bucket, owner=owner, linked_domain=linked_domain)
+    fh = h5pyd.File(domain, mode=mode, endpoint=endpoint, username=username, password=password, bucket=bucket, owner=owner, linked_domain=linked_domain)
     return fh
 
 
@@ -151,6 +156,7 @@ def main():
         cfg["cmd"] = "python " + cfg["cmd"]
     cfg["logfname"] = None
     logfname=None
+    no_clobber = False
 
     src_files = []
     argn = 1
@@ -200,6 +206,9 @@ def main():
         elif arg in ("-b", "--bucket"):
             cfg["hs_bucket"] = val
             argn += 2
+        elif arg in ("-n", "--no-clobber"):
+            no_clobber = True
+            argn += 1
         elif arg == '--cnf-eg':
             print_config_example()
             sys.exit(0)
@@ -263,7 +272,7 @@ def main():
 
     # create a new file using the src domain for the root group
     try:
-        fout = createFile(des_domain, linked_domain=src_domain)
+        fout = createFile(des_domain, linked_domain=src_domain, no_clobber=no_clobber)
     except IOError as oe:
         msg = "Error: {} creating domain: {}".format(oe.errno, des_domain)
         logging.error(msg)

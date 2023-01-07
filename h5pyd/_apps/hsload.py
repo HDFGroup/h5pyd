@@ -66,6 +66,7 @@ def usage():
     print(
         "     -a | --append <mode>  :: Flag to append to an existing HDF Server domain"
     )
+    print(    "-n | --no-clobber :: Do not overwrite existing domains (or existing datasets/groups in -a mode) ")
     print("     --extend <dimscale> :: extend along the given dimension scale")
     print("     --extend-offset <n> :: write data at index n along extended dimension")
     print("     -c | --conf <file.cnf>  :: A credential and config file")
@@ -149,6 +150,7 @@ def main():
     compression = None
     compression_opts = None
     append = False
+    no_clobber = False
     extend_dim = None
     extend_offset = None
     s3path = None
@@ -228,6 +230,9 @@ def main():
             argn += 2
         elif arg in ("-a", "--append"):
             append = True
+            argn += 1
+        elif arg in ("-n", "--no-clobber"):
+            no_clobber = True
             argn += 1
         elif arg == "--extend":
             extend_dim = val
@@ -379,7 +384,12 @@ def main():
 
             # create the output domain
             try:
-                mode = "a" if append else "w"
+                if append:
+                    mode = "a"
+                elif no_clobber:
+                    mode = "x"
+                else:
+                    mode = "w"
                 kwargs = {
                     "username": cfg["hs_username"],
                     "password": cfg["hs_password"],
@@ -405,6 +415,10 @@ def main():
                 # in the target domain
                 s3path = link_path
 
+            if not append and no_clobber:
+                # no need to check for clobber if not in append mode
+                no_clobber = False
+
             # do the actual load
             kwargs = {
                 "verbose": verbose,
@@ -417,6 +431,7 @@ def main():
                 "extend_offset": extend_offset,
                 "verbose": verbose,
                 "ignore_error": ignore_error,
+                "no_clobber": no_clobber
             }
             load_file(fin, fout, **kwargs)
 
