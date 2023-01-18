@@ -21,6 +21,8 @@ except ImportError as e:
     sys.stderr.write(f"ERROR : {e} : install it to use this utility...")
     sys.exit(1)
 
+# copy rather than link for any datasets with product of extents less than the following
+MIN_DSET_ELEMENTS_FOR_LINKING=512
 
 def dump_dtype(dt):
     if not isinstance(dt, np.dtype):
@@ -413,11 +415,25 @@ def get_chunktable_dims(dset):
 
 # ----------------------------------------------------------------------------------
 def get_num_chunks(dset):
-    if dset.chunks:
+    if dset.shape is None:
+        # null space dataset - no data
+        return 0
+    elif np.prod(dset.shape) == 0:
+        # zero extent dataset
+        return 0
+    elif np.prod(dset.shape) == 1:
+        # scalar or extent 1 dataset
+        return 1
+    elif dset.chunks:
         if is_h5py(dset):
             dsetid = dset.id
             spaceid = dsetid.get_space()
-            num_chunks = dsetid.get_num_chunks(spaceid)
+            try:
+                num_chunks = dsetid.get_num_chunks(spaceid)
+            except ValueError:
+                # thrown for compact or contiguous datasets,
+                # just treat as 1 chunk
+                return 1
         else:
             # for hsds, just return maximum number of chunk in dataset
             chunk_table_dims = get_chunktable_dims(dset)
@@ -427,6 +443,18 @@ def get_num_chunks(dset):
         num_chunks = 1
     return num_chunks
 
+# ----------------------------------------------------------------------------------
+def get_dset_offset(dset):
+    """ Return dataset file offset for HDF5 contiguous datasets """
+    if not is_h5py(dset):
+        return -1
+    if dset.chunks is not None:
+        return -1
+    offset = dset.id.get_offset()
+    if offset is None:
+        return -1
+    return offset
+   
 # ----------------------------------------------------------------------------------
 def get_chunktable_dtype(include_file_uri=False):
     if include_file_uri:
@@ -492,7 +520,7 @@ def create_chunktable(dset, dset_dims, ctx):
         # use contiguous mapping
         chunks["class"] = "H5D_CONTIGUOUS_REF"
         chunks["file_uri"] = ctx["s3path"]
-        dset_offset = dset.id.get_offset()
+        dset_offset = get_dset_offset(dset)
         if dset_offset <= 0:
             msg = f"unexpected dataset_offset: {dset_offset}"
             logging.error(msg)
@@ -599,7 +627,14 @@ def update_chunktable(src, tgt, ctx):
    
     if is_h5py(src):   
         if src.chunks is None:
-            chunk_offset = src.id.get_offset()
+            chunk_offset = get_dset_offset(src)
+            if chunk_offset <= 0:
+                msg = "Expected dset_offset to be greater than zero"
+                logging.error(msg)
+                if not ctx["ignore_error"]:
+                    raise IOError(msg)
+                return
+
             chunk_size = src.id.get_storage_size()
             if extend:
                 chunkinfo_arr[...] = (chunk_offset, chunk_size, s3path)
@@ -818,6 +853,8 @@ def create_dataset(dobj, ctx):
             and not is_vlen(dobj.dtype)
             and dobj.shape is not None
             and len(dobj.shape) > 0
+            and not is_compact(dobj)
+            and np.prod(dobj.shape) > MIN_DSET_ELEMENTS_FOR_LINKING
         ):
             chunks = create_chunktable(dobj, tgt_shape, ctx)
             logging.info(f"using chunk layout: {chunks}")
