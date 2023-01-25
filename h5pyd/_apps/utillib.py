@@ -314,6 +314,18 @@ def copy_attribute(desobj, name, srcobj, ctx):
 
     tgtarr = None
     data = srcobj.attrs[name]
+    if data.dtype.kind == "S" and isinstance(data, bytes):
+        # check that this is actually utf-encodable
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError:
+            msg = f"byte value for attribute {name} in {srcobj.name} "
+            msg += "is not utf8 encodable - using surrogateescaping"
+            logging.warning(msg)
+            if ctx["verbose"]:
+                print(msg)
+            data = data.decode("utf-8", errors="surrogateescape")
+
     src_dt = None
     try:
         src_dt = data.dtype
@@ -340,7 +352,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
         desobj.attrs.create(name, tgtarr)
     except (IOError, TypeError) as e:
         msg = f"ERROR: failed to create attribute {name} "
-        msg += f"of object {desobj.naame} -- {e}"
+        msg += f"of object {desobj.name} -- {e}"
         logging.error(msg)
         if not ctx["ignore_error"]:
             raise IOError(msg)
