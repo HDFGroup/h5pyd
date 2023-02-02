@@ -36,10 +36,7 @@ else:
     from .config import Config
     from .utillib import load_file
 
-if sys.version_info >= (3, 0):
-    from urllib.parse import urlparse
-else:
-    from urlparse import urlparse
+from urllib.parse import urlparse
 
 cfg = Config()
 
@@ -51,31 +48,23 @@ def usage():
     print(("    {} [ OPTIONS ]  sourcefile  folder".format(cfg["cmd"])))
     print("")
     print("Description:")
-    print("    Copy HDF5 file to Domain or multiple files to a Domain folder")
+    print("    Copy HDF5 file to domain or multiple files to a domain folder")
     print("       sourcefile: HDF5 file to be copied ")
-    print("       domain: HDF Server domain (Unix or DNS style)")
-    print("       folder: HDF Server folder (Unix style ending in '/')")
+    print("       domain: HSDS domain (absolute path with or without hdf5:// prefix)")
+    print("       folder: HSDS folder (path as above ending in '/')")
     print("")
     print("Options:")
-    print("     -v | --verbose :: verbose output")
-    print(
-        "     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org"
-    )
-    print("     -u | --user <username>   :: User name credential")
-    print("     -p | --password <password> :: Password credential")
-    print(
-        "     -a | --append <mode>  :: Flag to append to an existing HDF Server domain"
-    )
-    print(    "-n | --no-clobber :: Do not overwrite existing domains (or existing datasets/groups in -a mode) ")
+    print("     -v, --verbose :: verbose output")
+    print("     -e, --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
+    print("     -u, --user <username>   :: User name credential")
+    print("     -p, --password <password> :: Password credential")
+    print("     -a, --append <mode>  :: Flag to append to an existing HDF Server domain")
+    print("     -n, --no-clobber :: Do not overwrite existing domains (or existing datasets/groups in -a mode) ")
     print("     --extend <dimscale> :: extend along the given dimension scale")
     print("     --extend-offset <n> :: write data at index n along extended dimension")
-    print("     -c | --conf <file.cnf>  :: A credential and config file")
-    print(
-        "     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]"
-    )
-    print(
-        "     --compression blosclz|lz4|lz4hc|snappy|gzip|zstd :: use the given compression algorithm for -z option (lz4 is default)"
-    )
+    print("     -c, --conf <file.cnf>  :: A credential and config file")
+    print("     -z[n] :: apply compression filter to any non-compressed datasets, n: [0-9]")
+    print("     --compression blosclz|lz4|lz4hc|snappy|gzip|zstd :: use the given compression algorithm for -z option (lz4 is default)")
     print("     --cnf-eg        :: Print a config file and then exit")
     print("     --logfile <logfile> :: logfile path")
     print("     --loglevel debug|info|warning|error :: Change log level")
@@ -88,16 +77,10 @@ def usage():
     print("     -h | --help    :: This message.")
     print("")
     print("Note about --link option:")
-    print(
-        "    --link enables just the source HDF5 metadata to be ingested while the dataset data"
-    )
+    print("    --link enables just the source HDF5 metadata to be ingested while the dataset data")
     print("     is left in the original file and fetched as needed.")
-    print(
-        "     When used with files stored in AWS S3, the source file can be specified using the S3"
-    )
-    print(
-        "     path: 's3://<bucket_name>/<s3_path>'.  Preferably, the bucket should be in the same"
-    )
+    print("     When used with files stored in AWS S3, the source file can be specified using the S3")
+    print("     path: 's3://<bucket_name>/<s3_path>'.  Preferably, the bucket should be in the same")
     print("     region as the HSDS service")
     print(
         "     For Posix or Azure deployments, the source file needs to be copied to a regular file"
