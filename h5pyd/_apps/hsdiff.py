@@ -18,7 +18,7 @@ try:
     import h5py
     import h5pyd
 except ImportError as e:
-    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
+    sys.stderr.write(f"ERROR : {str(e)} : install it to use this utility...\n")
     sys.exit(1)
 
 try:
@@ -34,6 +34,15 @@ else:
     from .config import Config
 
 cfg = Config()
+
+def getFile(domain, mode="r"):
+    username = cfg["hs_username"]
+    password = cfg["hs_password"]
+    endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
+    fh = h5pyd.File(domain, mode=mode, endpoint=endpoint, username=username,
+                   password=password, bucket=bucket, use_cache=True)
+    return fh
 
 
 def diff_attrs(src, tgt, ctx):
@@ -438,32 +447,29 @@ def diff_file(fin, fout, verbose=False, nodata=False, noattr=False, quiet=False)
 
 # ----------------------------------------------------------------------------------
 def usage():
+    option_names = cfg.get_names()
+    cmd = cfg.get_cmd()
     print("Usage:\n")
-    print(("    {} [ OPTIONS ]  file  domain".format(cfg["cmd"])))
+    print(f"    {cmd} [ OPTIONS ]  hdf5_file  domain")
     print("")
     print("Description:")
-    print("    Diff HDF5 file with domain")
-    print("       file: HDF5 file ")
+    print("    Compare an HDF5 file to a domain")
+    print("       hdf5_file: hdf5_file")
     print("       domain: domain")
     print("")
     print("Options:")
-    print("     -v | --verbose :: verbose output")
-    print(
-        "     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org"
-    )
-    print("     -u | --user <username>   :: User name credential")
-    print("     -p | --password <password> :: Password credential")
-    print("     -c | --conf <file.cnf>  :: A credential and config file")
-    print("     --cnf-eg        :: Print a config file and then exit")
-    print("     --logfile <logfile> :: logfile path")
-    print("     --loglevel debug|info|warning|error :: Change log level")
-    print("     --bucket <bucket_name> :: Storage bucket")
-    print("     --nodata :: Do not compare dataset data")
-    print("     --noattr :: Do not compare attributes")
-    print("     --quiet :: Do not produce output")
-    print("     -h | --help    :: This message.")
+    for name in option_names:
+        help_msg = cfg.get_help_message(name)
+        if help_msg:
+            print(f"    {help_msg}")  
     print("")
-
+    print("Examples:")
+    print(f"     {cmd} myfile.h5  /home/myfolder/myfile.h5")
+    print(f"     {cmd} s3://myybucket/myfile.h5  /home/myfolder/myfile.h5")
+    print("")
+    print(cfg.get_see_also(cmd))
+    print("")
+    sys.exit(1)
 
 # end print_usage
 
@@ -481,124 +487,44 @@ def print_config_example():
 # ----------------------------------------------------------------------------------
 def main():
 
-    loglevel = logging.ERROR
-    verbose = False
-    nodata = False
-    noattr = False
-    quiet = False
-    cfg["cmd"] = sys.argv[0].split("/")[-1]
-    if cfg["cmd"].endswith(".py"):
-        cfg["cmd"] = "python " + cfg["cmd"]
-    cfg["logfname"] = None
-    logfname = None
+    cfg.setitem("nodata", False, flags=["--nodata",], help="do not compare dataset data")
+    cfg.setitem("noattr", False, flags=["--noattr",], help="do not compare attributes")
+    cfg.setitem("quiet", False, flags=["--quiet",], help="surpress normal output")
+    cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
+
+    try:
+        args = cfg.set_cmd_flags(sys.argv[1:])
+    except ValueError as ve:
+        print(ve)
+        usage()
+
+    if cfg["quiet"] and cfg["verbose"]:
+        msg = "--quiet and --verbose options can't be used together"        
+        sys.exit(msg)
+
+    if len(args) < 2:
+        # need at least source and target
+        usage()
+    file_path = args[0]
+    domain_path = args[1]
+
+    # setup logging
+    logfname = cfg["logfile"]
+    loglevel = cfg.get_loglevel()
+    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
+    logging.debug(f"set log_level to {loglevel}")
+
+
     rc = 0
     s3 = None  # s3fs instance
 
-    src_files = []
-    argn = 1
-    while argn < len(sys.argv):
-        arg = sys.argv[argn]
-        val = None
-
-        if arg[0] == "-" and len(src_files) > 0:
-            # options must be placed before filenames
-            print("options must precead source files")
-            usage()
-            sys.exit(-1)
-        if len(sys.argv) > argn + 1:
-            val = sys.argv[argn + 1]
-        if arg in ("-v", "--verbose"):
-            verbose = True
-            argn += 1
-        elif arg == "--nodata":
-            nodata = True
-            argn += 1
-        elif arg == "--noattr":
-            noattr = True
-            argn += 1
-        elif arg in ("-q", "--quiet"):
-            quiet = True
-            argn += 1
-        elif arg == "--loglevel":
-            if val == "debug":
-                loglevel = logging.DEBUG
-            elif val == "info":
-                loglevel = logging.INFO
-            elif val == "warning":
-                loglevel = logging.WARNING
-            elif val == "error":
-                loglevel = logging.ERROR
-            else:
-                print("unknown loglevel")
-                usage()
-                sys.exit(-1)
-            argn += 2
-        elif arg == "--logfile":
-            logfname = val
-            argn += 2
-        elif arg in ("-b", "--bucket"):
-            cfg["hs_bucket"] = val
-            argn += 2
-        elif arg in ("-h", "--help"):
-            usage()
-            sys.exit(0)
-        elif arg in ("-e", "--endpoint"):
-            cfg["hs_endpoint"] = val
-            argn += 2
-        elif arg in ("-u", "--username"):
-            cfg["hs_username"] = val
-            argn += 2
-        elif arg in ("-p", "--password"):
-            cfg["hs_password"] = val
-            argn += 2
-        elif arg == "--cnf-eg":
-            print_config_example()
-            sys.exit(0)
-        elif arg[0] == "-":
-            usage()
-            sys.exit(-1)
-        else:
-            src_files.append(arg)
-            argn += 1
-
-    # setup logging
-    logging.basicConfig(
-        filename=logfname,
-        format="%(levelname)s %(asctime)s %(filename)s:%(lineno)d %(message)s",
-        level=loglevel,
-    )
-    logging.debug("set log_level to {}".format(loglevel))
-
-    # end arg parsing
-    logging.info("username: {}".format(cfg["hs_username"]))
-    logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
-    logging.info("verbose: {}".format(verbose))
-
-    if len(src_files) < 2:
-        # need at least a src and destination
-        usage()
-        sys.exit(-1)
-    file_path = src_files[0]
-    domain_path = src_files[1]
-
-    logging.info("file: {}".format(file_path))
-    logging.info("domain: {}".format(domain_path))
-    if domain_path.startswith("/") or domain_path.startswith("hdf5://"):
-        logging.debug("domain path is absolute")
-    else:
-        msg = "domain must be an absolute path"
-        logging.error(msg)
-        sys.exit(msg)
+    cfg.print(f"file: {file_path}")
+    cfg.print(f"domain: {domain_path}")
 
     if domain_path[-1] == "/":
         msg = "domain can't be a folder"
         logging.error(msg)
         sys.exit(msg)
-
-    if cfg["hs_endpoint"] is None:
-        logging.error("No endpoint given, try -h for help\n")
-        sys.exit(1)
-    logging.info("endpoint: {}".format(cfg["hs_endpoint"]))
 
     try:
 
@@ -613,50 +539,46 @@ def main():
             try:
                 fin = h5py.File(s3.open(file_path, "rb"), mode="r")
             except IOError as ioe:
-                logging.error("Error opening file {}: {}".format(file_path, ioe))
-                sys.exit(1)
+                msg = f"Error opening file {file_path}: {ioe}"
+                logging.error(msg)
+                sys.exit(msg)
         else:
             # regular h5py open
             try:
                 fin = h5py.File(file_path, mode="r")
             except IOError as ioe:
-                logging.error("Error opening file {}: {}".format(domain_path, ioe))
-                sys.exit(1)
+                msg = f"Error opening file {domain_path}: {ioe}"
+                logging.error(msg)
+                sys.exit(msg)
 
         # get the  domain
         try:
-            username = cfg["hs_username"]
-            password = cfg["hs_password"]
-            endpoint = cfg["hs_endpoint"]
-            bucket = cfg["hs_bucket"]
-            fout = h5pyd.File(
-                domain_path,
-                "r",
-                endpoint=endpoint,
-                username=username,
-                password=password,
-                bucket=bucket,
-            )
+            fout = getFile(domain_path)
         except IOError as ioe:
             if ioe.errno == 404:
-                logging.error("domain: {} not found".format(domain_path))
-            if ioe.errno == 403:
-                logging.error("No read access to domain: {}".format(domain_path))
+                msg = f"domain: {domain_path} not found"
+                logging.error(msg)
+            elif ioe.errno == 403:
+                msg = f"No read access to domain: {domain_path}"
+                logging.error(msg)
             else:
-                logging.error("Error opening file {}: {}".format(domain_path, ioe))
-            sys.exit(1)
+                msg = f"Error opening file: {domain_path}: {ioe}"
+                logging.error(msg)
+            sys.exit(msg)
 
-        # do the actual load
-        if quiet:
-            verbose = False
-        rc = diff_file(
-            fin, fout, verbose=verbose, nodata=nodata, noattr=noattr, quiet=quiet
-        )
+        # do the actual diff
+        kwargs = {}
+        kwargs["verbose"] = cfg["verbose"]
+        kwargs["nodata"] = cfg["nodata"]
+        kwargs["noattr"] = cfg["noattr"]
+        kwargs["quiet"] = cfg["quiet"]
+        rc = diff_file(fin, fout, **kwargs)
+    
 
-        if not quiet and rc > 0:
-            print("{} differences found".format(rc))
+        if not cfg["quiet"] and rc > 0:
+            print(f"{rc} differences found")
 
-        logging.info("diff_file done")
+        cfg.print(f"diff done for {file_path}")
 
     except KeyboardInterrupt:
         logging.error("Aborted by user via keyboard interrupt.")

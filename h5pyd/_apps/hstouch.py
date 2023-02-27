@@ -142,7 +142,7 @@ def touchDomain(domain):
 #
 # Usage
 #
-def printUsage():
+def usage():
     option_names = cfg.get_names()
     cmd = cfg.get_cmd()
     print("Usage:\n")
@@ -160,7 +160,9 @@ def printUsage():
         if help_msg:
             print(f"    {help_msg}")  
     print("")
-    print(f"example: {cmd}  hdf5://home/myfolder/emptydomain.h5")
+    print(f"Example: {cmd}  hdf5://home/myfolder/emptydomain.h5")
+    print(cfg.get_see_also(cmd))
+    print("")
     sys.exit()
 
 #
@@ -170,17 +172,17 @@ def main():
     domains = []
     # additional options
     cfg.setitem("hs_owner", None, flags=["-o", "--owner"], choices=["OWNER",], help="set owner (must be run as an admin user)")
-    cfg.setitem("help", False, flags=["-h", "--help"], help="This message")
+    cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
     try:
         domains = cfg.set_cmd_flags(sys.argv[1:])
     except ValueError as ve:
         print(ve)
-        printUsage()
+        usage()
 
     if len(domains) == 0:
         # need a domain
-        printUsage()
+        usage()
 
     # setup logging
     logfname = cfg["logfile"]

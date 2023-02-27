@@ -46,6 +46,9 @@ def usage():
     print(f"   {cmd} /myfolder/orig.h5 /myfolder/copy.h5")
     print(f"   {cmd} /myfolder/orig.h5 /anotherfolder/")
     print(f"   {cmd} -z 5 /myfolder/uncompressed.h5 /myfolder/compressed.h5")
+    print("")
+    print(cfg.get_see_also(cmd))
+    print("")
     sys.exit()
 
 

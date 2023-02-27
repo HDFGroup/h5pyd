@@ -24,25 +24,25 @@ default_cfg = {
     "hs_username": {
         "default": None,
         "flags": ["-u", "--user"],
-        "help": "User name credential",
+        "help": "user name credential",
         "choices": ["USERNAME",]
     },
     "hs_password": {
         "default": None,
         "flags": ["-p", "--password"],
-        "help": "Password credential",
+        "help": "password credential",
         "choices": ["PASSWORD",]
     },
     "hs_api_key": {
         "default": None,
         "flags": ["--api_key",],
-        "help": "User api key",
+        "help": "user api key",
         "choices": ["API_KEY"]
     }, 
     "hs_bucket": {
         "default": None,
         "flags": ["--bucket",],
-        "help": "Storage Bucket to use (S3 Bucket, Azure Container, or top-level directory)",
+        "help": "storage Bucket to use (S3 Bucket, Azure Container, or top-level directory)",
         "choices": ["BUCKET",]
     },
 
@@ -67,9 +67,10 @@ default_cfg = {
         "default": False,
         "flags": ["--ignore",],
         "help": "don't exit on error"
-    }
-   
+    } 
 }
+
+hscmds = ("hsinfo", "hsconfigure", "hsls", "hstouch", "hsload", "hsget", "hsacl", "hsrm", "hsdiff")
 
 class Config:
     """
@@ -204,6 +205,15 @@ class Config:
         else:
             return None
 
+    def get_see_also(self, this_cmd):
+        msg = "See also the commands: "
+        for cmd in hscmds:
+            if cmd != this_cmd:
+                msg += f"{cmd}, "
+        msg = msg[:-2]  # remove trailing comma
+        return msg
+        
+
     def get_help_message(self, name):
         help_text= self.get_help(name)
         flags = self.get_flags(name)
@@ -248,7 +258,7 @@ class Config:
     def get_names(self):
         return self._names
 
-    def set_cmd_flags(self, args):
+    def set_cmd_flags(self, args, allow_post_flags=False):
         """ process any command line options
             return any place argument as a list 
         """
@@ -262,9 +272,13 @@ class Config:
             if not arg.startswith("-"):
                 options.append(arg)
                 argn += 1
-            else:
-                if options:
+            elif options:
+                if allow_post_flags:
+                    options.append(arg)
+                    argn += 1
+                else:
                     raise ValueError("flags must be set before positional arguments")
+            else:
                 name = self._flag_map.get(arg)
                 if arg in ("-h", "--help"):
                     raise ValueError()  # trigger print usage

@@ -361,7 +361,7 @@ def visitDomains(domain, depth=1):
 #
 # Usage
 #
-def printUsage():
+def usage():
     option_names = cfg.get_names()
     cmd = cfg.get_cmd()
     print("Usage:\n")
@@ -381,6 +381,9 @@ def printUsage():
             print(f"    {help_msg}")  
     print("")
     print(f"example: {cmd} -r -e http://hsdshdflab.hdfgroup.org /shared/tall.h5")
+    print("")
+    print(cfg.get_see_also(cmd))
+    print("")
     sys.exit()
 
 
@@ -403,7 +406,7 @@ def main():
         domains = cfg.set_cmd_flags(sys.argv[1:])
     except ValueError as ve:
         print(ve)
-        printUsage()
+        usage()
 
     if len(domains) == 0:
         # need a domain - use root

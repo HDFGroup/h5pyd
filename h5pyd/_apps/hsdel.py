@@ -18,8 +18,14 @@ def getFolder(domain, mode='r'):
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
     bucket = cfg["hs_bucket"]
-    dir = h5py.Folder(domain, mode=mode, endpoint=endpoint, username=username, password=password, bucket=bucket)
-    return dir
+    folder = h5py.Folder(domain, mode=mode, endpoint=endpoint, username=username, password=password, bucket=bucket)
+    return folder
+
+def exitUnlessIgnore(msg):
+    if cfg["ignore"]:
+        return
+    sys.exit(msg)
+
 
 
 def deleteDomain(domain):
@@ -42,18 +48,28 @@ def deleteDomain(domain):
         hparent = getFolder(parent_domain, mode='a')
     except IOError as oe:
         if oe.errno == 404:   # Not Found
-            sys.exit("Parent domain: {} not found".format(parent_domain))
+            msg = f"Parent domain: {parent_domain} not found"
+            logging.error(msg)
+            exitUnlessIgnore(msg)
         elif oe.errno == 401:  # Unauthorized
-            sys.exit("Authorization failure")
+            msg = f"Authorization failure opening {parent_domain}"
+            logging.error(msg)
+            exitUnlessIgnore(msg)
         elif oe.errno == 403:  # Forbidden
-            sys.exit("Not allowed")
+            msg = f"Not allowed to open: {parent_domain}"
+            logging.error(msg)
+            exitUnlessIgnore(msg)
         else:
-            sys.exit("Unexpected error: {}".format(oe))
+            msg = f"Unexpected error: {oe}"
+            logging.error(msg)
+            exitUnlessIgnore(msg)
 
     if base_name not in hparent:
         # note - this may happen if the domain was recently created and not
         # yet synced to S3
-        sys.exit("domain: {} not found".format(domain))
+        msg = f"domain: {domain} not found"
+        logging.error(msg)
+        exitUnlessIgnore(msg)
 
     # delete the domain
     try:
@@ -61,94 +77,82 @@ def deleteDomain(domain):
     except IOError as oe:
         if oe.errno == 404:   # Not Found
             # should have caught this in the base_name check...
-            sys.exit("domain: {} not found".format(parent_domain))
+            msg = f"domain {parent_domain} not found"
+            logging.error(msg)
+            exitUnlessIgnore(msg)
         elif oe.errno == 401:  # Unauthorized
-            sys.exit("Authorization failure")
+            msg = "Authorization failure"
+            logging.error(msg)
+            exitUnlessIgnore(msg)
         elif oe.errno == 403:  # Forbidden
-            sys.exit("Not allowed")
+            msg = "Not Allowed"
+            logging.error(msg)
+            exitUnlessIgnore(msg)
         elif oe.errno == 409 and domain.endswith('/'):  # Conflict
-            sys.exit("folder has sub-items")
+            msg = "folder has sub-items"
+            logging.error(msg)
+            exitUnlessIgnore(msg)
         else:
-            sys.exit("Unexpected error: {}".format(oe))
+            msg = f"Unexpected error: {oe}"
+            logging.error(msg)
+            exitUnlessIgnore(msg)
     if cfg["verbose"]:
         if domain.endswith('/'):
-            print("Folder: {} deleted".format(domain))
+            msg = f"Folder: {domain} deleted"
         else:
-            print("Domain: {} deleted".format(domain))
+            msg = f"Domain: {domain} deleted"
+        cfg.print(msg)
+           
 
 #
 # Usage
 #
-def printUsage():
-    print("usage: {} [-v] [-e endpoint] [-u username] [-p password] [--loglevel debug|info|warning|error] [--logfile <logfile>] [--bucket <bucket_name>] domains".format(cfg["cmd"]))
-    print("example: {} -e http://hsdshdflab.hdfgroup.org /hdfgroup/data/test/deleteme.h5".format(cfg["cmd"]))
+def usage():
+    option_names = cfg.get_names()
+    cmd = cfg.get_cmd()
+    print("Usage:\n")
+    print(f"    {cmd} [ OPTIONS ]  target")
+    print("")
+    print("Description:")
+    print("    Delete given domains")
+    print("       target: one or more domains to be deleted")
+    print("")
+    print("Options:")
+    for name in option_names:
+        help_msg = cfg.get_help_message(name)
+        if help_msg:
+            print(f"    {help_msg}")  
+    print("")
+    print("Examples:")
+    print(f"     {cmd} /home/myfolder/file1.h5  /home/myfolder/file2.h5")
+    print(f"     {cmd} hdf5://home/myfolder/file2.h5  hdf5://home/afolder/")
+    print("")
+    print(cfg.get_see_also(cmd))
+    print("")
     sys.exit()
 
 #
 # Main
 #
 def main():
-    domains = []
-    argn = 1
-    loglevel = logging.ERROR
-    logfname=None
-    cfg["cmd"] = sys.argv[0].split('/')[-1]
-    if cfg["cmd"].endswith(".py"):
-        cfg["cmd"] = "python " + cfg["cmd"]
-    cfg["verbose"] = False
 
-    while argn < len(sys.argv):
-        arg = sys.argv[argn]
-        val = None
-        if len(sys.argv) > argn + 1:
-            val = sys.argv[argn+1]
+    cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
-        if arg in ("-h", "--help"):
-            printUsage()
-        elif arg in ("-e", "--endpoint"):
-            cfg["hs_endpoint"] = val
-            argn += 2
-        elif arg in ("-u", "--username"):
-            cfg["hs_username"] = val
-            argn += 2
-        elif arg in ("-p", "--password"):
-            cfg["hs_password"] = val
-            argn += 2
-        elif arg in ("-b", "--bucket"):
-            cfg["hs_bucket"] = val
-            argn += 2
-        elif arg in ("-v", "--verbose"):
-            cfg["verbose"] = True
-            argn += 1
-        elif arg == "--loglevel":
-            val = val.upper()
-            if val == "DEBUG":
-                loglevel = logging.DEBUG
-            elif val == "INFO":
-                loglevel = logging.INFO
-            elif val in ("WARN", "WARNING"):
-                loglevel = logging.WARNING
-            elif val == "ERROR":
-                loglevel = logging.ERROR
-            else:
-                printUsage()
-            argn += 2
-        elif arg == '--logfile':
-            logfname = val
-            argn += 2
-        elif arg[0] == '-':
-            printUsage()
-        else:
-            domains.append(arg)
-            argn += 1
+    try:
+        domains = cfg.set_cmd_flags(sys.argv[1:])
+    except ValueError as ve:
+        print(ve)
+        usage()
 
     if len(domains) == 0:
         # need a domain
-        printUsage()
+        usage()
 
-
+    # setup logging
+    logfname = cfg["logfile"]
+    loglevel = cfg.get_loglevel()
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
-    logging.debug("set log_level to {}".format(loglevel))
+    logging.debug(f"set log_level to {loglevel}")
 
     for domain in domains:
         deleteDomain(domain)
