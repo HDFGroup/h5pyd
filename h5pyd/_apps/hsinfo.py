@@ -1,7 +1,18 @@
+##############################################################################
+# Copyright by The HDF Group.                                                #
+# All rights reserved.                                                       #
+#                                                                            #
+# This file is part of HSDS (HDF5 Scalable Data Service), Libraries and      #
+# Utilities.  The full HSDS copyright notice, including                      #
+# terms governing use, modification, and redistribution, is contained in     #
+# the file COPYING, which can be found at the root of the source code        #
+# distribution tree.  If you do not have access to this file, you may        #
+# request a copy from help@hdfgroup.org.                                     #
+##############################################################################
+
 import sys
 import logging
 import time
-from datetime import datetime
 import h5pyd
 
 if __name__ == "__main__":
@@ -10,48 +21,36 @@ else:
     from .config import Config
 
 #
-# Print objects in a domain in the style of the hsls utilitiy
+# Get server status info
 #
 
-
 cfg = Config()
-
 
 #
 # Usage
 #
-def printUsage():
-    print(
-        "Usage: {} [-h] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-c oonf_file] [-e endpoint] [-u username] [-p password] [-b bucket] [domain]".format(
-            cfg["cmd"]
-        )
-    )
+def usage():
+    option_names = cfg.get_names()
+    cmd = cfg.get_cmd()
+    print("Usage:\n")
+    print(f"    {cmd} [ OPTIONS ]")
     print("")
     print("Description:")
-    print(
-        "    Get status information from server, or domain stats if domain is provided"
-    )
+    print("    Get status information from server")
     print("")
+    
     print("Options:")
-    print(
-        "     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org"
-    )
-    print("     -u | --user <username>   :: User name credential")
-    print("     -p | --password <password> :: Password credential")
-    print(
-        "     -b | --bucket <bucket> :: bucket name (for use when domain is provided)"
-    )
-    print("     -c | --conf <file.cnf>  :: A credential and config file")
-    print(
-        "     -H | --human-readable :: with -v, print human readable sizes (e.g. 123M)"
-    )
-    print("     --rescan :: refresh domain stats (for use when domain is provided)")
-    print("     --logfile <logfile> :: logfile path")
-    print("     --loglevel debug|info|warning|error :: Change log level")
-    print("     --bucket <bucket_name> :: Storage bucket")
-    print("     -h | --help    :: This message.")
+    for name in option_names:
+        help_msg = cfg.get_help_message(name)
+        if help_msg:
+            print(f"    {help_msg}")  
+    print("")
+    print("examples:")
+    print(f"   {cmd} -e http://hsdshdflab.hdfgroup.org")
+    print(f"   {cmd} -e http://hsdshdflab.hdfgroup.org /shared/tall.h5")
+    print(cfg.get_see_also(cmd))
+    print("")
     sys.exit()
-
 
 #
 #
@@ -77,24 +76,6 @@ def getUpTime(start_time):
     return ret_str
 
 
-def format_size(n):
-    if n is None or n == " ":
-        return " " * 8
-    symbol = " "
-    if not cfg["human_readable"]:
-        return str(n)
-    # convert to common storage unit
-    for s in ("B", "K", "M", "G", "T"):
-        if n < 1024:
-            symbol = s
-            break
-        n /= 1024
-    if symbol == "B":
-        return "{:}B".format(n)
-    else:
-        return "{:.1f}{}".format(n, symbol)
-
-
 def getServerInfo(cfg):
     """get server state and print"""
     username = cfg["hs_username"]
@@ -107,7 +88,7 @@ def getServerInfo(cfg):
         print("server name: {}".format(info["name"]))
         if "state" in info:
             print("server state: {}".format(info["state"]))
-        print("endpoint: {}".format(endpoint))
+        print(f"endpoint: {endpoint}")
         if "isadmin" in info and info["isadmin"]:
             admin_tag = "(admin)"
         else:
@@ -119,11 +100,9 @@ def getServerInfo(cfg):
             try:
                 home_folder = getHomeFolder()
                 if home_folder:
-                    print("home: {}".format(home_folder))
+                    print(f"home: {home_folder}")
             except IOError:
-                print(
-                    "home: NO ACCESS",
-                )
+                print("home: NO ACCESS")
 
         if "hsds_version" in info:
             print("server version: {}".format(info["hsds_version"]))
@@ -133,109 +112,18 @@ def getServerInfo(cfg):
             print("server version: {}".format(info["h5serv_version"]))
         if "start_time" in info:
             uptime = getUpTime(info["start_time"])
-            print("up: {}".format(uptime))
+            print(f"up: {uptime}")
         print("h5pyd version: {}".format(h5pyd.version.version))
 
     except IOError as ioe:
         if ioe.errno == 401:
             if username and password:
-                print("username/password not valid for username: {}".format(username))
+                print(f"username/password not valid for username: {username}")
             else:
                 # authentication error with openid or app token
                 print("authentication failure")
         else:
-            print("Error: {}".format(ioe))
-
-
-def getDomainInfo(domain, cfg):
-    """get info about the domain and print"""
-    username = cfg["hs_username"]
-    password = cfg["hs_password"]
-    endpoint = cfg["hs_endpoint"]
-    bucket = cfg["hs_bucket"]
-    if "rescan" in cfg and cfg["rescan"]:
-        mode = "r+"  # need write intent
-    else:
-        mode = "r"
-
-    if domain.endswith("/"):
-        is_folder = True
-    else:
-        is_folder = False
-
-    try:
-        if is_folder:
-            f = h5pyd.Folder(
-                domain,
-                mode=mode,
-                endpoint=endpoint,
-                username=username,
-                password=password,
-                bucket=bucket,
-                use_cache=True,
-            )
-        else:
-            f = h5pyd.File(
-                domain,
-                mode=mode,
-                endpoint=endpoint,
-                username=username,
-                password=password,
-                bucket=bucket,
-                use_cache=False,
-            )
-    except IOError as oe:
-        if oe.errno in (404, 410):  # Not Found
-            sys.exit("domain: {} not found".format(domain))
-        elif oe.errno == 401:  # Unauthorized
-            sys.exit("Authorization failure")
-        elif oe.errno == 403:  # Forbidden
-            sys.exit("Not allowed")
-        else:
-            sys.exit("Unexpected error: {}".format(oe))
-
-    timestamp = datetime.fromtimestamp(int(f.modified))
-    if not is_folder and f.last_scan:
-        last_scan = datetime.fromtimestamp(int(f.last_scan))
-    else:
-        last_scan = None
-
-    if is_folder:
-        print("folder: {}".format(domain))
-        print("    owner:           {}".format(f.owner))
-        print("    last modified:   {}".format(timestamp))
-    else:
-        if "rescan" in cfg and cfg["rescan"]:
-            f.run_scan()
-
-        # report HDF objects (groups, datasets, and named datatypes) vs. allocated chunks
-        num_objects = f.num_groups + f.num_datatypes + f.num_datasets
-        if f.num_chunks > 0:
-            num_chunks = f.num_chunks
-        else:
-            # older storeinfo format doesn't have num_chunks, so calculate
-            num_chunks = f.num_objects - num_objects
-
-        print("domain: {}".format(domain))
-        print("    owner:           {}".format(f.owner))
-        print("    id:              {}".format(f.id.id))
-        print("    last modified:   {}".format(timestamp))
-        if last_scan:
-            print("    last scan:       {}".format(last_scan))
-        if f.md5_sum:
-            print("    md5 sum:         {}".format(f.md5_sum))
-        print("    total_size:      {}".format(format_size(f.total_size)))
-        print("    allocated_bytes: {}".format(format_size(f.allocated_bytes)))
-        if f.metadata_bytes:
-            print("    metadata_bytes:  {}".format(format_size(f.metadata_bytes)))
-        if f.linked_bytes:
-            print("    linked_bytes:    {}".format(format_size(f.linked_bytes)))
-        print("    num objects:     {}".format(num_objects))
-        print("    num chunks:      {}".format(num_chunks))
-        if f.num_linked_chunks:
-            print("    linked chunks:   {}".format(f.num_linked_chunks))
-
-    f.close()
+            print(f"Error: {ioe}")
 
 
 #
@@ -281,79 +169,31 @@ def getHomeFolder():
 # Main
 #
 def main():
-    argn = 1
-    cfg["cmd"] = sys.argv[0].split("/")[-1]
-    if cfg["cmd"].endswith(".py"):
-        cfg["cmd"] = "python " + cfg["cmd"]
-    cfg["loglevel"] = logging.ERROR
-    cfg["logfname"] = None
-    cfg["human_readable"] = False
-    domains = []
 
-    while argn < len(sys.argv):
-        arg = sys.argv[argn]
-        val = None
-        if len(sys.argv) > argn + 1:
-            val = sys.argv[argn + 1]
-        if arg == "--loglevel":
-            val = val.upper()
-            if val == "DEBUG":
-                cfg["loglevel"] = logging.DEBUG
-            elif val == "INFO":
-                cfg["loglevel"] = logging.INFO
-            elif val in ("WARN", "WARNING"):
-                cfg["loglevel"] = logging.WARNING
-            elif val == "ERROR":
-                cfg["loglevel"] = logging.ERROR
-            else:
-                printUsage()
-            argn += 2
-        elif arg == "--logfile":
-            cfg["logfname"] = val
-            argn += 2
-        elif arg in ("-h", "--help"):
-            printUsage()
-        elif arg in ("-e", "--endpoint"):
-            cfg["hs_endpoint"] = val
-            argn += 2
-        elif arg in ("-u", "--username"):
-            cfg["hs_username"] = val
-            argn += 2
-        elif arg in ("-p", "--password"):
-            cfg["hs_password"] = val
-            argn += 2
-        elif arg in ("-b", "--bucket"):
-            cfg["hs_bucket"] = val
-            argn += 2
-        elif arg == "--rescan":
-            cfg["rescan"] = True
-            argn += 1
-        elif arg == "-H":
-            cfg["human_readable"] = True
-            argn += 1
-        else:
-            domains.append(arg)
-            argn += 1
+    cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
+
+    try:
+        domains = cfg.set_cmd_flags(sys.argv[1:])
+    except ValueError as ve:
+        print(ve)
+        usage()
 
     # setup logging
+    logfname = cfg["logfile"]
+    loglevel = cfg.get_loglevel()
+    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
+    logging.debug(f"set log_level to {loglevel}")
 
-    logging.basicConfig(
-        filename=cfg["logfname"],
-        format="%(levelname)s %(asctime)s %(message)s",
-        level=cfg["loglevel"],
-    )
-    logging.debug("set log_level to {}".format(cfg["loglevel"]))
+    if domains:
+        sys.exit("Use the hsstat command to get information about about a folder or domain ")
 
-    endpoint = cfg["hs_endpoint"]
-    if not endpoint or endpoint[-1] == "/" or endpoint[:4] not in ("http", "loca"):
-        print("WARNING: endpoint: {} doesn't appear to be valid".format(endpoint))
 
-    if not domains:
-        getServerInfo(cfg)
-    else:
-        for domain in domains:
-            getDomainInfo(domain, cfg)
-
+    if not cfg["hs_endpoint"]:
+        logging.error("endpoint not set")
+        usage()
+    
+    getServerInfo(cfg)
+    
 
 if __name__ == "__main__":
     main()

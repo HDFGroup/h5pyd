@@ -1027,9 +1027,11 @@ def write_dataset(src, tgt, ctx):
             print(msg)
         resize_dataset(tgt, new_extent, axis=0)
 
-    if ctx["dataload"] == "link":
-        # don't write chunks, but update chunktable for chunk ref indirect
-        if tgt.id.layout and tgt.id.layout["class"] == "H5D_CHUNKED_REF_INDIRECT":
+
+    if tgt.id.layout and tgt.id.layout["class"] != "H5D_CHUNKED":
+        # this is one of the ref layouts
+        if tgt.id.layout["class"] == "H5D_CHUNKED_REF_INDIRECT":
+            # don't write chunks, but update chunktable for chunk ref indirect
             update_chunktable(src, tgt, ctx)
         else:
             pass # skip chunkterator for link option
@@ -1061,7 +1063,7 @@ def write_dataset(src, tgt, ctx):
 
         for src_s in it:
             logging.debug(f"src selection: {src_s}")
-            if rank == 1:
+            if rank == 1 and isinstance(src_s, slice):
                 start = src_s.start + offset[0]
                 stop = src_s.stop + offset[0]
                 if len(tgt.shape) > rank:

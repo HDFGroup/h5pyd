@@ -12,16 +12,6 @@
 
 from __future__ import absolute_import
 
-#from . import _conv
-#_conv.register_converters()
-
-#from . import h5a, h5d, h5ds, h5f, h5fd, h5g, h5r, h5s, h5t, h5p, h5z
-
-#h5s.NULL = h5s._NULL  # NULL is a reserved name at the Cython layer
-#h5z._register_lzf()
-
-#from .highlevel import *
-
 from . import version
 from ._hl.base import Empty
 from ._hl.h5type import special_dtype, Reference, RegionReference
@@ -40,9 +30,7 @@ from . import h5ds
 
 
 from .config import Config
-#from . import hsinfo
 __version__ = version.version
-
 
 
 __doc__ = \

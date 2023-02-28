@@ -60,6 +60,7 @@ setup(
             "hscp = h5pyd._apps.hscopy:main",
             "hsmv = h5pyd._apps.hsmv:main",
             "hsdiff = h5pyd._apps.hsdiff:main",
+            "hsstat = h5pyd._apps.hsstat:main",
         ]
     },
 )
