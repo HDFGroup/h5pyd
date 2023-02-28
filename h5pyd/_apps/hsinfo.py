@@ -13,7 +13,6 @@
 import sys
 import logging
 import time
-from datetime import datetime
 import h5pyd
 
 if __name__ == "__main__":

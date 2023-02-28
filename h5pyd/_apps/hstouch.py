@@ -118,7 +118,7 @@ def touchDomain(domain):
                 cfg.print(f"updated timestamp for domain: {domain}")
                 hdomain.close()
             except IOError as oe:
-                msg = "Got error updating domain: {oe}"
+                msg = f"Got error updating domain: {oe}"
                 logging.error(msg)
                 sys.exit(msg)
     else:
