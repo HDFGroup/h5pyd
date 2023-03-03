@@ -74,7 +74,7 @@ def is_regionreference(val):
         elif isinstance(val, type) and val.__name__ == "RegionReference":
             return True
     except AttributeError as ae:
-        msg = f"is_reference for {val} error: {ae}"
+        msg = f"is_regionreference for {val} error: {ae}"
         logging.warning(msg)
 
     return False
@@ -97,6 +97,13 @@ def has_reference(dtype):
         basedt = dtype.metadata["vlen"]
         has_ref = has_reference(basedt)
     return has_ref
+
+def get_reftype(obj):
+    if is_h5py(obj):
+        ref_type = h5py. special_dtype(ref=h5py.Reference)
+    else:
+        ref_type = h5pyd.special_dtype(ref=h5pyd.Reference)
+    return ref_type
 
 
 def is_vlen(dtype):
@@ -307,14 +314,48 @@ def copy_array(src_arr, ctx):
 def copy_attribute(desobj, name, srcobj, ctx):
 
     msg = f"creating attribute {name} in {srcobj.name}"
-    logging.debug(msg)
+    logging.info(msg)
 
     if ctx["verbose"]:
         print(msg)
 
     tgtarr = None
     data = srcobj.attrs[name]
-    if data.dtype.kind == "S" and isinstance(data, bytes):
+    src_dt = None
+    
+    # check for non-numpy types that might get returned
+    if is_regionreference(data):
+        msg = "regionreference types not supported, "
+        msg += f"attribute {name} in object {desobj.name} will not be loaded"
+        if ctx["verbose"]:
+            print(msg)
+        logging.warning(msg)
+        return
+
+    if is_reference(data):
+        src_dt = get_reftype(srcobj)
+        tgt_dt = get_reftype(desobj)
+        tgt_ref = copy_element(data, src_dt, tgt_dt, ctx)
+        try:
+            desobj.attrs.create(name, tgt_ref)
+        except (IOError, TypeError) as e:
+            msg = f"ERROR: failed to create attribute {name} "
+            msg += f"of object {desobj.name} for reference type -- {e}"
+            logging.error(msg)
+            if not ctx["ignore_error"]:
+                raise IOError(msg)
+
+        # done with non-numpy compatible data
+        return
+
+    try:
+        src_dt = data.dtype
+    except AttributeError:
+        # convert to numpy type
+        data = np.asarray(data)
+        src_dt = data.dtype
+        
+    if src_dt.kind == "S" and isinstance(data, bytes):
         # check that this is actually utf-encodable
         try:
             data.decode("utf-8")
@@ -326,11 +367,6 @@ def copy_attribute(desobj, name, srcobj, ctx):
                 print(msg)
             data = data.decode("utf-8", errors="surrogateescape")
 
-    src_dt = None
-    try:
-        src_dt = data.dtype
-    except AttributeError:
-        pass  # auto convert to numpy array
     # First, make sure we have a NumPy array.
     if is_h5py(srcobj):
         src_empty = h5py.Empty
@@ -341,6 +377,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
     else:
         des_empty = h5pyd.Empty
 
+    
     if isinstance(data, src_empty):
         # create Empty object with tgt dtype
         tgt_dt = convert_dtype(src_dt, ctx)
@@ -348,6 +385,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
     else:
         srcarr = np.asarray(data, order="C", dtype=src_dt)
         tgtarr = copy_array(srcarr, ctx)
+
     try:
         desobj.attrs.create(name, tgtarr)
     except (IOError, TypeError) as e:
