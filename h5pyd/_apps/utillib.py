@@ -1066,7 +1066,7 @@ def write_dataset(src, tgt, ctx):
         resize_dataset(tgt, new_extent, axis=0)
 
 
-    if tgt.id.layout and tgt.id.layout["class"] != "H5D_CHUNKED":
+    if not is_h5py(tgt) and tgt.id.layout["class"] != "H5D_CHUNKED":
         # this is one of the ref layouts
         if tgt.id.layout["class"] == "H5D_CHUNKED_REF_INDIRECT":
             # don't write chunks, but update chunktable for chunk ref indirect
