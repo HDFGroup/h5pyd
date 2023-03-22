@@ -223,7 +223,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
             else:
                 out = ""  # h5pyd refs are strings
 
-            if ref:
+            if ref:                
                 try:
                     fin_obj = fin[val]
                 except AttributeError as ae:
@@ -233,7 +233,6 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                         raise IOError(msg)
                     return None
 
-                # TBD - for hsget, the name property is not getting set
                 h5path = fin_obj.name
                 if not h5path:
                     msg = "No path found for ref object"
@@ -245,9 +244,9 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                     if is_h5py(ctx["fout"]):
                         out = fout_obj.ref
                     else:
-                        out = str(
-                            fout_obj.ref
-                        )  # convert to string for JSON serialization
+                        # convert to string for JSON serialization
+                        out = str(fout_obj.ref)
+
 
         elif is_regionreference(ref):
             out = "tbd"
@@ -947,14 +946,14 @@ def create_dataset(dobj, ctx):
             kwargs["scaleoffset"] = dobj.scaleoffset
         # setting the fillvalue is failing in some cases
         # see: https://github.com/HDFGroup/h5pyd/issues/119
-        # just setting to None for now
+        # don't set fill value for reference types
         fillvalue = get_fillvalue(dobj)
-        if fillvalue is not None:
+        if fillvalue is not None and not has_reference(tgt_dtype):
             logging.debug(f"got fillvalue: {fillvalue}")
             kwargs["fillvalue"] = fillvalue
 
         # finally, create the dataset  
-        msg = f"creating dataset {dobj.name}, shape: {dobj.shape}, type: {dobj.dtype}"
+        msg = f"creating dataset {dobj.name}, shape: {dobj.shape}, type: {tgt_dtype}"
         logging.info(msg)
         if ctx["verbose"]:
             print(msg) 
@@ -1134,6 +1133,7 @@ def write_dataset(src, tgt, ctx):
                 msg = f"skipping chunk for slice: {src_s}"
             else:
                 msg = f"writing dataset data for slice: {src_s}"
+                arr = copy_array(arr, ctx)
                 tgt[tgt_s] = arr
             logging.info(msg)
             if ctx["verbose"]:

@@ -66,8 +66,10 @@ for filename in filenames:
     print(f"running hsload for {hdf5_path} to {test_folder}")
     rc = os.system(f"python ../../h5pyd/_apps/hsload.py {hdf5_path} {test_folder}")
     if rc != 0:
-        sys.exit(f"Failed to load {filename}")
+        sys.exit(f"Failed to hsload {filename}")
     print(f"running hsget for {test_folder}{filename} to {out_dir}")
     rc = os.system(f"python ../../h5pyd/_apps/hsget.py {test_folder}{filename} {out_dir}/{filename}")
+    if rc != 0:
+        sys.exit(f"Failed to hsget {filename}")
 print("load_files done")
     
