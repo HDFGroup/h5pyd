@@ -109,7 +109,6 @@ class TestFile(TestCase):
         self.assertEqual(f.id.id, 0)
 
         for mode in ("w-", "x"):
-            print(mode)
             try:
                 # re-open is exclusive mode (should fail)
                 h5py.File(filename, mode)

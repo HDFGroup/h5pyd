@@ -33,36 +33,40 @@ if test_folder[-1] != "/":
     test_folder += "/"
 
 data_dir = "data"
-
-s3_http_path = "https://s3.amazonaws.com/hdfgroup/data/hdf5test/"
+out_dir = "out"
+test_file_http_path = config.get("test_file_http_path")
 
 parent =  h5pyd.Folder(test_folder)
 filenames = config.get_test_filenames()
 
 if not os.path.exists(data_dir):
-    # make data directory for downloaded HDF5 files
+    # make data directory for test HDF5 files
     os.mkdir(data_dir)
 
+if not os.path.exists(out_dir):
+    # make data directory for files downloaded from server
+    os.mkdir(out_dir)
+
 for filename in filenames:
-    print(filename)
     domain_path = os.path.join(test_folder, filename)
-    print(domain_path)
-    if filename in parent:
-        print("found")
-        continue
-    # check to see if the file has already been downloaded
     hdf5_path = os.path.join(data_dir, filename)
-    if not os.path.isfile(hdf5_path):
-        # wget from S3
-        s3path = s3_http_path + filename
-        print("downloading", s3path)
-        rc = os.system("wget -q https://s3.amazonaws.com/hdfgroup/data/hdf5test/{} -P {}".format(filename, data_dir))
-        if rc != 0:
-            sys.exit("Failed to retreive test data file")
+    if filename not in data_dir:
+        # check to see if the file has already been downloaded
+        if not os.path.isfile(hdf5_path):
+            # wget from S3
+            http_path = test_file_http_path + filename
+            print("downloading:", http_path)
+            rc = os.system(f"wget -q https://s3.amazonaws.com/hdfgroup/data/hdf5test/{filename} -P {data_dir}")
+            if rc != 0:
+                sys.exit("Failed to retreive test data file")
     # run hsload for each file
-    print("running hsload for {}".format(hdf5_path))
-    rc = os.system("python ../../h5pyd/_apps/hsload.py {} {}".format(hdf5_path, test_folder))
+    print(f"running hsload for {hdf5_path} to {test_folder}")
+    rc = os.system(f"python ../../h5pyd/_apps/hsload.py {hdf5_path} {test_folder}")
     if rc != 0:
-        sys.exit("Failed to load {}".format(filename))
+        sys.exit(f"Failed to hsload {filename}")
+    print(f"running hsget for {test_folder}{filename} to {out_dir}")
+    rc = os.system(f"python ../../h5pyd/_apps/hsget.py {test_folder}{filename} {out_dir}/{filename}")
+    if rc != 0:
+        sys.exit(f"Failed to hsget {filename}")
 print("load_files done")
     

@@ -16,7 +16,6 @@ else:
 
 cfg = Config()
 
-
 def intToStr(n):
     if cfg["human_readable"]:
         s = "{:,}".format(n)
@@ -177,6 +176,24 @@ def dump(name, obj, visited=None):
             # verbose info not available, just show the chunk layout
             fstr = "    {0:>32}: {1} {2} bytes"
             print(fstr.format("Chunks", chunk_dims, intToStr(chunk_size)))
+
+        # show filters (if any)
+        # currently HSDS only supports the shuffle filter (not fletcher32 or 
+        # scaleoffset), so just check for shuffle and whatever compressor may
+        # be applied
+        filter_number = 0
+        fstr = "    {0:>30}-{1}: {2} OPT {{{3}}}"
+        if obj.compression_opts:
+            compression_opts = obj.compression_opts
+        else:
+            compression_opts = ""
+        if obj.shuffle:
+            print(fstr.format("Filter", filter_number, "shuffle", compression_opts))
+            filter_number += 1
+        if obj.compression:
+            print(fstr.format("Filter", filter_number, obj.compression, compression_opts))
+
+        # display type info
 
         fstr = "    {0:>32}: {1}"
         print(fstr.format("Type", getTypeStr(obj.dtype)))  # dump out type info
@@ -362,26 +379,29 @@ def visitDomains(domain, depth=1):
 #
 # Usage
 #
-def printUsage():
-    print("usage: {} [-v] [-h] [--showacls] [--showattrs] [--recursive|-r] [--loglevel debug|info|warning|error] [--logfile <logfile>] [-e endpoint] [-u username] [-p password] [--bucket bucketname] domains".format(cfg["cmd"]))
-    print("example: {} -r -e http://hsdshdflab.hdfgroup.org /shared/tall.h5".format(cfg["cmd"]))
+def usage():
+    option_names = cfg.get_names()
+    cmd = cfg.get_cmd()
+    print("Usage:\n")
+    print(f"    {cmd} [ OPTIONS ]  domain")
+    print(f"    {cmd} [ OPTIONS ]  folder")
     print("")
+    print("Description:")
+    print("    List contents of a domain or folder")
+    print("       domain: HSDS domain (absolute path with or without 'hdf5:// prefix)")
+    print("       folder: HSDS folder (path as above ending in '/')")
+    print("")
+    
     print("Options:")
-    print("     -v | --verbose :: verbose output")
-    print("     -H | --human-readable :: with -v, print human readable sizes (e.g. 123M)")
-    print("     -e | --endpoint <domain> :: The HDF Server endpoint, e.g. http://hsdshdflab.hdfgroup.org")
-    print("     -u | --user <username>   :: User name credential")
-    print("     -p | --password <password> :: Password credential")
-    print("     -c | --conf <file.cnf>  :: A credential and config file")
-    print("     --showacls :: prints domain ACLs")
-    print("     --showattrs :: print attributes")
-    print("     --pattern  :: <regex>  :: list domains that match the given regex")
-    print("     --query :: <query> list domains where the attributes of the root group match the given query string")
-    print("     --logfile <logfile> :: logfile path")
-    print("     --loglevel debug|info|warning|error :: Change log level")
-    print("     --bucket <bucket_name> :: Storage bucket")
-    print("     --recursive, -r :: recursively list sub-folders or sub-groups")
-    print("     -h | --help    :: This message.")
+    for name in option_names:
+        help_msg = cfg.get_help_message(name)
+        if help_msg:
+            print(f"    {help_msg}")  
+    print("")
+    print(f"example: {cmd} -r -e http://hsdshdflab.hdfgroup.org /shared/tall.h5")
+    print("")
+    print(cfg.get_see_also(cmd))
+    print("")
     sys.exit()
 
 
@@ -390,97 +410,42 @@ def printUsage():
 #
 def main():
     domains = []
-    argn = 1
-    depth = 1
-    loglevel = logging.ERROR
-    logfname = None
-    cfg["verbose"] = False
-    cfg["showacls"] = False
-    cfg["showattrs"] = False
-    cfg["human_readable"] = False
-    cfg["pattern"] = None
-    cfg["query"] = None
-    cfg["cmd"] = sys.argv[0].split('/')[-1]
-    if cfg["cmd"].endswith(".py"):
-        cfg["cmd"] = "python " + cfg["cmd"]
 
-    while argn < len(sys.argv):
-        arg = sys.argv[argn]
-        val = None
-        if len(sys.argv) > argn + 1:
-            val = sys.argv[argn + 1]
-        if arg in ("-r", "--recursive"):
-            depth = -1
-            argn += 1
-        elif arg in ("-v", "--verbose"):
-            cfg["verbose"] = True
-            argn += 1
-        elif arg in ("-H", "--human-readable"):
-            cfg["human_readable"] = True
-            argn += 1
-        elif arg == "--loglevel":
-            val = val.upper()
-            if val == "DEBUG":
-                loglevel = logging.DEBUG
-            elif val == "INFO":
-                loglevel = logging.INFO
-            elif val in ("WARN", "WARNING"):
-                loglevel = logging.WARNING
-            elif val == "ERROR":
-                loglevel = logging.ERROR
-            else:
-                printUsage()
-            argn += 2
-        elif arg == '--logfile':
-            logfname = val
-            argn += 2
-        elif arg in ("-showacls", "--showacls"):
-            cfg["showacls"] = True
-            argn += 1
-        elif arg in ("-showattrs", "--showattrs"):
-            cfg["showattrs"] = True
-            argn += 1
-        elif arg in ("-h", "--help"):
-            printUsage()
-        elif arg in ("-e", "--endpoint"):
-            cfg["hs_endpoint"] = val
-            argn += 2
-        elif arg in ("-u", "--username"):
-            cfg["hs_username"] = val
-            argn += 2
-        elif arg in ("-p", "--password"):
-            cfg["hs_password"] = val
-            argn += 2
-        elif arg in ("-b", "--bucket"):
-            cfg["hs_bucket"] = val
-            argn += 2
-        elif arg == "--pattern":
-            cfg["pattern"] = val
-            argn += 2
-        elif arg == "--query":
-            cfg["query"] = val
-            argn += 2
+    # additional options
+    cfg.setitem("showacls", False, flags=["--showacls",], help="display domain ACLs")
+    cfg.setitem("showattrs", False, flags=["--showattrs",], help="display domain attributes")
+    cfg.setitem("pattern", None, flags=["--pattern",], choices=["REGEX",], help="list domains that match the given regex")
+    cfg.setitem("query", None, flags=["--query",], choices=["QUERY",], help="list domains where the attributes of the root group match the given query string")
+    cfg.setitem("recursive", False, flags=["-r", "--recursive"], help="recursively list sub-folders or sub-groups")
+    cfg.setitem("human_readable", False, flags=["-H", "--human-readable"], help="with -v, print human readable sizes (e.g. 123M)")
+    cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
-        elif arg[0] == '-':
-            printUsage()
-        else:
-            domains.append(arg)
-            argn += 1
-
-    # setup logging
-    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s',
-                        level=loglevel)
-    logging.debug("set log_level to {}".format(loglevel))
+    try:
+        domains = cfg.set_cmd_flags(sys.argv[1:])
+    except ValueError as ve:
+        print(ve)
+        usage()
 
     if len(domains) == 0:
-        # add top-level domain
+        # need a domain - use root
         domains.append("/")
 
+    # setup logging
+    logfname = cfg["logfile"]
+    loglevel = cfg.get_loglevel()
+    logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
+    logging.debug(f"set log_level to {loglevel}")
+
     for domain in domains:
+        if cfg["recursive"]:
+            depth = -1
+        else:
+            depth = 1
+
         if domain.endswith('/'):
             # given a folder path
             count = visitDomains(domain, depth=depth)
-            print("{} items".format(count))
+            print(f"{count} items")
 
         else:
             try:
@@ -490,24 +455,24 @@ def main():
                     print("Username/Password missing or invalid")
                     continue
                 if ioe.errno == 403:
-                    print("No permission to read domain: {}".format(domain))
+                    print(f"No permission to read domain: {domain}")
                     continue
                 elif ioe.errno == 404:
-                    print("Domain {} not found".format(domain))
+                    print(f"Domain {domain} not found")
                     continue
                 elif ioe.errno == 410:
-                    print("Domain {} has been removed".format(domain))
+                    print(f"Domain {domain} has been removed")
                     continue
                 else:
-                    print("Unexpected error: {}".format(ioe))
+                    print(f"Unexpected error: {ioe}")
                     continue
 
             grp = f['/']
             if grp is None:
-                print("{}: No such domain".format(domain))
+                print(f"{domain}: No such domain")
                 domain += '/'
                 count = visitDomains(domain, depth=depth)
-                print("{} items".format(count))
+                print(f"{count} items")
                 continue
             dump('/', grp)
 

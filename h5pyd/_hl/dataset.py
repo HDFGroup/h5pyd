@@ -669,14 +669,6 @@ class Dataset(HLObject):
     def fletcher32(self):
         """Fletcher32 filter is present (T/F)"""
         return "fletcher32" in self._filters
-        for filter in self._filters:
-            # check by class or name
-            if "class" in filter and filter["class"] == "H5Z_FILTER_FLETCHER32":
-                return True
-            if "name" in filter and filter["name"] == "fletcher32":
-                return True
-
-        return False
 
     @property
     def scaleoffset(self):
@@ -1056,9 +1048,9 @@ class Dataset(HLObject):
 
         rank = len(self._shape)
 
-        self.log.debug("dataset shape: {}".format(self._shape))
-        self.log.debug("mshape: {}".format(mshape))
-        self.log.debug("single_element: {}".format(single_element))
+        self.log.debug(f"dataset shape: {self._shape}")
+        self.log.debug(f"mshape: {mshape}")
+        self.log.debug(f"single_element: {single_element}")
         # Perfom the actual read
         rsp = None
         req = "/datasets/" + self.id.uuid + "/value"
@@ -1080,7 +1072,7 @@ class Dataset(HLObject):
             elif isinstance(chunk_layout, dict):
                 # CHUNK_REF layout
                 if "dims" not in chunk_layout:
-                    self.log.error("Unexpected chunk_layout: {}".format(chunk_layout))
+                    self.log.error(f"Unexpected chunk_layout: {chunk_layout}")
                 else:
                     chunk_layout = tuple(chunk_layout["dims"])
 
@@ -1112,13 +1104,10 @@ class Dataset(HLObject):
                     split_dim = i
                 chunks_per_page = max_chunks
 
-            self.log.info(
-                "selection: start {} stop {} step {}".format(
-                    sel_start, sel_stop, sel_step
-                )
-            )
-            self.log.debug("split_dim: {}".format(split_dim))
-            self.log.debug("chunks_per_page: {}".format(chunks_per_page))
+            msg = f"selection: start {sel_start} stop {sel_stop} step {sel_step}"
+            self.log.info(msg)
+            self.log.debug(f"split_dim: {split_dim}")
+            self.log.debug(f"chunks_per_page: {chunks_per_page}")
 
             # determine which dimension of the target array to split on
             mshape_split_dim = 0
@@ -1147,9 +1136,7 @@ class Dataset(HLObject):
 
                 des_index = 0  # this is where we'll copy to the arr for each page
 
-                self.log.debug(
-                    f"paged read, chunks_per_page: {chunks_per_page} max_chunks: {max_chunks}, num_pages: {num_pages}"
-                )
+                self.log.debug(f"paged read, chunks_per_page: {chunks_per_page} max_chunks: {max_chunks}, num_pages: {num_pages}")
 
                 for page_number in range(num_pages):
                     self.log.debug(f"page_number: {page_number}")
@@ -1169,18 +1156,12 @@ class Dataset(HLObject):
                     self.log.info(f"page_stop: {page_stop[split_dim]}")
 
                     page_mshape = list(copy(mshape))
-                    page_mshape[mshape_split_dim] = (
-                        1
-                        + (page_stop[split_dim] - page_start[split_dim] - 1)
-                        // sel_step[split_dim]
-                    )
+                    page_mshape[mshape_split_dim] = (1 + (page_stop[split_dim] - page_start[split_dim] - 1) // sel_step[split_dim])
 
                     page_mshape = tuple(page_mshape)
                     self.log.info(f"page_mshape: {page_mshape}")
 
-                    params["select"] = self._getQueryParam(
-                        page_start, page_stop, sel_step
-                    )
+                    params["select"] = self._getQueryParam( page_start, page_stop, sel_step)
                     try:
                         rsp = self.GET(req, params=params, format="binary")
                     except IOError as ioe:
@@ -1226,7 +1207,7 @@ class Dataset(HLObject):
                             des_index += num_rows
                         else:
                             slices.append(slice(0, mshape[i]))
-                    self.log.debug("slices: {}".format(slices))
+                    self.log.debug(f"slices: {slices}")
                     arr[tuple(slices)] = page_arr
 
                     page_start[split_dim] = page_stop[split_dim]

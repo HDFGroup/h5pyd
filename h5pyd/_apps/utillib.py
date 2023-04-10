@@ -74,7 +74,7 @@ def is_regionreference(val):
         elif isinstance(val, type) and val.__name__ == "RegionReference":
             return True
     except AttributeError as ae:
-        msg = f"is_reference for {val} error: {ae}"
+        msg = f"is_regionreference for {val} error: {ae}"
         logging.warning(msg)
 
     return False
@@ -97,6 +97,13 @@ def has_reference(dtype):
         basedt = dtype.metadata["vlen"]
         has_ref = has_reference(basedt)
     return has_ref
+
+def get_reftype(obj):
+    if is_h5py(obj):
+        ref_type = h5py. special_dtype(ref=h5py.Reference)
+    else:
+        ref_type = h5pyd.special_dtype(ref=h5pyd.Reference)
+    return ref_type
 
 
 def is_vlen(dtype):
@@ -216,7 +223,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
             else:
                 out = ""  # h5pyd refs are strings
 
-            if ref:
+            if ref and val: 
                 try:
                     fin_obj = fin[val]
                 except AttributeError as ae:
@@ -226,7 +233,6 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                         raise IOError(msg)
                     return None
 
-                # TBD - for hsget, the name property is not getting set
                 h5path = fin_obj.name
                 if not h5path:
                     msg = "No path found for ref object"
@@ -238,9 +244,9 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                     if is_h5py(ctx["fout"]):
                         out = fout_obj.ref
                     else:
-                        out = str(
-                            fout_obj.ref
-                        )  # convert to string for JSON serialization
+                        # convert to string for JSON serialization
+                        out = str(fout_obj.ref)
+
 
         elif is_regionreference(ref):
             out = "tbd"
@@ -307,7 +313,7 @@ def copy_array(src_arr, ctx):
 def copy_attribute(desobj, name, srcobj, ctx):
 
     msg = f"creating attribute {name} in {srcobj.name}"
-    logging.debug(msg)
+    logging.info(msg)
 
     if ctx["verbose"]:
         print(msg)
@@ -315,10 +321,51 @@ def copy_attribute(desobj, name, srcobj, ctx):
     tgtarr = None
     data = srcobj.attrs[name]
     src_dt = None
+    
+    # check for non-numpy types that might get returned
+    if is_regionreference(data):
+        msg = "regionreference types not supported, "
+        msg += f"attribute {name} in object {desobj.name} will not be loaded"
+        if ctx["verbose"]:
+            print(msg)
+        logging.warning(msg)
+        return
+
+    if is_reference(data):
+        src_dt = get_reftype(srcobj)
+        tgt_dt = get_reftype(desobj)
+        tgt_ref = copy_element(data, src_dt, tgt_dt, ctx)
+        try:
+            desobj.attrs.create(name, tgt_ref)
+        except (IOError, TypeError) as e:
+            msg = f"ERROR: failed to create attribute {name} "
+            msg += f"of object {desobj.name} for reference type -- {e}"
+            logging.error(msg)
+            if not ctx["ignore_error"]:
+                raise IOError(msg)
+
+        # done with non-numpy compatible data
+        return
+
     try:
         src_dt = data.dtype
     except AttributeError:
-        pass  # auto convert to numpy array
+        # convert to numpy type
+        data = np.asarray(data)
+        src_dt = data.dtype
+        
+    if src_dt.kind == "S" and isinstance(data, bytes):
+        # check that this is actually utf-encodable
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError:
+            msg = f"byte value for attribute {name} in {srcobj.name} "
+            msg += "is not utf8 encodable - using surrogateescaping"
+            logging.warning(msg)
+            if ctx["verbose"]:
+                print(msg)
+            data = data.decode("utf-8", errors="surrogateescape")
+
     # First, make sure we have a NumPy array.
     if is_h5py(srcobj):
         src_empty = h5py.Empty
@@ -329,6 +376,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
     else:
         des_empty = h5pyd.Empty
 
+    
     if isinstance(data, src_empty):
         # create Empty object with tgt dtype
         tgt_dt = convert_dtype(src_dt, ctx)
@@ -336,11 +384,12 @@ def copy_attribute(desobj, name, srcobj, ctx):
     else:
         srcarr = np.asarray(data, order="C", dtype=src_dt)
         tgtarr = copy_array(srcarr, ctx)
+
     try:
         desobj.attrs.create(name, tgtarr)
     except (IOError, TypeError) as e:
         msg = f"ERROR: failed to create attribute {name} "
-        msg += f"of object {desobj.naame} -- {e}"
+        msg += f"of object {desobj.name} -- {e}"
         logging.error(msg)
         if not ctx["ignore_error"]:
             raise IOError(msg)
@@ -885,26 +934,40 @@ def create_dataset(dobj, ctx):
             # or vlen
             pass
         else:
-            kwargs["compression"] = dobj.compression
-            kwargs["compression_opts"] = dobj.compression_opts
-            if ctx["default_compression"] is not None and dobj.compression is None:
+            if not ctx["ignorefilters"]:
+                kwargs["compression"] = dobj.compression
+                kwargs["compression_opts"] = dobj.compression_opts
+                kwargs["shuffle"] = dobj.shuffle
+
+            if ctx["default_compression"] is not None and not kwargs.get("compression"):
                 kwargs["compression"] = ctx["default_compression"]
                 kwargs["compression_opts"] = ctx["default_compression_opts"]
                 if ctx["verbose"]:
                     print("applying default compression filter")
-            kwargs["shuffle"] = dobj.shuffle
-            kwargs["fletcher32"] = dobj.fletcher32
-            kwargs["scaleoffset"] = dobj.scaleoffset
+                
+            # TBD: it would be better if HSDS could let us know what filters
+            # are supported (like it does with compressors)
+            # For now, just hard-code fletcher32 and scaleoffset to be ignored
+            if dobj.fletcher32:
+                msg = f"fletcher32 filter used by dataset: {dobj.name} is not "
+                msg += "supported by HSDS, this filter will not be used"
+                logging.warning(msg)
+                # kwargs["fletcher32"] = dobj.fletcher32
+            if dobj.scaleoffset:
+                msg = f"scaleoffset filter used by dataset: {dobj.name} is not "
+                msg += "supported by HSDS, this filter will not be used"
+                logging.warning(msg)
+                # kwargs["scaleoffset"] = dobj.scaleoffset
         # setting the fillvalue is failing in some cases
         # see: https://github.com/HDFGroup/h5pyd/issues/119
-        # just setting to None for now
+        # don't set fill value for reference types
         fillvalue = get_fillvalue(dobj)
-        if fillvalue is not None:
+        if fillvalue is not None and not has_reference(tgt_dtype):
             logging.debug(f"got fillvalue: {fillvalue}")
             kwargs["fillvalue"] = fillvalue
 
         # finally, create the dataset  
-        msg = f"creating dataset {dobj.name}, shape: {dobj.shape}, type: {dobj.dtype}"
+        msg = f"creating dataset {dobj.name}, shape: {dobj.shape}, type: {tgt_dtype}"
         logging.info(msg)
         if ctx["verbose"]:
             print(msg) 
@@ -1015,9 +1078,11 @@ def write_dataset(src, tgt, ctx):
             print(msg)
         resize_dataset(tgt, new_extent, axis=0)
 
-    if ctx["dataload"] == "link":
-        # don't write chunks, but update chunktable for chunk ref indirect
-        if tgt.id.layout and tgt.id.layout["class"] == "H5D_CHUNKED_REF_INDIRECT":
+
+    if not is_h5py(tgt) and tgt.id.layout["class"] != "H5D_CHUNKED":
+        # this is one of the ref layouts
+        if tgt.id.layout["class"] == "H5D_CHUNKED_REF_INDIRECT":
+            # don't write chunks, but update chunktable for chunk ref indirect
             update_chunktable(src, tgt, ctx)
         else:
             pass # skip chunkterator for link option
@@ -1049,7 +1114,7 @@ def write_dataset(src, tgt, ctx):
 
         for src_s in it:
             logging.debug(f"src selection: {src_s}")
-            if rank == 1:
+            if rank == 1 and isinstance(src_s, slice):
                 start = src_s.start + offset[0]
                 stop = src_s.stop + offset[0]
                 if len(tgt.shape) > rank:
@@ -1082,6 +1147,7 @@ def write_dataset(src, tgt, ctx):
                 msg = f"skipping chunk for slice: {src_s}"
             else:
                 msg = f"writing dataset data for slice: {src_s}"
+                arr = copy_array(arr, ctx)
                 tgt[tgt_s] = arr
             logging.info(msg)
             if ctx["verbose"]:
@@ -1239,6 +1305,7 @@ def load_file(
     s3path=None,
     compression=None,
     compression_opts=None,
+    ignorefilters=False,
     append=False,
     no_clobber=False,
     extend_dim=None,
@@ -1270,6 +1337,7 @@ def load_file(
     ctx["dataload"] = dataload  # ingest, link, or None
     ctx["default_compression"] = compression
     ctx["default_compression_opts"] = compression_opts
+    ctx["ignorefilters"] = ignorefilters
     ctx["s3path"] = s3path
     ctx["append"] = append
     ctx["no_clobber"] = no_clobber

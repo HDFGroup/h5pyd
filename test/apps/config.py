@@ -12,10 +12,19 @@
 import os
 
 def get_test_filenames():
-    return ("tall.h5", "diamond.h5", "shuffle_compress.h5")
+    return ("tall.h5", 
+            "shuffle_compress.h5", 
+            "d_objref.h5",
+            "a_objref.h5",
+            "d_link_hard.h5",
+            "d_link_soft.h5",
+            "scale_offset.h5",
+            "fletcher32.h5"
+    )
 
 cfg = {
-    'use_h5py': False
+    'use_h5py': False,
+    'test_file_http_path': "https://s3.amazonaws.com/hdfgroup/data/hdf5test/"
 }
 
 def get(x):
