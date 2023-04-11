@@ -19,7 +19,8 @@ def get_test_filenames():
             "d_link_hard.h5",
             "d_link_soft.h5",
             "scale_offset.h5",
-            "fletcher32.h5"
+            "fletcher32.h5",
+            "undecodable_attr.h5"
     )
 
 cfg = {

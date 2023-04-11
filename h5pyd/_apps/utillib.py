@@ -365,6 +365,7 @@ def copy_attribute(desobj, name, srcobj, ctx):
             if ctx["verbose"]:
                 print(msg)
             data = data.decode("utf-8", errors="surrogateescape")
+            src_dt = None  # let numpy figure out the unicode type
 
     # First, make sure we have a NumPy array.
     if is_h5py(srcobj):
