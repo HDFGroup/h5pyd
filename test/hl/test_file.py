@@ -136,8 +136,8 @@ class TestFile(TestCase):
          
         # re-open as read-only
         if is_hsds:
-            wait_time = 90
-            print("waiting {} seconds for root scan sync".format(wait_time))
+            wait_time = 90 # change to >90 to test async updates
+            print("waiting {wait_time} seconds for root scan sync")
             time.sleep(wait_time)  # let async process update obj number
         f = h5py.File(filename, 'r')
         self.assertEqual(f.filename, filename)
@@ -171,9 +171,9 @@ class TestFile(TestCase):
             # check properties that are only available for h5pyd
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously
-            if is_hsds:
-                self.assertEqual(f.num_objects, 2)
-                self.assertEqual(f.num_groups, 2)
+            if is_hsds and wait_time >= 90:
+                self.assertEqual(f.num_objects, 3)
+                self.assertEqual(f.num_groups, 3)
             else:
                 # reported as 0 for h5serv
                 self.assertEqual(f.num_objects, 0)

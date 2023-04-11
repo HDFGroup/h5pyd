@@ -284,6 +284,7 @@ def jsonToArray(data_shape, data_dtype, data_json):
                 converted_data = toTuple(np_shape_rank, data_json)
             data_json = converted_data
 
+
         arr = np.array(data_json, dtype=data_dtype)
         # raise an exception of the array shape doesn't match the selection shape
         # allow if the array is a scalar and the selection shape is one element,

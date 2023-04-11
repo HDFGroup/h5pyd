@@ -154,7 +154,16 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         arr = jsonToArray(shape, htype, value_json)
 
         if len(arr.shape) == 0:
-            return arr[()]
+            v = arr[()]
+            if isinstance(v, str):
+                # if this is not utf-8, return bytes instead
+                try:
+                    v.encode("utf-8")
+                except UnicodeEncodeError:
+                    self._parent.log.debug("converting utf8 unencodable string as bytes")
+                    v = v.encode("utf-8", errors="surrogateescape")
+            return v
+
         return arr
 
     def __setitem__(self, name, value):
