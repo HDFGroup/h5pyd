@@ -94,10 +94,10 @@ def main():
 
     # get a handle to input domain
     kwargs = {}
-    kwargs["endpoint"] = cfg["endpoint"]
-    kwargs["username"] = cfg["username"]
-    kwargs["password"] = cfg["password"]
-    kwargs["bucket"] = cfg["bucket"]
+    kwargs["endpoint"] = cfg["hs_endpoint"]
+    kwargs["username"] = cfg["hs_username"]
+    kwargs["password"] = cfg["hs_password"]
+    kwargs["bucket"] = cfg["hs_bucket"]
     try:
         fin = h5pyd.File(src_domain, mode='r', **kwargs)
     except IOError as ioe:
