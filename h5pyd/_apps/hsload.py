@@ -246,18 +246,27 @@ def main():
             if cfg["no_clobber"]:
                 if cfg["append"]: 
                     # no need to check for clobber if not in append mode
-                    no_clobber = False
-                else:
                     no_clobber = True
+                else:
+                    no_clobber = False
             else:
                 no_clobber = False
+
+            if cfg["compression"]:
+                compression = cfg["compression"]
+            else:
+                compression = None
 
             if cfg["z"]:
                 try:
                     compression_opts = int(cfg["z"])
+                    if compression is None:
+                        # if no other comressor is specified, just use gzip
+                        compression = "gzip"
+
                 except ValueError:
                     # not a numeric option?  Just pass the string
-                    compresion_opts = cfg["z"]
+                    compression_opts = cfg["z"]
             else:
                 compression_opts = None
 
@@ -267,7 +276,7 @@ def main():
                 "verbose": cfg["verbose"],
                 "dataload": dataload,
                 "s3path": s3path,
-                "compression": cfg["compression"],
+                "compression": compression,
                 "compression_opts": compression_opts,
                 "ignorefilters": cfg["ignorefilters"],
                 "append": cfg["append"],
