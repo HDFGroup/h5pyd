@@ -95,7 +95,7 @@ def main():
     s3 = None # S3FS instance
 
     cfg.setitem("append", False, flags=["-a", "--append"], help="append to existing domain")
-    cfg.setitem("extend", None, flags=["--extend",], choices=["DIMSCALE",], help="extend along given dimensionscale")
+    cfg.setitem("extend_dim", None, flags=["--extend",], choices=["DIMSCALE",], help="extend along given dimensionscale")
     cfg.setitem("extend_offset", None, flags=["--extend-offset"], choices=["N",], help="write data at index n along extended dimension")
     cfg.setitem("no_clobber", False, flags=["-n", "--no-clobber"],  help="do not overwrite target")
     cfg.setitem("nodata", False, flags=["--nodata",], help="do not copy dataset data")
