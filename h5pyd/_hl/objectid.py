@@ -190,12 +190,9 @@ class DatasetID(ObjectID):
     @property
     def layout(self):
         layout = None
-        if "layout" in self._obj_json:
-            layout = self._obj_json['layout']
-        else:
-            dcpl = self._obj_json['creationProperties']
-            if 'layout' in dcpl:
-                layout = dcpl['layout']
+        dcpl = self.dcpl_json
+        if dcpl and 'layout' in dcpl:
+            layout = dcpl['layout']
         return layout
 
     @property
