@@ -190,12 +190,11 @@ class DatasetID(ObjectID):
     @property
     def layout(self):
         layout = None
-        if "layout" in self._obj_json:
-            layout = self._obj_json['layout']
-        else:
-            dcpl = self._obj_json['creationProperties']
-            if 'layout' in dcpl:
-                layout = dcpl['layout']
+        dcpl = self.dcpl_json
+        if dcpl and 'layout' in dcpl:
+            layout = dcpl['layout']
+        elif 'layout' in self.obj_json:
+            layout = self.obj_json['layout']
         return layout
 
     @property
@@ -203,8 +202,9 @@ class DatasetID(ObjectID):
 
         chunks = None
         layout = self.layout
+
          
-        if layout and layout['class'] in  ('H5D_CHUNKED', 'H5D_CHUNKED_REF', 'H5D_CHUNKED_REF_INDIRECT'):
+        if layout and layout['class'] in ('H5D_CHUNKED', 'H5D_CHUNKED_REF', 'H5D_CHUNKED_REF_INDIRECT'):
             if "dims" in layout:
                 chunks = layout['dims']
              
