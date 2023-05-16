@@ -24,6 +24,10 @@ except ImportError as e:
 # copy rather than link for any datasets with product of extents less than the following
 MIN_DSET_ELEMENTS_FOR_LINKING=512
 
+# check if hdf5 library version supports chunk iteration
+hdf_library_version  = tuple([int(val) for val in h5py.version.info.split('\n')[4].split(' ')[4].split('.')])
+library_has_chunk_iter = (hdf_library_version >= (1, 14, 0) or (hdf_library_version < (1, 12, 0) and (hdf_library_version >= (1, 10, 10))))
+
 def dump_dtype(dt):
     if not isinstance(dt, np.dtype):
         raise TypeError(f"expected np.dtype, but got: {type(dt)}")
@@ -589,27 +593,54 @@ def create_chunktable(dset, dset_dims, ctx):
         # construct map of chunks if count is less than 10
         chunk_map = {}
         if is_h5py(dset):
-            # for hdf5 use get_chunk_info function to get chunk location for each chunk
             spaceid = dset.id.get_space()
             chunk_dims = get_chunk_dims(dset)
-            for i in range(num_chunks):
-                chunk_info = dset.id.get_chunk_info(i, spaceid)
-                index = chunk_info.chunk_offset
-                logging.debug(f"got chunk_info: {chunk_info} for chunk: {i}")
-                if not isinstance(index, tuple) or len(index) != rank:
-                    msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
-                    logging.error(msg)
-                    if not ctx["ignore_error"]:
-                        raise IOError(msg)
-                chunk_key = ""
-                for dim in range(rank):
-                    chunk_key += str(index[dim] // chunk_dims[dim])
-                    if dim < rank - 1:
-                        chunk_key += "_"
-                logging.debug(f"adding chunk_key: {chunk_key}")
-                chunk_map[chunk_key] = (chunk_info.byte_offset, chunk_info.size)
-                if i % 5000 == 0:
-                    logging.info(f"{i} chunks indexed")
+
+            if library_has_chunk_iter:
+                def create_chunktable_callback(chunk_info):
+                    # Use chunk offset as index 
+                    index = chunk_info[0]
+                    byte_offset = chunk_info[2]
+                    size = chunk_info[3]
+
+                    if not isinstance(index, tuple) or len(index) != rank:
+                        msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
+                        logging.error(msg)
+                        if not ctx["ignore_error"]:
+                            raise IOError(msg)
+
+                    chunk_key = ""
+
+                    for dim in range(rank):
+                        chunk_key += str(index[dim] // chunk_dims[dim])
+                        if dim < rank - 1:
+                            chunk_key += "_"
+                        chunk_map[chunk_key] = (byte_offset, size)
+
+                    return None
+                
+                dset.id.chunk_iter(create_chunktable_callback)
+
+            else: # Using old HDF5 version without H5Dchunk_iter
+                for i in range(num_chunks):
+                    chunk_info = dset.id.get_chunk_info(i, spaceid)
+                    index = chunk_info.chunk_offset
+                    logging.debug(f"got chunk_info: {chunk_info} for chunk: {i}")
+                    if not isinstance(index, tuple) or len(index) != rank:
+                        msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
+                        logging.error(msg)
+                        if not ctx["ignore_error"]:
+                            raise IOError(msg)
+                    chunk_key = ""
+                    for dim in range(rank):
+                        chunk_key += str(index[dim] // chunk_dims[dim])
+                        if dim < rank - 1:
+                            chunk_key += "_"
+                    logging.debug(f"adding chunk_key: {chunk_key}")
+                    chunk_map[chunk_key] = (chunk_info.byte_offset, chunk_info.size)
+                    if i % 5000 == 0:
+                        logging.info(f"{i} chunks indexed")
+
         else:
             msg = f"expected {dset} to be a h5py object"
             logging.error(msg)
@@ -692,21 +723,55 @@ def update_chunktable(src, tgt, ctx):
                 chunkinfo_arr[...] = (chunk_offset, chunk_size)
         else:
             spaceid = src.id.get_space()
-    
-            for i in range(num_chunks):
-                chunk_info = src.id.get_chunk_info(i, spaceid)
-                index = get_chunk_table_index(chunk_info.chunk_offset, chunk_dims)
-                if not isinstance(index, tuple) or len(index) != rank:
-                    msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
-                    logging.error(msg)
-                    if not ctx["ignore_error"]:
-                        raise IOError(msg)
-                    return
-                e = [chunk_info.byte_offset, chunk_info.size]
-                if extend:
-                    e.append(s3path)
-                e = tuple(e)
-                chunkinfo_arr[index] = e
+
+            if library_has_chunk_iter:
+                def update_chunktable_callback(chunk_info):
+                    chunk_offset = chunk_info[0]
+                    byte_offset = chunk_info[2]
+                    size = chunk_info[3]
+
+                    if len(chunk_offset) != len(chunk_dims):
+                        pass
+                        msg = f"Unexptected chunk offset: {chunk_offset}"
+                        logging.error(msg)
+                        if not ctx["ignore_error"]:
+                            raise IOError(msg)
+                        return
+
+                    chunk_index = []
+
+                    for i in range(rank):
+                        chunk_index.append(chunk_offset[i] // chunk_dims[i])
+                    
+                    index = tuple(chunk_index)
+
+                    e = [byte_offset,size]
+
+                    if extend:
+                        e.append(s3path)
+                    e = tuple(e)
+
+                    chunkinfo_arr[index] = e
+
+                    return None
+
+                src.id.chunk_iter(update_chunktable_callback)
+
+            else: # Using old HDF5 version without H5Dchunk_iter
+                for i in range(num_chunks):
+                    chunk_info = src.id.get_chunk_info(i, spaceid)
+                    index = get_chunk_table_index(chunk_info.chunk_offset, chunk_dims)
+                    if not isinstance(index, tuple) or len(index) != rank:
+                        msg = f"Unexpected array_offset: {index} for dataset with rank: {rank}"
+                        logging.error(msg)
+                        if not ctx["ignore_error"]:
+                            raise IOError(msg)
+                        return
+                    e = [chunk_info.byte_offset, chunk_info.size]
+                    if extend:
+                        e.append(s3path)
+                    e = tuple(e)
+                    chunkinfo_arr[index] = e
     else:
         if not extend:
             msg = "unexpected src type for update_chunktable"
@@ -1078,7 +1143,6 @@ def write_dataset(src, tgt, ctx):
         if ctx["verbose"]:
             print(msg)
         resize_dataset(tgt, new_extent, axis=0)
-
 
     if not is_h5py(tgt) and tgt.id.layout["class"] != "H5D_CHUNKED":
         # this is one of the ref layouts
