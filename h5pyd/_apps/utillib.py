@@ -550,7 +550,7 @@ def get_chunk_locations(dset, ctx, include_file_uri=False):
     rank = len(dset.shape)
 
     spaceid = dset.id.get_space()
-    print("chunk_iter:", library_has_chunk_iter)
+    logging.debug("using chunk_iter:", library_has_chunk_iter)
     dt = get_chunktable_dtype(include_file_uri=include_file_uri)
 
     chunktable_dims = get_chunktable_dims(dset)
@@ -599,7 +599,7 @@ def get_chunk_locations(dset, ctx, include_file_uri=False):
     chunk_dims = get_chunk_dims(dset)
 
     if library_has_chunk_iter:
-        def create_chunktable_callback(chunk_info):
+        def init_chunktable_callback(chunk_info):
             # Use chunk offset as index 
             index = chunk_info[0]
             byte_offset = chunk_info[2]
@@ -617,7 +617,7 @@ def get_chunk_locations(dset, ctx, include_file_uri=False):
 
             chunk_arr[index] = e
                 
-        dset.id.chunk_iter(create_chunktable_callback)
+        dset.id.chunk_iter(init_chunktable_callback)
     else: 
         # Using old HDF5 version without H5Dchunk_iter
         num_chunks = get_num_chunks(dset)
@@ -644,7 +644,6 @@ def get_chunk_locations(dset, ctx, include_file_uri=False):
             if i % 5000 == 0:
                 logging.info(f"{i} chunks indexed")
 
-    print("returning chunk_arr:", chunk_arr)
     return chunk_arr
 
 # ----------------------------------------------------------------------------------
@@ -678,7 +677,31 @@ def create_chunktable(dset, dset_dims, ctx):
         chunk_dims.extend(get_chunk_dims(dset))
 
         fout = ctx["fout"]
-        anon_dset = fout.create_dataset(None, shape=chunktable_dims, dtype=dt, maxshape=chunktable_maxshape)
+        kwargs = {}
+        kwargs["shape"] = chunktable_dims
+        kwargs["dtype"] = dt
+        kwargs["maxshape"] = chunktable_maxshape
+        if ctx["dataload"] == "fastlink" and dset.name:
+            kwargs["initializer"] = "chunklocator"
+            initializer_opts = []
+            initializer_opts.append(f"--h5path={dset.name}")
+            linkpath = ctx["s3path"]
+            s3prefix = "s3://"
+            if linkpath.startswith(s3prefix):
+                linkpath = linkpath[len(s3prefix):]
+            index = linkpath.find("/")
+            if index < 1:
+                msg = f"unexpected linkpath: {linkpath}"
+                logging.error(msg)
+                raise ValueError(msg)
+            bucket = linkpath[:index]
+            filepath = linkpath[(index+1):]
+            initializer_opts.append(f"--filepath={filepath}")
+            initializer_opts.append(f"--bucket={bucket}")
+            logging.info(f"using initializer: {initializer_opts}")
+            kwargs["initializer_opts"] = initializer_opts
+        
+        anon_dset = fout.create_dataset(None, **kwargs)
         msg = f"created chunk table: {anon_dset}"
         logging.info(msg)
         if ctx["verbose"]:
@@ -753,11 +776,14 @@ def update_chunktable(src, tgt, ctx):
     if layout["class"] != "H5D_CHUNKED_REF_INDIRECT":
         logging.info("update_chunktable not supported for this chunk class")
         return
+    if ctx["dataload"] == "fastlink":
+        logging.info("skip update_chunktable for fastload")
+        return
     rank = len(tgt.shape)
     chunktable_id = layout["chunk_table"]
 
     fout = ctx["fout"]
-    print("update_chunk_table", src.name, src.id.id)
+    logging.info(f"update_chunk_table {src.name}, id: {src.id.id}")
 
     # create a numpy array containing chunk refs for each chunk in src array
     extend = True if rank > len(src.shape) else False
@@ -862,7 +888,6 @@ def create_dataset(dobj, ctx):
     dset_preappend = None
 
     msg = f"create_dataset({dobj.name})"
-    print(msg)
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
@@ -982,7 +1007,7 @@ def create_dataset(dobj, ctx):
         kwargs = {"shape": tgt_shape, "maxshape": tgt_maxshape, "dtype": tgt_dtype}
 
         if (
-            ctx["dataload"] == "link"
+            ctx["dataload"] in ("link", "fastlink")
             and not is_vlen(dobj.dtype)
             and dobj.shape is not None
             and len(dobj.shape) > 0
@@ -1401,7 +1426,7 @@ def load_file(
     if dataload != "ingest":
         if not dataload:
             logging.info("no data load")
-        elif dataload == "link":
+        elif dataload in ("link", "fastlink"):
             if not s3path:
                 logging.error("s3path expected to be set")
                 sys.exit(1)

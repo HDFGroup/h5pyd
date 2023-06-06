@@ -101,6 +101,7 @@ def main():
     cfg.setitem("nodata", False, flags=["--nodata",], help="do not copy dataset data")
     cfg.setitem("z", None, flags=["-z",], choices=["N",], help="apply compression filter to any non-compressed datasets, n: [0-9]")
     cfg.setitem("link", None, flags=["--link",],  help="Link to dataset data (sourcefile given as <bucket>/<path>) or s3uri")
+    cfg.setitem("fastlink", None, flags=["--fastlink",],  help="Link to dataset data without initializing chunk locations (will be set server side)")
     cfg.setitem("linkpath", None, flags=["--linkpath",], choices=["PATH_URI",], help="Use the given URI for the link references rather than the src path")
     cfg.setitem("compression", None, flags=["--compression",], choices=COMPRESSION_FILTERS, help="use the given compression algorithm for -z option (lz4 is default)")
     cfg.setitem("ignorefilters", False, flags=["--ignore-filters"], help="ignore any filters used by source dataset")
@@ -139,11 +140,12 @@ def main():
 
     if cfg["link"]:
         dataload = "link"
+    elif cfg["fastlink"]:
+        dataload = "fastlink"
     elif cfg["nodata"]:
         dataload = None
     else:
         dataload = "ingest"
-
     
     logging.info(f"source files: {src_files}")
     logging.info(f"target domain: {domain}")
@@ -198,9 +200,9 @@ def main():
                     abort(f"Error opening file {src_file}: {ioe}")
                     
             else:
-                if cfg["link"]:
+                if cfg["link"] or cfg["fastlink"]:
                     if op.isabs(src_file) and not cfg["linkpath"]:
-                        msg = "source file must be s3path (for HSDS using S3 storage) or relative path from server "
+                        msg = "source file must be an s3path (for HSDS using S3 storage) or relative path from server "
                         msg += "root directory (for HSDS using posix storage)"
                         abort(msg)
                     s3path = src_file

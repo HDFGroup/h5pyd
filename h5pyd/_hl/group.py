@@ -315,6 +315,10 @@ class Group(HLObject, MutableMappingHDF5):
             (Scalar) Use this value for uninitialized parts of the dataset.
         track_times
             (T/F) Enable dataset creation timestamps.
+        initializer
+            (String) chunk initializer function
+        initializer_args
+            (List) arguments to be passed to initializer 
         """
 
 

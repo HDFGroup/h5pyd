@@ -53,14 +53,16 @@ SO_INT_MINBITS_DEFAULT = 0
 def generate_dcpl(
     shape,
     dtype,
-    chunks,
-    compression,
-    compression_opts,
-    shuffle,
-    fletcher32,
-    maxshape,
-    scaleoffset,
-    layout,
+    chunks=None,
+    compression=None,
+    compression_opts=None,
+    shuffle=None,
+    fletcher32=None,
+    maxshape=None,
+    scaleoffset=None,
+    layout=None,
+    initializer=None,
+    initializer_opts=None
 ):
     """Generate a dataset creation property list.
 
@@ -252,6 +254,14 @@ def generate_dcpl(
 
     if len(filters) > 0:
         plist["filters"] = filters
+
+    if initializer:
+        # pass in initializer options
+        initializer = [initializer,]
+        if initializer_opts:
+            initializer.extend(initializer_opts)
+        plist["initializer"] = initializer
+
 
     return plist
 

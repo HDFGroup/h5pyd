@@ -77,6 +77,8 @@ def make_new_dset(
     fillvalue=None,
     scaleoffset=None,
     track_times=None,
+    initializer=None,
+    initializer_opts=None
 ):
     """Return a new low-level dataset identifier
 
@@ -127,8 +129,8 @@ def make_new_dset(
         chunk > dim for dim, chunk in zip(tmp_shape, chunks) if dim is not None
     ):
         errmsg = (
-            f"Chunk shape must not be greater than data shape in any dimension. "
-            "{chunks} is not compatible with {shape}"
+            "Chunk shape must not be greater than data shape in any dimension. "
+            f"{chunks} is not compatible with {shape}"
         )
         raise ValueError(errmsg)
 
@@ -243,14 +245,17 @@ def make_new_dset(
     dcpl = filters.generate_dcpl(
         shape,
         dtype,
-        chunks,
-        compression,
-        compression_opts,
-        shuffle,
-        fletcher32,
-        maxshape,
-        scaleoffset,
-        layout,
+        chunks=chunks,
+        compression=compression,
+        compression_opts=compression_opts,
+        shuffle=shuffle,
+        fletcher32=fletcher32,
+        maxshape=maxshape,
+        scaleoffset=scaleoffset,
+        layout=layout,
+        initializer=initializer,
+        initializer_opts=initializer_opts
+
     )
 
     if fillvalue is not None:
