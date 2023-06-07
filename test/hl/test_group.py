@@ -195,7 +195,6 @@ class TestGroup(TestCase):
         
         if is_hsds:
             linkee_class = r.get('mysoftlink', getclass=True)
-            print("linkee_class:", linkee_class)
             # TBD: investigate why h5py returned None here
             self.assertEqual(linkee_class, h5py.Group)
             link_class = r.get('mysoftlink', getclass=True, getlink=True)
