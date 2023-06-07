@@ -603,7 +603,7 @@ def get_chunk_locations(dset, ctx, include_file_uri=False):
     if library_has_chunk_iter:
         def init_chunktable_callback(chunk_info):
             # Use chunk offset as index 
-            index = chunk_info[0]
+            index = get_chunk_table_index(chunk_info[0], chunk_dims)
             byte_offset = chunk_info[2]
             chunk_size = chunk_info[3]
 
