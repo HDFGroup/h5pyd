@@ -550,7 +550,9 @@ def get_chunk_locations(dset, ctx, include_file_uri=False):
     rank = len(dset.shape)
 
     spaceid = dset.id.get_space()
-    logging.debug("using chunk_iter:", library_has_chunk_iter)
+    logging.debug(f"using chunk_iter: {library_has_chunk_iter}")
+    print(f"using chunk_iter: {library_has_chunk_iter}")
+
     dt = get_chunktable_dtype(include_file_uri=include_file_uri)
 
     chunktable_dims = get_chunktable_dims(dset)

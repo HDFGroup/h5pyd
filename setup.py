@@ -36,14 +36,21 @@ setup(
         "requests_unixsocket",
         "pytz",
         "pyjwt",
-        "msrestazure",
-        "cryptography",
-        "google-api-python-client",
-        "google-auth-oauthlib",
-        "google-auth<2.0dev",
-        "adal",
+        # "cryptography",
     ],
     setup_requires=["pkgconfig"],
+    extras_require={
+        "azure": [
+            "msrestazure",
+            "adal"
+            ], 
+        "google": [
+            "google-api-python-client",
+            "google-auth-oauthlib",
+            "google-auth<2.0dev",],
+        "aws": ["s3fs",],
+        "hdf5": ["h5py",]
+    },
     zip_safe=False,
     entry_points={
         "console_scripts": [
