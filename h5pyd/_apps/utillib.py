@@ -926,7 +926,7 @@ def expandChunk(chunk_shape, max_shape, typesize):
             # unable to increase chunk_shape further
             break
 
-    logging.debug(f"expanChunk - returning {chunk_shape}")
+    logging.debug(f"expandChunk - returning {chunk_shape}")
 
     return chunk_shape 
 
