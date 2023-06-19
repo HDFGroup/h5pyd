@@ -900,7 +900,7 @@ def expandChunk(chunk_shape, max_shape, typesize):
         # scalar - can't be expanded
         return chunk_shape
     
-    chunk_shape = chunk_shape.copy()
+    chunk_shape = list(chunk_shape).copy()
 
     while True:
         chunk_size = np.prod(chunk_shape).item() * typesize
