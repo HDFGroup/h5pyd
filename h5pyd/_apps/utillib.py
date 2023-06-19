@@ -1077,9 +1077,7 @@ def create_dataset(dobj, ctx):
             chunks = get_chunk_dims(dobj)
         
         if chunks is not None:
-            # expand chunk if too small
-            chunk_dims = chunks["dims"]
-            
+            # expand chunk if too small            
 
             if dset_preappend is not None:
                 # check to see if an extra dimension is needed for the chunk shape
