@@ -24,6 +24,10 @@ except ImportError as e:
 # copy rather than link for any datasets with product of extents less than the following
 MIN_DSET_ELEMENTS_FOR_LINKING=512
 
+# adjust chunk shape to fit between min and max chunk sizes when possible
+MIN_CHUNK_SIZE = 1 * 1024 * 1024
+MAC_CHUNK_SIZE = 8 * 1024 * 1024
+
 # check if hdf5 library version supports chunk iteration
 hdf_library_version  = h5py.version.hdf5_version_tuple
 library_has_chunk_iter = (hdf_library_version >= (1, 14, 0) or (hdf_library_version < (1, 12, 0) and (hdf_library_version >= (1, 10, 10))))
@@ -878,6 +882,54 @@ def update_chunktable(src, tgt, ctx):
     else:
         chunktable[...] = chunk_arr
 
+#----------------------------------------------------------------------------------
+def expandChunk(chunk_shape, max_shape, typesize):
+    """Extend the chunk shape until it is above the MIN target."""
+
+    if chunk_shape is None:
+        return None
+    
+    logging.debug(f"orig chunk_shape: {chunk_shape}")
+
+    rank = len(chunk_shape)
+
+    if rank != len(max_shape):
+        raise ValueError("non-compatible arguments to expandChunk")
+
+    if rank == 0:
+        # scalar - can't be expanded
+        return chunk_shape
+    
+    chunk_shape = chunk_shape.copy()
+
+    while True:
+        chunk_size = np.prod(chunk_shape).item() * typesize
+        if chunk_size >= MIN_CHUNK_SIZE:
+            # this shape works
+            break
+        if chunk_size == 0:
+            # can't do anything with zero-size chunks
+            break
+
+        extended = False
+
+        for i in range(rank):
+            # start from the low-order dimension
+            dim = rank - i - 1 
+            nextent = chunk_shape[dim]
+            if nextent * 2 <= max_shape[dim]:
+                chunk_shape[dim] = nextent * 2
+                extended = True
+                break
+
+        if not extended:
+            # unable to increase chunk_shape further
+            break
+
+    logging.debug(f"expanChunk - returning {chunk_shape}")
+
+    return chunk_shape 
+
 
 # ----------------------------------------------------------------------------------
 def create_dataset(dobj, ctx):
@@ -1023,7 +1075,12 @@ def create_dataset(dobj, ctx):
             # converting hsds dset with linked chunks to h5py dataset
             # just use the dims field of dobj.chunks as chunk shape
             chunks = get_chunk_dims(dobj)
+        
         if chunks is not None:
+            # expand chunk if too small
+            chunk_dims = chunks["dims"]
+            
+
             if dset_preappend is not None:
                 # check to see if an extra dimension is needed for the chunk shape
                 if isinstance(chunks, dict):
@@ -1033,6 +1090,18 @@ def create_dataset(dobj, ctx):
                     new_chunks = [1,]
                     new_chunks.extend(chunks)
                     chunks = tuple(new_chunks)
+            else:
+                if isinstance(chunks, dict):
+                    chunk_dims = chunks["dims"]
+                    chunk_dims = expandChunk(chunk_dims, dobj.shape, dobj.dtype.itemsize)
+                    logging.debug(f"expanded chunks: {chunk_dims}")
+                    chunks["dims"] = chunk_dims 
+                else:
+                    # just a list with chunk shape
+                    chunks = expandChunk(chunks, dobj.shape, dobj.dtype.itemsize)
+                
+            logging.debug(f"setting chunks kwargs to: {chunks}")
+           
             kwargs["chunks"] = chunks
 
         if (
