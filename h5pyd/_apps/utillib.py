@@ -716,6 +716,7 @@ def create_chunktable(dset, dset_dims, ctx):
             chunks["file_uri"] = ctx["s3path"]
         chunks["dims"] = chunk_dims
         chunks["chunk_table"] = anon_dset.id.id
+        chunks["hyper_dims"] = dset.chunks
 
     elif num_chunks <= 1 and dset.chunks is None:
         # use contiguous mapping
