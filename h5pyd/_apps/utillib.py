@@ -1091,10 +1091,14 @@ def create_dataset(dobj, ctx):
                     chunks = tuple(new_chunks)
             else:
                 if isinstance(chunks, dict):
-                    chunk_dims = chunks["dims"]
-                    chunk_dims = expandChunk(chunk_dims, dobj.shape, dobj.dtype.itemsize)
-                    logging.debug(f"expanded chunks: {chunk_dims}")
-                    chunks["dims"] = chunk_dims 
+                    if "dims" in chunks:
+                        chunk_dims = chunks["dims"]
+                        chunk_dims = expandChunk(chunk_dims, dobj.shape, dobj.dtype.itemsize)
+                        logging.debug(f"expanded chunks: {chunk_dims}")
+                        chunks["dims"] = chunk_dims 
+                    else:
+                        # contiguous or compact, using dataset shape
+                        pass
                 else:
                     # just a list with chunk shape
                     chunks = expandChunk(chunks, dobj.shape, dobj.dtype.itemsize)
