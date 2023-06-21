@@ -1093,15 +1093,20 @@ def create_dataset(dobj, ctx):
                 if isinstance(chunks, dict):
                     if "dims" in chunks:
                         chunk_dims = chunks["dims"]
-                        chunk_dims = expandChunk(chunk_dims, dobj.shape, dobj.dtype.itemsize)
-                        logging.debug(f"expanded chunks: {chunk_dims}")
-                        chunks["dims"] = chunk_dims 
+                        if len(chunk_dims) == 1:
+                            # currently hyperchunks only supported for 1d datasets
+                            chunk_dims = expandChunk(chunk_dims, dobj.shape, dobj.dtype.itemsize)
+                            logging.debug(f"expanded chunks: {chunk_dims}")
+                            chunks["dims"] = chunk_dims 
                     else:
                         # contiguous or compact, using dataset shape
                         pass
                 else:
                     # just a list with chunk shape
-                    chunks = expandChunk(chunks, dobj.shape, dobj.dtype.itemsize)
+                    if len(chunks) == 1:
+                        # currently hyperchunks only supported for 1d datasets
+                        chunks = expandChunk(chunks, dobj.shape, dobj.dtype.itemsize)
+                        logging.debug(f"expanded chunks: {chunks}")
                 
             logging.debug(f"setting chunks kwargs to: {chunks}")
            
