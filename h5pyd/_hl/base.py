@@ -965,15 +965,15 @@ class HLObject(CommonStateObject):
         if 'Content-Type' in rsp.headers and rsp.headers['Content-Type'] == "application/octet-stream":
             if 'Content-Length' in rsp.headers:
                 # not available when http compression is used
-                self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
+                self.log.debug("returning binary content, length: " + rsp.headers['Content-Length'])
             else:
-                self.log.info("returning binary content - length unknown")
+                self.log.debug("returning binary content - length unknown")
             HTTP_CHUNK_SIZE=4096
             http_chunks = []
             downloaded_bytes = 0
             for http_chunk in rsp.iter_content(chunk_size=HTTP_CHUNK_SIZE):
                 if http_chunk:  # filter out keep alive chunks
-                    self.log.info(f"got http_chunk - {len(http_chunk)} bytes")
+                    self.log.debug(f"got http_chunk - {len(http_chunk)} bytes")
                     downloaded_bytes += len(http_chunk)
                     http_chunks.append(http_chunk)
             if len(http_chunks) == 0:
@@ -994,7 +994,7 @@ class HLObject(CommonStateObject):
         else:
             # assume JSON
             rsp_json = json.loads(rsp.text)
-            self.log.debug("rsp_json: {}".format(rsp_json))
+            self.log.debug(f"rsp_json - {len(rsp.text)} bytes")
             return rsp_json
 
 
@@ -1004,13 +1004,13 @@ class HLObject(CommonStateObject):
 
         # try to do a PUT to the domain
         rsp = self._id._http_conn.PUT(req, body=body, params=params, format=format)
-        self.log.info("PUT rsp status_code: {}".format(rsp.status_code))
+        self.log.info(f"PUT rsp status_code: {rsp.status_code}")
 
         if rsp.status_code not in (200, 201, 204):
             if rsp.status_code == 409:
                 # Conflict error
                 if replace:
-                    self.log.info("replacing resource: {}".format(req))
+                    self.log.info(f"replacing resource: {req}")
                     rsp = self.id._http_conn.DELETE(req)
                     if rsp.status_code != 200:
                         raise IOError(rsp.reason)

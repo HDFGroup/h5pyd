@@ -3,11 +3,15 @@ import sys
 import json
 import requests
 import time
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 
 # Azure
-import adal
+try:
+    import adal
+except ModuleNotFoundError:
+    logging.info("Unable to import azure auth packages")
 
 # Google
 try:
@@ -16,7 +20,7 @@ try:
     from google.oauth2.credentials import Credentials as GoogleCredentials
     from google.oauth2 import id_token as GoogleIDToken
 except ModuleNotFoundError:
-    print("Unable to import google auth packages")
+    logging.info("Unable to import google auth packages")
 
 from .config import Config
 
@@ -160,6 +164,10 @@ class AzureOpenID(OpenIDHandler):
     def acquire(self):
         """Acquire a new Azure token."""
 
+        if "adal" not in sys.modules:
+            msg = "adal module not found, run: python setup.py install -e '.[azure]'"
+            raise ModuleNotFoundError(msg)
+
         app_id = self.config["AD_APP_ID"]
         resource_id = self.config["AD_RESOURCE_ID"]
         tenant_id = self.config["AD_TENANT_ID"]
@@ -239,6 +247,10 @@ class GoogleOpenID(OpenIDHandler):
     def __init__(self, endpoint, config=None, scopes=None):
         """Store configuration."""
 
+        if "google.oauth2" not in sys.modules:
+            msg = "google.oauth2 module not found, run: python setup.py install -e '.[google]'"
+            raise ModuleNotFoundError(msg)
+        
         # Configuration manager
         hs_config = Config()
 

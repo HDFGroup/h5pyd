@@ -23,7 +23,7 @@ with open(path.join(here, "README.rst"), encoding="utf-8") as f:
 
 setup(
     name="h5pyd",
-    version="0.14.1",
+    version="0.15.0",
     description="h5py compatible client lib for HDF REST API",
     long_description=long_description,
     url="http://github.com/HDFGroup/h5pyd",
@@ -36,14 +36,21 @@ setup(
         "requests_unixsocket",
         "pytz",
         "pyjwt",
-        "msrestazure",
-        "cryptography",
-        "google-api-python-client",
-        "google-auth-oauthlib",
-        "google-auth<2.0dev",
-        "adal",
+        # "cryptography",
     ],
     setup_requires=["pkgconfig"],
+    extras_require={
+        "azure": [
+            "msrestazure",
+            "adal"
+            ], 
+        "google": [
+            "google-api-python-client",
+            "google-auth-oauthlib",
+            "google-auth<2.0dev",],
+        "aws": ["s3fs",],
+        "hdf5": ["h5py",]
+    },
     zip_safe=False,
     entry_points={
         "console_scripts": [
