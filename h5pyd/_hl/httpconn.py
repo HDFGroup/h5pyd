@@ -613,8 +613,12 @@ class HttpConn:
             data = body
         else:
             # assume json
-            data = json.dumps(body)
-
+            try:
+                data = json.dumps(body)
+            except TypeError:
+                msg = f"Unable to convert {body} to json"
+                self.log.error(msg)
+                raise IOError("JSON encoding error")
         if format == "binary":
             # recieve data as binary
             headers["accept"] = "application/octet-stream"
