@@ -899,7 +899,7 @@ def expandChunk(chunk_shape, max_shape, typesize):
 
     if rank == 0:
         # scalar - can't be expanded
-        return chunk_shape
+        return tuple(chunk_shape)
     
     chunk_shape = list(chunk_shape).copy()
 
@@ -929,7 +929,7 @@ def expandChunk(chunk_shape, max_shape, typesize):
 
     logging.debug(f"expandChunk - returning {chunk_shape}")
 
-    return chunk_shape 
+    return tuple(chunk_shape)
 
 
 # ----------------------------------------------------------------------------------
@@ -1077,7 +1077,7 @@ def create_dataset(dobj, ctx):
             # just use the dims field of dobj.chunks as chunk shape
             chunks = get_chunk_dims(dobj)
         
-        if chunks is not None:
+        if chunks is not None and not is_h5py(fout):
             # expand chunk if too small            
 
             if dset_preappend is not None:
