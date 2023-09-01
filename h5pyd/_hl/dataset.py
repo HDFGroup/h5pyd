@@ -993,7 +993,7 @@ class Dataset(HLObject):
 
         if self._shape == ():
             selection = sel.select(self, args)
-            self.log.info("selection.mshape: {}".format(selection.mshape))
+            self.log.info(f"selection.mshape: {selection.mshape}")
 
             # TBD - refactor the following with the code for the non-scalar case
             req = "/datasets/" + self.id.uuid + "/value"
@@ -1006,7 +1006,7 @@ class Dataset(HLObject):
                 arr = bytesToArray(rsp, new_dtype, self._shape)
 
                 if not self.dtype.shape:
-                    self.log.debug("reshape arr to: {}".format(self._shape))
+                    self.log.debug(f"reshape arr to: {self._shape}")
                     arr = numpy.reshape(arr, self._shape)
             else:
                 # got JSON response
@@ -1024,11 +1024,8 @@ class Dataset(HLObject):
                 arr = numpy.empty((), dtype=new_dtype)
                 arr[()] = data
             if selection.mshape is None:
-                self.log.info(
-                    "return scalar selection of: {}, dtype: {}, shape: {}".format(
-                        arr, arr.dtype, arr.shape
-                    )
-                )
+                msg = f"return scalar selection of: {arr}, dtype: {arr.dtype}, shape: {arr.shape}"
+                self.log.info(msg)
                 val = arr[()]
                 if isinstance(val, str):
                     # h5py always returns bytes, so encode the str
@@ -1308,9 +1305,7 @@ class Dataset(HLObject):
                     points, dtype="u8"
                 )  # must use unsigned 64-bit int
                 body = arr_points.tobytes()
-                self.log.info(
-                    "point select binary request, num bytes: {}".format(len(body))
-                )
+                self.log.info(f"point select binary request, num bytes: {len(body)}")
             else:
                 if delistify:
                     self.log.info("delistifying point selection")
@@ -1324,7 +1319,7 @@ class Dataset(HLObject):
                 else:
                     # can just assign
                     body["points"] = points
-                self.log.info("sending point selection request: {}".format(body))
+                self.log.info(f"sending point selection request: {body}")
             rsp = self.POST(req, format=format, body=body)
             if type(rsp) in (bytes, bytearray):
                 if len(rsp) // mtype.itemsize != selection.mshape[0]:
@@ -1337,18 +1332,14 @@ class Dataset(HLObject):
             else:
                 data = rsp["value"]
                 if len(data) != selection.mshape[0]:
-                    raise IOError(
-                        "Expected {} elements, but got {}".format(
-                            selection.mshape[0], len(data)
-                        )
-                    )
-
+                    msg = f"Expected {selection.mshape[0]} elements, but got {len(data)}"
+                    raise IOError(msg)
                 arr = numpy.asarray(data, dtype=mtype, order="C")
 
         else:
             raise ValueError("selection type not supported")
 
-        self.log.info("got arr: {}, cleaning up shape!".format(arr.shape))
+        self.log.info(f"got arr: {arr.shape}, cleaning up shape!")
         # Patch up the output for NumPy
         if len(names) == 1:
             arr = arr[names[0]]  # Single-field recarray convention
@@ -1368,7 +1359,7 @@ class Dataset(HLObject):
         (slices and integers).  For advanced indexing, the shapes must
         match.
         """
-        self.log.info("Dataset __setitem__, args: {}".format(args))
+        self.log.info(f"Dataset __setitem__, args: {args}")
         use_base64 = True  # may need to set this to false below for some types
 
         args = args if isinstance(args, tuple) else (args,)
@@ -1480,7 +1471,7 @@ class Dataset(HLObject):
             # TBD - need to handle cases where the type shape is different
             self.log.debug("got numpy array")
             if val.dtype != self.dtype and val.dtype.shape == self.dtype.shape:
-                self.log.info("converting {} to {}".format(val.dtype, self.dtype))
+                self.log.info(f"converting {val.dtype} to {self.dtype}")
                 # convert array
                 tmp = numpy.empty(val.shape, dtype=self.dtype)
                 tmp[...] = val[...]
@@ -1584,15 +1575,13 @@ class Dataset(HLObject):
                 data = val.tobytes()
                 data = base64.b64encode(data)
                 data = data.decode("ascii")
-                self.log.debug("data: {}".format(data))
                 body["value_base64"] = data
-                self.log.debug("writing base64 data, {} bytes".format(len(data)))
+                self.log.debug(f"writing base64 data, {len(data)} bytes")
         else:
             if type(val) is not list:
                 val = val.tolist()
             val = _decode(val)
-            self.log.debug("writing json data, {} elements".format(len(val)))
-            self.log.debug("data: {}".format(val))
+            self.log.debug(f"writing json data, {len(val)} elements")
             body["value"] = val
 
         if selection.select_type != sel.H5S_SELECT_ALL:

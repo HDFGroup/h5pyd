@@ -651,7 +651,7 @@ class Group(HLObject, MutableMappingHDF5):
             #  (and hince the httpconn socket won't be closed)
             from .files import File
             external_domain = link_json['h5domain']
-            if not op.isabs(external_domain):
+            if not external_domain.startswith("hdf5://") and not op.isabs(external_domain):
                 current_domain = self._id.http_conn.domain
                 external_domain = op.join(op.dirname(current_domain), external_domain)
                 external_domain = op.normpath(external_domain)
@@ -659,6 +659,7 @@ class Group(HLObject, MutableMappingHDF5):
                 endpoint = self.id.http_conn.endpoint
                 username = self.id.http_conn.username
                 password = self.id.http_conn.password
+                print(external_domain)
                 f = File(external_domain, endpoint=endpoint, username=username, password=password, mode='r') 
             except IOError:
                 # unable to find external link
