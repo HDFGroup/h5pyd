@@ -64,7 +64,7 @@ class TestCase(ut.TestCase):
     @property
     def test_user2(self):
         user2 = {}
-        if  "TEST12_USERNAME" in os.environ:
+        if  "TEST2_USERNAME" in os.environ:
             user2["name"] = os.environ["TEST2_USERNAME"]
         else:
             user2["name"] = "test_user2"
@@ -204,13 +204,10 @@ class TestCase(ut.TestCase):
             if "H5PYD_TEST_FOLDER" in os.environ:
                 domain = os.environ["H5PYD_TEST_FOLDER"]
             else:
-                domain = "h5pyd_test.hdfgroup.org"
-            if domain.find('/') > -1:
-                # Use path-style domain naming
-                filename = op.join(domain, basename)
-                filename += ".h5"
-            else:
-                filename = basename + "." + domain
+                domain = "/"
+            # Use path-style domain naming
+            filename = op.join(domain, basename)
+            filename += ".h5"
         return filename
 
 
