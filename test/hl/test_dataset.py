@@ -254,7 +254,7 @@ class TestReadDirectly(BaseDataset):
             dest_shape = self.dest_shapes[i]
             source_sel = self.source_sels[i]
             dest_sel = self.dest_sels[i]
-            source_values = np.arange(np.product(source_shape), dtype="int64").reshape(source_shape)
+            source_values = np.arange(np.prod(source_shape), dtype="int64").reshape(source_shape)
             dset = self.f.create_dataset(f"dset_{i}", source_shape, data=source_values)
             arr = np.full(dest_shape, -1, dtype="int64")
             expected = arr.copy()
@@ -305,7 +305,7 @@ class TestWriteDirectly(BaseDataset):
             source_sel = self.source_sels[i]
             dest_sel = self.dest_sels[i]
             dset = self.f.create_dataset(f'dset_{i}', dest_shape, dtype='int32', fillvalue=-1)
-            arr = np.arange(np.product(source_shape)).reshape(source_shape)
+            arr = np.arange(np.prod(source_shape)).reshape(source_shape)
             expected = np.full(dest_shape, -1, dtype='int32')
             expected[dest_sel] = arr[source_sel]
             dset.write_direct(arr, source_sel, dest_sel)
@@ -1036,7 +1036,6 @@ class TestChunkIterator(BaseDataset):
         self.assertTrue(count > 1)
  
 
-
 class TestResize(BaseDataset):
 
     """
@@ -1590,24 +1589,6 @@ class TestAstype(BaseDataset):
     """
 
     @ut.expectedFailure
-    def test_astype_ctx(self):
-        dset = self.f.create_dataset('x', (100,), dtype='i2')
-        dset[...] = np.arange(100)
-
-        with warnings.catch_warnings(record=True) as warn_rec:
-            warnings.simplefilter("always")
-
-            with dset.astype('f8'):
-                self.assertArrayEqual(dset[...], np.arange(100, dtype='f8'))
-
-            with dset.astype('f4') as f4ds:
-                self.assertArrayEqual(f4ds[...], np.arange(100, dtype='f4'))
-
-        # TBD: no H5pyDeprecationWarning
-        assert warn_rec
-        # assert [w.category for w in warn_rec] == [H5pyDeprecationWarning] * 2
-
-    @ut.expectedFailure
     def test_astype_wrapper(self):
         dset = self.f.create_dataset('x', (100,), dtype='i2')
         dset[...] = np.arange(100)
@@ -1896,7 +1877,7 @@ class TestCommutative(BaseDataset):
                                      data=np.random.rand(*shape))
         # grab a value from the elements, ie dset[0]
         # check that mask arrays are commutative wrt ==, !=
-        val = np.float64(dset[0])
+        val = np.float64(dset[0][0])
 
         assert np.all((val == dset) == (dset == val))
         assert np.all((val != dset) == (dset != val))

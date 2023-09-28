@@ -42,10 +42,7 @@ class TestFolders(TestCase):
             return
 
         self.assertTrue(f.id.id is not None)
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # HSDS currently supports folders, but h5serv does not
-            f.close()
-            return
+        
         f.close()
 
         folder_name = op.dirname(filepath)  + '/'
@@ -188,10 +185,6 @@ class TestFolders(TestCase):
             f.close()
             return
 
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # HSDS currently supports folders, but h5serv does not
-            f.close()
-            return
         f.close()
 
         folder_test = self.getFileName("create_folder_test")
@@ -216,10 +209,7 @@ class TestFolders(TestCase):
             # Folders not supported for h5py
             f.close()
             return
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # HSDS currently supports folders, but h5serv does not
-            f.close()
-            return
+        
         f.close()
 
         path_components = filepath.split('/')

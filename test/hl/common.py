@@ -19,21 +19,8 @@ import tempfile
 import time
 import config
 
-
-from six import unichr
-
 import numpy as np
-
-if sys.version_info >= (2, 7) or sys.version_info >= (3, 2):
-    import unittest as ut
-else:
-    try:
-        import unittest2 as ut
-    except ImportError:
-        raise ImportError(
-            'unittest2 is required to run the test suite with python-%d.%d'
-            % (sys.version_info[:2])
-            )
+import unittest as ut
 
 
 # Check if non-ascii filenames are supported
@@ -41,7 +28,7 @@ else:
 # See also h5py issue #263 and ipython #466
 # To test for this, run the testsuite with LC_ALL=C
 try:
-    testfile, fname = tempfile.mkstemp(unichr(0x03b7))
+    testfile, fname = tempfile.mkstemp(chr(0x03b7))
 except UnicodeError:
     UNICODE_FILENAMES = False
 else:
@@ -227,13 +214,10 @@ class TestCase(ut.TestCase):
             if "H5PYD_TEST_FOLDER" in os.environ:
                 domain = os.environ["H5PYD_TEST_FOLDER"]
             else:
-                domain = "h5pyd_test.hdfgroup.org"
-            if domain.find('/') > -1:
-                # Use path-style domain naming
-                filename = op.join(domain, basename)
-                filename += ".h5"
-            else:
-                filename = basename + "." + domain
+                # default to the root folder
+                domain = "/"
+            filename = op.join(domain, basename)
+            filename += ".h5"
         return filename
 
 

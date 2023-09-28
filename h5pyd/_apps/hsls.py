@@ -145,32 +145,60 @@ def dump(name, obj, visited=None):
         if isinstance(obj.id.layout, dict):
             # H5D_CHUNKED_REF layout
             chunk_dims = obj.id.layout["dims"]
-            storage_desc = "Storage " + obj.id.layout["class"]
+            obj_layout = obj.id.layout["class"]
         else:
             chunk_dims = obj.chunks
-            storage_desc = "Storage H5D_CHUNKED"
-        for chunk_dim in chunk_dims:
+            obj_layout = "H5D_CHUNKED"
+        storage_desc = f"Storage {obj_layout}"
+        max_chunk_count = 1
+        rank = len(obj.shape)
+        for i in range(rank):
+            extent = obj.shape[i]
+            chunk_dim = chunk_dims[i]
             chunk_size *= chunk_dim
+            max_chunk_count *= -(-extent // chunk_dim)
         dset_size = obj.dtype.itemsize
         for dim_extent in obj.shape:
             dset_size *= dim_extent
 
-        num_chunks = obj.num_chunks
-        allocated_size = obj.allocated_size
+        if obj_layout == "H5D_CHUNKED_REF_INDIRECT":
+            chunk_table_id = obj.id.layout["chunk_table"]
+            chunk_table = obj.file[f"datasets/{chunk_table_id}"]
+            num_chunks = int(np.prod(chunk_table.shape))
+            chunk_table_elements = chunk_table[...].reshape((num_chunks,))
+            num_linked_chunks = 0
+            allocated_size = 0
+            for e in chunk_table_elements:
+                chunk_offset = e[0]
+                chunk_size = e[1]
+                if chunk_offset > 0 and chunk_size > 0:
+                    num_linked_chunks += 1
+                    allocated_size += chunk_size
+            num_chunks = num_linked_chunks
+            chunk_type = "linked"
+
+        else:
+            num_chunks = obj.num_chunks
+            allocated_size = obj.allocated_size
+            chunk_type = "allocated"
+
         if num_chunks is not None and allocated_size is not None:
-            fstr = "    {0:>32}: {1} {2} bytes, {3} allocated chunks"
-            print(fstr.format("Chunks", chunk_dims, intToStr(chunk_size),
-                              intToStr(num_chunks)))
+            fstr = "    {0:>32}: {1} {2} bytes, {3}/{4} {5} chunks"
+
+            s = fstr.format("Chunks", chunk_dims, intToStr(chunk_size), intToStr(num_chunks), 
+                            intToStr(max_chunk_count), chunk_type)
+            print(s)
             if dset_size > 0:
                 utilization = allocated_size / dset_size
-                fstr = "    {0:>32}: {1} logical bytes, {2} allocated bytes, {3:.2f}% utilization"
+                fstr = "    {0:>32}: {1} logical bytes, {2} {3} bytes, {4:.2f}% utilization"
                 print(fstr.format(storage_desc, intToStr(dset_size),
                                   intToStr(allocated_size),
+                                  chunk_type,
                                   utilization * 100.0))
             else:
-                fstr = "    {0:>32}: {1} logical bytes, {2} allocated bytes"
+                fstr = "    {0:>32}: {1} logical bytes, {2} {3} bytes"
                 print(fstr.format(storage_desc, intToStr(dset_size),
-                                  intToStr(allocated_size)))
+                                  intToStr(allocated_size), chunk_type))
 
         else:
             # verbose info not available, just show the chunk layout

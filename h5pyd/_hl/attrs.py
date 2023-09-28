@@ -252,7 +252,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             # Not an array type; make sure to check the number of elements
             # is compatible, and reshape if needed.
             else:
-                if numpy.product(shape) != numpy.product(data.shape):
+                if numpy.prod(shape) != numpy.prod(data.shape):
                     raise ValueError("Shape of new attribute conflicts with shape of data")
 
                 if shape != data.shape:
@@ -321,7 +321,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
                 # Allow the case of () <-> (1,)
                 if (value.shape != attr.shape) and not \
-                   (numpy.product(value.shape) == 1 and numpy.product(attr.shape) == 1):
+                   (numpy.prod(value.shape) == 1 and numpy.prod(attr.shape) == 1):
                     raise TypeError("Shape of data is incompatible with existing attribute")
                 attr.write(value)
         """

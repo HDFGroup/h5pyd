@@ -31,8 +31,6 @@ class TestTable(TestCase):
         if config.get("use_h5py"):
             return # Table not supported with h5py
         f = h5py.File(filename, "w")
-        if not f.id.id.startswith("g-"):
-            return # append not supported with h5serv
 
         count = 10
 
@@ -75,9 +73,6 @@ class TestTable(TestCase):
         if config.get("use_h5py"):
             return # Table not supported with h5py
         f = h5py.File(filename, "w")
-
-        if not f.id.id.startswith("g-"):
-            return # append not supported with h5serv
 
         # write entire array
         data = [

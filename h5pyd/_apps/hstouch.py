@@ -69,10 +69,6 @@ def touchDomain(domain):
     parent_domain = getParentDomain(domain)
 
     if parent_domain == "/":
-        if not domain.endswith("/"):
-            msg = "Only folders can be created as a top-level domain"
-            logging.error(msg)
-            sys.exit(msg)
         if len(domain) < 4:
             msg = "Top-level folders must be at least three characters"
             logging.error(msg)

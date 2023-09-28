@@ -259,7 +259,7 @@ class TestScalarCompound(TestCase):
     @ut.skip
     def test_fieldnames(self):
         """ field name -> bare value """
-        #TBD: fix when field access is supported in h5serv/hsds
+        #TBD: fix when field access is supported in hsds
         out = self.dset['a']
         self.assertIsInstance(out, np.float32)
         self.assertEqual(out, self.dset['a'])

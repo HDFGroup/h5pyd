@@ -97,7 +97,7 @@ def select(obj, args):
         use_fancy = False
         if isinstance(a, np.ndarray):
             use_fancy = True
-        if a is []:
+        elif a is []:
             use_fancy = True
         elif not isinstance(a, slice) and a is not Ellipsis:
             try:

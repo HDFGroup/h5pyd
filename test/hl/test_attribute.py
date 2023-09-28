@@ -11,7 +11,6 @@
 ##############################################################################
 
 import numpy as np
-import six
 import logging
 import config
 
@@ -31,10 +30,6 @@ class TestAttribute(TestCase):
         filename = self.getFileName("create_attribute")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
-
-        is_hsds = False
-        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-            is_hsds = True  # HSDS has different permission defaults
 
         g1 = f.create_group('g1')
         
@@ -111,17 +106,15 @@ class TestAttribute(TestCase):
         g11 = g1.create_group('g1.1') # create subgroup g1/g1.1
         g11.attrs['name'] = 'g1.1'   # tag group with an attribute
 
-        if is_hsds:
-            # following is not working with h5serv
-            g11_ref = g11.ref   # get ref to g1/g1.1
-            self.assertTrue(isinstance(g11_ref, h5py.Reference))
-            refdt = h5py.special_dtype(ref=h5py.Reference)  # create ref dtype
-            g1.attrs.create('f1', g11_ref, dtype=refdt)     # create attribute with ref to g1.1
-            ref = g1.attrs['f1'] # read back the attribute
+        g11_ref = g11.ref   # get ref to g1/g1.1
+        self.assertTrue(isinstance(g11_ref, h5py.Reference))
+        refdt = h5py.special_dtype(ref=h5py.Reference)  # create ref dtype
+        g1.attrs.create('f1', g11_ref, dtype=refdt)     # create attribute with ref to g1.1
+        ref = g1.attrs['f1'] # read back the attribute
 
-            refobj = f[ref]  # get the ref'd object
-            self.assertTrue('name' in refobj.attrs)  # should see the tag attribute
-            self.assertEqual(refobj.attrs['name'], 'g1.1')  # check tag value
+        refobj = f[ref]  # get the ref'd object
+        self.assertTrue('name' in refobj.attrs)  # should see the tag attribute
+        self.assertEqual(refobj.attrs['name'], 'g1.1')  # check tag value
 
         # close file
         f.close()

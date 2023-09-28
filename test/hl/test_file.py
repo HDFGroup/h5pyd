@@ -21,7 +21,6 @@ else:
 from common import ut, TestCase
 from datetime import datetime
 from copy import copy
-import six
 import time
 import logging
 
@@ -63,9 +62,7 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 0)
         self.assertEqual(f.mode, 'r+')
         self.assertTrue(h5py.is_hdf5(filename))
-        is_hsds = False
-        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-            is_hsds = True  # HSDS has different permission defaults
+        
         if h5py.__name__ == "h5pyd":
             self.assertTrue(f.id.http_conn.endpoint.startswith("http"))
         self.assertTrue(f.id.id is not None)
@@ -73,8 +70,7 @@ class TestFile(TestCase):
         # should not see id as a file
         self.assertFalse(h5py.is_hdf5(f.id.id))
         # Check domain's timestamps
-        if h5py.__name__ == "h5pyd" and is_hsds:
-            # TBD: remove is_hsds when h5serv timestamp changed to float
+        if h5py.__name__ == "h5pyd":
             #print("modified:", datetime.fromtimestamp(f.modified), f.modified)
             #print("created: ", datetime.fromtimestamp(f.created), f.created)
             #print("now:     ", datetime.fromtimestamp(now), now)
@@ -86,8 +82,7 @@ class TestFile(TestCase):
             self.assertTrue(f.modified - 30.0 < now)
             self.assertTrue(f.modified + 30.0 > now)
             self.assertTrue(f.modified >= f.created)
-        if is_hsds:
-            # owner prop is just for HSDS
+        
             self.assertTrue(len(f.owner) > 0)
             version = f.serverver
              # server version should be of form "n.n.n"
@@ -135,7 +130,7 @@ class TestFile(TestCase):
         f.close()
          
         # re-open as read-only
-        if is_hsds:
+        if h5py.__name__ == "h5pyd":
             wait_time = 90 # change to >90 to test async updates
             print("waiting {wait_time} seconds for root scan sync")
             time.sleep(wait_time)  # let async process update obj number
@@ -171,14 +166,9 @@ class TestFile(TestCase):
             # check properties that are only available for h5pyd
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously
-            if is_hsds and wait_time >= 90:
-                self.assertEqual(f.num_objects, 3)
-                self.assertEqual(f.num_groups, 3)
-            else:
-                # reported as 0 for h5serv
-                self.assertEqual(f.num_objects, 0)
-                self.assertEqual(f.num_groups, 0)
-
+            self.assertEqual(f.num_objects, 3)
+            self.assertEqual(f.num_groups, 3)
+            
             self.assertEqual(f.num_datasets, 0)
             self.assertEqual(f.num_datatypes, 0)
             self.assertTrue(f.allocated_bytes == 0)
@@ -187,7 +177,7 @@ class TestFile(TestCase):
         self.assertEqual(f.id.id, 0)
 
         # re-open using hdf5:// prefix
-        if h5py.__name__ == "h5pyd" and is_hsds:
+        if h5py.__name__ == "h5pyd":
             if filename[0] == '/':
                 filepath = "hdf5:/" + filename
             else:
@@ -248,21 +238,11 @@ class TestFile(TestCase):
         root_id = f.id.id
         self.assertEqual(len(f.keys()), 2)
 
-        is_hsds = False
-        if root_id.startswith("g-"):
-            is_hsds = True  # HSDS has different permission defaults
-
         # no explicit ACLs yet
         file_acls = f.getACLs()
-        if is_hsds:
-            self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl
-        else:
-            self.assertEqual(len(file_acls), 0)
-
-        if is_hsds:
-            username = f.owner
-        else:
-            username = "test_user1"
+        self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl
+        
+        username = f.owner
 
         file_acl = f.getACL(username)
         # default owner ACL should grant full permissions
@@ -271,28 +251,21 @@ class TestFile(TestCase):
         for k in acl_keys:
             self.assertEqual(file_acl[k], True)
 
-        # for h5serv a default acl should be available
-        # hsds does not create one initially
-
         try:
             default_acl = f.getACL("default")
         except IOError as ioe:
             if ioe.errno == 404:
-                if is_hsds:
-                    pass # expected
-                else:
-                    self.assertTrue(False)
+                pass # expected
 
-        if is_hsds:
-            # create  public-read ACL
-            default_acl = {}
-            for key in acl_keys:
-                if key == "read":
-                    default_acl[key] = True
-                else:
-                    default_acl[key] = False
-            default_acl["userName"] = "default"
-            f.putACL(default_acl)
+        # create  public-read ACL
+        default_acl = {}
+        for key in acl_keys:
+            if key == "read":
+                default_acl[key] = True
+            else:
+                default_acl[key] = False
+        default_acl["userName"] = "default"
+        f.putACL(default_acl)
         f.close()
 
         # ooen with test_user2 should succeed for read mode
@@ -305,17 +278,15 @@ class TestFile(TestCase):
         # test_user2 has read access, but opening in write mode should fail
         try:
             f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
-            self.assertFalse(is_hsds)  # expect exception for hsds
+            self.assertFalse(True)  # expect exception for hsds
         except IOError as ioe:
-            self.assertTrue(is_hsds)
             self.assertEqual(ioe.errno, 403)  # user is not authorized
 
         # append mode w/ test_user2
         try:
             f = h5py.File(filename, 'a', username=self.test_user2["name"], password=self.test_user2["password"])
-            self.assertFalse(is_hsds)  # expected exception
+            self.assertFalse(True)  # expected exception
         except IOError as ioe:
-            self.assertTrue(is_hsds)
             self.assertEqual(ioe.errno, 403)  # Forbidden
 
         f = h5py.File(filename, 'a')  # open for append with original username
@@ -338,9 +309,8 @@ class TestFile(TestCase):
         # test_user2  opening in write mode should still fail
         try:
             f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
-            self.assertFalse(is_hsds)  # expected exception
+            self.assertFalse(True)  # expected exception
         except IOError as ioe:
-            self.assertTrue(is_hsds)
             self.assertEqual(ioe.errno, 403)  # user is not authorized
 
         # append mode w/ test_user2
@@ -357,20 +327,18 @@ class TestFile(TestCase):
             if "HS_ENDPOINT" in os.environ:
                 endpoint = os.environ["HS_ENDPOINT"]
                 filename = self.getFileName("test_http_url_file")
-                is_hsds = False
                 f = h5py.File(filename, 'w')
-                if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-                    is_hsds = True  # HSDS has different permission defaults
+            
                 f.close()
-                if is_hsds:
-                    url = endpoint + filename
-                    f = h5py.File(url, 'w')
-                    self.assertEqual(f.filename, filename)
-                    self.assertEqual(f.name, "/")
-                    self.assertTrue(f.id.id is not None)
-                    self.assertEqual(len(f.keys()), 0)
-                    self.assertEqual(f.mode, 'r+')
-                    f.close()
+
+                url = endpoint + filename
+                f = h5py.File(url, 'w')
+                self.assertEqual(f.filename, filename)
+                self.assertEqual(f.name, "/")
+                self.assertTrue(f.id.id is not None)
+                self.assertEqual(len(f.keys()), 0)
+                self.assertEqual(f.mode, 'r+')
+                f.close()
             else:
                 print("set HS_ENDPOINT environment variable to enable test_http_url test")
 

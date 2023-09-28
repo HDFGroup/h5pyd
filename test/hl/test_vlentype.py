@@ -21,7 +21,6 @@ else:
 
 from common import ut, TestCase
 
-# Note: this test currently works with the HSDS server but not h5serv
 
 class TestVlenTypes(TestCase):
 
@@ -31,12 +30,11 @@ class TestVlenTypes(TestCase):
         print("filename:", filename)
         if config.get("use_h5py"):
             # TBD - skipping as this core dumps in travis for some reason
+            #return
             return
+       
         f = h5py.File(filename, 'w')
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # vlen ref types not working for h5serv, so abort here
-            f.close()
-            return
+
 
         g1 = f.create_group('g1')
         g1_1 = g1.create_group('g1_1')
@@ -84,6 +82,7 @@ class TestVlenTypes(TestCase):
             e = vlen_val[i]
             self.assertTrue(isinstance(e, np.ndarray))
             ref_type = h5py.check_dtype(ref=e.dtype)
+            
             self.assertEqual(ref_type, h5py.Reference)
             # TBD - h5pyd is returning shape of () rather than (1,) for singletons
             if i>0:
@@ -126,11 +125,6 @@ class TestVlenTypes(TestCase):
             # TBD - skipping as this core dumps in travis for some reason
             return
         f = h5py.File(filename, 'w')
-
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # vlen ref types not working for h5serv, so abort here
-            f.close()
-            return
 
         g1 = f.create_group('g1')
         g1_1 = g1.create_group('g1_1')
@@ -218,11 +212,6 @@ class TestVlenTypes(TestCase):
             return
         f = h5py.File(filename, 'w')
 
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # vlen ref types not working for h5serv, so abort here
-            f.close()
-            return
-
         # create a dataset that is a VLEN int32
         dtvlen = h5py.special_dtype(vlen=np.dtype('int32'))
 
@@ -273,10 +262,6 @@ class TestVlenTypes(TestCase):
             # TBD - skipping as this core dumps in travis for some reason
             return
         f = h5py.File(filename, "w")
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # vlen ref types not working for h5serv, so abort here
-            f.close()
-            return
 
         words = (b"one", b"two", b"three", b"four", b"five", b"six", b"seven", b"eight", b"nine", b"ten")
 
@@ -302,11 +287,7 @@ class TestVlenTypes(TestCase):
             # TBD - skipping as this core dumps in travis for some reason
             return
         f = h5py.File(filename, "w")
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # vlen  types not working for h5serv, so abort here
-            f.close()
-            return
-
+        
         dims = (10,)
         dt = h5py.special_dtype(vlen=bytes)
         dset = f.create_dataset('variable_len_str_dset', dims, dtype=dt)
@@ -346,9 +327,6 @@ class TestVlenTypes(TestCase):
             return
         """
         f = h5py.File(filename, "w")
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            f.close()
-            return  # variable len types not working with h5serv
 
         dims = (10,)
         dt = h5py.special_dtype(vlen=str)
@@ -364,7 +342,7 @@ class TestVlenTypes(TestCase):
         self.assertEqual(len(dset.maxshape), 1)
         self.assertEqual(dset.maxshape[0], 10)
         if config.get('use_h5py'):
-            self.assertEqual(dset.fillvalue, None)
+            self.assertEqual(dset.fillvalue, b'')
         else:
             self.assertEqual(dset.fillvalue, 0)
 
@@ -386,9 +364,6 @@ class TestVlenTypes(TestCase):
         filename = self.getFileName("variable_len_unicode_attr")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            f.close()
-            return  # variable len types not working with h5serv
 
         dims = (10,)
         dt = h5py.special_dtype(vlen=str)
@@ -404,7 +379,6 @@ class TestVlenTypes(TestCase):
         for i in range(10):
             self.assertEqual(vals[i], words[i])
             self.assertEqual(type(vals[i]), str)
-
 
         f.close()
 

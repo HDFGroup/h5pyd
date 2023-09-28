@@ -104,8 +104,8 @@ def make_new_dset(
     else:
         shape = (shape,) if isinstance(shape, int) else tuple(shape)
         if data is not None and (
-            numpy.product(shape, dtype=numpy.ulonglong)
-            != numpy.product(data.shape, dtype=numpy.ulonglong)
+            numpy.prod(shape, dtype=numpy.ulonglong)
+            != numpy.prod(data.shape, dtype=numpy.ulonglong)
         ):
             raise ValueError("Shape tuple is incompatible with data")
 
@@ -399,7 +399,6 @@ class ChunkIterator(object):
 
         if not dset.chunks:
             # can only use with chunked datasets
-            # (currently all datasets are chunked, but check for future compat)
             raise TypeError("Chunked dataset required")
 
         if isinstance(dset.chunks, dict):
@@ -426,9 +425,8 @@ class ChunkIterator(object):
         for dim in range(rank):
             s = self._sel[dim]
             if s.start < 0 or s.stop > self._shape[dim] or s.stop <= s.start:
-                raise ValueError(
-                    "Invalid selection - selection region must be within dataset space"
-                )
+                msg = "Invalid selection - selection region must be within dataset space"
+                raise ValueError(msg)
             index = s.start // self._layout[dim]
             self._chunk_index.append(index)
 
@@ -436,12 +434,6 @@ class ChunkIterator(object):
         return self
 
     def __next__(self):
-        def get_ret(item):
-            if len(item) == 1:
-                return item[0]
-            else:
-                return tuple(item)
-
         rank = len(self._shape)
         slices = []
         if rank == 0 or self._chunk_index[0] * self._layout[0] >= self._sel[0].stop:
@@ -475,7 +467,7 @@ class ChunkIterator(object):
                 # reset to the start and continue iterating with higher dimension
                 self._chunk_index[dim] = 0
             dim -= 1
-        return get_ret(slices)
+        return tuple(slices)
 
 
 class Dataset(HLObject):
@@ -910,7 +902,7 @@ class Dataset(HLObject):
             step = (1,) * rank
         param += "["
         for i in range(rank):
-            field = "{}:{}:{}".format(start[i], stop[i], step[i])
+            field = f"{start[i]}:{stop[i]}:{step[i]}"
             param += field
             if i != (rank - 1):
                 param += ","
@@ -973,7 +965,7 @@ class Dataset(HLObject):
             mshape = sel.guess_shape(sid)
             if mshape is None:
                 return numpy.array((0,), dtype=new_dtype)
-            if numpy.product(mshape) == 0:
+            if numpy.prod(mshape) == 0:
                 return numpy.array(mshape, dtype=new_dtype)
             out = numpy.empty(mshape, dtype=new_dtype)
             sid_out = h5s.create_simple(mshape)
@@ -993,7 +985,7 @@ class Dataset(HLObject):
 
         if self._shape == ():
             selection = sel.select(self, args)
-            self.log.info("selection.mshape: {}".format(selection.mshape))
+            self.log.info(f"selection.mshape: {selection.mshape}")
 
             # TBD - refactor the following with the code for the non-scalar case
             req = "/datasets/" + self.id.uuid + "/value"
@@ -1006,7 +998,7 @@ class Dataset(HLObject):
                 arr = bytesToArray(rsp, new_dtype, self._shape)
 
                 if not self.dtype.shape:
-                    self.log.debug("reshape arr to: {}".format(self._shape))
+                    self.log.debug(f"reshape arr to: {self._shape}")
                     arr = numpy.reshape(arr, self._shape)
             else:
                 # got JSON response
@@ -1024,11 +1016,8 @@ class Dataset(HLObject):
                 arr = numpy.empty((), dtype=new_dtype)
                 arr[()] = data
             if selection.mshape is None:
-                self.log.info(
-                    "return scalar selection of: {}, dtype: {}, shape: {}".format(
-                        arr, arr.dtype, arr.shape
-                    )
-                )
+                msg = f"return scalar selection of: {arr}, dtype: {arr.dtype}, shape: {arr.shape}"
+                self.log.info(msg)
                 val = arr[()]
                 if isinstance(val, str):
                     # h5py always returns bytes, so encode the str
@@ -1308,9 +1297,7 @@ class Dataset(HLObject):
                     points, dtype="u8"
                 )  # must use unsigned 64-bit int
                 body = arr_points.tobytes()
-                self.log.info(
-                    "point select binary request, num bytes: {}".format(len(body))
-                )
+                self.log.info(f"point select binary request, num bytes: {len(body)}")
             else:
                 if delistify:
                     self.log.info("delistifying point selection")
@@ -1324,7 +1311,7 @@ class Dataset(HLObject):
                 else:
                     # can just assign
                     body["points"] = points
-                self.log.info("sending point selection request: {}".format(body))
+                self.log.info(f"sending point selection request: {body}")
             rsp = self.POST(req, format=format, body=body)
             if type(rsp) in (bytes, bytearray):
                 if len(rsp) // mtype.itemsize != selection.mshape[0]:
@@ -1337,18 +1324,14 @@ class Dataset(HLObject):
             else:
                 data = rsp["value"]
                 if len(data) != selection.mshape[0]:
-                    raise IOError(
-                        "Expected {} elements, but got {}".format(
-                            selection.mshape[0], len(data)
-                        )
-                    )
-
+                    msg = f"Expected {selection.mshape[0]} elements, but got {len(data)}"
+                    raise IOError(msg)
                 arr = numpy.asarray(data, dtype=mtype, order="C")
 
         else:
             raise ValueError("selection type not supported")
 
-        self.log.info("got arr: {}, cleaning up shape!".format(arr.shape))
+        self.log.info(f"got arr: {arr.shape}, cleaning up shape!")
         # Patch up the output for NumPy
         if len(names) == 1:
             arr = arr[names[0]]  # Single-field recarray convention
@@ -1368,7 +1351,7 @@ class Dataset(HLObject):
         (slices and integers).  For advanced indexing, the shapes must
         match.
         """
-        self.log.info("Dataset __setitem__, args: {}".format(args))
+        self.log.info(f"Dataset __setitem__, args: {args}")
         use_base64 = True  # may need to set this to false below for some types
 
         args = args if isinstance(args, tuple) else (args,)
@@ -1378,7 +1361,7 @@ class Dataset(HLObject):
             self.log.debug(
                 f"val dtype: {val.dtype}, shape: {val.shape} metadata: {val.dtype.metadata}"
             )
-            if numpy.product(val.shape) == 0:
+            if numpy.prod(val.shape) == 0:
                 self.log.info("no elements in numpy array, skipping write")
         except AttributeError:
             self.log.debug("val not ndarray")
@@ -1428,7 +1411,7 @@ class Dataset(HLObject):
                         i
                         for i in val.reshape(
                             (
-                                numpy.product(val.shape[:-1], dtype=numpy.ulonglong),
+                                numpy.prod(val.shape[:-1], dtype=numpy.ulonglong),
                                 val.shape[-1],
                             )
                         )
@@ -1480,7 +1463,7 @@ class Dataset(HLObject):
             # TBD - need to handle cases where the type shape is different
             self.log.debug("got numpy array")
             if val.dtype != self.dtype and val.dtype.shape == self.dtype.shape:
-                self.log.info("converting {} to {}".format(val.dtype, self.dtype))
+                self.log.info(f"converting {val.dtype} to {self.dtype}")
                 # convert array
                 tmp = numpy.empty(val.shape, dtype=self.dtype)
                 tmp[...] = val[...]
@@ -1584,15 +1567,13 @@ class Dataset(HLObject):
                 data = val.tobytes()
                 data = base64.b64encode(data)
                 data = data.decode("ascii")
-                self.log.debug("data: {}".format(data))
                 body["value_base64"] = data
-                self.log.debug("writing base64 data, {} bytes".format(len(data)))
+                self.log.debug(f"writing base64 data, {len(data)} bytes")
         else:
             if type(val) is not list:
                 val = val.tolist()
             val = _decode(val)
-            self.log.debug("writing json data, {} elements".format(len(val)))
-            self.log.debug("data: {}".format(val))
+            self.log.debug(f"writing json data, {len(val)} elements")
             body["value"] = val
 
         if selection.select_type != sel.H5S_SELECT_ALL:
@@ -1702,7 +1683,7 @@ class Dataset(HLObject):
         arr = numpy.empty(self._shape, dtype=self.dtype if dtype is None else dtype)
 
         # Special case for (0,)*-shape datasets
-        if self._shape is None or numpy.product(self._shape) == 0:
+        if self._shape is None or numpy.prod(self._shape) == 0:
             return arr
 
         self.read_direct(arr)
