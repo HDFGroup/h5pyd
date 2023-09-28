@@ -464,9 +464,10 @@ def getElementCount(buffer, offset):
     count_bytes = bytes(buffer[offset:(offset+4)])
 
     try:
-        count = int(np.frombuffer(count_bytes, dtype="<i4"))
+        arr =np.frombuffer(count_bytes, dtype="<i4")
+        count = int(arr[0])
     except TypeError as e:
-        msg = "Unexpected error reading count value for variable length elemennt: {}".format(e)
+        msg = f"Unexpected error reading count value for variable length elemennt: {e}"
         raise TypeError(msg)
     if count < 0:
         # shouldn't be negative

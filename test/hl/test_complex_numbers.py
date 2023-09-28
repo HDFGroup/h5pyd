@@ -23,8 +23,6 @@ else:
     import h5pyd as h5py
 
 
-@ut.skipIf(os.environ.get('H5_DRIVER', '') == 'h5serv',
-           'Does not work with h5serv due to an h5json exception')
 class TestComplexNumbers(TestCase):
     """ Test read/write of complex numbers """
 

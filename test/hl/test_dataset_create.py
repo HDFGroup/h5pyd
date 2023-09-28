@@ -63,11 +63,7 @@ class TestCreateDataset(TestCase):
 
         # try with chunk=True
         dset_chunked = f.create_dataset('chunked_dset', dims, dtype='f4', chunks=True)
-        if config.get('use_h5py') or (isinstance(f.id.id, str) and f.id.id.startswith("g-")):
-            self.assertTrue(dset_chunked.chunks)
-        else:
-            # h5serv not reporting chunks
-            self.assertTrue(dset_chunked.chunks is None)
+        self.assertTrue(dset_chunked.chunks)
 
         f.close()
 
@@ -76,9 +72,6 @@ class TestCreateDataset(TestCase):
         filename = self.getFileName("create_float16_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-        if not config.get('use_h5py') and isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # Float16 not supported with h5serv
-            return
 
         nrows = 4
         ncols = 8
@@ -139,10 +132,6 @@ class TestCreateDataset(TestCase):
         filename = self.getFileName("fillvalue_char_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-        if not config.get('use_h5py') and isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # the following is failing on h5serv
-            f.close()
-            return
 
         dims = (6, 3)
         dtype = np.dtype("S1")
@@ -254,7 +243,6 @@ class TestCreateDataset(TestCase):
             self.assertEqual(dset.id.id, dset_ref.id.id)
             # Check dataset's last modified time
             self.assertTrue(isinstance(dset.modified, datetime))
-            #self.assertEqual(dset.modified.tzname(), six.u('UTC'))
 
         f.close()
 
@@ -293,10 +281,9 @@ class TestCreateDataset(TestCase):
         else:
             self.assertEqual(chunks[0], 20)
             self.assertEqual(chunks[1], 40)
-        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-            # h5serv not setting this
-            self.assertEqual(dset.compression, 'gzip')
-            self.assertEqual(dset.compression_opts, 9)
+    
+        self.assertEqual(dset.compression, 'gzip')
+        self.assertEqual(dset.compression_opts, 9)
         self.assertFalse(dset.shuffle)
 
         dset_ref = f['/simple_dset_gzip']
@@ -306,7 +293,6 @@ class TestCreateDataset(TestCase):
             self.assertEqual(dset.id.id, dset_ref.id.id)
             # Check dataset's last modified time
             self.assertTrue(isinstance(dset.modified, datetime))
-            #self.assertEqual(dset.modified.tzname(), six.u('UTC'))
 
         f.close()
 
@@ -363,7 +349,6 @@ class TestCreateDataset(TestCase):
             self.assertEqual(dset.id.id, dset_ref.id.id)
             # Check dataset's last modified time
             self.assertTrue(isinstance(dset.modified, datetime))
-            #self.assertEqual(dset.modified.tzname(), six.u('UTC'))
 
         f.close()
 
@@ -406,7 +391,6 @@ class TestCreateDataset(TestCase):
             self.assertEqual(dset.id.id, dset_ref.id.id)
             # Check dataset's last modified time
             self.assertTrue(isinstance(dset.modified, datetime))
-            #self.assertEqual(dset.modified.tzname(), six.u('UTC'))
 
         f.close()
 

@@ -19,7 +19,6 @@ else:
 from common import ut, TestCase
 from datetime import datetime
 import os.path
-import six
 
 class TestGroup(TestCase):
 
@@ -139,13 +138,8 @@ class TestGroup(TestCase):
         external_link = r.get('myexternallink', getlink=True)
         self.assertEqual(external_link.path, 'somepath')
         external_link_filename = external_link.filename
-        if config.get('use_h5py') or is_hsds:
-            self.assertTrue(external_link_filename.find('link_target') > -1)
-        else:
-            self.assertTrue(external_link_filename.find('link_target') > -1)
-            # h5serv should be a DNS style name
-            self.assertEqual(external_link_filename.find('/'), -1)
-
+        self.assertTrue(external_link_filename.find('link_target') > -1)
+       
         links = r.items()
         got_external_link = False
         for link in links:
@@ -181,7 +175,6 @@ class TestGroup(TestCase):
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":
             self.assertTrue(isinstance(g1.modified, datetime))
-            #self.assertEqual(g1.modified.tzname(), six.u('UTC'))
 
         f.close()
 
@@ -267,17 +260,12 @@ class TestGroup(TestCase):
         except KeyError:
             pass # expected
 
-        try:
-            linked_obj = f["abspath_link"]
-            self.assertTrue(linked_obj.name, "/g1/ds")
-            self.assertEqual(linked_obj.shape, (5, 7))
-            # The following no longer works for h5py 2.8
-            # self.assertEqual(linked_obj.id.id, dset_id)
-        except KeyError:
-            if config.get("use_h5py") or is_hsds:
-                # absolute paths aren't working yet for h5serv
-                self.assertTrue(False)
-
+        linked_obj = f["abspath_link"]
+        self.assertTrue(linked_obj.name, "/g1/ds")
+        self.assertEqual(linked_obj.shape, (5, 7))
+        # The following no longer works for h5py 2.8
+        # self.assertEqual(linked_obj.id.id, dset_id)
+        
         linked_obj = f["relpath_link"]
         self.assertTrue(linked_obj.name, "/g1/ds")
         self.assertEqual(linked_obj.shape, (5, 7))

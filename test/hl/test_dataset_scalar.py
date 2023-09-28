@@ -11,7 +11,6 @@
 ##############################################################################
 
 import numpy as np
-import math
 import logging
 
 import config
@@ -23,8 +22,6 @@ else:
 
 from common import ut, TestCase
 from datetime import datetime
-import six
-
 
 class TestScalarDataset(TestCase):
     def test_scalar_dset(self):

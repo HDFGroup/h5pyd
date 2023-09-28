@@ -104,8 +104,8 @@ def make_new_dset(
     else:
         shape = (shape,) if isinstance(shape, int) else tuple(shape)
         if data is not None and (
-            numpy.product(shape, dtype=numpy.ulonglong)
-            != numpy.product(data.shape, dtype=numpy.ulonglong)
+            numpy.prod(shape, dtype=numpy.ulonglong)
+            != numpy.prod(data.shape, dtype=numpy.ulonglong)
         ):
             raise ValueError("Shape tuple is incompatible with data")
 
@@ -399,7 +399,6 @@ class ChunkIterator(object):
 
         if not dset.chunks:
             # can only use with chunked datasets
-            # (currently all datasets are chunked, but check for future compat)
             raise TypeError("Chunked dataset required")
 
         if isinstance(dset.chunks, dict):
@@ -426,9 +425,8 @@ class ChunkIterator(object):
         for dim in range(rank):
             s = self._sel[dim]
             if s.start < 0 or s.stop > self._shape[dim] or s.stop <= s.start:
-                raise ValueError(
-                    "Invalid selection - selection region must be within dataset space"
-                )
+                msg = "Invalid selection - selection region must be within dataset space"
+                raise ValueError(msg)
             index = s.start // self._layout[dim]
             self._chunk_index.append(index)
 
@@ -436,12 +434,6 @@ class ChunkIterator(object):
         return self
 
     def __next__(self):
-        def get_ret(item):
-            if len(item) == 1:
-                return item[0]
-            else:
-                return tuple(item)
-
         rank = len(self._shape)
         slices = []
         if rank == 0 or self._chunk_index[0] * self._layout[0] >= self._sel[0].stop:
@@ -475,7 +467,7 @@ class ChunkIterator(object):
                 # reset to the start and continue iterating with higher dimension
                 self._chunk_index[dim] = 0
             dim -= 1
-        return get_ret(slices)
+        return tuple(slices)
 
 
 class Dataset(HLObject):
@@ -910,7 +902,7 @@ class Dataset(HLObject):
             step = (1,) * rank
         param += "["
         for i in range(rank):
-            field = "{}:{}:{}".format(start[i], stop[i], step[i])
+            field = f"{start[i]}:{stop[i]}:{step[i]}"
             param += field
             if i != (rank - 1):
                 param += ","
@@ -973,7 +965,7 @@ class Dataset(HLObject):
             mshape = sel.guess_shape(sid)
             if mshape is None:
                 return numpy.array((0,), dtype=new_dtype)
-            if numpy.product(mshape) == 0:
+            if numpy.prod(mshape) == 0:
                 return numpy.array(mshape, dtype=new_dtype)
             out = numpy.empty(mshape, dtype=new_dtype)
             sid_out = h5s.create_simple(mshape)
@@ -1369,7 +1361,7 @@ class Dataset(HLObject):
             self.log.debug(
                 f"val dtype: {val.dtype}, shape: {val.shape} metadata: {val.dtype.metadata}"
             )
-            if numpy.product(val.shape) == 0:
+            if numpy.prod(val.shape) == 0:
                 self.log.info("no elements in numpy array, skipping write")
         except AttributeError:
             self.log.debug("val not ndarray")
@@ -1419,7 +1411,7 @@ class Dataset(HLObject):
                         i
                         for i in val.reshape(
                             (
-                                numpy.product(val.shape[:-1], dtype=numpy.ulonglong),
+                                numpy.prod(val.shape[:-1], dtype=numpy.ulonglong),
                                 val.shape[-1],
                             )
                         )
@@ -1691,7 +1683,7 @@ class Dataset(HLObject):
         arr = numpy.empty(self._shape, dtype=self.dtype if dtype is None else dtype)
 
         # Special case for (0,)*-shape datasets
-        if self._shape is None or numpy.product(self._shape) == 0:
+        if self._shape is None or numpy.prod(self._shape) == 0:
             return arr
 
         self.read_direct(arr)

@@ -3,15 +3,18 @@ import sys
 import json
 import requests
 import time
-import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 # Azure
 try:
     import adal
 except ModuleNotFoundError:
-    logging.info("Unable to import azure auth packages")
+    pass  # change this to the eprint below to see the import error
+    # eprint()"Unable to import azure auth packages")
 
 # Google
 try:
@@ -20,7 +23,8 @@ try:
     from google.oauth2.credentials import Credentials as GoogleCredentials
     from google.oauth2 import id_token as GoogleIDToken
 except ModuleNotFoundError:
-    logging.info("Unable to import google auth packages")
+    pass  # change this to the eprint below to see the import error
+    # eprint("Unable to import google auth packages")
 
 from .config import Config
 
@@ -120,9 +124,6 @@ class OpenIDHandler(ABC):
                 token_file.truncate(0)
                 json.dump(cache, token_file)
 
-
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
 
 class AzureOpenID(OpenIDHandler):
 

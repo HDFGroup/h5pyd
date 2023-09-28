@@ -12,7 +12,6 @@
 ##############################################################################
 
 import numpy as np
-import six
 import config
 from common import ut, TestCase
 import logging
@@ -31,10 +30,6 @@ class TestDimensionScale(TestCase):
         filename = self.getFileName('test_dimscale')
         print('filename:', filename)
         f = h5py.File(filename, 'w')
-        is_h5serv = False
-        if isinstance(f.id.id, str) and not f.id.id.startswith("g-"):
-            # HSDS currently supports dimscales, but h5serv does not
-            is_h5serv = True
 
         dset = f.create_dataset('temperatures', (10, 10, 10), dtype='f')
         f.create_dataset('scale_x', data=np.arange(10) * 10e3)
@@ -48,11 +43,7 @@ class TestDimensionScale(TestCase):
         self.assertEqual(len(dset.dims), len(dset.shape))
         for d in dset.dims:
             self.assertIsInstance(d, h5py._hl.dims.DimensionProxy)
-
-        if is_h5serv:
-            f.close()  # can't go any farther with h5serv
-            return
-
+            
         # Create and name dimension scales
         dset.dims.create_scale(f['scale_x'], 'Simulation X (North) axis')
         self.assertTrue(h5py.h5ds.is_scale(f['scale_x'].id))
@@ -123,7 +114,7 @@ class TestDimensionScale(TestCase):
         for s in dset.dims[2].items():
             self.assertIsInstance(s, tuple)
             self.assertIsInstance(s[1], h5py.Dataset)
-            self.assertIsInstance(s[0], six.string_types)
+            self.assertIsInstance(s[0], str)
             self.assertEqual(s[0], 'Simulation Z (Vertical) axis')
 
         self.assertIsInstance(dset.dims[0][0], h5py.Dataset)
@@ -166,7 +157,7 @@ class TestDimensionScale(TestCase):
         for s in dset.dims[2].items():
             self.assertIsInstance(s, tuple)
             self.assertIsInstance(s[1], h5py.Dataset)
-            self.assertIsInstance(s[0], six.string_types)
+            self.assertIsInstance(s[0], str)
             self.assertEqual(s[0], 'Simulation Z (Vertical) axis')
 
         f.close()
