@@ -132,7 +132,7 @@ class TestFile(TestCase):
         # re-open as read-only
         if h5py.__name__ == "h5pyd":
             wait_time = 90 # change to >90 to test async updates
-            print("waiting {wait_time} seconds for root scan sync")
+            print("waiting {wait_time:d} seconds for root scan sync".format(wait_time = wait_time))
             time.sleep(wait_time)  # let async process update obj number
         f = h5py.File(filename, 'r')
         self.assertEqual(f.filename, filename)
@@ -328,7 +328,7 @@ class TestFile(TestCase):
                 endpoint = os.environ["HS_ENDPOINT"]
                 filename = self.getFileName("test_http_url_file")
                 f = h5py.File(filename, 'w')
-            
+
                 f.close()
 
                 url = endpoint + filename
