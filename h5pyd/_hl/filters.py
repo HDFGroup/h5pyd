@@ -177,8 +177,23 @@ def generate_dcpl(
         filters.append(filter_scaleoffset)
 
     if shuffle:
-        filter_shuffle = {"class": "H5Z_FILTER_SHUFFLE"}
-        filter_shuffle["id"] = 2
+        if isinstance(shuffle, int) and shuffle == 32008:
+            bitshuffle = True
+        elif isinstance(shuffle, str) and shuffle == "bitshuffle":
+            bitshuffle = True
+        else:
+            bitshuffle = False
+
+        if bitshuffle:
+            filter_shuffle = {"class": "H5Z_FILTER_BITSHUFFLE"}
+            filter_shuffle["id"] = 32008
+            filter_shuffle["name"] = "bitshuffle"
+
+        else:
+            # regular shuffle filter
+            filter_shuffle = {"class": "H5Z_FILTER_SHUFFLE"}
+            filter_shuffle["id"] = 2
+            filter_shuffle["name"] = "shuffle"
         filters.append(filter_shuffle)
 
     if compression == "gzip":
