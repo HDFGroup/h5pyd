@@ -1157,15 +1157,11 @@ def create_dataset(dobj, ctx):
                 # apply any custom filters as long as they are supported in HSDS
                 for filter_id in dobj._filters:
                     filter_opts = dobj._filters[filter_id]
-                    print("filter_id:", filter_id, type(filter_id))
                     try:
                         filter_id = int(filter_id)
                     except ValueError:
                         msg = "unrecognized filter id: {filter_id} for {dobj.name}, ignoring"
                         logging.warning(msg)
-
-                    print("filter_id:", filter_id, type(filter_id))
-
 
                     if not isinstance(filter_id, int):
                         continue
