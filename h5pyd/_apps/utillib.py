@@ -28,6 +28,13 @@ MIN_DSET_ELEMENTS_FOR_LINKING=512
 MIN_CHUNK_SIZE = 1 * 1024 * 1024
 MAC_CHUNK_SIZE = 8 * 1024 * 1024
 
+H5Z_FILTER_MAP = { 32001: "blosclz", 
+                   32004: "lz4",
+                   32008: "bitshuffle", 
+                   32015: "zstd",
+}
+
+
 # check if hdf5 library version supports chunk iteration
 hdf_library_version  = h5py.version.hdf5_version_tuple
 library_has_chunk_iter = (hdf_library_version >= (1, 14, 0) or (hdf_library_version < (1, 12, 0) and (hdf_library_version >= (1, 10, 10))))
@@ -761,8 +768,8 @@ def create_chunktable(dset, dset_dims, ctx):
                 chunk_key += str(index[dim] // chunk_dims[dim])
                 if dim < rank - 1:
                     chunk_key += "_"
-                logging.debug(f"adding chunk_key: {chunk_key}")
-                chunk_map[chunk_key] = (chunk_info.byte_offset, chunk_info.size)
+            logging.debug(f"adding chunk_key: {chunk_key}")
+            chunk_map[chunk_key] = (chunk_info.byte_offset, chunk_info.size)
 
         chunks["class"] = "H5D_CHUNKED_REF"
         if not extend:
@@ -1121,6 +1128,7 @@ def create_dataset(dobj, ctx):
             # or vlen
             pass
         else:
+            logging.debug(f"filter setup for {dobj.name}")
             if not ctx["ignorefilters"]:
                 kwargs["compression"] = dobj.compression
                 kwargs["compression_opts"] = dobj.compression_opts
@@ -1134,7 +1142,7 @@ def create_dataset(dobj, ctx):
                 
             # TBD: it would be better if HSDS could let us know what filters
             # are supported (like it does with compressors)
-            # For now, just hard-code fletcher32 and scaleoffset to be ignored
+            # For now, just hard-ccreate_datasetcreate_datasetode fletcher32 and scaleoffset to be ignored
             if dobj.fletcher32:
                 msg = f"fletcher32 filter used by dataset: {dobj.name} is not "
                 msg += "supported by HSDS, this filter will not be used"
@@ -1144,7 +1152,35 @@ def create_dataset(dobj, ctx):
                 msg = f"scaleoffset filter used by dataset: {dobj.name} is not "
                 msg += "supported by HSDS, this filter will not be used"
                 logging.warning(msg)
-                # kwargs["scaleoffset"] = dobj.scaleoffset
+
+            if is_h5py(dobj) and not kwargs.get("compression"):
+                # apply any custom filters as long as they are supported in HSDS
+                for filter_id in dobj._filters:
+                    filter_opts = dobj._filters[filter_id]
+                    try:
+                        filter_id = int(filter_id)
+                    except ValueError:
+                        msg = "unrecognized filter id: {filter_id} for {dobj.name}, ignoring"
+                        logging.warning(msg)
+
+                    if not isinstance(filter_id, int):
+                        continue
+
+                    if filter_id in H5Z_FILTER_MAP:
+                        filter_name = H5Z_FILTER_MAP[filter_id]
+                        if filter_name == "bitshuffle":
+                            kwargs["shuffle"] = filter_name
+                            logging.info(f"using bitshuffle on {dobj.name}")
+                        else:
+                            # supported non-standard compressor
+                            kwargs["compression"] = filter_name
+                            logging.info(f"using compressor: {filter_name} for {dobj.name}")
+                            kwargs["compression_opts"] = filter_opts
+                            logging.info(f"compression_opts: {filter_opts}")
+                    else:
+                        logging.warning(f"filter id {filter_id} for {dobj.name} not supported")
+
+        # kwargs["scaleoffset"] = dobj.scaleoffset
         # setting the fillvalue is failing in some cases
         # see: https://github.com/HDFGroup/h5pyd/issues/119
         # don't set fill value for reference types
@@ -1501,6 +1537,7 @@ def load_file(
 
     logging.info(f"input file: {fin.filename}")
     logging.info(f"output file: {fout.filename}")
+    logging.info(f"dataload: {dataload}")
     if dataload != "ingest":
         if not dataload:
             logging.info("no data load")
@@ -1508,7 +1545,7 @@ def load_file(
             if not s3path:
                 logging.error("s3path expected to be set")
                 sys.exit(1)
-            logging.info("using s3path")
+            logging.info(f"using s3path: {s3path}")
         else:
             logging.error(f"unexpected dataload value: {dataload}")
             sys.exit(1)

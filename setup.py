@@ -23,7 +23,7 @@ with open(path.join(here, "README.rst"), encoding="utf-8") as f:
 
 setup(
     name="h5pyd",
-    version="0.16.0",
+    version="0.17.0",
     description="h5py compatible client lib for HDF REST API",
     long_description=long_description,
     url="http://github.com/HDFGroup/h5pyd",
