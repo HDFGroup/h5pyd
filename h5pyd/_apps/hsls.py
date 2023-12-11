@@ -111,7 +111,7 @@ def dump(name, obj, visited=None):
     elif class_name in ("ExternalLink", "SoftLink"):
         pass
     else:
-        raise TypeError("unexpected classname: {}".format(class_name))
+        raise TypeError(f"unexpected classname: {class_name}")
 
     is_dataset = False
     if class_name in ("Dataset", "Table"):
@@ -316,6 +316,16 @@ def getFile(domain):
                    password=password, bucket=bucket, use_cache=True)
     return fh
 
+def isFile(domain):
+    username = cfg["hs_username"]
+    password = cfg["hs_password"]
+    endpoint = cfg["hs_endpoint"]
+    bucket = cfg["hs_bucket"]
+
+    return h5py.is_hdf5(domain, endpoint=endpoint, username=username,
+                   password=password, bucket=bucket)
+
+
 
 def visitDomains(domain, depth=1):
     if depth == 0:
@@ -403,6 +413,27 @@ def visitDomains(domain, depth=1):
     return count
 
 
+def checkDomain(path):
+    """ Convenience method to specify a domain + h5path as a single string.
+        Walk up the path items, as soon as the parent is a domain or folder return it.
+        Supply the other part as h5path.  """
+    
+    path_names = path.split("/")
+    h5path = ""
+    while path_names:
+        domain_path = "/".join(path_names)
+        if h5py.is_hdf5(domain_path):
+            return (h5path, domain_path)
+        last = path_names[-1]
+        path_names = path_names[:-1]
+        h5path = last + "/" + h5path
+
+    return None
+
+         
+
+
+
 
 #
 # Usage
@@ -445,6 +476,9 @@ def main():
     cfg.setitem("pattern", None, flags=["--pattern",], choices=["REGEX",], help="list domains that match the given regex")
     cfg.setitem("query", None, flags=["--query",], choices=["QUERY",], help="list domains where the attributes of the root group match the given query string")
     cfg.setitem("recursive", False, flags=["-r", "--recursive"], help="recursively list sub-folders or sub-groups")
+    cfg.setitem("dataset_path", None, flags=["-d", "--dataset"], choices=["H5PATH",], help="display specified dataset")
+    cfg.setitem("group_path", None, flags=["-g", "--group"], choices=["H5PATH",], help="display specified group")
+    cfg.setitem("datatype_path", None, flags=["-t", "--datatype"], choices=["H5PATH",], help="display specified datatype")
     cfg.setitem("human_readable", False, flags=["-H", "--human-readable"], help="with -v, print human readable sizes (e.g. 123M)")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
@@ -470,12 +504,23 @@ def main():
         else:
             depth = 1
 
+        h5path = None
+
         if domain.endswith('/'):
             # given a folder path
             count = visitDomains(domain, depth=depth)
             print(f"{count} items")
 
         else:
+            res = checkDomain(domain)
+            if res is None:
+                # couldn't find a domain, call getFile anyway so we can 
+                # report on exactly what went wrong
+                pass
+            else:
+                h5path = res[0]
+                domain = res[1]
+                logging.debug(f"using h5path: {h5path} domain: {domain}")
             try:
                 f = getFile(domain)
             except IOError as ioe:
@@ -502,7 +547,93 @@ def main():
                 count = visitDomains(domain, depth=depth)
                 print(f"{count} items")
                 continue
-            dump('/', grp)
+
+            if h5path:
+                if h5path not in f:
+                    print(f"h5path: {h5path} not found in domain: {domain}")
+                    continue
+
+                obj = f[h5path]
+                class_name = obj.__class__.__name__
+                if class_name in ("Table", "Dataset"):
+                    dump(h5path, obj)
+                    continue
+                elif class_name == "Datatype":
+                    dump(h5path, obj)
+                    continue
+                else:
+                    grp = obj
+                    # we'll just fall through to our normal processin
+
+            if cfg["group_path"]:
+                if h5path:
+                    print("group_path option can't be used when h5path is specified")
+                    continue
+                h5path = cfg["group_path"]
+                if h5path not in grp:
+                    print(f"group_path: {h5path} not found")
+                    continue
+                else:
+                    grp = grp[h5path]
+                    class_name = grp.__class__.__name__
+                    if class_name != "Group":
+                        if class_name in ("Table", "Dataset"):
+                            hint = " (use --dataset option to display)"
+                        elif class_name == "Datatype":
+                            hint = " (use --datatype option to display)"
+                        else:
+                            hint = ""
+                        print(f"group_path: {h5path} points to a {class_name}{hint}")
+                        continue
+            else:
+                h5path = "/"  # start at root
+
+            if cfg["dataset_path"]:
+                dataset_path = cfg["dataset_path"]
+                if dataset_path[0] == "/" and h5path != "/":
+                    print("--group_path can't be used with absolute --dataset_path")
+                    continue
+                if dataset_path[0] == "/":
+                    h5path = dataset_path  # replace h5path
+                else:
+                    if h5path[-1] != "/":
+                        h5path = h5path + "/"
+                    h5path = h5path + dataset_path
+                    print("using h5path:", h5path) 
+                if h5path not in grp:
+                    print("dataset path: {h5path} not found")
+                    continue
+                obj = grp[h5path]
+                class_name = obj.__class__.__name__
+                if class_name not in ("Table", "Dataset"):
+                    print(f"was expecting a Dataset object but found: {class_name}")
+                    continue
+
+                dump(h5path, obj)
+                continue
+
+            if cfg["datatype_path"]:
+                datatype_path = cfg["datatype_path"]
+                if datatype_path[0] == "/" and h5path != "/":
+                    print("--group_path can't be used with absolute --datatype_path")
+                    continue
+                if datatype_path[0] == "/":
+                    h5path = datatype_path  # replace h5path
+                else:
+                    if h5path[-1] != "/":
+                        h5path = h5path + "/"
+                    h5path = h5path + datatype_path
+                    print("using h5path:", h5path) 
+                if h5path not in grp:
+                    print("datatype path: {h5path} not found")
+                    continue
+                obj = grp[h5path]
+                class_name = obj.__class__.__name__
+                if class_name != "Datatype":
+                    print(f"was expecting a Datatype object but found: {class_name}")
+                    continue
+                dump(h5path, obj)
+                continue
 
             if depth < 0:
                 # recursive
