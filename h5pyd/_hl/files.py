@@ -191,7 +191,7 @@ class File(Group):
             #   /home/user/myfile.h5
             #
             #  For http prefixed values, extract the endpont and use the rest as domain path
-            for protocol in ("http://", "https://", "hdf5://"):
+            for protocol in ("http://", "https://", "hdf5://", "http+unix://"):
                 if domain.startswith(protocol):
                     if protocol.startswith("http"):
                         domain = domain[len(protocol) :]
