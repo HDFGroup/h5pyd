@@ -48,6 +48,10 @@ if not os.path.exists(out_dir):
     os.mkdir(out_dir)
 
 for filename in filenames:
+    if filename == "undecodable_attr.h5":
+        # TBD: need to update hsload to use base64 encoding rather
+        # than urlescapping with HSDS v0.9
+        continue
     domain_path = os.path.join(test_folder, filename)
     hdf5_path = os.path.join(data_dir, filename)
     if filename not in data_dir:
