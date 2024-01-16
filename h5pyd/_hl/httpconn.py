@@ -178,6 +178,7 @@ class HttpConn:
         self._lambda = None
         self._api_key = api_key
         self._s = None  # Sessions
+        self._server_info = None
         if use_cache:
             self._cache = {}
             self._objdb = {}
@@ -371,6 +372,32 @@ class HttpConn:
             pass
 
         return headers
+
+    def serverInfo(self):
+        if self._server_info:
+            return self._server_info
+
+        if self._endpoint is None:
+            raise IOError("object not initialized")
+        
+        # make an about request
+        rsp = self.GET("/about")
+        if rsp.status_code != 200:
+            raise IOError(rsp.status_code, rsp.reason)
+        server_info = rsp.json()
+        print("server_info:", server_info)
+        if server_info:
+            self._server_info = server_info
+        return server_info
+
+    def server_version(self):
+        server_info = self.serverInfo()
+        if "hsds_version" in server_info:
+            server_version = server_info["hsds_version"]
+        else:
+            # no standard way to get version for other implements...
+            server_version = None
+        return server_version
 
     def verifyCert(self):
         # default to validate CERT for https requests, unless
