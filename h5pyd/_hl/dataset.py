@@ -1260,9 +1260,7 @@ class Dataset(HLObject):
             if len(points) == rank and isinstance(points[0], int) and rank > 1:
                 # Single point selection - need to wrap this in an array
                 self.log.info("single point selection")
-                points = [
-                    points,
-                ]
+                points = [points, ]
             else:
                 for point in points:
                     if isinstance(point, (list, tuple)):
@@ -1276,9 +1274,7 @@ class Dataset(HLObject):
                         if rank == 1:
                             delistify = True
                             if point[0] <= last_point:
-                                raise TypeError(
-                                    "index points must be strictly increasing"
-                                )
+                                raise TypeError("index points must be strictly increasing")
                             last_point = point[0]
 
                     elif rank == 1 and isinstance(point, int):
@@ -1314,18 +1310,17 @@ class Dataset(HLObject):
                 self.log.info(f"sending point selection request: {body}")
             rsp = self.POST(req, format=format, body=body)
             if type(rsp) in (bytes, bytearray):
-                if len(rsp) // mtype.itemsize != selection.mshape[0]:
-                    raise IOError(
-                        "Expected {} elements, but got {}".format(
-                            selection.mshape[0], (len(rsp) // mtype.itemsize)
-                        )
-                    )
-                arr = numpy.frombuffer(rsp, dtype=mtype)
+                item_count = len(rsp) // mtype.itemsize
+                if item_count != selection.mshape[0]:
+                    msg = f"Expected {selection.mshape[0]} elements, but got {item_count}"
+                    raise IOError(msg)
+                arr = bytesToArray(rsp, mtype, mshape)
             else:
                 data = rsp["value"]
                 if len(data) != selection.mshape[0]:
                     msg = f"Expected {selection.mshape[0]} elements, but got {len(data)}"
                     raise IOError(msg)
+                
                 arr = numpy.asarray(data, dtype=mtype, order="C")
 
         else:

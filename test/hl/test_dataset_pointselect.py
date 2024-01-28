@@ -62,6 +62,36 @@ class TestPointSelectDataset(TestCase):
 
         f.close()
 
+    def test_vlen_1d_pointselect(self):
+        filename = self.getFileName("test_vlen_1d_pointselect")
+        
+        print("filename:", filename)
+
+        words = ("blasphemes",
+                "brushfires",
+                "disablers",
+                "exempt,",
+                "hurtling,",
+                "imprinting,",
+                "italic,",
+                "loci",
+                "sandstorm",
+                "scientist",
+                )
+        count = len(words)
+        f = h5py.File(filename, "w")
+        dt = h5py.special_dtype(vlen=str)
+        dset1d = f.create_dataset('dset1d', (count,), dtype=dt)
+        dset1d[...] = words
+        indices = [2,4,6,8]
+        pts = dset1d[ indices ]
+        self.assertEqual(len(pts), len(indices))
+        for i in range(len(indices)):
+            index = indices[i]
+            self.assertEqual(pts[i].decode(), words[index])
+
+        f.close()
+
     def test_2d_pointselect(self):
         filename = self.getFileName("test_2d_pointselect")
         print("filename:", filename)
