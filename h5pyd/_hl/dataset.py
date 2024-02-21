@@ -19,6 +19,7 @@ import time
 import base64
 import numpy
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 
 from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes
 from .base import Empty, guess_dtype
@@ -1750,6 +1751,9 @@ class MultiManager():
     high-level object to support slicing operations
     that map to H5Dread_multi/H5Dwrite_multi
     """
+    # Avoid overtaxing HSDS
+    max_workers = 16
+
     def __init__(self, datasets=None):
         if (datasets is None) or (len(datasets) == 0):
             raise ValueError("MultiManager requires non-empty list of datasets")
@@ -1760,14 +1764,25 @@ class MultiManager():
         Thread-local method to read from a single dataset
         """
         dset = args[0]
-        read_args = args[1]
-        return dset[read_args]
+        idx = args[1]
+        try:
+            read_args = args[2]
+        except Exception as e:
+            raise e
+        return (idx, dset[read_args])
 
     def write_dset_tl(self, args):
+        """
+        Thread-local method to write to a single dataset
+        """
         dset = args[0]
-        write_args = args[1]
-        write_vals = args[2]
-        dset[write_args] = write_vals
+        idx = args[1]
+        write_args = args[2]
+        write_vals = args[3]
+        try:
+            dset[write_args] = write_vals
+        except Exception as e:
+            raise e
         return
 
     def __getitem__(self, args):
@@ -1775,15 +1790,33 @@ class MultiManager():
         Read the same slice from each of the datasets
         managed by this MultiManager.
         """
-        with ThreadPoolExecutor(max_workers=len(self.datasets)) as pool:
-            pool_args = [(d, args) for d in self.datasets]
-            return list(pool.map(self.read_dset_tl, pool_args))
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            read_futures = [executor.submit(self.read_dset_tl, (self.datasets[i], i, args)) for i in range(len(self.datasets))]
+            ret_data = [None] * len(self.datasets)
+
+            for future in as_completed(read_futures):
+                try:
+                    result = future.result()
+                    idx = result[0]
+                    dset_data = result[1]
+                    ret_data[idx] = dset_data
+                except Exception as exc:
+                    executor.shutdown(wait=False)
+                    raise ValueError(f"Error during multi-read: {exc}")
+            return ret_data
 
     def __setitem__(self, args, vals):
         """
         Write to the provided slice of each dataset
         managed by this MultiManager.
         """
-        with ThreadPoolExecutor(max_workers=len(self.datasets)) as pool:
-            pool_args = [(self.datasets[i], args, vals[i]) for i in range(len(self.datasets))]
-            return list(pool.map(self.write_dset_tl, pool_args))
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            write_futures = [executor.submit(self.write_dset_tl, (self.datasets[i], i, args, vals[i])) for i in range(len(self.datasets))]
+
+            for future in as_completed(write_futures):
+                try:
+                    future.result()
+                except Exception as exc:
+                    executor.shutdown(wait=False)
+                    raise ValueError(f"Error during multi-write: {exc}")
+            return
