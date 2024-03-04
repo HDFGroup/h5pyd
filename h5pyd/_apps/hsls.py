@@ -339,10 +339,19 @@ def visitDomains(domain, depth=1):
         d = getFolder(domain + '/')
         dir_class = "domain"
         display_name = domain
+        if cfg["names_only"]:
+            parts = display_name.split('/')
+            if len(parts) > depth:
+                parts = parts[-depth:]
+                parts = parts[1:]
+                print("display_name pre:", display_name)
+                display_name = "/".join(parts)
+                print("display_name post:", display_name)
         num_bytes = ' '
         if d.is_folder:
             dir_class = "folder"
-            display_name += '/'
+            if not cfg["names_only"]:
+                display_name += '/'
         elif cfg["verbose"]:
             # get the number of allocated bytes
             f = getFile(domain)
@@ -357,7 +366,8 @@ def visitDomains(domain, depth=1):
         else:
             timestamp = datetime.fromtimestamp(int(d.modified))
 
-        print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
+        if not cfg["names_only"]:
+            print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
                                               dir_class, timestamp,
                                               display_name))
         count += 1
@@ -366,8 +376,9 @@ def visitDomains(domain, depth=1):
         for name in d:
             item = d[name]
             owner = item["owner"]
-            full_path = domain + '/' + name
-
+            full_path = display_name + name
+            if item["class"] == "folder":
+                full_path += "/"
             num_bytes = " "
             if cfg["verbose"] and "total_size" in item:
                 num_bytes = item["total_size"]
@@ -382,7 +393,11 @@ def visitDomains(domain, depth=1):
             else:
                 timestamp = datetime.fromtimestamp(int(item["lastModified"]))
 
-            print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
+            if cfg["names_only"]:
+                # just print the name...
+                print(full_path)
+            else:
+                print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
                                               dir_class, timestamp,
                                               full_path))
             if cfg["showacls"]:
@@ -430,10 +445,6 @@ def checkDomain(path):
 
     return None
 
-         
-
-
-
 
 #
 # Usage
@@ -479,6 +490,7 @@ def main():
     cfg.setitem("dataset_path", None, flags=["-d", "--dataset"], choices=["H5PATH",], help="display specified dataset")
     cfg.setitem("group_path", None, flags=["-g", "--group"], choices=["H5PATH",], help="display specified group")
     cfg.setitem("datatype_path", None, flags=["-t", "--datatype"], choices=["H5PATH",], help="display specified datatype")
+    cfg.setitem("names_only", False, flags=["-n", "--names"], help="list just folder names or link titles")
     cfg.setitem("human_readable", False, flags=["-H", "--human-readable"], help="with -v, print human readable sizes (e.g. 123M)")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
@@ -509,7 +521,8 @@ def main():
         if domain.endswith('/'):
             # given a folder path
             count = visitDomains(domain, depth=depth)
-            print(f"{count} items")
+            if  not cfg["names_only"]:
+                print(f"{count} items")
 
         else:
             res = checkDomain(domain)
@@ -642,6 +655,10 @@ def main():
                 visititems('/', grp, visited)
             else:
                 for k in grp:
+                    if cfg["names_only"]:
+                        # just print the link name
+                        print(k)
+                        continue
                     item = grp.get(k, getlink=True)
                     if item.__class__.__name__ == "HardLink":
                         # follow hardlinks

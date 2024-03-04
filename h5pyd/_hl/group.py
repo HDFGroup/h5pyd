@@ -659,7 +659,6 @@ class Group(HLObject, MutableMappingHDF5):
                 endpoint = self.id.http_conn.endpoint
                 username = self.id.http_conn.username
                 password = self.id.http_conn.password
-                print(external_domain)
                 f = File(external_domain, endpoint=endpoint, username=username, password=password, mode='r') 
             except IOError:
                 # unable to find external link
