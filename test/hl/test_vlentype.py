@@ -139,6 +139,17 @@ class TestVlenTypes(TestCase):
 
         dset1 = f.create_dataset("dset1", shape=(2,), dtype=dtvlen)
 
+        # try reading uninitialized values
+        ret_val = dset1[...]
+        self.assertTrue(isinstance(ret_val, np.ndarray))
+        self.assertEqual(len(ret_val), 2)
+        e0 = ret_val[0]
+        self.assertTrue(isinstance(e0, np.ndarray))
+        self.assertEqual(e0.shape, (0,))
+        e1 = ret_val[1]
+        self.assertTrue(isinstance(e1, np.ndarray))
+        self.assertEqual(e1.shape, (0,))
+        
         # create numpy object array
         e0 = np.array([1,2,3],dtype='uint16')
         e1 = np.array([1,2,3,4],dtype='uint16')
