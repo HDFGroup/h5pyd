@@ -18,6 +18,7 @@ import sys
 import time
 import base64
 import numpy
+import os
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 
@@ -1790,6 +1791,40 @@ class MultiManager():
         Read the same slice from each of the datasets
         managed by this MultiManager.
         """
+        # Spread requests out evenly among all available SNs
+
+        # TODO: This should eventually be handled at the config/HTTPConn level
+        try:
+            num_endpoints = int(os.environ["SN_CORES"])
+            port_range = os.environ["SN_PORT_RANGE"]
+            ports = port_range.split('-')
+
+            if len(ports) != 2:
+                raise ValueError("Malformed SN_PORT_RANGE")
+
+            low_port = int(ports[0])
+            high_port = int(ports[1])
+
+        except Exception as e:
+            msg = f"{e}: Defaulting Number of SN_COREs to 1"
+            self.log.warning(msg)
+            num_endpoints = 1
+
+        if (num_endpoints > 1):
+            next_port = low_port
+            port_len = len(ports[0])
+
+            for i, dset in enumerate(self.datasets):
+                endpt = dset.id.http_conn._endpoint
+                endpt = endpt[:len(endpt) - port_len] + str(next_port)
+                dset.id.http_conn._endpoint = endpt
+                next_port += 1
+
+                if next_port > high_port:
+                    next_port = low_port
+
+            # TODO: Handle the case where some or all datasets share an HTTPConn object
+
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             read_futures = [executor.submit(self.read_dset_tl, (self.datasets[i], i, args)) for i in range(len(self.datasets))]
             ret_data = [None] * len(self.datasets)
@@ -1810,6 +1845,40 @@ class MultiManager():
         Write to the provided slice of each dataset
         managed by this MultiManager.
         """
+        # TODO: This should eventually be handled at the config/HTTPConn level
+        try:
+            num_endpoints = int(os.environ["SN_CORES"])
+            port_range = os.environ["SN_PORT_RANGE"]
+            ports = port_range.split('-')
+
+            if len(ports) != 2:
+                raise ValueError("Malformed SN_PORT_RANGE")
+
+            low_port = int(ports[0])
+            high_port = int(ports[1])
+
+            if (high_port - low_port) != num_endpoints - 1:
+                raise ValueError("Malformed port range specification; must be sequential ports")
+
+        except Exception as e:
+            print(f"{e}: Defaulting Number of SNs to 1")
+            num_endpoints = 1
+
+        # TODO: Handle the case where some or all datasets share an HTTPConn object
+        # For now, assume each connection is distinct
+        if (num_endpoints > 1):
+            next_port = low_port
+            port_len = len(ports[0])
+
+            for i, dset in enumerate(self.datasets):
+                endpt = dset.id.http_conn._endpoint
+                endpt = endpt[:len(endpt) - port_len] + str(next_port)
+                dset.id.http_conn._endpoint = endpt
+                next_port += 1
+
+                if next_port > high_port:
+                    next_port = low_port
+
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             write_futures = [executor.submit(self.write_dset_tl, (self.datasets[i], i, args, vals[i])) for i in range(len(self.datasets))]
 
