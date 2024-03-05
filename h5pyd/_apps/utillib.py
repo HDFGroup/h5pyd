@@ -36,8 +36,9 @@ H5Z_FILTER_MAP = { 32001: "blosclz",
 
 
 # check if hdf5 library version supports chunk iteration
-hdf_library_version  = h5py.version.hdf5_version_tuple
-library_has_chunk_iter = (hdf_library_version >= (1, 14, 0) or (hdf_library_version < (1, 12, 0) and (hdf_library_version >= (1, 10, 10))))
+library_has_chunk_iter = True if "chunk_iter" in dir(h5py.h5d.DatasetID) else False
+
+#(hdf_library_version >= (1, 14, 0) or (hdf_library_version < (1, 12, 0) and (hdf_library_version >= (1, 10, 10))))
 
 def dump_dtype(dt):
     if not isinstance(dt, np.dtype):
@@ -562,6 +563,7 @@ def get_chunk_locations(dset, ctx, include_file_uri=False):
 
     spaceid = dset.id.get_space()
     logging.debug(f"using chunk_iter: {library_has_chunk_iter}")
+    print(f"using chunk_iter: {library_has_chunk_iter}")
 
     dt = get_chunktable_dtype(include_file_uri=include_file_uri)
 
