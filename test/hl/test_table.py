@@ -29,7 +29,7 @@ class TestTable(TestCase):
         filename = self.getFileName("create_table_dset")
         print("filename:", filename)
         if config.get("use_h5py"):
-            return # Table not supported with h5py
+            return  # Table not supported with h5py
         f = h5py.File(filename, "w")
 
         count = 10
@@ -39,7 +39,7 @@ class TestTable(TestCase):
 
         elem = table[0]
         for i in range(count):
-            theta = (4.0 * math.pi)*(float(i)/float(count))
+            theta = (4.0 * math.pi) * (float(i) / float(count))
             elem['real'] = math.cos(theta)
             elem['img'] = math.sin(theta)
             table[i] = elem
@@ -64,14 +64,13 @@ class TestTable(TestCase):
         arr = table.read(start=5, stop=6)
         self.assertEqual(arr.shape, (1,))
 
-
         f.close()
 
     def test_query_table(self):
         filename = self.getFileName("query_compound_dset")
         print("filename:", filename)
         if config.get("use_h5py"):
-            return # Table not supported with h5py
+            return  # Table not supported with h5py
         f = h5py.File(filename, "w")
 
         # write entire array
@@ -100,7 +99,7 @@ class TestTable(TestCase):
         for indx in range(len(data)):
             row = table[indx]
             item = data[indx]
-            for col in range(2,3):
+            for col in range(2, 3):
                 # first two columns will come back as bytes, not strs
                 self.assertEqual(row[col], item[col])
 
@@ -108,7 +107,7 @@ class TestTable(TestCase):
         indx = 0
         for row in cursor:
             item = data[indx]
-            for col in range(2,3):
+            for col in range(2, 3):
                 # first two columns will come back as bytes, not strs
                 self.assertEqual(row[col], item[col])
             indx += 1
@@ -118,7 +117,7 @@ class TestTable(TestCase):
         indx = 2
         for row in cursor:
             item = data[indx]
-            for col in range(2,3):
+            for col in range(2, 3):
                 # first two columns will come back as bytes, not strs
                 self.assertEqual(row[col], item[col])
             indx += 1
@@ -127,7 +126,7 @@ class TestTable(TestCase):
         condition = "symbol == b'AAPL'"
         quotes = table.read_where(condition)
         self.assertEqual(len(quotes), 4)
-        expected_indices = [1,4,7,10]
+        expected_indices = [1, 4, 7, 10]
         for i in range(4):
             quote = quotes[i]
             self.assertEqual(len(quote), 5)
@@ -145,9 +144,9 @@ class TestTable(TestCase):
             self.assertEqual(len(row), 5)
             num_rows += 1
         self.assertEqual(num_rows, 4)
- 
+
         # try a compound query
-        condition = "(open > 3000) & (open < 3100)" 
+        condition = "(open > 3000) & (open < 3100)"
         quotes = table.read_where(condition)
 
         self.assertEqual(len(quotes), 5)
@@ -155,13 +154,13 @@ class TestTable(TestCase):
             quote = quotes[i]
             self.assertTrue(quote[3] > 3000)
             self.assertTrue(quote[3] < 3100)
-        
+
         # try modifying specific rows
         condition = "symbol == b'AAPL'"
         update_val = {"open": 123}
         indices = table.update_where(condition, update_val)
         self.assertEqual(len(indices), 4)
-        self.assertEqual(list(indices), [1,4,7,10])
+        self.assertEqual(list(indices), [1, 4, 7, 10])
 
         row = tuple(table[4])
         self.assertEqual(row, (b'AAPL', b'20170103', 123, 3034))
@@ -172,6 +171,7 @@ class TestTable(TestCase):
         self.assertEqual(len(indices), 1)
         self.assertEqual(list(indices), [1])
         f.close()
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

@@ -24,17 +24,15 @@ from common import ut, TestCase
 
 class TestVlenTypes(TestCase):
 
-
     def test_create_vlen_attr(self):
         filename = self.getFileName("create_vlen_attribute")
         print("filename:", filename)
         if config.get("use_h5py"):
             # TBD - skipping as this core dumps in travis for some reason
-            #return
+            # return
             return
-       
-        f = h5py.File(filename, 'w')
 
+        f = h5py.File(filename, 'w')
 
         g1 = f.create_group('g1')
         g1_1 = g1.create_group('g1_1')
@@ -46,8 +44,8 @@ class TestVlenTypes(TestCase):
 
         # create an attribute that is a VLEN int32
         dtvlen = h5py.special_dtype(vlen=np.dtype('int32'))
-        e0 = np.array([0,1,2])
-        e1 = np.array([0,1,2,3])
+        e0 = np.array([0, 1, 2])
+        e1 = np.array([0, 1, 2, 3])
         data = np.array([e0, e1], dtype=object)
 
         g1.attrs.create("a1", data, shape=(2,), dtype=dtvlen)
@@ -58,22 +56,22 @@ class TestVlenTypes(TestCase):
         self.assertTrue(isinstance(ret_val[0], np.ndarray))
         # py36  attribute[a1]: [array([0, 1, 2], dtype=int32) array([0, 1, 2, 3], dtype=int32)]
         # py27  [(0, 1, 2) (0, 1, 2, 3)]
-        self.assertEqual(list(ret_val[0]), [0,1,2])
+        self.assertEqual(list(ret_val[0]), [0, 1, 2])
         self.assertEqual(ret_val[0].dtype, np.dtype('int32'))
         self.assertTrue(isinstance(ret_val[1], np.ndarray))
         self.assertEqual(ret_val[1].dtype, np.dtype('int32'))
 
-        self.assertEqual(list(ret_val[1]), [0,1,2,3])
+        self.assertEqual(list(ret_val[1]), [0, 1, 2, 3])
 
         # create an attribute that is VLEN ObjRef
         dtref = h5py.special_dtype(ref=h5py.Reference)
         dtvlen = h5py.special_dtype(vlen=dtref)
         e0 = np.array((g1_1.ref,), dtype=dtref)
-        e1 = np.array((g1_1.ref,g1_2.ref), dtype=dtref)
-        e2 = np.array((g1_1.ref,g1_2.ref,g1_3.ref), dtype=dtref)
-        data = [e0,e1,e2]
+        e1 = np.array((g1_1.ref, g1_2.ref), dtype=dtref)
+        e2 = np.array((g1_1.ref, g1_2.ref, g1_3.ref), dtype=dtref)
+        data = [e0, e1, e2]
 
-        g1.attrs.create("b1", data, shape=(3,),dtype=dtvlen)
+        g1.attrs.create("b1", data, shape=(3,), dtype=dtvlen)
 
         vlen_val = g1.attrs["b1"]  # read back attribute
         self.assertTrue(isinstance(vlen_val, np.ndarray))
@@ -82,11 +80,11 @@ class TestVlenTypes(TestCase):
             e = vlen_val[i]
             self.assertTrue(isinstance(e, np.ndarray))
             ref_type = h5py.check_dtype(ref=e.dtype)
-            
+
             self.assertEqual(ref_type, h5py.Reference)
             # TBD - h5pyd is returning shape of () rather than (1,) for singletons
-            if i>0:
-                self.assertEqual(e.shape, ((i+1),))
+            if i > 0:
+                self.assertEqual(e.shape, ((i + 1),))
                 # first element is always a ref to g1
                 refd_group = f[e[0]]
                 self.assertEqual(refd_group.attrs['name'], 'g1_1')
@@ -109,14 +107,13 @@ class TestVlenTypes(TestCase):
             self.assertTrue(isinstance(item, np.void))
             self.assertEqual(len(item), 2)
             e = item[0]
-            self.assertEqual(len(e), i+2)
+            self.assertEqual(len(e), i + 2)
             refd_group = f[e[0]]
             self.assertEqual(refd_group.attrs['name'], 'g1_1')
-            self.assertEqual(item[1], i+1)
+            self.assertEqual(item[1], i + 1)
 
         # close file
         f.close()
-
 
     def test_create_vlen_dset(self):
         filename = self.getFileName("create_vlen_dset")
@@ -151,39 +148,37 @@ class TestVlenTypes(TestCase):
         self.assertEqual(e1.shape, (0,))
         
         # create numpy object array
-        e0 = np.array([1,2,3],dtype='uint16')
-        e1 = np.array([1,2,3,4],dtype='uint16')
+        e0 = np.array([1, 2, 3], dtype='uint16')
+        e1 = np.array([1, 2, 3, 4], dtype='uint16')
         data = np.array([e0, e1], dtype=dtvlen)
 
         # write data
         dset1[...] = data
 
         # read back data
-        e = dset1[0]
         ret_val = dset1[...]
         self.assertTrue(isinstance(ret_val, np.ndarray))
         self.assertEqual(len(ret_val), 2)
         self.assertTrue(isinstance(ret_val[0], np.ndarray))
         # py36  attribute[a1]: [array([0, 1, 2], dtype=int32) array([0, 1, 2, 3], dtype=int32)]
         # py27  [(0, 1, 2) (0, 1, 2, 3)]
-        self.assertEqual(list(ret_val[0]), [1,2,3])
+        self.assertEqual(list(ret_val[0]), [1, 2, 3])
         self.assertEqual(ret_val[0].dtype, np.dtype('uint16'))
         self.assertTrue(isinstance(ret_val[1], np.ndarray))
         self.assertEqual(ret_val[1].dtype, np.dtype('uint16'))
 
-        self.assertEqual(list(ret_val[1]), [1,2,3,4])
+        self.assertEqual(list(ret_val[1]), [1, 2, 3, 4])
 
         # Read back just one element
         e0 = dset1[0]
         self.assertEqual(len(e0), 3)
-        self.assertEqual(list(e0), [1,2,3])
-        
+        self.assertEqual(list(e0), [1, 2, 3])
+
         # try writing int arrays into dataset
-        data = [42,]  
+        data = [42,]
         dset1[0] = data
         ret_val = dset1[...]
         self.assertEqual(list(ret_val[0]), [42])
-
 
         # TBD: Test for VLEN objref and comount as with attribute test above
 
@@ -196,7 +191,7 @@ class TestVlenTypes(TestCase):
         f = h5py.File(filename, "w")
 
         count = 10
-         # create a dataset that is a VLEN int32
+        # create a dataset that is a VLEN int32
         dtvlen = h5py.special_dtype(vlen=np.dtype('int32'))
         dt = np.dtype([('x', np.int32), ('vals', dtvlen)])
         dset = f.create_dataset('compound_vlen', (count,), dtype=dt)
@@ -204,7 +199,7 @@ class TestVlenTypes(TestCase):
         elem = dset[0]
         for i in range(count):
             elem['x'] = i
-            elem['vals'] = np.array(list(range(i+1)), dtype=np.int32)
+            elem['vals'] = np.array(list(range(i + 1)), dtype=np.int32)
             dset[i] = elem
 
         e = dset[5]
@@ -212,7 +207,7 @@ class TestVlenTypes(TestCase):
         self.assertEqual(e[0], 5)
         e1 = list(e[1])
         self.assertEqual(e1, list(range(6)))
-        
+
         f.close()
 
     def test_create_vlen_2d_dset(self):
@@ -228,16 +223,16 @@ class TestVlenTypes(TestCase):
 
         nrows = 2
         ncols = 3
-        dset1 = f.create_dataset("dset1", shape=(nrows,ncols), dtype=dtvlen)
+        dset1 = f.create_dataset("dset1", shape=(nrows, ncols), dtype=dtvlen)
 
         # create numpy object array
-        data = np.zeros((nrows,ncols), dtype=dtvlen)
+        data = np.zeros((nrows, ncols), dtype=dtvlen)
         for i in range(nrows):
             for j in range(ncols):
                 alist = []
-                for k in range((i+1)*(j+1)):
+                for k in range((i + 1) * (j + 1)):
                     alist.append(k)
-                data[i,j] = np.array(alist, dtype="int32")
+                data[i, j] = np.array(alist, dtype="int32")
 
         # write data
         dset1[...] = data
@@ -246,25 +241,24 @@ class TestVlenTypes(TestCase):
         ret_val = dset1[...]
         self.assertTrue(isinstance(ret_val, np.ndarray))
         self.assertEqual(ret_val.shape, (nrows, ncols))
-        e12 = ret_val[1,2]
+        e12 = ret_val[1, 2]
         self.assertTrue(isinstance(e12, np.ndarray))
         # py36  attribute[a1]: [array([0, 1, 2], dtype=int32) array([0, 1, 2, 3], dtype=int32)]
         # py27  [(0, 1, 2) (0, 1, 2, 3)]
-        self.assertEqual(list(e12), [0,1,2,3,4,5])
+        self.assertEqual(list(e12), [0, 1, 2, 3, 4, 5])
         self.assertEqual(e12.dtype, np.dtype('int32'))
 
         # Read back just one element
-        e12 = dset1[1,2]
+        e12 = dset1[1, 2]
         self.assertTrue(isinstance(e12, np.ndarray))
         self.assertEqual(e12.shape, (6,))
         # py36  attribute[a1]: [array([0, 1, 2], dtype=int32) array([0, 1, 2, 3], dtype=int32)]
         # py27  [(0, 1, 2) (0, 1, 2, 3)]
-        self.assertEqual(list(e12), [0,1,2,3,4,5])
+        self.assertEqual(list(e12), [0, 1, 2, 3, 4, 5])
         self.assertEqual(e12.dtype, np.dtype('int32'))
 
         # close file
         f.close()
-
 
     def test_variable_len_str_attr(self):
         filename = self.getFileName("variable_len_str_dset")
@@ -280,7 +274,6 @@ class TestVlenTypes(TestCase):
         dt = h5py.special_dtype(vlen=bytes)
         f.attrs.create('a1', words, shape=dims, dtype=dt)
 
-
         vals = f.attrs["a1"]  # read back
 
         self.assertTrue("vlen" in vals.dtype.metadata)
@@ -290,7 +283,6 @@ class TestVlenTypes(TestCase):
 
         f.close()
 
-
     def test_variable_len_str_dset(self):
         filename = self.getFileName("variable_len_str_dset")
         print("filename:", filename)
@@ -298,7 +290,7 @@ class TestVlenTypes(TestCase):
             # TBD - skipping as this core dumps in travis for some reason
             return
         f = h5py.File(filename, "w")
-        
+
         dims = (10,)
         dt = h5py.special_dtype(vlen=bytes)
         dset = f.create_dataset('variable_len_str_dset', dims, dtype=dt)
@@ -359,7 +351,8 @@ class TestVlenTypes(TestCase):
 
         self.assertEqual(dset[0], b'')
 
-        words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94", u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
+        words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94",
+                 u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
         dset[:] = words
         vals = dset[:]  # read back
 
@@ -379,12 +372,13 @@ class TestVlenTypes(TestCase):
         dims = (10,)
         dt = h5py.special_dtype(vlen=str)
 
-        words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94", u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
+        words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94",
+                 u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
 
         f.attrs.create('a1', words, shape=dims, dtype=dt)
 
         vals = f.attrs["a1"]  # read back
-        #print("type:", type(vals))
+        # print("type:", type(vals))
         self.assertTrue("vlen" in vals.dtype.metadata)
 
         for i in range(10):

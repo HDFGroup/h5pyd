@@ -20,6 +20,7 @@ from common import ut, TestCase
 from datetime import datetime
 import os.path
 
+
 class TestGroup(TestCase):
 
     def test_create(self):
@@ -78,7 +79,7 @@ class TestGroup(TestCase):
             r.create_group('g1')
             self.assertTrue(False)
         except ValueError:
-            pass # expected
+            pass  # expected
 
         r.create_group('g3')
         self.assertEqual(len(r), 3)
@@ -99,7 +100,7 @@ class TestGroup(TestCase):
             r['g1.1'] = g1_1
             self.assertTrue(False)  # shouldn't get here'
         except RuntimeError:
-            pass # expected
+            pass  # expected
 
         del r['tmp']
         self.assertEqual(len(r), 4)
@@ -139,7 +140,7 @@ class TestGroup(TestCase):
         self.assertEqual(external_link.path, 'somepath')
         external_link_filename = external_link.filename
         self.assertTrue(external_link_filename.find('link_target') > -1)
-       
+
         links = r.items()
         got_external_link = False
         for link in links:
@@ -185,7 +186,7 @@ class TestGroup(TestCase):
             self.assertTrue(name in f)
         self.assertTrue("/g1/g1.1" in f)
         g1_1 = f["/g1/g1.1"]
-        
+
         if is_hsds:
             linkee_class = r.get('mysoftlink', getclass=True)
             # TBD: investigate why h5py returned None here
@@ -198,16 +199,10 @@ class TestGroup(TestCase):
         self.assertEqual(linked_obj.id, g1_1.id)
         f.close()
 
-
-
-
     def test_nested_create(self):
         filename = self.getFileName("create_nested_group")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
-        is_hsds = False
-        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-            is_hsds = True  # HSDS has different permission defaults
         self.assertTrue('/' in f)
         r = f['/']
         self.assertEqual(len(r), 0)
@@ -226,7 +221,6 @@ class TestGroup(TestCase):
 
         f.close()
 
-
     def test_external_links(self):
         # create a file for use a link target
         if config.get("use_h5py"):
@@ -239,11 +233,8 @@ class TestGroup(TestCase):
         else:
             rel_filepath = "linked_file.h5"
         f = h5py.File(linked_filename, 'w')
-        is_hsds = False
-        if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
-            is_hsds = True
         g1 = f.create_group("g1")
-        dset = g1.create_dataset('ds', (5,7), dtype='f4')
+        dset = g1.create_dataset('ds', (5, 7), dtype='f4')
         dset_id = dset.id.id
         f.close()
 
@@ -258,14 +249,14 @@ class TestGroup(TestCase):
             linked_obj = f["missing_link"]
             self.assertTrue(False)
         except KeyError:
-            pass # expected
+            pass  # expected
 
         linked_obj = f["abspath_link"]
         self.assertTrue(linked_obj.name, "/g1/ds")
         self.assertEqual(linked_obj.shape, (5, 7))
         # The following no longer works for h5py 2.8
         # self.assertEqual(linked_obj.id.id, dset_id)
-        
+
         linked_obj = f["relpath_link"]
         self.assertTrue(linked_obj.name, "/g1/ds")
         self.assertEqual(linked_obj.shape, (5, 7))
@@ -290,7 +281,6 @@ class TestGroup(TestCase):
 
         f = h5py.File(filename, 'w')
         g1 = f.create_group("g1")
-        dset = g1.create_dataset('ds', (5,7), dtype='f4')
         self.assertEqual(len(g1), 1)
         self.assertEqual(get_count(g1), 1)
 
@@ -305,10 +295,7 @@ class TestGroup(TestCase):
         self.assertEqual(len(g1_clone), 0)
         self.assertEqual(get_count(g1_clone), 0)
 
-
         f.close()
-
-
 
 
 if __name__ == '__main__':
