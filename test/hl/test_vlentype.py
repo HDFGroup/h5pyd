@@ -146,7 +146,7 @@ class TestVlenTypes(TestCase):
         e1 = ret_val[1]
         self.assertTrue(isinstance(e1, np.ndarray))
         self.assertEqual(e1.shape, (0,))
-        
+
         # create numpy object array
         e0 = np.array([1, 2, 3], dtype='uint16')
         e1 = np.array([1, 2, 3, 4], dtype='uint16')

@@ -1775,7 +1775,7 @@ class MultiManager():
         Thread-local method to write to a single dataset
         """
         dset = args[0]
-        idx = args[1]
+        # idx = args[1]
         write_args = args[2]
         write_vals = args[3]
         try:
@@ -1785,7 +1785,7 @@ class MultiManager():
         return
 
     def __getitem__(self, args):
-        """ 
+        """
         Read the same slice from each of the datasets
         managed by this MultiManager.
         """
@@ -1824,7 +1824,8 @@ class MultiManager():
             # TODO: Handle the case where some or all datasets share an HTTPConn object
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            read_futures = [executor.submit(self.read_dset_tl, (self.datasets[i], i, args)) for i in range(len(self.datasets))]
+            read_futures = [executor.submit(self.read_dset_tl,
+                            (self.datasets[i], i, args)) for i in range(len(self.datasets))]
             ret_data = [None] * len(self.datasets)
 
             for future in as_completed(read_futures):
@@ -1878,7 +1879,8 @@ class MultiManager():
                     next_port = low_port
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            write_futures = [executor.submit(self.write_dset_tl, (self.datasets[i], i, args, vals[i])) for i in range(len(self.datasets))]
+            write_futures = [executor.submit(self.write_dset_tl,
+                             (self.datasets[i], i, args, vals[i])) for i in range(len(self.datasets))]
 
             for future in as_completed(write_futures):
                 try:

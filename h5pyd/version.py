@@ -12,7 +12,7 @@
 
 from __future__ import absolute_import
 
-from distutils.version import StrictVersion as _sv
+from packaging.version import Version, parse
 import sys
 import numpy
 
@@ -20,11 +20,11 @@ version = "0.18.0"
 
 hdf5_version = "REST"
 
-_exp = _sv(version)
+_exp = parse(version)
 
-version_tuple = _exp.version + (
-    ("".join(str(x) for x in _exp.prerelease),)
-    if _exp.prerelease is not None
+version_tuple = _exp._version + (
+    ("".join(str(x) for x in _exp.pre),)
+    if _exp.is_prerelease
     else ("",)
 )
 

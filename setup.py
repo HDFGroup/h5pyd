@@ -36,6 +36,7 @@ setup(
         "requests_unixsocket",
         "pytz",
         "pyjwt",
+        "packaging"
         # "cryptography",
     ],
     setup_requires=["pkgconfig"],
