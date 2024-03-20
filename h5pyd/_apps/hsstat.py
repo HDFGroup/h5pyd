@@ -26,6 +26,7 @@ else:
 
 cfg = Config()
 
+
 #
 # log error and abort app
 #
@@ -36,6 +37,7 @@ def abort(msg):
         sys.stderr.write(msg + "\n")
     logging.error("exiting program with return code -1")
     sys.exit(-1)
+
 
 #
 # Usage
@@ -52,12 +54,12 @@ def usage():
     print("       domain: HSDS domain (absolute path with or without 'hdf5:// prefix)")
     print("       folder: HSDS folder (path as above ending in '/')")
     print("")
-    
+
     print("Options:")
     for name in option_names:
         help_msg = cfg.get_help_message(name)
         if help_msg:
-            print(f"    {help_msg}")  
+            print(f"    {help_msg}")
     print("")
     print("examples:")
     print(f"   {cmd} -e http://hsdshdflab.hdfgroup.org")
@@ -174,13 +176,16 @@ def getDomainInfo(domain, cfg):
             print(f"    linked chunks:   {f.num_linked_chunks}")
 
     f.close()
+
+
 #
 # Main
 #
 def main():
     domains = []
 
-    cfg.setitem("human_readable", False, flags=["-H", "--human-readable"], help="print human readable sizes (e.g. 123M)")
+    cfg.setitem("human_readable", False, flags=["-H", "--human-readable"],
+                help="print human readable sizes (e.g. 123M)")
     cfg.setitem("rescan", False, flags=["--rescan",], help="refresh domain stats (for use when domain is provided)")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 

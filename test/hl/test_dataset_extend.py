@@ -32,7 +32,7 @@ class TestExtendDataset(TestCase):
 
         primes = [2, 3, 5, 7, 11, 13, 17, 19]
 
-        dset = f.create_dataset('primes', (1,len(primes)), maxshape=(None, len(primes)), dtype='i8')
+        dset = f.create_dataset('primes', (1, len(primes)), maxshape=(None, len(primes)), dtype='i8')
 
         maxshape = dset.maxshape
         self.assertEqual(maxshape[0], None)
@@ -40,10 +40,10 @@ class TestExtendDataset(TestCase):
         shape = dset.shape
         self.assertEqual(shape[0], 1)
         self.assertEqual(shape[1], len(primes))
-        #print('chunks:', dset.chunks)
+        # print('chunks:', dset.chunks)
 
         # write primes
-        dset[0:,:] = primes
+        dset[0:, :] = primes
 
         # extend first dimension of dataset
         dset.resize(2, axis=0)
@@ -58,10 +58,10 @@ class TestExtendDataset(TestCase):
         for i in range(len(primes)):
             primes[i] *= 2
 
-        dset[1:,:] = primes
+        dset[1:, :] = primes
 
         # retrieve  an element from updated dataset
-        self.assertEqual(dset[1,2], 10)
+        self.assertEqual(dset[1, 2], 10)
 
         f.close()
 

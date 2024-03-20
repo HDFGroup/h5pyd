@@ -34,6 +34,3 @@ def get(x):
         elif config_value.upper() in ('F', 'FALSE'):
             config_value = False
     return config_value
-
-
-

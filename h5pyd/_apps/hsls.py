@@ -16,6 +16,7 @@ else:
 
 cfg = Config()
 
+
 def intToStr(n):
     if cfg["human_readable"]:
         s = "{:,}".format(n)
@@ -117,7 +118,6 @@ def dump(name, obj, visited=None):
     if class_name in ("Dataset", "Table"):
         is_dataset = True
 
-
     if is_dataset:
         desc = getShapeText(obj)
         obj_id = obj.id.id
@@ -141,7 +141,7 @@ def dump(name, obj, visited=None):
     if cfg["verbose"] and is_dataset and obj.shape is not None \
             and obj.chunks is not None:
         chunk_size = obj.dtype.itemsize
-        
+
         if isinstance(obj.id.layout, dict):
             # H5D_CHUNKED_REF layout
             chunk_dims = obj.id.layout["dims"]
@@ -185,7 +185,7 @@ def dump(name, obj, visited=None):
         if num_chunks is not None and allocated_size is not None:
             fstr = "    {0:>32}: {1} {2} bytes, {3}/{4} {5} chunks"
 
-            s = fstr.format("Chunks", chunk_dims, intToStr(chunk_size), intToStr(num_chunks), 
+            s = fstr.format("Chunks", chunk_dims, intToStr(chunk_size), intToStr(num_chunks),
                             intToStr(max_chunk_count), chunk_type)
             print(s)
             if dset_size > 0:
@@ -206,7 +206,7 @@ def dump(name, obj, visited=None):
             print(fstr.format("Chunks", chunk_dims, intToStr(chunk_size)))
 
         # show filters (if any)
-        # currently HSDS only supports the shuffle filter (not fletcher32 or 
+        # currently HSDS only supports the shuffle filter (not fletcher32 or
         # scaleoffset), so just check for shuffle and whatever compressor may
         # be applied
         filter_number = 0
@@ -294,7 +294,7 @@ def getFolder(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
-    bucket   = cfg["hs_bucket"]
+    bucket = cfg["hs_bucket"]
     pattern = cfg["pattern"]
     query = cfg["query"]
     if cfg["verbose"]:
@@ -303,7 +303,7 @@ def getFolder(domain):
         verbose = False
     batch_size = 100  # use smaller batchsize for interactively listing of large collections
     d = h5py.Folder(domain, endpoint=endpoint, username=username, verbose=verbose,
-                      password=password, bucket=bucket, pattern=pattern, query=query, batch_size=batch_size)
+                    password=password, bucket=bucket, pattern=pattern, query=query, batch_size=batch_size)
     return d
 
 
@@ -316,6 +316,7 @@ def getFile(domain):
                    password=password, bucket=bucket, use_cache=True)
     return fh
 
+
 def isFile(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -323,8 +324,7 @@ def isFile(domain):
     bucket = cfg["hs_bucket"]
 
     return h5py.is_hdf5(domain, endpoint=endpoint, username=username,
-                   password=password, bucket=bucket)
-
+                        password=password, bucket=bucket)
 
 
 def visitDomains(domain, depth=1):
@@ -368,8 +368,8 @@ def visitDomains(domain, depth=1):
 
         if not cfg["names_only"]:
             print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
-                                              dir_class, timestamp,
-                                              display_name))
+                                                  dir_class, timestamp,
+                                                  display_name))
         count += 1
         if cfg["showacls"]:
             dumpAcls(d)
@@ -386,7 +386,7 @@ def visitDomains(domain, depth=1):
                     cfg["total_size"] = 0
                 cfg["total_size"] += item["total_size"]
             else:
-                 num_bytes = " "
+                num_bytes = " "
             dir_class = item["class"]
             if item["lastModified"] is None:
                 timestamp = ""
@@ -398,8 +398,8 @@ def visitDomains(domain, depth=1):
                 print(full_path)
             else:
                 print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
-                                              dir_class, timestamp,
-                                              full_path))
+                                                      dir_class, timestamp,
+                                                      full_path))
             if cfg["showacls"]:
                 if dir_class == "folder":
                     with getFolder(domain + '/' + name + '/') as f:
@@ -432,7 +432,7 @@ def checkDomain(path):
     """ Convenience method to specify a domain + h5path as a single string.
         Walk up the path items, as soon as the parent is a domain or folder return it.
         Supply the other part as h5path.  """
-    
+
     path_names = path.split("/")
     h5path = ""
     while path_names:
@@ -461,12 +461,12 @@ def usage():
     print("       domain: HSDS domain (absolute path with or without 'hdf5:// prefix)")
     print("       folder: HSDS folder (path as above ending in '/')")
     print("")
-    
+
     print("Options:")
     for name in option_names:
         help_msg = cfg.get_help_message(name)
         if help_msg:
-            print(f"    {help_msg}")  
+            print(f"    {help_msg}")
     print("")
     print(f"example: {cmd} -r -e http://hsdshdflab.hdfgroup.org /shared/tall.h5")
     print("")
@@ -484,14 +484,18 @@ def main():
     # additional options
     cfg.setitem("showacls", False, flags=["--showacls",], help="display domain ACLs")
     cfg.setitem("showattrs", False, flags=["--showattrs",], help="display domain attributes")
-    cfg.setitem("pattern", None, flags=["--pattern",], choices=["REGEX",], help="list domains that match the given regex")
-    cfg.setitem("query", None, flags=["--query",], choices=["QUERY",], help="list domains where the attributes of the root group match the given query string")
+    cfg.setitem("pattern", None, flags=["--pattern",], choices=["REGEX",],
+                help="list domains that match the given regex")
+    cfg.setitem("query", None, flags=["--query",], choices=["QUERY",],
+                help="list domains where the attributes of the root group match the given query string")
     cfg.setitem("recursive", False, flags=["-r", "--recursive"], help="recursively list sub-folders or sub-groups")
     cfg.setitem("dataset_path", None, flags=["-d", "--dataset"], choices=["H5PATH",], help="display specified dataset")
     cfg.setitem("group_path", None, flags=["-g", "--group"], choices=["H5PATH",], help="display specified group")
-    cfg.setitem("datatype_path", None, flags=["-t", "--datatype"], choices=["H5PATH",], help="display specified datatype")
+    cfg.setitem("datatype_path", None, flags=["-t", "--datatype"], choices=["H5PATH",],
+                help="display specified datatype")
     cfg.setitem("names_only", False, flags=["-n", "--names"], help="list just folder names or link titles")
-    cfg.setitem("human_readable", False, flags=["-H", "--human-readable"], help="with -v, print human readable sizes (e.g. 123M)")
+    cfg.setitem("human_readable", False, flags=["-H", "--human-readable"],
+                help="with -v, print human readable sizes (e.g. 123M)")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
     try:
@@ -521,13 +525,13 @@ def main():
         if domain.endswith('/'):
             # given a folder path
             count = visitDomains(domain, depth=depth)
-            if  not cfg["names_only"]:
+            if not cfg["names_only"]:
                 print(f"{count} items")
 
         else:
             res = checkDomain(domain)
             if res is None:
-                # couldn't find a domain, call getFile anyway so we can 
+                # couldn't find a domain, call getFile anyway so we can
                 # report on exactly what went wrong
                 pass
             else:
@@ -612,7 +616,7 @@ def main():
                     if h5path[-1] != "/":
                         h5path = h5path + "/"
                     h5path = h5path + dataset_path
-                    print("using h5path:", h5path) 
+                    print("using h5path:", h5path)
                 if h5path not in grp:
                     print("dataset path: {h5path} not found")
                     continue
@@ -636,7 +640,7 @@ def main():
                     if h5path[-1] != "/":
                         h5path = h5path + "/"
                     h5path = h5path + datatype_path
-                    print("using h5path:", h5path) 
+                    print("using h5path:", h5path)
                 if h5path not in grp:
                     print("datatype path: {h5path} not found")
                     continue

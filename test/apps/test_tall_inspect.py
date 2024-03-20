@@ -22,9 +22,10 @@ else:
 
 from common import ut, TestCase
 
+
 def get_filename():
     if config.get("use_h5py"):
-        dirpath = "data" 
+        dirpath = "data"
     else:
         dirpath = config.get("H5PYD_TEST_FOLDER")
     filename = os.path.join(dirpath, "tall.h5")
@@ -34,12 +35,12 @@ def get_filename():
 class TestTallInspect(TestCase):
 
     def setUp(self):
-        
         filename = get_filename()
         self.f = h5py.File(filename, "r")
 
     def test_obj_count(self):
         counts = {"groups": 0, "datasets": 0}
+
         def visit(name):
             obj = self.f[name]
             if isinstance(obj, h5py.Dataset):
@@ -64,10 +65,10 @@ class TestTallInspect(TestCase):
         self.assertTrue("attr2" in self.f.attrs)
         attr2 = self.f.attrs["attr2"]
         self.assertEqual(attr2.dtype, np.dtype(">i4"))
-        self.assertEqual(attr2.shape, (2,2))
+        self.assertEqual(attr2.shape, (2, 2))
         for i in range(2):
             for j in range(2):
-                self.assertEqual(attr2[i,j], 2*i+j)
+                self.assertEqual(attr2[i, j], 2 * i + j)
         dset111 = self.f["/g1/g1.1/dset1.1.1"]
         self.assertEqual(2, len(dset111.attrs))
         self.assertTrue("attr1" in dset111.attrs)
@@ -94,10 +95,10 @@ class TestTallInspect(TestCase):
         for i in range(20):
             self.assertEqual(arr[i], i)
 
+
 if __name__ == '__main__':
     print("filename:", get_filename())
     loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
-    
-    ut.main()
 
+    ut.main()

@@ -25,14 +25,13 @@ from common import ut, TestCase
 
 class TestAttribute(TestCase):
 
-
     def test_create(self):
         filename = self.getFileName("create_attribute")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
 
         g1 = f.create_group('g1')
-        
+
         g1.attrs['a1'] = 42
 
         n = g1.attrs['a1']
@@ -96,21 +95,21 @@ class TestAttribute(TestCase):
         self.assertEqual(arr[0], b"Hello")
         self.assertEqual(arr[1], b"Good-bye")
         self.assertEqual(arr.dtype.kind, 'S')
-     
+
         # scalar byte values
         g1.attrs['e1'] = "Hello"
         s = g1.attrs['e1']
-        self.assertEqual(s, "Hello" )
+        self.assertEqual(s, "Hello")
 
         # scalar objref attribute
-        g11 = g1.create_group('g1.1') # create subgroup g1/g1.1
+        g11 = g1.create_group('g1.1')  # create subgroup g1/g1.1
         g11.attrs['name'] = 'g1.1'   # tag group with an attribute
 
         g11_ref = g11.ref   # get ref to g1/g1.1
         self.assertTrue(isinstance(g11_ref, h5py.Reference))
         refdt = h5py.special_dtype(ref=h5py.Reference)  # create ref dtype
         g1.attrs.create('f1', g11_ref, dtype=refdt)     # create attribute with ref to g1.1
-        ref = g1.attrs['f1'] # read back the attribute
+        ref = g1.attrs['f1']  # read back the attribute
 
         refobj = f[ref]  # get the ref'd object
         self.assertTrue('name' in refobj.attrs)  # should see the tag attribute

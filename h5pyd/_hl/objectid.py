@@ -16,6 +16,7 @@ import pytz
 import time
 from .h5type import createDataType
 
+
 def parse_lastmodified(datestr):
     """Turn last modified datetime string into a datetime object."""
     if isinstance(datestr, str):
@@ -133,7 +134,7 @@ class ObjectID:
     def __del__(self):
         """ cleanup """
         self.close()
-        
+
     __nonzero__ = __bool__  # Python 2.7 compat
 
 
@@ -203,11 +204,10 @@ class DatasetID(ObjectID):
         chunks = None
         layout = self.layout
 
-         
         if layout and layout['class'] in ('H5D_CHUNKED', 'H5D_CHUNKED_REF', 'H5D_CHUNKED_REF_INDIRECT'):
             if "dims" in layout:
                 chunks = layout['dims']
-             
+
         return chunks
 
     def __init__(self, parent, item, **kwds):

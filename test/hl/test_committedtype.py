@@ -34,7 +34,9 @@ class TestCommittedType(TestCase):
         self.assertEqual(len(ctype.dtype), len(dt))
         ctype.attrs["attr1"] = "this is a named datatype"
         dset = f.create_dataset('complex_dset', (10,), dtype=f['complex_type'])
+        self.assertNotEqual(dset, None)
         f.close()
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

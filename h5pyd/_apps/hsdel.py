@@ -13,6 +13,7 @@ else:
 
 cfg = Config()
 
+
 def getFolder(domain, mode='r'):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -21,11 +22,11 @@ def getFolder(domain, mode='r'):
     folder = h5py.Folder(domain, mode=mode, endpoint=endpoint, username=username, password=password, bucket=bucket)
     return folder
 
+
 def exitUnlessIgnore(msg):
     if cfg["ignore"]:
         return
     sys.exit(msg)
-
 
 
 def deleteDomain(domain):
@@ -39,7 +40,7 @@ def deleteDomain(domain):
     base_name = op.basename(path)
 
     if len(parent_domain) < 2:
-        #sys.exit("can't get parent domain")
+        # sys.exit("can't get parent domain")
         parent_domain = '/'
 
     if not parent_domain.endswith('/'):
@@ -102,7 +103,7 @@ def deleteDomain(domain):
         else:
             msg = f"Domain: {domain} deleted"
         cfg.print(msg)
-           
+
 
 #
 # Usage
@@ -121,7 +122,7 @@ def usage():
     for name in option_names:
         help_msg = cfg.get_help_message(name)
         if help_msg:
-            print(f"    {help_msg}")  
+            print(f"    {help_msg}")
     print("")
     print("Examples:")
     print(f"     {cmd} /home/myfolder/file1.h5  /home/myfolder/file2.h5")
@@ -130,6 +131,7 @@ def usage():
     print(cfg.get_see_also(cmd))
     print("")
     sys.exit()
+
 
 #
 # Main

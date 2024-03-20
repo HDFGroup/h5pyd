@@ -281,6 +281,9 @@ class TestGroup(TestCase):
 
         f = h5py.File(filename, 'w')
         g1 = f.create_group("g1")
+        dset = g1.create_dataset('ds', (5, 7), dtype='f4')
+
+        self.assertNotEqual(dset, None)
         self.assertEqual(len(g1), 1)
         self.assertEqual(get_count(g1), 1)
 

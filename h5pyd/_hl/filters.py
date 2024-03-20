@@ -136,10 +136,9 @@ def generate_dcpl(
             )
     # End argument validation
 
+    has_filter = any((shuffle, fletcher32, compression, maxshape, scaleoffset is not None))
     if (chunks is True) or (
-        chunks is None
-        and layout is not None
-        and any((shuffle, fletcher32, compression, maxshape, scaleoffset is not None))
+        chunks is None and layout is not None and has_filter
     ):
         chunks = guess_chunk(shape, maxshape, dtype.itemsize)
 
@@ -277,7 +276,6 @@ def generate_dcpl(
             initializer.extend(initializer_opts)
         plist["initializer"] = initializer
 
-
     return plist
 
 
@@ -339,8 +337,7 @@ def guess_chunk(shape, maxshape, typesize):
         chunk_bytes = np.prod(chunks) * typesize
 
         if (
-            chunk_bytes < target_size
-            or abs(chunk_bytes - target_size) / target_size < 0.5
+            chunk_bytes < target_size or abs(chunk_bytes - target_size) / target_size < 0.5
         ) and chunk_bytes < CHUNK_MAX:
             break
 

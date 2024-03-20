@@ -33,8 +33,3 @@ try:
     h5pyd.Folder(folder_path)  # will trigger error with h5serv
 except Exception:
     sys.exit("Server doesn't support Folder objects")
-    
-
-
-
-

@@ -11,9 +11,10 @@
 ##############################################################################
 import os
 
+
 def get_test_filenames():
-    return ("tall.h5", 
-            "shuffle_compress.h5", 
+    return ("tall.h5",
+            "shuffle_compress.h5",
             "d_objref.h5",
             "a_objref.h5",
             "d_link_hard.h5",
@@ -22,12 +23,14 @@ def get_test_filenames():
             "fletcher32.h5",
             "undecodable_attr.h5",
             "diamond.h5"
-    )
+            )
+
 
 cfg = {
     'use_h5py': False,
     'test_file_http_path': "https://s3.amazonaws.com/hdfgroup/data/hdf5test/"
 }
+
 
 def get(x):
     # see if there is a command-line override
@@ -47,6 +50,3 @@ def get(x):
         elif config_value.upper() in ('F', 'FALSE'):
             config_value = False
     return config_value
-
-
-

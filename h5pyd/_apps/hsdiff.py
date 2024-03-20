@@ -35,13 +35,14 @@ else:
 
 cfg = Config()
 
+
 def getFile(domain, mode="r"):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
     bucket = cfg["hs_bucket"]
     fh = h5pyd.File(domain, mode=mode, endpoint=endpoint, username=username,
-                   password=password, bucket=bucket, use_cache=True)
+                    password=password, bucket=bucket, use_cache=True)
     return fh
 
 
@@ -347,10 +348,9 @@ def diff_dataset(src, ctx):
                 print("quiet output differ")
             ctx["differences"] += 1
             return False
-        
 
     if src.chunks is None:
-        # assume that the dataset is small enough that we can 
+        # assume that the dataset is small enough that we can
         # read all the values into memory.
         # TBD: use some sort  of psuedo-chunk iteration for large
         # contiguous datasetsChunkIter
@@ -389,12 +389,12 @@ def diff_dataset(src, ctx):
                 if isinstance(arr_tgt, np.ndarray):
                     is_equal = np.array_equal(arr_src, arr_tgt)
                 else:
-                    is_equal = False # type not the same
+                    is_equal = False  # type not the same
             else:
                 # just compare the objects directly
                 if arr_src != arr_tgt:
                     is_equal = False
-            
+
             if not is_equal:
                 msg = "values for dataset {} differ for slice: {}".format(src.name, s)
                 logging.info(msg)
@@ -461,7 +461,7 @@ def usage():
     for name in option_names:
         help_msg = cfg.get_help_message(name)
         if help_msg:
-            print(f"    {help_msg}")  
+            print(f"    {help_msg}")
     print("")
     print("Examples:")
     print(f"     {cmd} myfile.h5  /home/myfolder/myfile.h5")
@@ -499,7 +499,7 @@ def main():
         usage()
 
     if cfg["quiet"] and cfg["verbose"]:
-        msg = "--quiet and --verbose options can't be used together"        
+        msg = "--quiet and --verbose options can't be used together"
         sys.exit(msg)
 
     if len(args) < 2:
@@ -513,7 +513,6 @@ def main():
     loglevel = cfg.get_loglevel()
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
     logging.debug(f"set log_level to {loglevel}")
-
 
     rc = 0
     s3 = None  # s3fs instance
@@ -573,7 +572,6 @@ def main():
         kwargs["noattr"] = cfg["noattr"]
         kwargs["quiet"] = cfg["quiet"]
         rc = diff_file(fin, fout, **kwargs)
-    
 
         if not cfg["quiet"] and rc > 0:
             print(f"{rc} differences found")

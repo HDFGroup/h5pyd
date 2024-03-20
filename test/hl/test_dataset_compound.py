@@ -30,8 +30,7 @@ class TestDatasetCompound(TestCase):
         print("filename:", filename)
         f = h5py.File(filename, "w")
 
-        #curl -v --header "Host: create_compound_dset.h5pyd_test.hdfgroup.org" http://127.0.0.1:5000
-
+        # curl -v --header "Host: create_compound_dset.h5pyd_test.hdfgroup.org" http://127.0.0.1:5000
 
         count = 10
 
@@ -40,7 +39,7 @@ class TestDatasetCompound(TestCase):
 
         elem = dset[0]
         for i in range(count):
-            theta = (4.0 * math.pi)*(float(i)/float(count))
+            theta = (4.0 * math.pi) * (float(i) / float(count))
             elem['real'] = math.cos(theta)
             elem['img'] = math.sin(theta)
             dset[i] = elem
@@ -53,7 +52,7 @@ class TestDatasetCompound(TestCase):
         filename = self.getFileName("test_onefield_compound_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
- 
+
         count = 10
 
         dt = np.dtype([('a_field', int),])
@@ -61,7 +60,7 @@ class TestDatasetCompound(TestCase):
 
         elem = dset[0]
         for i in range(count):
-            elem['a_field'] = i*2
+            elem['a_field'] = i * 2
             dset[i] = elem
 
         val = dset[5]
@@ -69,6 +68,7 @@ class TestDatasetCompound(TestCase):
         self.assertEqual(len(dset.dtype), 1)
         self.assertEqual(dset.dtype.kind, "V")
         f.close()
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

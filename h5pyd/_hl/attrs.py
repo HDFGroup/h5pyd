@@ -102,7 +102,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if is_list:
             out = []
             for item in data:
-                out.append(self._bytesArrayToList(item)) # recursive call
+                out.append(self._bytesArrayToList(item))  # recursive call
         elif isinstance(data, bytes):
             out = data.decode("utf-8")
         else:
@@ -208,19 +208,19 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if shape is None and not isinstance(data, Empty):
             shape = data.shape
 
-        use_htype = None    # If a committed type is given, we must use it
-                            # in the call to h5a.create.
+        use_htype = None  # If a committed type is given, we must use it in h5a.create.
 
         if isinstance(dtype, Datatype):
             use_htype = dtype.id
             dtype = dtype.dtype
 
             # Special case if data are complex numbers
-            if (data.dtype.kind == 'c' and
-                (dtype.names is None or
-                    dtype.names != ('r', 'i') or
-                    any(dt.kind != 'f' for dt, off in dtype.fields.values()) or
-                    dtype.fields['r'][0] == dtype.fields['i'][0])):
+            is_complex = (data.dtype.kind == 'c') and (dtype.names is None) or (
+                dtype.names != ('r', 'i')) or (
+                any(dt.kind != 'f' for dt, off in dtype.fields.values())) or (
+                dtype.fields['r'][0] == dtype.fields['i'][0])
+
+            if is_complex:
                 raise TypeError(
                     'Wrong committed datatype for complex numbers: %s' %
                     dtype.name)
@@ -231,7 +231,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             else:
                 dtype = data.dtype
         else:
-            dtype = numpy.dtype(dtype) # In case a string, e.g. 'i8' is passed
+            dtype = numpy.dtype(dtype)  # In case a string, e.g. 'i8' is passed
 
         # Where a top-level array type is requested, we have to do some
         # fiddling around to present the data as a smaller array of
@@ -259,7 +259,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                     data = data.reshape(shape)
 
             # We need this to handle special string types.
-        
+
                 data = numpy.asarray(data, dtype=dtype)
 
         # Make HDF5 datatype and dataspace for the H5A calls
@@ -376,7 +376,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             try:
                 self._parent.GET(req)
             except IOError:
-                #todo - verify this is a 404 response
+                # todo - verify this is a 404 response
                 exists = False
         return exists
 

@@ -43,7 +43,7 @@ setup(
         "azure": [
             "msrestazure",
             "adal"
-            ], 
+        ],
         "google": [
             "google-api-python-client",
             "google-auth-oauthlib",

@@ -212,8 +212,7 @@ class TestFile(TestCase):
             filename = self.getFileName("no_file_here")
             print("filename:", filename)
             with h5py.File(filename, 'r') as f:
-                if f is not None:
-                    pass
+                self.assertNotEqual(f, None)
                 self.assertTrue(False)  # expect exception
         except IOError:
             pass

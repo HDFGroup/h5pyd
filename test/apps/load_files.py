@@ -36,7 +36,7 @@ data_dir = "data"
 out_dir = "out"
 test_file_http_path = config.get("test_file_http_path")
 
-parent =  h5pyd.Folder(test_folder)
+parent = h5pyd.Folder(test_folder)
 filenames = config.get_test_filenames()
 
 if not os.path.exists(data_dir):
@@ -73,4 +73,3 @@ for filename in filenames:
     if rc != 0:
         sys.exit(f"Failed to hsget {filename}")
 print("load_files done")
-    

@@ -43,6 +43,7 @@ class TestFolders(TestCase):
 
         f.close()
 
+        print(f" folder filepath = {filepath}")
         folder_name = op.dirname(filepath) + '/'
 
         d = h5py.Folder(folder_name)  # get folder object
@@ -89,7 +90,7 @@ class TestFolders(TestCase):
                 # non-folder objects will have last modified time
                 self.assertTrue("lastModified" in item)
                 self.assertTrue("created" in item)
-                # shouldn't have total_size, other verbose only, items
+                # shouldn't have total_size, other verbose only,items
                 self.assertFalse("total_size" in item)
 
             i += 1
