@@ -14,6 +14,7 @@
 import os
 import sys
 
+
 hl_tests = ('test_attribute',
             'test_committedtype',
             'test_complex_numbers',
@@ -26,6 +27,7 @@ hl_tests = ('test_attribute',
             'test_dataset_pointselect',
             'test_dataset_scalar',
             'test_dataset_setitem',
+            'test_datatype',
             'test_dimscale',
             'test_file',
             'test_group',
@@ -33,6 +35,7 @@ hl_tests = ('test_attribute',
             'test_visit',
             'test_vlentype',
             'test_folder')
+
 
 app_tests = ('test_hsinfo', 'test_tall_inspect', 'test_diamond_inspect',
              'test_shuffle_inspect')
