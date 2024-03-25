@@ -72,7 +72,7 @@ def is_attached(dsetid: DatasetID, dscaleid: DatasetID, idx: int) -> bool:
     dimlist = _getAttributeJson("DIMENSION_LIST", dsetid)
     reflist = _getAttributeJson("REFERENCE_LIST", dscaleid)
     try:
-        return ([f"datasets/{dsetid.id}", idx] in reflist["value"] and
-                f"datasets/{dscaleid.id}" in dimlist["value"][idx])
+        return ([f"datasets/{dsetid.id}", idx] in
+                reflist["value"] and f"datasets/{dscaleid.id}" in dimlist["value"][idx])
     except (KeyError, IndexError):
         return False

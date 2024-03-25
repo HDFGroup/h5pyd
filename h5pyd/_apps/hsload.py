@@ -40,6 +40,7 @@ from urllib.parse import urlparse
 
 cfg = Config()
 
+
 # ----------------------------------------------------------------------------------
 def abort(msg):
     logging.error(msg)
@@ -47,6 +48,7 @@ def abort(msg):
         sys.stderr.write(msg + "\n")
     logging.error("exiting program with return code -1")
     sys.exit(-1)
+
 
 # ----------------------------------------------------------------------------------
 def usage():
@@ -66,7 +68,7 @@ def usage():
     for name in option_names:
         help_msg = cfg.get_help_message(name)
         if help_msg:
-            print(f"    {help_msg}")  
+            print(f"    {help_msg}")
     print("")
     print("Note about --link option:")
     print("    --link enables just the source HDF5 metadata to be ingested while the dataset data")
@@ -81,7 +83,6 @@ def usage():
     print(cfg.get_see_also(cmd))
     print("")
     sys.exit(-1)
-     
 
 
 # end print_usage
@@ -92,18 +93,25 @@ def main():
 
     COMPRESSION_FILTERS = ("blosclz", "lz4", "lz4hc", "snappy", "gzip", "zstd")
 
-    s3 = None # S3FS instance
+    s3 = None  # S3FS instance
 
     cfg.setitem("append", False, flags=["-a", "--append"], help="append to existing domain")
-    cfg.setitem("extend_dim", None, flags=["--extend",], choices=["DIMSCALE",], help="extend along given dimensionscale")
-    cfg.setitem("extend_offset", None, flags=["--extend-offset"], choices=["N",], help="write data at index n along extended dimension")
-    cfg.setitem("no_clobber", False, flags=["-n", "--no-clobber"],  help="do not overwrite target")
+    cfg.setitem("extend_dim", None, flags=["--extend",], choices=["DIMSCALE",],
+                help="extend along given dimensionscale")
+    cfg.setitem("extend_offset", None, flags=["--extend-offset"], choices=["N",],
+                help="write data at index n along extended dimension")
+    cfg.setitem("no_clobber", False, flags=["-n", "--no-clobber"], help="do not overwrite target")
     cfg.setitem("nodata", False, flags=["--nodata",], help="do not copy dataset data")
-    cfg.setitem("z", None, flags=["-z",], choices=["N",], help="apply compression filter to any non-compressed datasets, n: [0-9]")
-    cfg.setitem("link", None, flags=["--link",],  help="Link to dataset data (sourcefile given as <bucket>/<path>) or s3uri")
-    cfg.setitem("fastlink", None, flags=["--fastlink",],  help="Link to dataset data without initializing chunk locations (will be set server side)")
-    cfg.setitem("linkpath", None, flags=["--linkpath",], choices=["PATH_URI",], help="Use the given URI for the link references rather than the src path")
-    cfg.setitem("compression", None, flags=["--compression",], choices=COMPRESSION_FILTERS, help="use the given compression algorithm for -z option (lz4 is default)")
+    cfg.setitem("z", None, flags=["-z",], choices=["N",],
+                help="apply compression filter to any non-compressed datasets, n: [0-9]")
+    cfg.setitem("link", None, flags=["--link",],
+                help="Link to dataset data (sourcefile given as <bucket>/<path>) or s3uri")
+    cfg.setitem("fastlink", None, flags=["--fastlink",],
+                help="Link to dataset data without initializing chunk locations (will be set server side)")
+    cfg.setitem("linkpath", None, flags=["--linkpath",], choices=["PATH_URI",],
+                help="Use the given URI for the link references rather than the src path")
+    cfg.setitem("compression", None, flags=["--compression",], choices=COMPRESSION_FILTERS,
+                help="use the given compression algorithm for -z option (lz4 is default)")
     cfg.setitem("ignorefilters", False, flags=["--ignore-filters"], help="ignore any filters used by source dataset")
     cfg.setitem("retries", 3, flags=["--retries",], choices=["N",], help="Set number of server retry attempts")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
@@ -124,7 +132,7 @@ def main():
     logfname = cfg["logfile"]
     loglevel = cfg.get_loglevel()
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
-    logging.debug(f"set log_level to {loglevel}") 
+    logging.debug(f"set log_level to {loglevel}")
 
     if cfg["linkpath"] and not cfg["link"]:
         abort("--linkpath option can only be used with --link")
@@ -146,7 +154,7 @@ def main():
         dataload = None
     else:
         dataload = "ingest"
-    
+
     logging.info(f"source files: {src_files}")
     logging.info(f"target domain: {domain}")
     if len(src_files) > 1 and domain[-1] != "/":
@@ -157,14 +165,12 @@ def main():
         logging.info("checking libversion")
 
         if (
-            h5py.version.version_tuple.major == 2
-            and h5py.version.version_tuple.minor < 10
+            h5py.version.version_tuple.major == 2 and h5py.version.version_tuple.minor < 10
         ):
             abort("link option requires h5py version 2.10 or higher")
-            
+
         if h5py.version.hdf5_version_tuple < (1, 10, 6):
             abort("link option requires h5py version 2.10 or higher")
-        
 
     try:
 
@@ -198,7 +204,7 @@ def main():
                     fin = h5py.File(s3.open(src_file, "rb"), moe="r")
                 except IOError as ioe:
                     abort(f"Error opening file {src_file}: {ioe}")
-                    
+
             else:
                 if cfg["link"] or cfg["fastlink"]:
                     if op.isabs(src_file) and not cfg["linkpath"]:
@@ -241,12 +247,12 @@ def main():
 
             if cfg["linkpath"]:
                 # now that we have a handle to the source file,
-                # repurpose s3path to the s3uri that will actually get stored 
+                # repurpose s3path to the s3uri that will actually get stored
                 # in the target domain
                 s3path = cfg["linkpath"]
 
             if cfg["no_clobber"]:
-                if cfg["append"]: 
+                if cfg["append"]:
                     # no need to check for clobber if not in append mode
                     no_clobber = True
                 else:
@@ -272,7 +278,6 @@ def main():
             else:
                 compression_opts = None
 
-
             # do the actual load
             kwargs = {
                 "verbose": cfg["verbose"],
@@ -286,7 +291,7 @@ def main():
                 "extend_offset": cfg["extend_offset"],
                 "ignore_error": cfg["ignore_error"],
                 "no_clobber": no_clobber
-                            }
+            }
             load_file(fin, fout, **kwargs)
 
             msg = f"File {src_file} uploaded to domain: {tgt}"

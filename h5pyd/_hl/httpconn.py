@@ -211,7 +211,7 @@ class HttpConn:
 
         if endpoint.startswith(lambda_prefix):
             # save lambda function name
-            self._lambda = endpoint[len(lambda_prefix) :]
+            self._lambda = endpoint[len(lambda_prefix):]
 
         elif endpoint.startswith("local"):
             # create a local hsds server
@@ -223,7 +223,7 @@ class HttpConn:
             dn_count = None
             if bracket_start > 0 and bracket_end > 0:
                 try:
-                    dn_count = int(endpoint[bracket_start + 1 : bracket_end])
+                    dn_count = int(endpoint[bracket_start + 1: bracket_end])
                 except ValueError:
                     # if value is '*' or something just drop down to default
                     # setup based on cpu count
@@ -379,7 +379,7 @@ class HttpConn:
 
         if self._endpoint is None:
             raise IOError("object not initialized")
-        
+
         # make an about request
         rsp = self.GET("/about")
         if rsp.status_code != 200:
@@ -440,14 +440,11 @@ class HttpConn:
         if format == "binary":
             headers["accept"] = "application/octet-stream"
 
-        if (
-            self._cache is not None
-            and use_cache
-            and format == "json"
-            and params["domain"] == self._domain
-            and "select" not in params
-            and "query" not in params
-        ):
+        check_cache = self._cache is not None and use_cache and format == "json"
+        check_cache = check_cache and params["domain"] == self._domain
+        check_cache = check_cache and "select" not in params and "query" not in params
+
+        if check_cache:
             self.log.debug("httpcon - checking cache")
             if req in self._cache:
                 self.log.debug("httpcon - returning cache result")
@@ -504,12 +501,10 @@ class HttpConn:
                 content_type = rsp_headers["Content-Type"]
             self.log.debug(f"content_type: {content_type}")
 
-            if (
-                content_type
-                and content_type.startswith("application/json")
-                and content_length < MAX_CACHE_ITEM_SIZE
-                and not req.endswith("/value")
-            ):
+            add_to_cache = content_type and content_type.startswith("application/json")
+            add_to_cache = add_to_cache and content_length < MAX_CACHE_ITEM_SIZE and not req.endswith("/value")
+
+            if add_to_cache:
                 # add to our _cache
                 cache_rsp = CacheResponse(rsp)
                 self.log.debug(f"adding {req} to cache")
@@ -523,11 +518,10 @@ class HttpConn:
         # indicates the Lambda request was successful, but not necessarily
         # the requested HSDS action was.
         # Check here and raise IOError is needed.
-        if (
-            rsp.status_code == 200
-            and content_type
-            and content_type.startswith("application/json")
-        ):
+
+        json_success = (rsp.status_code == 200) and content_type and content_type.startswith("application/json")
+
+        if json_success:
             body = json.loads(rsp.text)
             if "statusCode" in body:
                 status_code = body["statusCode"]
@@ -771,7 +765,6 @@ class HttpConn:
         if self._hsds:
             self._hsds.stop()
             self._hsds = None
-    
 
     @property
     def domain(self):
@@ -799,7 +792,6 @@ class HttpConn:
             return False
         else:
             return True
- 
 
     @property
     def domain_json(self):

@@ -25,7 +25,6 @@ loglevel = "warn"
 CHUNKS = (1500, 275)
 
 
-
 if len(sys.argv) == 1 or sys.argv[1] in ("-h", "--help"):
     s = f"usage: python {sys.argv[0]} "
     s += "[--ncols=n] "

@@ -30,17 +30,16 @@ class H5TypeTest(unittest.TestCase):
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_INTEGER')
         self.assertEqual(typeItem['base'], 'H5T_STD_I8LE')
-        typeItem = h5type.getTypeResponse(typeItem) # non-verbose format
+        typeItem = h5type.getTypeResponse(typeItem)  # non-verbose format
         self.assertEqual(typeItem['class'], 'H5T_INTEGER')
         self.assertEqual(typeItem['base'], 'H5T_STD_I8LE')
-
 
     def testBaseFloatTypeItem(self):
         dt = np.dtype('<f8')
         typeItem = h5type.getTypeItem(dt)
         self.assertEqual(typeItem['class'], 'H5T_FLOAT')
         self.assertEqual(typeItem['base'], 'H5T_IEEE_F64LE')
-        typeItem = h5type.getTypeResponse(typeItem) # non-verbose format
+        typeItem = h5type.getTypeResponse(typeItem)  # non-verbose format
         self.assertEqual(typeItem['class'], 'H5T_FLOAT')
         self.assertEqual(typeItem['base'], 'H5T_IEEE_F64LE')
 
@@ -59,7 +58,7 @@ class H5TypeTest(unittest.TestCase):
             print(f"got typeItem: {typeItem}")
             self.assertTrue(False)  # expected exception
         except TypeError:
-            pass # expected
+            pass  # expected
 
     def testBaseVLenAsciiTypeItem(self):
         dt = special_dtype(vlen=bytes)
@@ -114,7 +113,6 @@ class H5TypeTest(unittest.TestCase):
         field_b_basetype = field_b_type['base']
         self.assertEqual(field_b_basetype['class'], 'H5T_STRING')
 
-
     def testOpaqueTypeItem(self):
         dt = np.dtype('V200')
         typeItem = h5type.getTypeItem(dt)
@@ -143,7 +141,7 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(tempFieldType['class'], 'H5T_FLOAT')
         self.assertEqual(tempFieldType['base'], 'H5T_IEEE_F32LE')
 
-        typeItem = h5type.getTypeResponse(typeItem) # non-verbose format
+        typeItem = h5type.getTypeResponse(typeItem)  # non-verbose format
         self.assertEqual(typeItem['class'], 'H5T_COMPOUND')
         self.assertTrue('fields' in typeItem)
         fields = typeItem['fields']
@@ -173,19 +171,19 @@ class H5TypeTest(unittest.TestCase):
         self.assertEqual(dt.name, 'float32')
         self.assertEqual(dt.kind, 'f')
 
-        typeItem = { 'class': 'H5T_INTEGER', 'base': 'H5T_STD_I32BE' }
+        typeItem = {'class': 'H5T_INTEGER', 'base': 'H5T_STD_I32BE'}
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'int32')
         self.assertEqual(dt.kind, 'i')
 
     def testCreateBaseStringType(self):
-        typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII', 'length': 6 }
+        typeItem = {'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII', 'length': 6}
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'bytes48')
         self.assertEqual(dt.kind, 'S')
 
     def testCreateBaseUnicodeType(self):
-        typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_UTF8', 'length': 32 }
+        typeItem = {'class': 'H5T_STRING', 'charSet': 'H5T_CSET_UTF8', 'length': 32}
         try:
             dt = h5type.createDataType(typeItem)
             print(f"got dtype: {dt}")
@@ -194,23 +192,21 @@ class H5TypeTest(unittest.TestCase):
             pass
 
     def testCreateNullTermStringType(self):
-        typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII',
-            'length': 6, 'strPad': 'H5T_STR_NULLTERM'}
+        typeItem = {'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII',
+                    'length': 6, 'strPad': 'H5T_STR_NULLTERM'}
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'bytes48')
         self.assertEqual(dt.kind, 'S')
 
-
     def testCreateVLenStringType(self):
-        typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII', 'length': 'H5T_VARIABLE' }
+        typeItem = {'class': 'H5T_STRING', 'charSet': 'H5T_CSET_ASCII', 'length': 'H5T_VARIABLE'}
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'object')
         self.assertEqual(dt.kind, 'O')
         self.assertEqual(check_dtype(vlen=dt), bytes)
 
-
     def testCreateVLenUTF8Type(self):
-        typeItem = { 'class': 'H5T_STRING', 'charSet': 'H5T_CSET_UTF8', 'length': 'H5T_VARIABLE' }
+        typeItem = {'class': 'H5T_STRING', 'charSet': 'H5T_CSET_UTF8', 'length': 'H5T_VARIABLE'}
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'object')
         self.assertEqual(dt.kind, 'O')
@@ -231,14 +227,14 @@ class H5TypeTest(unittest.TestCase):
     def testCreateCompoundType(self):
         typeItem = {
             'class': 'H5T_COMPOUND', 'fields':
-                [{'name': 'temp',     'type': 'H5T_IEEE_F32LE'},
+                [{'name': 'temp', 'type': 'H5T_IEEE_F32LE'},
                  {'name': 'pressure', 'type': 'H5T_IEEE_F32LE'},
                  {'name': 'location', 'type': {
                      'length': 'H5T_VARIABLE',
                      'charSet': 'H5T_CSET_ASCII',
                      'class': 'H5T_STRING',
                      'strPad': 'H5T_STR_NULLTERM'}},
-                 {'name': 'wind',     'type': 'H5T_STD_I16LE'}]
+                 {'name': 'wind', 'type': 'H5T_STD_I16LE'}]
         }
 
         dt = h5type.createDataType(typeItem)
@@ -253,9 +249,9 @@ class H5TypeTest(unittest.TestCase):
     def testCreateCompoundTypeUnicodeFields(self):
         typeItem = {
             'class': 'H5T_COMPOUND', 'fields':
-                [{'name': u'temp',     'type': 'H5T_IEEE_F32LE'},
+                [{'name': u'temp', 'type': 'H5T_IEEE_F32LE'},
                  {'name': u'pressure', 'type': 'H5T_IEEE_F32LE'},
-                 {'name': u'wind',     'type': 'H5T_STD_I16LE'}]
+                 {'name': u'wind', 'type': 'H5T_STD_I16LE'}]
         }
 
         dt = h5type.createDataType(typeItem)
@@ -266,7 +262,7 @@ class H5TypeTest(unittest.TestCase):
     def testCreateArrayType(self):
         typeItem = {'class': 'H5T_ARRAY',
                     'base': 'H5T_STD_I64LE',
-                    'dims': (3, 5) }
+                    'dims': (3, 5)}
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'void960')
         self.assertEqual(dt.kind, 'V')
@@ -274,7 +270,7 @@ class H5TypeTest(unittest.TestCase):
     def testCreateArrayIntegerType(self):
         typeItem = {'class': 'H5T_INTEGER',
                     'base': 'H5T_STD_I64LE',
-                    'dims': (3, 5) }
+                    'dims': (3, 5)}
         dt = h5type.createDataType(typeItem)
         self.assertEqual(dt.name, 'void960')
         self.assertEqual(dt.kind, 'V')
@@ -301,9 +297,9 @@ class H5TypeTest(unittest.TestCase):
                             "class": "H5T_STRING",
                             "strPad": "H5T_STR_NULLPAD"
                         },
-                    "class": "H5T_ARRAY"
-                },
-                "name": "b"
+                        "class": "H5T_ARRAY"
+                    },
+                    "name": "b"
                 }
             ]
         }
@@ -323,6 +319,6 @@ class H5TypeTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    #setup test files
+    # setup test files
 
     unittest.main()

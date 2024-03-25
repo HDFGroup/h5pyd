@@ -10,7 +10,6 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 import logging
-import numpy as np
 
 import config
 
@@ -21,8 +20,8 @@ else:
 
 from common import ut, TestCase
 
-class TestDatasetInitializer(TestCase):
 
+class TestDatasetInitializer(TestCase):
 
     def test_create_arange_dset(self):
         filename = self.getFileName("create_arange_dset")
@@ -36,9 +35,9 @@ class TestDatasetInitializer(TestCase):
         start = 10
         step = 2
         dims = (extent,)
-        initializer="arange"
+        initializer = "arange"
         initializer_opts = [f"--start={start}", f"--step={step}"]
-        kwargs = {"dtype": "i8", "initializer":initializer, "initializer_opts": initializer_opts}
+        kwargs = {"dtype": "i8", "initializer": initializer, "initializer_opts": initializer_opts}
         dset = f.create_dataset('arange_dset', dims, **kwargs)
 
         self.assertEqual(dset.name, "/arange_dset")
@@ -55,6 +54,7 @@ class TestDatasetInitializer(TestCase):
             self.assertEqual(arr[i], expected)
 
         f.close()
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

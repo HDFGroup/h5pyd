@@ -17,6 +17,7 @@ else:
     import h5pyd as h5py
 from common import ut, TestCase
 
+
 class TestVisit(TestCase):
     def test_visit(self):
         visit_names = []
@@ -43,7 +44,6 @@ class TestVisit(TestCase):
         f.create_dataset('g1/g1.1/dset', data=42, dtype='i4')
         f["/g1/soft"] = h5py.SoftLink('/g2')
         f.close()
-
 
         # re-open as read-only
         f = h5py.File(filename, 'r')
@@ -105,7 +105,6 @@ class TestVisit(TestCase):
 
         f.close()
         self.assertEqual(len(visited_ids), len(obj_ids))
-
 
 
 if __name__ == '__main__':

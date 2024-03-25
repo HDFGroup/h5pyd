@@ -26,6 +26,7 @@ else:
 
 cfg = Config()
 
+
 #
 # Usage
 #
@@ -38,12 +39,12 @@ def usage():
     print("Description:")
     print("    Get status information from server")
     print("")
-    
+
     print("Options:")
     for name in option_names:
         help_msg = cfg.get_help_message(name)
         if help_msg:
-            print(f"    {help_msg}")  
+            print(f"    {help_msg}")
     print("")
     print("examples:")
     print(f"   {cmd} -e http://hsdshdflab.hdfgroup.org")
@@ -52,8 +53,9 @@ def usage():
     print("")
     sys.exit()
 
+
 #
-#
+# getUpTime
 #
 def getUpTime(start_time):
     now = int(time.time())
@@ -187,13 +189,12 @@ def main():
     if domains:
         sys.exit("Use the hsstat command to get information about about a folder or domain ")
 
-
     if not cfg["hs_endpoint"]:
         logging.error("endpoint not set")
         usage()
-    
+
     getServerInfo(cfg)
-    
+
 
 if __name__ == "__main__":
     main()

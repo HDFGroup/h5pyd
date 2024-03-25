@@ -21,7 +21,6 @@ from common import ut, TestCase
 
 class TestObjRef(TestCase):
 
-
     def test_create(self):
         filename = self.getFileName("objref_test")
         print(filename)
@@ -133,7 +132,6 @@ class TestObjRef(TestCase):
             self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
         self.assertEqual(obj.name, "/g2/d1")
 
-
     def test_delete(self):
         filename = self.getFileName("objref_delete_test")
         print(filename)
@@ -142,7 +140,7 @@ class TestObjRef(TestCase):
         self.assertTrue('/' in f)
 
         # create a dataset
-        dset = f.create_dataset('dset', data=[1,2,3])
+        dset = f.create_dataset('dset', data=[1, 2, 3])
         dset_ref = dset.ref
 
         f.attrs["dset_ref"] = dset_ref
@@ -150,7 +148,7 @@ class TestObjRef(TestCase):
         try:
             f[dset_ref]
         except ValueError:
-            pass # expected
+            pass  # expected
 
         f.close()
 

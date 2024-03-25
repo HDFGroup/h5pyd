@@ -12,6 +12,7 @@
 import os
 import json
 
+
 class Config:
     """
     User Config state
@@ -41,7 +42,7 @@ class Config:
                         print("config file: {} line: {} is not valid".format(self._config_file, line_number))
                         continue
                     k = line[:index].strip()
-                    v = line[(index+1):].strip()
+                    v = line[(index + 1):].strip()
                     if v and v.upper() != "NONE":
                         self._cfg[k] = v
         # override any config values with environment variable if found
@@ -95,4 +96,3 @@ class Config:
             return self[name]
         else:
             return default
-            

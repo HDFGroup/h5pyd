@@ -51,7 +51,7 @@ def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **k
         try:
             rsp = http_conn.GET("/about")
             break
-        except IOError as ioe:
+        except IOError:
             if connect_try < len(connect_backoff):
                 time.sleep(connect_backoff[connect_try])
             else:

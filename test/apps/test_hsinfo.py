@@ -18,15 +18,13 @@ from common import ut, TestCase
 
 class TestHsinfo(TestCase):
 
-
     def test_help(self):
 
-        arg = "-h"
         result = subprocess.check_output(["python", "../../h5pyd/_apps/hsinfo.py", "-h"])
         self.assertTrue(len(result) > 400)
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()
-

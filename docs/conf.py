@@ -16,9 +16,9 @@ from importlib import metadata
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-        'sphinx.ext.intersphinx',
-        'sphinx.ext.extlinks',
-        'sphinx.ext.mathjax',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.extlinks',
+    'sphinx.ext.mathjax',
 ]
 
 # intersphinx_mapping = {'low': ('https://api.h5py.org', None)}

@@ -60,7 +60,7 @@ class TestCase(ut.TestCase):
         # HS_USERNAME is the username h5pyd will look up if
         #   if not provided in the File constructor
         user1 = {}
-        if  "HS_USERNAME" in os.environ:
+        if "HS_USERNAME" in os.environ:
             user1["name"] = os.environ["HS_USERNAME"]
         else:
             user1["name"] = "test_user1"
@@ -74,7 +74,7 @@ class TestCase(ut.TestCase):
     @property
     def test_user2(self):
         user2 = {}
-        if  "TEST12_USERNAME" in os.environ:
+        if "TEST12_USERNAME" in os.environ:
             user2["name"] = os.environ["TEST2_USERNAME"]
         else:
             user2["name"] = "test_user2"
@@ -96,22 +96,22 @@ class TestCase(ut.TestCase):
     @classmethod
     def setUpClass(cls):
         pass
-        #cls.tempdir = tempfile.mkdtemp(prefix='h5py-test_')
+        # cls.tempdir = tempfile.mkdtemp(prefix='h5py-test_')
 
     @classmethod
     def tearDownClass(cls):
         pass
-        #shutil.rmtree(cls.tempdir)
+        # shutil.rmtree(cls.tempdir)
 
     def setUp(self):
         self.test_dir = str(int(time.time()))
-        #self.f = h5py.File(self.mktemp(), 'w')
+        # self.f = h5py.File(self.mktemp(), 'w')
 
     def tearDown(self):
         try:
             if self.f:
                 self.f.close()
-        except:
+        except Exception:
             pass
 
     if not hasattr(ut.TestCase, 'assertSameElements'):
@@ -160,11 +160,11 @@ class TestCase(ut.TestCase):
         self.assertTrue(
             dset.shape == arr.shape,
             "Shape mismatch (%s vs %s)%s" % (dset.shape, arr.shape, message)
-            )
+        )
         self.assertTrue(
             dset.dtype == arr.dtype,
             "Dtype mismatch (%s vs %s)%s" % (dset.dtype, arr.dtype, message)
-            )
+        )
 
         if arr.dtype.names is not None:
             for n in arr.dtype.names:
@@ -174,12 +174,12 @@ class TestCase(ut.TestCase):
             self.assertTrue(
                 np.all(np.abs(dset[...] - arr[...]) < precision),
                 "Arrays differ by more than %.3f%s" % (precision, message)
-                )
+            )
         else:
             self.assertTrue(
                 np.all(dset[...] == arr[...]),
                 "Arrays are not equal (dtype %s) %s" % (arr.dtype.str, message)
-                )
+            )
 
     def assertNumpyBehavior(self, dset, arr, s):
         """ Apply slicing arguments "s" to both dset and arr.
@@ -220,7 +220,6 @@ class TestCase(ut.TestCase):
             filename += ".h5"
         return filename
 
-
     def getPathFromDomain(self, domain):
         """
         Convert DNS-style domain name to filepath
@@ -236,8 +235,8 @@ class TestCase(ut.TestCase):
         path = '/'
         for name in names:
             if name:
-                 path += name
-                 path += '/'
+                path += name
+                path += '/'
         path = path[:-1]  # strip trailing slash
         return path
 

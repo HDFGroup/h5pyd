@@ -187,7 +187,7 @@ class Session:
         # function_name = FUNC_NAME
         # req_path = REQ
         # params = {PARAMS}
-        s = req[len(LAMBDA_REQ_PREFIX) :]  # strip off protocol
+        s = req[len(LAMBDA_REQ_PREFIX):]  # strip off protocol
         index = s.find("/")
         if index <= 0:
             msg = "Unexpected request"
@@ -197,7 +197,7 @@ class Session:
             msg = f"unexpected lambda function name: {function_name}"
             raise ValueError(msg)
         index = s.find(function_name)
-        req_path = s[index + len(function_name) :]
+        req_path = s[index + len(function_name):]
         if not req_path:
             msg = "no request path found"
             raise ValueError(msg)

@@ -39,12 +39,10 @@ VERBOSE_REFRESH_TIME = 1.0  # 1 second
 def readtime_dtype(basetype, names):
     """Make a NumPy dtype appropriate for reading"""
     # Check if basetype is the special case for storing complex numbers
-    if (
-        basetype.names is not None
-        and basetype.names == ("r", "i")
-        and all(dt.kind == "f" for dt, off in basetype.fields.values())
-        and basetype.fields["r"][0] == basetype.fields["i"][0]
-    ):
+    is_complex_basetype = basetype.names is not None and basetype.names == ("r", "i")
+    is_complex_basetype = is_complex_basetype and all(dt.kind == "f" for dt, off in basetype.fields.values())
+    is_complex_basetype = is_complex_basetype and basetype.fields["r"][0] == basetype.fields["i"][0]
+    if is_complex_basetype:
         itemsize = basetype.itemsize
         if itemsize == 16:
             return numpy.dtype(numpy.complex128)
@@ -107,8 +105,7 @@ def make_new_dset(
     else:
         shape = (shape,) if isinstance(shape, int) else tuple(shape)
         if data is not None and (
-            numpy.prod(shape, dtype=numpy.ulonglong)
-            != numpy.prod(data.shape, dtype=numpy.ulonglong)
+            numpy.prod(shape, dtype=numpy.ulonglong) != numpy.prod(data.shape, dtype=numpy.ulonglong)
         ):
             raise ValueError("Shape tuple is incompatible with data")
 
@@ -773,8 +770,7 @@ class Dataset(HLObject):
     def _getVerboseInfo(self):
         now = time.time()
         if (
-            self._verboseUpdated is None
-            or now - self._verboseUpdated > VERBOSE_REFRESH_TIME
+            self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME
         ):
             # resynch the verbose data
             req = "/datasets/" + self.id.uuid + "?verbose=1"
@@ -874,7 +870,7 @@ class Dataset(HLObject):
                 if shape[0] - i < numrows:
                     numrows = shape[0] - i
                 self.log.debug("get {} iter items".format(numrows))
-                arr = self[i : numrows + i]
+                arr = self[i: numrows + i]
 
             yield arr[i % BUFFER_SIZE]
 
@@ -1133,7 +1129,8 @@ class Dataset(HLObject):
 
                 des_index = 0  # this is where we'll copy to the arr for each page
 
-                self.log.debug(f"paged read, chunks_per_page: {chunks_per_page} max_chunks: {max_chunks}, num_pages: {num_pages}")
+                self.log.debug(f"paged read, chunks_per_page: {chunks_per_page}\
+                                max_chunks: {max_chunks}, num_pages: {num_pages}")
 
                 for page_number in range(num_pages):
                     self.log.debug(f"page_number: {page_number}")
@@ -1153,12 +1150,13 @@ class Dataset(HLObject):
                     self.log.info(f"page_stop: {page_stop[split_dim]}")
 
                     page_mshape = list(copy(mshape))
-                    page_mshape[mshape_split_dim] = (1 + (page_stop[split_dim] - page_start[split_dim] - 1) // sel_step[split_dim])
+                    page_mshape[mshape_split_dim] =\
+                        (1 + (page_stop[split_dim] - page_start[split_dim] - 1) // sel_step[split_dim])
 
                     page_mshape = tuple(page_mshape)
                     self.log.info(f"page_mshape: {page_mshape}")
 
-                    params["select"] = self._getQueryParam( page_start, page_stop, sel_step)
+                    params["select"] = self._getQueryParam(page_start, page_stop, sel_step)
                     try:
                         rsp = self.GET(req, params=params, format="binary")
                     except IOError as ioe:
@@ -1378,7 +1376,7 @@ class Dataset(HLObject):
                 raise TypeError("Unable to assign values to dataset with null shape")
 
         elif isinstance(val, Empty):
-            pass  #  no data
+            pass  # no data
 
         if isinstance(val, Reference):
             # h5pyd References are just strings
@@ -1425,8 +1423,7 @@ class Dataset(HLObject):
                 val = tmp
 
         elif (
-            isinstance(val, complex)
-            or getattr(getattr(val, "dtype", None), "kind", None) == "c"
+            isinstance(val, complex) or getattr(getattr(val, "dtype", None), "kind", None) == "c"
         ):
             if self.dtype.kind != "V" or self.dtype.names != ("r", "i"):
                 raise TypeError(
@@ -1441,9 +1438,9 @@ class Dataset(HLObject):
             val = tmp
 
         elif self.dtype.kind == "O" or (
-            self.dtype.kind == "V"
-            and (not isinstance(val, numpy.ndarray) or val.dtype.kind != "V")
-            and (self.dtype.subdtype == None)
+            self.dtype.kind == "V" and (
+                               not isinstance(val, numpy.ndarray) or val.dtype.kind != "V"
+            ) and (self.dtype.subdtype is None)
         ):
             # TBD: Do we need something like the following in the above if condition:
             # (self.dtype.str != val.dtype.str)
@@ -1482,7 +1479,8 @@ class Dataset(HLObject):
             shp = self.dtype.subdtype[1]   # type shape
             valshp = val.shape[-len(shp):]
             if valshp != shp:  # Last dimension has to match
-                raise TypeError("When writing to array types, last N dimensions have to match (got %s, but should be %s)" % (valshp, shp,))
+                raise TypeError("When writing to array types,\
+                                 last N dimensions have to match (got %s, but should be %s)" % (valshp, shp,))
             mtype = h5t.py_create(numpy.dtype((val.dtype, shp)))
             mshape = val.shape[0:len(val.shape)-len(shp)]
 
@@ -1531,7 +1529,7 @@ class Dataset(HLObject):
             return
 
         # Broadcast scalars if necessary.
-        if mshape == () and selection.mshape != None and selection.mshape != ():
+        if mshape == () and selection.mshape is not None and selection.mshape != ():
             self.log.debug("broadcast scalar")
             if self.dtype.subdtype is not None:
                 raise TypeError("Scalar broadcasting is not supported for array dtypes")
@@ -1777,7 +1775,7 @@ class MultiManager():
         Thread-local method to write to a single dataset
         """
         dset = args[0]
-        idx = args[1]
+        # idx = args[1]
         write_args = args[2]
         write_vals = args[3]
         try:
@@ -1787,7 +1785,7 @@ class MultiManager():
         return
 
     def __getitem__(self, args):
-        """ 
+        """
         Read the same slice from each of the datasets
         managed by this MultiManager.
         """
@@ -1826,7 +1824,8 @@ class MultiManager():
             # TODO: Handle the case where some or all datasets share an HTTPConn object
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            read_futures = [executor.submit(self.read_dset_tl, (self.datasets[i], i, args)) for i in range(len(self.datasets))]
+            read_futures = [executor.submit(self.read_dset_tl,
+                            (self.datasets[i], i, args)) for i in range(len(self.datasets))]
             ret_data = [None] * len(self.datasets)
 
             for future in as_completed(read_futures):
@@ -1880,7 +1879,8 @@ class MultiManager():
                     next_port = low_port
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            write_futures = [executor.submit(self.write_dset_tl, (self.datasets[i], i, args, vals[i])) for i in range(len(self.datasets))]
+            write_futures = [executor.submit(self.write_dset_tl,
+                             (self.datasets[i], i, args, vals[i])) for i in range(len(self.datasets))]
 
             for future in as_completed(write_futures):
                 try:

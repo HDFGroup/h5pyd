@@ -6,8 +6,10 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
+
 
 # Azure
 try:
@@ -27,6 +29,7 @@ except ModuleNotFoundError:
     # eprint("Unable to import google auth packages")
 
 from .config import Config
+
 
 class OpenIDHandler(ABC):
 
@@ -158,7 +161,7 @@ class AzureOpenID(OpenIDHandler):
 
     def write_token_cache(self):
         if 'AD_CLIENT_SECRET' in self.config and self.config['AD_CLIENT_SECRET']:
-            pass # don't use token cache for unattended authentication
+            pass  # don't use token cache for unattended authentication
         else:
             super().write_token_cache()
 
@@ -239,7 +242,7 @@ class AzureOpenID(OpenIDHandler):
                 expire_dt = datetime.strptime(mgmt_token['expiresOn'], '%Y-%m-%d %H:%M:%S.%f')
                 self._token['expiresOn'] = expire_dt.timestamp()
 
-        except:
+        except Exception:
             self._token = None
 
 
@@ -251,7 +254,7 @@ class GoogleOpenID(OpenIDHandler):
         if "google.oauth2" not in sys.modules:
             msg = "google.oauth2 module not found, run: python setup.py install -e '.[google]'"
             raise ModuleNotFoundError(msg)
-        
+
         # Configuration manager
         hs_config = Config()
 
@@ -332,7 +335,7 @@ class GoogleOpenID(OpenIDHandler):
             creds.refresh(GoogleRequest())
             self._token = self._parse(creds)
 
-        except:
+        except Exception:
             self._token = None
 
 
@@ -377,7 +380,7 @@ class KeycloakOpenID(OpenIDHandler):
             raise KeyError("keycloak client_id not set")
 
         url = self.config['keycloak_uri']
-        url += "/auth/realms/" 
+        url += "/auth/realms/"
         url += self.config['keycloak_realm']
         url += "/protocol/openid-connect/token"
 
@@ -401,7 +404,7 @@ class KeycloakOpenID(OpenIDHandler):
         if "expires_in" in creds:
             now = time.time()
             token['expiresOn'] = now + creds["expires_in"]
-       
+
         # TBD: client_secret
         # TBD: scopes
         # TBD: client_id
@@ -411,7 +414,7 @@ class KeycloakOpenID(OpenIDHandler):
     def acquire(self):
         """Acquire a new Keycloak token."""
         keycloak_url = self._getKeycloakUrl()
-        
+
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         body = {}
         body["username"] = self._username
@@ -419,7 +422,7 @@ class KeycloakOpenID(OpenIDHandler):
         body["grant_type"] = "password"
         body["client_id"] = self.config.get("keycloak_client_id")
         rsp = requests.post(keycloak_url, data=body, headers=headers)
-        
+
         if rsp.status_code not in (200, 201):
             print("POST error: {}".format(rsp.status_code))
             raise IOError("Keycloak response: {}".format(rsp.status_code))
@@ -429,7 +432,6 @@ class KeycloakOpenID(OpenIDHandler):
 
     def refresh(self):
         """Try to renew a token."""
-        # TBD 
+        # TBD
         # unclear if refresh is supported without a client secret
         self._token = None
-

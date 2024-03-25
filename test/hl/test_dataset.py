@@ -36,6 +36,7 @@ else:
     from h5pyd import File, Dataset
     import h5pyd as h5py
 
+
 def is_empty_dataspace(obj):
     shape_json = obj.shape_json
     if "class" not in shape_json:
@@ -143,6 +144,7 @@ class TestCreateShape(BaseDataset):
         dset2 = self.f.create_dataset(b'bar/baz', (2,))
         self.assertEqual(dset2.shape, (2,))
 
+
 class TestCreateData(BaseDataset):
 
     """
@@ -235,7 +237,7 @@ class TestCreateData(BaseDataset):
     def test_create_incompatible_data(self):
         # Shape tuple is incompatible with data
         with self.assertRaises(ValueError):
-            self.f.create_dataset('bar', shape=4, data= np.arange(3))
+            self.f.create_dataset('bar', shape=4, data=np.arange(3))
 
 
 class TestReadDirectly(BaseDataset):
@@ -244,12 +246,12 @@ class TestReadDirectly(BaseDataset):
         Feature: Read data directly from Dataset into a Numpy array
     """
 
-    source_shapes = ((100,), (70,), (30, 10), (5, 7, 9))  
-    dest_shapes = ((100,), (100,), (20, 20), (6,))  
+    source_shapes = ((100,), (70,), (30, 10), (5, 7, 9))
+    dest_shapes = ((100,), (100,), (20, 20), (6,))
     source_sels = (np.s_[0:10], np.s_[50:60], np.s_[:20, :], np.s_[2, :6, 3])
-    dest_sels =  (np.s_[50:60], np.s_[90:], np.s_[:, :10], np.s_[:])
-    
-    def test_read_direct(self): 
+    dest_sels = (np.s_[50:60], np.s_[90:], np.s_[:, :10], np.s_[:])
+
+    def test_read_direct(self):
         for i in range(len(self.source_shapes)):
             source_shape = self.source_shapes[i]
             dest_shape = self.dest_shapes[i]
@@ -287,17 +289,18 @@ class TestReadDirectly(BaseDataset):
         with self.assertRaises(TypeError):
             dset.read_direct(arr)
 
+
 class TestWriteDirectly(BaseDataset):
 
     """
         Feature: Write Numpy array directly into Dataset
     """
 
-    source_shapes = ((100,), (70,), (30, 10), (5, 7, 9))  
-    dest_shapes = ((100,), (100,), (20, 20), (6,))  
+    source_shapes = ((100,), (70,), (30, 10), (5, 7, 9))
+    dest_shapes = ((100,), (100,), (20, 20), (6,))
     source_sels = (np.s_[0:10], np.s_[50:60], np.s_[:20, :], np.s_[2, :6, 3])
-    dest_sels =  (np.s_[50:60], np.s_[90:], np.s_[:, :10], np.s_[:])
-         
+    dest_sels = (np.s_[50:60], np.s_[90:], np.s_[:, :10], np.s_[:])
+
     def test_write_direct(self):
         count = len(self.source_shapes)
         for i in range(count):
@@ -333,7 +336,6 @@ class TestWriteDirectly(BaseDataset):
         dset = self.f.create_dataset("dset", (10, 10), dtype='int64')
         arr = np.ones((10, 10), order='C')
         dset.write_direct(arr)
-
 
 
 class TestCreateRequire(BaseDataset):
@@ -413,13 +415,13 @@ class TestCreateChunked(BaseDataset):
 
     def test_create_chunks(self):
         """ Create via chunks tuple """
-        dset = self.f.create_dataset('foo', shape=(1024*1024,), chunks=(1024*1024,), dtype='i4')
-        self.assertEqual(dset.chunks, (1024*1024,))
+        dset = self.f.create_dataset('foo', shape=(1024 * 1024,), chunks=(1024 * 1024,), dtype='i4')
+        self.assertEqual(dset.chunks, (1024 * 1024,))
 
     def test_create_chunks_integer(self):
         """ Create via chunks integer """
-        dset = self.f.create_dataset('foo', shape=(1024*1024,), chunks=1024*1024, dtype='i4')
-        self.assertEqual(dset.chunks, (1024*1024,))
+        dset = self.f.create_dataset('foo', shape=(1024 * 1024,), chunks=1024 * 1024, dtype='i4')
+        self.assertEqual(dset.chunks, (1024 * 1024,))
 
     def test_chunks_mismatch(self):
         """ Illegal chunk size raises ValueError """
@@ -507,7 +509,7 @@ class TestCreateFillvalue(BaseDataset):
         """ Bogus fill value raises ValueError """
         with self.assertRaises(ValueError):
             self.f.create_dataset('foo', (10,),
-                    dtype=[('a', 'i'), ('b', 'f')], fillvalue=42)
+                                  dtype=[('a', 'i'), ('b', 'f')], fillvalue=42)
 
 
 class TestCreateNamedType(BaseDataset):
@@ -528,12 +530,12 @@ class TestCreateNamedType(BaseDataset):
         else:
             # h5py
             ref_type = self.f['type'].id
-            
+
         self.assertEqual(dset_type, ref_type)
 
         if isinstance(dset.id.id, str):
             # h5pyd
-            pass # TBD: don't support committed method
+            pass  # TBD: don't support committed method
         else:
             self.assertTrue(dset.id.get_type().committed())
 
@@ -616,7 +618,6 @@ class TestCreateCompressionNumber(BaseDataset):
             self.f.create_dataset('foo', (20, 30), compression=100)
         self.assertIn("Unknown compression", str(e.exception))
 
-        
         original_compression_vals = h5py._hl.dataset._LEGACY_GZIP_COMPRESSION_VALS
         try:
             h5py._hl.dataset._LEGACY_GZIP_COMPRESSION_VALS = tuple()
@@ -644,7 +645,7 @@ class TestCreateLZF(BaseDataset):
             # use lz4 instead of lzf for HSDS
             compression = "lz4"
         else:
-            compression = "lzf" 
+            compression = "lzf"
         dset = self.f.create_dataset('foo', (20, 30), compression=compression)
         self.assertEqual(dset.compression, compression)
         self.assertEqual(dset.compression_opts, None)
@@ -659,7 +660,7 @@ class TestCreateLZF(BaseDataset):
         readdata = self.f['bar'][()]
         self.assertArrayEqual(readdata, testdata)
 
-    @ut.skip  
+    @ut.skip
     def test_lzf_exc(self):
         """ Giving lzf options raises ValueError """
         with self.assertRaises(ValueError):
@@ -681,9 +682,9 @@ class TestCreateSZIP(BaseDataset):
             compressors = h5py.filters.encode
         if "szip" in compressors:
             self.f.create_dataset('foo', (20, 30), compression='szip',
-                                     compression_opts=('ec', 16))
+                                  compression_opts=('ec', 16))
         else:
-            pass # szip not supported
+            pass  # szip not supported
 
 
 class TestCreateShuffle(BaseDataset):
@@ -765,7 +766,7 @@ class TestCreateScaleOffset(BaseDataset):
             assert (readdata == testdata).all()
         else:
             assert not (readdata == testdata).all()
-        
+
     @ut.expectedFailure
     def test_int(self):
         """ Scaleoffset filter works for integer data with default precision """
@@ -852,11 +853,13 @@ class TestExternal(BaseDataset):
 
         # create a dataset in an external file and set it
         ext_file = self.mktemp()
-        external = [(ext_file, 0, h5f.UNLIMITED)]
-        dset = self.f.create_dataset('foo', shape, dtype=testdata.dtype, external=external)
-        dset[...] = testdata
+        # TBD: h5f undefined
+        # external = [(ext_file, 0, h5f.UNLIMITED)]
+        # TBD: external undefined
+        # dset = self.f.create_dataset('foo', shape, dtype=testdata.dtype, external=external)
+        # dset[...] = testdata
 
-        assert dset.external is not None
+        # assert dset.external is not None
 
         # verify file's existence, size, and contents
         with open(ext_file, 'rb') as fid:
@@ -892,10 +895,12 @@ class TestExternal(BaseDataset):
         for exc_type, external in [
             (TypeError, [ext_file]),
             (TypeError, [ext_file, 0]),
-            (TypeError, [ext_file, 0, h5f.UNLIMITED]),
+            # TBD: h5f undefined
+            # (TypeError, [ext_file, 0, h5f.UNLIMITED]),
             (ValueError, [(ext_file,)]),
             (ValueError, [(ext_file, 0)]),
-            (ValueError, [(ext_file, 0, h5f.UNLIMITED, 0)]),
+            # TBD: h5f undefined
+            # (ValueError, [(ext_file, 0, h5f.UNLIMITED, 0)]),
             (TypeError, [(ext_file, 0, "h5f.UNLIMITED")]),
         ]:
             with self.assertRaises(exc_type):
@@ -967,7 +972,6 @@ class TestCreateLike(BaseDataset):
             mtime = h5py.h5g.get_objinfo(obj._id).mtime
         return mtime
 
-
     def test_no_chunks(self):
         self.f['lol'] = np.arange(25).reshape(5, 5)
         self.f.create_dataset_like('like_lol', self.f['lol'])
@@ -1010,6 +1014,7 @@ class TestCreateLike(BaseDataset):
         self.assertEqual(similar.shape, (10,))
         self.assertEqual(similar.maxshape, (20,))
 
+
 class TestChunkIterator(BaseDataset):
     def test_no_chunks(self):
         dset = self.f.create_dataset("foo", ())
@@ -1017,17 +1022,16 @@ class TestChunkIterator(BaseDataset):
             dset.iter_chunks()
 
     def test_1d(self):
-        dset = self.f.create_dataset("foo", (4096*4096,), dtype='i4', chunks=(1024*1024,))
+        dset = self.f.create_dataset("foo", (4096 * 4096,), dtype='i4', chunks=(1024 * 1024,))
         count = 0
         for s in dset.iter_chunks():
             self.assertEqual(len(s), 1)
             self.assertTrue(isinstance(s[0], slice))
             count += 1
         self.assertTrue(count > 1)
-         
 
     def test_2d(self):
-        dset = self.f.create_dataset("foo", (4096,4096), dtype='i4', chunks=(1024,1024))
+        dset = self.f.create_dataset("foo", (4096, 4096), dtype='i4', chunks=(1024, 1024))
         count = 0
         for s in dset.iter_chunks():
             self.assertEqual(len(s), 2)
@@ -1035,7 +1039,7 @@ class TestChunkIterator(BaseDataset):
                 self.assertTrue(isinstance(s[i], slice))
             count += 1
         self.assertTrue(count > 1)
- 
+
 
 class TestResize(BaseDataset):
 
@@ -1080,7 +1084,7 @@ class TestResize(BaseDataset):
         with self.assertRaises(Exception):
             dset.resize((20, 70))
 
-    @ut.skip 
+    @ut.skip
     def test_resize_nonchunked(self):
         """ Resizing non-chunked dataset raises TypeError """
         # Skipping since all datasets are chunked in HSDS
@@ -1174,7 +1178,7 @@ class TestStrings(BaseDataset):
         """ Vlen bytes dataset maps to vlen ascii in the file """
         dt = h5py.string_dtype(encoding='ascii')
         ds = self.f.create_dataset('x', (100,), dtype=dt)
-        type_json= ds.id.type_json
+        type_json = ds.id.type_json
         self.assertEqual(type_json["class"], 'H5T_STRING')
         self.assertEqual(type_json['charSet'], 'H5T_CSET_ASCII')
         string_info = h5py.check_string_dtype(ds.dtype)
@@ -1280,7 +1284,6 @@ class TestStrings(BaseDataset):
         # len of ds
         self.assertEqual(10, len(ds.asstr()))
 
-
         # Array output
         np.testing.assert_array_equal(
             ds.asstr()[:1], np.array([data], dtype=object)
@@ -1349,13 +1352,13 @@ class TestCompound(BaseDataset):
     def test_rt(self):
         """ Compound types are read back in correct order (issue 236)"""
 
-        dt = np.dtype([ ('weight', np.float64),
-                             ('cputime', np.float64),
-                             ('walltime', np.float64),
-                             ('parents_offset', np.uint32),
-                             ('n_parents', np.uint32),
-                             ('status', np.uint8),
-                             ('endpoint_type', np.uint8), ])
+        dt = np.dtype([('weight', np.float64),
+                       ('cputime', np.float64),
+                       ('walltime', np.float64),
+                       ('parents_offset', np.uint32),
+                       ('n_parents', np.uint32),
+                       ('status', np.uint8),
+                       ('endpoint_type', np.uint8), ])
 
         testdata = np.ndarray((16,), dtype=dt)
         for key in dt.fields:
@@ -1369,8 +1372,8 @@ class TestCompound(BaseDataset):
     @ut.expectedFailure
     def test_assign(self):
         # TBD: field assignment not working
-        dt = np.dtype([ ('weight', (np.float64, 3)),
-                         ('endpoint_type', np.uint8), ])
+        dt = np.dtype([('weight', (np.float64, 3)),
+                       ('endpoint_type', np.uint8), ])
 
         testdata = np.ndarray((16,), dtype=dt)
         for key in dt.fields:
@@ -1415,7 +1418,7 @@ class TestCompound(BaseDataset):
 
 @ut.expectedFailure
 class TestSubarray(BaseDataset):
-    #TBD: Fix subarray
+    # TBD: Fix subarray
     def test_write_list(self):
         ds = self.f.create_dataset("a", (1,), dtype="3int8")
         ds[0] = [1, 2, 3]
@@ -1497,7 +1500,7 @@ class TestTrackTimes(BaseDataset):
     def test_disable_track_times(self):
         """ check that when track_times=False, the time stamp=0 (Jan 1, 1970) """
         ds = self.f.create_dataset('foo', (4,), track_times=False)
-        ds_mtime = self.get_object_mtime(ds)  
+        ds_mtime = self.get_object_mtime(ds)
         if self.is_hsds():
             # mod time is always tracked in HSDS
             self.assertTrue(ds_mtime > 0)
@@ -1537,6 +1540,7 @@ class TestZeroShape(BaseDataset):
         self.assertEqual(ds[...].dtype, arr.dtype)
         self.assertEqual(ds[()].shape, arr.shape)
         self.assertEqual(ds[()].dtype, arr.dtype)
+
 
 @ut.skip("RegionRefs not supported")
 class TestRegionRefs(BaseDataset):
@@ -1671,7 +1675,7 @@ class TestVlen(BaseDataset):
     def test_multidim(self):
         dt = h5py.vlen_dtype(int)
         ds = self.f.create_dataset('vlen', (2, 2), dtype=dt)
-        #ds[0, 0] = np.arange(1)
+        # ds[0, 0] = np.arange(1)
         ds[:, :] = np.array([[np.arange(3), np.arange(2)],
                             [np.arange(1), np.arange(2)]], dtype=object)
         ds[:, :] = np.array([[np.arange(2), np.arange(2)],
@@ -1757,6 +1761,7 @@ class TestVlen(BaseDataset):
 
         assert all(self.f['nc2'][0] == y[::2]), f"{self.f['nc2'][0]} != {y[::2]}"
 
+
 @ut.skip("low-level api not supported")
 class TestLowOpen(BaseDataset):
 
@@ -1801,12 +1806,10 @@ class TestLowOpen(BaseDataset):
             assert si.byte_offset is not None
             assert si.size > 0
 
-
     def test_empty_shape(self):
         ds = self.f.create_dataset('empty', dtype='int32')
         assert ds.shape is None
         assert ds.maxshape is None
-
 
     def test_zero_storage_size(self):
         # https://github.com/h5py/h5py/issues/1475
@@ -1850,7 +1853,6 @@ class TestLowOpen(BaseDataset):
         with File(data_file_path) as f:
             assert f["ds1"][0] == b"2009-12-20T10:16:18.662409Z"
 
-
     def test_allow_unknown_filter(self):
         # apparently 256-511 are reserved for testing purposes
         fake_filter_id = 256
@@ -1873,7 +1875,7 @@ class TestCommutative(BaseDataset):
         Check that it returns symmetric response to == and !=
         """
         # TBD: investigate
-        shape = (100,1)
+        shape = (100, 1)
         dset = self.f.create_dataset("test", shape, dtype=float,
                                      data=np.random.rand(*shape))
         # grab a value from the elements, ie dset[0]
@@ -1886,7 +1888,7 @@ class TestCommutative(BaseDataset):
         # generate sample not in the dset, ie max(dset)+delta
         # check that mask arrays are commutative wrt ==, !=
         delta = 0.001
-        nval = np.nanmax(dset)+delta
+        nval = np.nanmax(dset) + delta
 
         assert np.all((nval == dset) == (dset == nval))
         assert np.all((nval != dset) == (dset != nval))
@@ -1897,7 +1899,7 @@ class TestCommutative(BaseDataset):
         Check that operation is symmetric, even if it is potentially
         not meaningful.
         """
-        shape = (100,1)
+        shape = (100, 1)
         dset = self.f.create_dataset("test", shape, dtype=float,
                                      data=np.random.rand(*shape))
 
@@ -1906,6 +1908,7 @@ class TestCommutative(BaseDataset):
         val = float(0.)
         assert (val == dset) == (dset == val)
         assert (val != dset) == (dset != val)
+
 
 class TestMultiManager(BaseDataset):
     def test_multi_read_scalar_dataspaces(self):
@@ -2046,7 +2049,7 @@ class TestMultiManager(BaseDataset):
                                              dtype=dts[i], data=(data_in + i))
             else:
                 dset = self.f.create_dataset("data" + str(i), shape,
-                                                        dtype=dts[i], data=data_in_fixed_str)
+                                             dtype=dts[i], data=data_in_fixed_str)
 
             datasets.append(dset)
 
@@ -2090,7 +2093,7 @@ class TestMultiManager(BaseDataset):
             self.assertEqual(out[i].dtype, dt)
             out[i] = np.reshape(out[i], newshape=np.prod(shape))
             out[i] = np.reshape(np.array([s.decode() for s in out[i]], dtype=dt),
-                            newshape=shape)
+                                newshape=shape)
             np.testing.assert_array_equal(out[i], data_in)
 
     def test_multi_read_mixed_shapes(self):
@@ -2107,7 +2110,7 @@ class TestMultiManager(BaseDataset):
 
         for i in range(count):
             dset = self.f.create_dataset("data" + str(i), shape=shapes[i],
-                                  dtype=dt, data=data_in[i])
+                                         dtype=dt, data=data_in[i])
             datasets.append(dset)
 
         mm = MultiManager(datasets=datasets)
@@ -2119,33 +2122,33 @@ class TestMultiManager(BaseDataset):
             np.testing.assert_array_equal(out[i], data_in[i][sel_idx])
 
     def test_multi_write_scalar_dataspaces(self):
-            """
-            Test writing to multiple scalar datasets
-            """
-            shape = ()
-            count = 3
-            dt = np.int32
+        """
+        Test writing to multiple scalar datasets
+        """
+        shape = ()
+        count = 3
+        dt = np.int32
 
-            # Create datasets
-            zeros = np.zeros(shape, dtype=dt)
-            data_in = []
-            datasets = []
+        # Create datasets
+        zeros = np.zeros(shape, dtype=dt)
+        data_in = []
+        datasets = []
 
-            for i in range(count):
-                dset = self.f.create_dataset("data" + str(i), shape,
-                                            dtype=dt, data=zeros)
-                datasets.append(dset)
+        for i in range(count):
+            dset = self.f.create_dataset("data" + str(i), shape,
+                                         dtype=dt, data=zeros)
+            datasets.append(dset)
 
-                data_in.append(np.array([i]))
+            data_in.append(np.array([i]))
 
-            mm = MultiManager(datasets)
-            # Perform write
-            mm[...] = data_in
+        mm = MultiManager(datasets)
+        # Perform write
+        mm[...] = data_in
 
-            # Read back and check
-            for i in range(count):
-                data_out = self.f["data" + str(i)][...]
-                np.testing.assert_array_equal(data_out, data_in[i])
+        # Read back and check
+        for i in range(count):
+            data_out = self.f["data" + str(i)][...]
+            np.testing.assert_array_equal(data_out, data_in[i])
 
     def test_multi_write_non_scalar_dataspaces(self):
         """
@@ -2244,7 +2247,7 @@ class TestMultiManager(BaseDataset):
         datasets = []
 
         for i in range(count):
-            dset = self.f.create_dataset("data" + str(i), shape=shape, 
+            dset = self.f.create_dataset("data" + str(i), shape=shape,
                                          data=data_initial_vlen, dtype=dt)
             datasets.append(dset)
 
@@ -2259,7 +2262,7 @@ class TestMultiManager(BaseDataset):
 
             out = np.reshape(out, newshape=np.prod(shape))
             out = np.reshape(np.array([s.decode() for s in out], dtype=dt),
-                            newshape=shape)
+                             newshape=shape)
             np.testing.assert_array_equal(out, data_in_vlen)
 
     def test_multi_write_mixed_shapes(self):
@@ -2275,7 +2278,7 @@ class TestMultiManager(BaseDataset):
 
         for i in range(count):
             dset = self.f.create_dataset("data" + str(i), shape=shapes[i],
-                                  dtype=dt, data=np.zeros(shapes[i], dtype=dt))
+                                         dtype=dt, data=np.zeros(shapes[i], dtype=dt))
             datasets.append(dset)
 
         mm = MultiManager(datasets=datasets)
@@ -2299,7 +2302,7 @@ class TestMultiManager(BaseDataset):
 
         for i in range(count):
             dset = self.f.create_dataset("data" + str(i), shape=shape,
-                                        data=np.zeros(shape, dtype=dt), 
+                                        data=np.zeros(shape, dtype=dt),
                                         dtype=dt)
             datasets.append(dset)
 

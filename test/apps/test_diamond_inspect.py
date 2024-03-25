@@ -22,9 +22,10 @@ else:
 
 from common import ut, TestCase
 
+
 def get_filename():
     if config.get("use_h5py"):
-        dirpath = "data" 
+        dirpath = "data"
     else:
         dirpath = config.get("H5PYD_TEST_FOLDER")
     filename = os.path.join(dirpath, "diamond.h5")
@@ -34,12 +35,13 @@ def get_filename():
 class TestDiamondInspect(TestCase):
 
     def setUp(self):
-        
+
         filename = get_filename()
         self.f = h5py.File(filename, "r")
 
     def test_obj_count(self):
         counts = {"groups": 0, "datasets": 0}
+
         def visit(name):
             obj = self.f[name]
             if isinstance(obj, h5py.Dataset):
@@ -68,10 +70,10 @@ class TestDiamondInspect(TestCase):
         g2_dset = g1["dset"]
         self.assertEqual(g1_dset.id.id, g2_dset.id.id)
 
+
 if __name__ == '__main__':
     print("filename:", get_filename())
     loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
-    
-    ut.main()
 
+    ut.main()
