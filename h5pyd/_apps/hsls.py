@@ -275,6 +275,7 @@ def dumpAcls(obj):
     for acl in acls:
         dumpACL(acl)
 
+
 def dumpAttrs(obj):
     """ print attributes of the given obj """
 
@@ -293,6 +294,7 @@ def dumpAttrs(obj):
             print("   attr: {0:24} {1}".format(attr_name, val))
         else:
             print("   attr: {0:24} {1}".format(attr_name, attr))
+
 
 def getFolder(domain):
     username = cfg["hs_username"]
@@ -655,7 +657,7 @@ def main():
                     continue
                 dump(h5path, obj)
                 continue
-            
+
             if cfg["showattrs"]:
                 # dump attributes for root group
                 dumpAttrs(grp)
