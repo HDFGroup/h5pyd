@@ -255,7 +255,6 @@ def make_new_dset(
         layout=layout,
         initializer=initializer,
         initializer_opts=initializer_opts
-
     )
 
     if fillvalue is not None:
@@ -778,7 +777,7 @@ class Dataset(HLObject):
             if "num_chunks" in rsp_json:
                 self._num_chunks = rsp_json["num_chunks"]
             else:
-                # not avaailable yet, set to 0
+                # not available yet, set to 0
                 self._num_chunks = 0
             if "allocated_size" in rsp_json:
                 self._allocated_size = rsp_json["allocated_size"]
