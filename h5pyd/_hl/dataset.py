@@ -567,7 +567,7 @@ class Dataset(HLObject):
         """Numpy-style attribute giving the total dataset size"""
         if self._shape is None:
             return None
-        return numpy.prod(self._shape).item()
+        return numpy.prod(self._shape, dtype=numpy.int64).item()
 
     @property
     def nbytes(self):
