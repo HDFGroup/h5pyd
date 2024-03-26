@@ -441,10 +441,14 @@ def getTypeItem(dt):
             type_info['length'] = 'H5T_VARIABLE'
             type_info['charSet'] = 'H5T_CSET_UTF8'
             type_info['strPad'] = 'H5T_STR_NULLTERM'
-        elif vlen_check == int:
+        elif vlen_check in (int, np.int64):
             type_info['class'] = 'H5T_VLEN'
             type_info['size'] = 'H5T_VARIABLE'
             type_info['base'] = 'H5T_STD_I64'
+        elif vlen_check == np.int32:
+            type_info['class'] = 'H5T_VLEN'
+            type_info['size'] = 'H5T_VARIABLE'
+            type_info['base'] = 'H5T_STD_I32'
         elif vlen_check in (float, np.float64):
             type_info['class'] = 'H5T_VLEN'
             type_info['size'] = 'H5T_VARIABLE'
@@ -456,7 +460,7 @@ def getTypeItem(dt):
             type_info['base'] = getTypeItem(vlen_check)
         elif vlen_check is not None:
             # unknown vlen type
-            raise TypeError("Unknown h5py vlen type: " + str(vlen_check))
+            raise TypeError("Unknown h5pyd vlen type: " + str(vlen_check))
         elif ref_check is not None:
             # a reference type
             type_info['class'] = 'H5T_REFERENCE'
@@ -781,7 +785,7 @@ def createBaseDataType(typeItem):
             raise TypeError("ArrayType is not supported for variable len types")
         if 'base' not in typeItem:
             raise KeyError("'base' not provided")
-        baseType = createBaseDataType(typeItem['base'])
+        baseType = createDataType(typeItem['base'])
         dtRet = special_dtype(vlen=np.dtype(baseType))
     elif typeClass == 'H5T_OPAQUE':
         if dims:
@@ -842,9 +846,8 @@ def createBaseDataType(typeItem):
         else:
             # not a boolean enum, use h5py special dtype
             dtRet = special_dtype(enum=(dt, mapping))
-
     else:
-        raise TypeError("Invalid type class")
+        raise TypeError(f"Invalid base type class: {typeClass}")
 
     return dtRet
 

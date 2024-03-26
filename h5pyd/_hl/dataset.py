@@ -1049,6 +1049,9 @@ class Dataset(HLObject):
         req = "/datasets/" + self.id.uuid + "/value"
         params = {}
 
+        if len(names) > 0:
+            params["fields"] = ":".join(names)
+
         if self.id._http_conn.mode == "r" and self.id._http_conn.cache_on:
             # enables lambda to be used on server
             self.log.debug("setting nonstrict parameter")
@@ -1483,41 +1486,23 @@ class Dataset(HLObject):
                                  last N dimensions have to match (got %s, but should be %s)" % (valshp, shp,))
             mtype = h5t.py_create(numpy.dtype((val.dtype, shp)))
             mshape = val.shape[0:len(val.shape)-len(shp)]
+        """
 
-
-        # Make a compound memory type if field-name slicing is required
-        elif len(names) != 0:
-
-            mshape = val.shape
-
+        # Check for field selection
+        if len(names) != 0:
             # Catch common errors
             if self.dtype.fields is None:
                 raise TypeError("Illegal slicing argument (not a compound dataset)")
             mismatch = [x for x in names if x not in self.dtype.fields]
             if len(mismatch) != 0:
-                mismatch = ", ".join('"%s"'%x for x in mismatch)
+                mismatch = ", ".join('"%s"' % x for x in mismatch)
                 raise ValueError("Illegal slicing argument (fields %s not in dataset type)" % mismatch)
-
-            # Write non-compound source into a single dataset field
-            if len(names) == 1 and val.dtype.fields is None:
-                subtype = h5y.py_create(val.dtype)
-                mtype = h5t.create(h5t.COMPOUND, subtype.get_size())
-                mtype.insert(self._e(names[0]), 0, subtype)
-
-            # Make a new source type keeping only the requested fields
-            else:
-                fieldnames = [x for x in val.dtype.names if x in names] # Keep source order
-                mtype = h5t.create(h5t.COMPOUND, val.dtype.itemsize)
-                for fieldname in fieldnames:
-                    subtype = h5t.py_create(val.dtype.fields[fieldname][0])
-                    offset = val.dtype.fields[fieldname][1]
-                   mtype.insert(self._e(fieldname), offset, subtype)
 
         # Use mtype derived from array (let DatasetID.write figure it out)
         else:
             mshape = val.shape
-            #mtype = None
-        """
+            # mtype = None
+
         mshape = val.shape
         self.log.debug(f"mshape: {mshape}")
         self.log.debug(f"data dtype: {val.dtype}")
@@ -1581,6 +1566,10 @@ class Dataset(HLObject):
             select_param = selection.getQueryParam()
             self.log.debug(f"got select query param: {select_param}")
             params["select"] = select_param
+
+        # Perform write to subset of named fields within compound datatype, if any
+        if len(names) > 0:
+            params["fields"] = ":".join(names)
 
         self.PUT(req, body=body, format=format, params=params)
         """
