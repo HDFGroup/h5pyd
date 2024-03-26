@@ -84,7 +84,7 @@ class TestFile(TestCase):
             self.assertTrue(f.modified >= f.created)
         
             self.assertTrue(len(f.owner) > 0)
-            version = f.serverver
+            version = f.server_ver
              # server version should be of form "n.n.n"
             n = version.find(".")
             self.assertTrue(n>=1)

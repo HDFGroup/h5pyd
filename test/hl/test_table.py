@@ -155,6 +155,17 @@ class TestTable(TestCase):
             quote = quotes[i]
             self.assertTrue(quote[3] > 3000)
             self.assertTrue(quote[3] < 3100)
+
+        # try where in list query        
+        if f.server_ver.startswith("0.9"):
+            condition = "where symbol in (b'AAPL', b'EBAY')"
+            quotes = table.read_where(condition)
+            self.assertEqual(len(quotes), 8)
+            for i in range(8):
+                quote = quotes[i]
+                self.assertTrue(quote[1] in (b'AAPL', b'EBAY'))
+        else:
+            print("'where in' queries require HSDS version 0.9 or higher")
         
         # try modifying specific rows
         condition = "symbol == b'AAPL'"

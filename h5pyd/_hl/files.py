@@ -83,7 +83,7 @@ class File(Group):
         return ("0.0.1",)
 
     @property
-    def serverver(self):
+    def server_ver(self):
         return self._version
 
     @property
