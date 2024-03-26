@@ -228,21 +228,7 @@ def dump(name, obj, visited=None):
 
     if cfg["showattrs"] and class_name in ("Dataset", "Table", "Group", "Datatype"):
         # dump attributes for the object
-        for attr_name in obj.attrs:
-            attr = obj.attrs[attr_name]
-            el = "..."  # show this if the attribute is too large
-            if isinstance(attr, np.ndarray):
-                rank = len(attr.shape)
-            else:
-                rank = 0  # scalar data
-            if rank > 1:
-                val = "[" * rank + el + "]" * rank
-                print("   attr: {0:24} {1}".format(attr_name, val))
-            elif rank == 1 and attr.shape[0] > 1:
-                val = "[{},{}]".format(attr[0], el)
-                print("   attr: {0:24} {1}".format(attr_name, val))
-            else:
-                print("   attr: {0:24} {1}".format(attr_name, attr))
+        dumpAttrs(obj)
 
     if visited is not None and obj_id is not None:
         visited[obj_id] = name
@@ -289,6 +275,24 @@ def dumpAcls(obj):
     for acl in acls:
         dumpACL(acl)
 
+def dumpAttrs(obj):
+    """ print attributes of the given obj """
+
+    for attr_name in obj.attrs:
+        attr = obj.attrs[attr_name]
+        el = "..."  # show this if the attribute is too large
+        if isinstance(attr, np.ndarray):
+            rank = len(attr.shape)
+        else:
+            rank = 0  # scalar data
+        if rank > 1:
+            val = "[" * rank + el + "]" * rank
+            print("   attr: {0:24} {1}".format(attr_name, val))
+        elif rank == 1 and attr.shape[0] > 1:
+            val = "[{},{}]".format(attr[0], el)
+            print("   attr: {0:24} {1}".format(attr_name, val))
+        else:
+            print("   attr: {0:24} {1}".format(attr_name, attr))
 
 def getFolder(domain):
     username = cfg["hs_username"]
@@ -651,6 +655,10 @@ def main():
                     continue
                 dump(h5path, obj)
                 continue
+            
+            if cfg["showattrs"]:
+                # dump attributes for root group
+                dumpAttrs(grp)
 
             if depth < 0:
                 # recursive
