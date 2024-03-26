@@ -22,7 +22,8 @@ else:
 
 cfg = Config()
 
-#----------------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------------
 def usage():
     option_names = cfg.get_names()
     cmd = cfg.get_cmd()
@@ -40,7 +41,7 @@ def usage():
     for name in option_names:
         help_msg = cfg.get_help_message(name)
         if help_msg:
-            print(f"    {help_msg}")  
+            print(f"    {help_msg}")
     print("")
     print("Examples:")
     print(f"     {cmd} /home/myfolder/file1.h5  /home/myfolder/file2.h5")
@@ -49,25 +50,26 @@ def usage():
     print(cfg.get_see_also(cmd))
     print("")
     sys.exit(-1)
-#end print_usage
+# end print_usage
 
-#----------------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------------
 def print_config_example():
     print("# default")
     print("hs_username = <username>")
     print("hs_password = <passwd>")
     print("hs_endpoint = http://hsdshdflab.hdfgroup.org")
-#print_config_example
+# print_config_example
 
-#----------------------------------------------------------------------------------
 
+# ----------------------------------------------------------------------------------
 def getFolder(domain, mode="r"):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
     bucket = cfg["hs_bucket"]
     dir = h5pyd.Folder(domain, endpoint=endpoint, username=username,
-                      password=password, bucket=bucket, mode=mode)
+                       password=password, bucket=bucket, mode=mode)
     return dir
 
 
@@ -77,23 +79,25 @@ def getFile(domain, mode="r"):
     endpoint = cfg["hs_endpoint"]
     bucket = cfg["hs_bucket"]
     fh = h5pyd.File(domain, mode=mode, endpoint=endpoint, username=username,
-                   password=password, bucket=bucket, use_cache=True)
+                    password=password, bucket=bucket, use_cache=True)
     return fh
 
+
 def createFile(domain, linked_domain=None, no_clobber=False):
-    #print("createFile", domain)
+    # print("createFile", domain)
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
     bucket = cfg["hs_bucket"]
     owner = None
     if no_clobber:
-        mode= "x"
+        mode = "x"
     else:
-        mode="w"
+        mode = "w"
     if "hs_owner" in cfg:
-        owner=cfg["hs_owner"]
-    fh = h5pyd.File(domain, mode=mode, endpoint=endpoint, username=username, password=password, bucket=bucket, owner=owner, linked_domain=linked_domain)
+        owner = cfg["hs_owner"]
+    fh = h5pyd.File(domain, mode=mode, endpoint=endpoint, username=username,
+                    password=password, bucket=bucket, owner=owner, linked_domain=linked_domain)
     return fh
 
 
@@ -137,10 +141,13 @@ def deleteDomain(domain, keep_root=False):
         else:
             print(f"Domain: {domain} deleted")
 
+
 def main():
 
-    cfg.setitem("no_clobber", False, flags=["-n", "--no-clobber"],  help="do not overwrite any domains")
-    cfg.setitem("hs_owner", None, flags=["-o", "--owner"], choices=["OWNER",], help="set owner (must be run as an admin user)")
+    cfg.setitem("no_clobber", False, flags=["-n", "--no-clobber"],
+                help="do not overwrite any domains")
+    cfg.setitem("hs_owner", None, flags=["-o", "--owner"], choices=["OWNER",],
+                help="set owner (must be run as an admin user)")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
     try:
@@ -207,6 +214,7 @@ def main():
         msg = f"Error: {oe.errno} removing source domain: {src_domain}"
         logging.error(msg)
         sys.exit(str(oe))
+
 
 # __main__
 if __name__ == "__main__":

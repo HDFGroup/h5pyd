@@ -13,6 +13,7 @@ else:
 
 cfg = Config()
 
+
 def getFolder(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -22,6 +23,7 @@ def getFolder(domain):
     dir = h5py.Folder(domain, endpoint=endpoint, username=username, password=password, bucket=bucket)
     return dir
 
+
 def createFolder(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -29,10 +31,12 @@ def createFolder(domain):
     bucket = cfg["hs_bucket"]
     owner = None
     if "hs_owner" in cfg:
-        owner=cfg["hs_owner"]
+        owner = cfg["hs_owner"]
     logging.debug(f"createFolder({domain})")
-    dir = h5py.Folder(domain, mode='x', endpoint=endpoint, username=username, password=password, bucket=bucket, owner=owner)
+    dir = h5py.Folder(domain, mode='x', endpoint=endpoint, username=username,
+                      password=password, bucket=bucket, owner=owner)
     return dir
+
 
 def getFile(domain, mode="a"):
     username = cfg["hs_username"]
@@ -43,6 +47,7 @@ def getFile(domain, mode="a"):
     fh = h5py.File(domain, mode=mode, endpoint=endpoint, username=username, password=password, bucket=bucket)
     return fh
 
+
 def createFile(domain):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
@@ -50,10 +55,12 @@ def createFile(domain):
     bucket = cfg["hs_bucket"]
     owner = None
     if "hs_owner" in cfg:
-        owner=cfg["hs_owner"]
+        owner = cfg["hs_owner"]
     logging.debug(f"createFile({domain})")
-    fh = h5py.File(domain, mode='x', endpoint=endpoint, username=username, password=password, bucket=bucket, owner=owner)
+    fh = h5py.File(domain, mode='x', endpoint=endpoint, username=username,
+                   password=password, bucket=bucket, owner=owner)
     return fh
+
 
 def getParentDomain(domain):
     if domain[-1] == '/':
@@ -63,6 +70,7 @@ def getParentDomain(domain):
     if not parent_domain.endswith("/"):
         parent_domain += "/"
     return parent_domain
+
 
 def touchDomain(domain):
     # get handle to parent folder
@@ -78,7 +86,7 @@ def touchDomain(domain):
         try:
             getFolder(parent_domain)
         except IOError as oe:
-            #print("errno:", oe.errno)
+            # print("errno:", oe.errno)
             if oe.errno in (404, 410):   # Not Found
                 sys.exit(f"Parent domain: {parent_domain} not found")
             elif oe.errno == 401:  # Unauthorized
@@ -135,6 +143,7 @@ def touchDomain(domain):
             except IOError as oe:
                 sys.exit(f"Got error updating domain: {oe}")
 
+
 #
 # Usage
 #
@@ -154,12 +163,13 @@ def usage():
     for name in option_names:
         help_msg = cfg.get_help_message(name)
         if help_msg:
-            print(f"    {help_msg}")  
+            print(f"    {help_msg}")
     print("")
     print(f"Example: {cmd}  hdf5://home/myfolder/emptydomain.h5")
     print(cfg.get_see_also(cmd))
     print("")
     sys.exit()
+
 
 #
 # Main
@@ -167,7 +177,8 @@ def usage():
 def main():
     domains = []
     # additional options
-    cfg.setitem("hs_owner", None, flags=["-o", "--owner"], choices=["OWNER",], help="set owner (must be run as an admin user)")
+    cfg.setitem("hs_owner", None, flags=["-o", "--owner"], choices=["OWNER",],
+                help="set owner (must be run as an admin user)")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
     try:
@@ -188,6 +199,7 @@ def main():
 
     for domain in domains:
         touchDomain(domain)
+
 
 if __name__ == "__main__":
     main()

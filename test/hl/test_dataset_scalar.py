@@ -23,12 +23,13 @@ else:
 from common import ut, TestCase
 from datetime import datetime
 
+
 class TestScalarDataset(TestCase):
     def test_scalar_dset(self):
         filename = self.getFileName("scalar_dset")
         print("filename:", filename)
         f = h5py.File(filename, "w")
-        
+
         dset = f.create_dataset('scalar', data=42, dtype='i8')
 
         val = dset[()]
@@ -56,14 +57,13 @@ class TestScalarDataset(TestCase):
             self.assertTrue(isinstance(dset.modified, datetime))
 
         self.assertEqual(dset.file.filename, filename)
-    
+
         # try creating dataset implicitly
         g1 = f.create_group("g1")
         g1["scalar"] = 42
         dset = g1["scalar"]
         val = dset[()]
         self.assertEqual(val, 42)
-    
 
         f.close()
 
@@ -97,7 +97,7 @@ class TestScalarDataset(TestCase):
         # try setting value using tuple
         dset[()] = str3
         val = dset[()]
-    
+
         self.assertEqual(val, str3.encode("utf-8"))
 
         # try creating dataset implicitly

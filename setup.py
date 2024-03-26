@@ -36,6 +36,7 @@ setup(
         "requests_unixsocket",
         "pytz",
         "pyjwt",
+        "packaging"
         # "cryptography",
     ],
     setup_requires=["pkgconfig"],
@@ -43,7 +44,7 @@ setup(
         "azure": [
             "msrestazure",
             "adal"
-            ], 
+        ],
         "google": [
             "google-api-python-client",
             "google-auth-oauthlib",

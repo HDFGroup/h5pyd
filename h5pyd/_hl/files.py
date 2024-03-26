@@ -164,13 +164,8 @@ class File(Group):
         dn_ids = []
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
-        if (
-            mode is None
-            and endpoint is None
-            and username is None
-            and password is None
-            and isinstance(domain, GroupID)
-        ):
+        no_endpoint_info = endpoint is None and username is None and password is None
+        if (mode is None and no_endpoint_info and isinstance(domain, GroupID)):
             groupid = domain
         else:
             if mode and mode not in ("r", "r+", "w", "w-", "x", "a"):
@@ -194,7 +189,7 @@ class File(Group):
             for protocol in ("http://", "https://", "hdf5://", "http+unix://"):
                 if domain.startswith(protocol):
                     if protocol.startswith("http"):
-                        domain = domain[len(protocol) :]
+                        domain = domain[len(protocol):]
                         # extract the endpoint
                         n = domain.find("/")
                         if n < 0:
@@ -203,7 +198,7 @@ class File(Group):
                         domain = domain[n:]
                         break
                     else:  # hdf5://
-                        domain = domain[(len(protocol) - 1) :]
+                        domain = domain[(len(protocol) - 1):]
 
             if not domain:
                 raise IOError(400, "no domain provided")
@@ -394,8 +389,7 @@ class File(Group):
     def _getVerboseInfo(self):
         now = time.time()
         if (
-            self._verboseUpdated is None
-            or now - self._verboseUpdated > VERBOSE_REFRESH_TIME
+            self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME
         ):
             # resynch the verbose data
             req = "/?verbose=1"

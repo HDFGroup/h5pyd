@@ -60,6 +60,7 @@ Disabled since low-level interface not supported with h5pyd
 Update using new NULL dataset constructor once h5py 2.7 is out.
 """
 
+
 class TestEmpty(TestCase):
 
     def setUp(self):
@@ -67,7 +68,7 @@ class TestEmpty(TestCase):
         filename = self.getFileName("dataset_testempty")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        self.dset = self.f.create_dataset('x',dtype='S10')
+        self.dset = self.f.create_dataset('x', dtype='S10')
         self.empty_obj = h5py.Empty(np.dtype("S10"))
 
     def test_ndim(self):
@@ -100,7 +101,7 @@ class TestEmpty(TestCase):
     def test_multi_block_slice(self):
         """ MultiBlockSlice -> ValueError """
         """ TBD """
-        #with self.assertRaises(ValueError):
+        # with self.assertRaises(ValueError):
         #    self.dset[h5py.MultiBlockSlice()]
 
     def test_index(self):
@@ -111,7 +112,7 @@ class TestEmpty(TestCase):
     def test_indexlist(self):
         """ index list -> ValueError """
         with self.assertRaises(ValueError):
-            self.dset[[1,2,5]]
+            self.dset[[1, 2, 5]]
 
     def test_mask(self):
         """ mask -> ValueError """
@@ -123,7 +124,7 @@ class TestEmpty(TestCase):
         """ field name -> ValueError """
         with self.assertRaises(ValueError):
             self.dset['field']
-      
+
 
 class TestScalarFloat(TestCase):
 
@@ -175,7 +176,7 @@ class TestScalarFloat(TestCase):
     def test_indexlist(self):
         """ index list -> ValueError """
         with self.assertRaises(ValueError):
-            self.dset[[1,2,5]]
+            self.dset[[1, 2, 5]]
 
     # FIXME: NumPy permits this
     def test_mask(self):
@@ -198,9 +199,9 @@ class TestScalarCompound(TestCase):
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
         self.data = np.array((42.5, -118, "Hello"), dtype=[('a', 'f'), ('b', 'i'), ('c', '|S10')])
-        #self.dset = self.f.create_dataset('x', data=self.data)
+        # self.dset = self.f.create_dataset('x', data=self.data)
         self.dset = self.f.create_dataset('x', (), dtype=[('a', 'f'), ('b', 'i'), ('c', '|S10')])
-        self.dset[...] =  (42.5, -118, "Hello")
+        self.dset[...] = (42.5, -118, "Hello")
 
     def test_ndim(self):
         """ Verify number of dimensions """
@@ -246,7 +247,7 @@ class TestScalarCompound(TestCase):
     def test_indexlist(self):
         """ index list -> ValueError """
         with self.assertRaises(ValueError):
-            self.dset[[1,2,5]]
+            self.dset[[1, 2, 5]]
 
     # FIXME: NumPy permits this
     def test_mask(self):
@@ -259,11 +260,10 @@ class TestScalarCompound(TestCase):
     @ut.skip
     def test_fieldnames(self):
         """ field name -> bare value """
-        #TBD: fix when field access is supported in hsds
+        # TBD: fix when field access is supported in hsds
         out = self.dset['a']
         self.assertIsInstance(out, np.float32)
         self.assertEqual(out, self.dset['a'])
-
 
 
 class TestScalarArray(TestCase):
@@ -279,7 +279,7 @@ class TestScalarArray(TestCase):
         try:
             self.dset[...] = self.data
         except (IOError, OSError) as oe:
-            #TBD this is failing on HSDS
+            # TBD this is failing on HSDS
             if not self.is_hsds():
                 raise oe
 
@@ -454,7 +454,7 @@ class Test1DFloat(TestCase):
             self.dset[100]
 
     def test_indexlist_simple(self):
-        self.assertNumpyBehavior(self.dset, self.data, np.s_[[1,2,5]])
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[[1, 2, 5]])
 
     def test_indexlist_single_index_ellipsis(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[[0], ...])
@@ -475,12 +475,12 @@ class Test1DFloat(TestCase):
     def test_indexlist_nonmonotonic(self):
         """ we require index list values to be strictly increasing """
         with self.assertRaises(TypeError):
-            self.dset[[1,3,2]]
+            self.dset[[1, 3, 2]]
 
     def test_indexlist_repeated(self):
         """ we forbid repeated index values """
         with self.assertRaises(TypeError):
-            self.dset[[1,1,2]]
+            self.dset[[1, 1, 2]]
 
     def test_mask_true(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[self.data > -100])
@@ -509,7 +509,7 @@ class Test2DZeroFloat(TestCase):
         filename = self.getFileName("dataset_test2dzerofloat")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        self.data = np.ones((0,3), dtype='f')
+        self.data = np.ones((0, 3), dtype='f')
         self.dset = self.f.create_dataset('x', data=self.data)
 
     def test_ndim(self):
@@ -521,7 +521,8 @@ class Test2DZeroFloat(TestCase):
         self.assertEqual(self.dset.shape, (0, 3))
 
     def test_indexlist(self):
-        self.assertNumpyBehavior(self.dset, self.data, np.s_[:,[0,1,2]])
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[:, [0, 1, 2]])
+
 
 class Test2DFloat(TestCase):
 
@@ -530,9 +531,9 @@ class Test2DFloat(TestCase):
         filename = self.getFileName("dataset_test2dfloat")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        self.data = np.ones((5,3), dtype='f')
+        self.data = np.ones((5, 3), dtype='f')
         self.dset = self.f.create_dataset('x', data=self.data)
-         
+
     def test_ndim(self):
         """ Verify number of dimensions """
         self.assertEqual(self.dset.ndim, 2)
@@ -543,14 +544,14 @@ class Test2DFloat(TestCase):
 
     def test_nbytes(self):
         """ Verify nbytes """
-        self.assertEqual(self.dset.nbytes, 15*self.data.dtype.itemsize) 
+        self.assertEqual(self.dset.nbytes, 15 * self.data.dtype.itemsize)
 
     def test_shape(self):
         """ Verify shape """
         self.assertEqual(self.dset.shape, (5, 3))
 
     def test_indexlist(self):
-        self.assertNumpyBehavior(self.dset, self.data, np.s_[:,[0,1,2]])
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[:, [0, 1, 2]])
 
     @ut.expectedFailure
     def test_index_emptylist(self):
@@ -559,6 +560,7 @@ class Test2DFloat(TestCase):
         # with h5py 3.2.1 at least
         self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
 
+
 class Test3DFloat(TestCase):
 
     def setUp(self):
@@ -566,11 +568,12 @@ class Test3DFloat(TestCase):
         filename = self.getFileName("dataset_test3dfloat")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        self.data = np.ones((4,6,8), dtype='f')
+        self.data = np.ones((4, 6, 8), dtype='f')
         self.dset = self.f.create_dataset('x', data=self.data, dtype='f')
 
     def test_index_simple(self):
-        self.assertNumpyBehavior(self.dset, self.data, np.s_[1,2:4,3:6])
+        self.assertNumpyBehavior(self.dset, self.data, np.s_[1, 2:4, 3:6])
+
 
 class TestVeryLargeArray(TestCase):
 
@@ -584,6 +587,7 @@ class TestVeryLargeArray(TestCase):
     @ut.skipIf(sys.maxsize < 2**31, 'Maximum integer size >= 2**31 required')
     def test_size(self):
         self.assertEqual(self.dset.size, 2**31)
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

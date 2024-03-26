@@ -43,7 +43,7 @@ class TestDimensionScale(TestCase):
         self.assertEqual(len(dset.dims), len(dset.shape))
         for d in dset.dims:
             self.assertIsInstance(d, h5py._hl.dims.DimensionProxy)
-            
+
         # Create and name dimension scales
         dset.dims.create_scale(f['scale_x'], 'Simulation X (North) axis')
         self.assertTrue(h5py.h5ds.is_scale(f['scale_x'].id))

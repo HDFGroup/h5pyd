@@ -27,9 +27,10 @@ else:
     from .config import Config
     from .utillib import load_file
 
-cfg = Config()  #  config object
+cfg = Config()  # config object
 
-#----------------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------------
 def usage():
     option_names = cfg.get_names()
     cmd = cfg.get_cmd()
@@ -45,7 +46,7 @@ def usage():
     for name in option_names:
         help_msg = cfg.get_help_message(name)
         if help_msg:
-            print(f"    {help_msg}")  
+            print(f"    {help_msg}")
     print("")
     print("Examples:")
     print(f"     {cmd} /shared/tall.h5 tall.h5")
@@ -56,13 +57,12 @@ def usage():
     print("")
     sys.exit()
 
-#end print_usage
+# end print_usage
 
 
-#----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------
 def main():
-    
-    cfg.setitem("no_clobber", False, flags=["-n", "--no-clobber"],  help="do not overwrite target")
+    cfg.setitem("no_clobber", False, flags=["-n", "--no-clobber"], help="do not overwrite target")
     cfg.setitem("nodata", False, flags=["--nodata",], help="do not copy dataset data")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
@@ -87,7 +87,7 @@ def main():
     logfname = cfg["logfile"]
     loglevel = cfg.get_loglevel()
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
-    logging.debug(f"set log_level to {loglevel}")     
+    logging.debug(f"set log_level to {loglevel}")
 
     logging.info(f"source domain: {src_domain}")
     logging.info(f"target file: {des_file}")
@@ -129,6 +129,8 @@ def main():
     except KeyboardInterrupt:
         logging.error('Aborted by user via keyboard interrupt.')
         sys.exit(1)
-#__main__
+
+
+# __main__
 if __name__ == "__main__":
     main()

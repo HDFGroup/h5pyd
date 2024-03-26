@@ -22,9 +22,6 @@ else:
 
 from common import ut, TestCase
 
-# test fancy selection
-#
-#
 
 class TestFancySelectDataset(TestCase):
     def test_dset(self):
@@ -32,22 +29,22 @@ class TestFancySelectDataset(TestCase):
         print("filename:", filename)
         f = h5py.File(filename, "w")
 
-        dset2d = f.create_dataset('dset2d', (10,10), dtype='i4')
-        vals = np.zeros((10,10), dtype='i4')
+        dset2d = f.create_dataset('dset2d', (10, 10), dtype='i4')
+        vals = np.zeros((10, 10), dtype='i4')
         for i in range(10):
             for j in range(10):
-                vals[i,j] = i*10+j
+                vals[i, j] = i * 10 + j
         dset2d[...] = vals
 
-        coords = [2,5,6,9]
+        coords = [2, 5, 6, 9]
 
-        arr = dset2d[ 5:7, coords ]
-        self.assertEqual(arr.shape, (2,4))
+        arr = dset2d[5:7, coords]
+        self.assertEqual(arr.shape, (2, 4))
         for i in range(2):
             row = arr[i]
             for j in range(4):
-                self.assertEqual(row[j], (i+5)*10+coords[j])
-        
+                self.assertEqual(row[j], (i + 5) * 10 + coords[j])
+
         f.close()
 
 

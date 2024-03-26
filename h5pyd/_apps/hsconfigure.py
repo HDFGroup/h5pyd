@@ -6,12 +6,14 @@ if __name__ == "__main__":
 else:
     from .config import Config
 
+
 #
 # input function that works with Python 2 or 3
 #
 def get_input(prompt):
     result = input(prompt)
     return result
+
 
 #
 # Save configuration file
@@ -38,6 +40,7 @@ def saveConfig(username, password, endpoint, api_key):
             file.write("hs_api_key = {}\n".format(api_key))
         else:
             file.write("hs_api_key = \n")
+
 
 #
 # Check to see if we can get a response from the server
@@ -73,6 +76,8 @@ def pingServer(username, password, endpoint, api_key):
         print("Unexpected response from server")
         return False
     return True
+
+
 #
 # Main
 #
@@ -137,6 +142,7 @@ def main():
         quit = get_input("Quit? (Y/N)")
         if quit in ("Y", "y"):
             break
+
 
 if __name__ == "__main__":
     main()

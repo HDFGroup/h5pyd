@@ -12,9 +12,11 @@
 
 import h5pyd as h5py
 
+
 def visit_item(name):
     print("visit:", name)
     return None
+
 
 def find_g1_2(name):
     print("visit:", name)
@@ -26,12 +28,13 @@ def visit_item_obj(name, obj):
     print("visit:", name, obj.id.id)
     return None
 
+
 print("version:", h5py.version.version)
 
 # this is the path specified in the "post-install instructions"
 # see:  "Test Data Setup" in:
 #  https://github.com/HDFGroup/hsds/blob/master/docs/post_install.md
-DOMAIN_PATH="/home/test_user1/test/tall.h5"
+DOMAIN_PATH = "/home/test_user1/test/tall.h5"
 print("opening domain:", DOMAIN_PATH)
 
 f = h5py.File(DOMAIN_PATH, "r")
@@ -85,6 +88,3 @@ f.visititems(visit_item_obj)
 
 print("search g1.2:")
 f.visit(find_g1_2)
-
-
-

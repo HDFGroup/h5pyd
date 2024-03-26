@@ -12,14 +12,14 @@
 
 from __future__ import absolute_import
 import numpy
-from .base import  _decode   
+from .base import _decode
 from .base import bytesToArray
 from .dataset import Dataset
 from .objectid import DatasetID
 from . import selections as sel
 from .h5type import Reference
 from .h5type import check_dtype
-from .h5type import getQueryDtype   
+from .h5type import getQueryDtype
 
 
 class Cursor():
@@ -64,17 +64,18 @@ class Cursor():
                 if nrows - indx < read_count:
                     read_count = nrows - indx
                 if self._query is None:
-                    arr = self._table[indx+self._start:read_count+indx+self._start]
+                    arr = self._table[indx + self._start:read_count + indx + self._start]
                 else:
                     # call table to return query result
                     if query_complete:
                         arr = None  # nothing more to fetch
                     else:
-                        arr = self._table.read_where(self._query, start=indx+self._start, limit=read_count)
+                        arr = self._table.read_where(self._query, start=indx + self._start, limit=read_count)
                         if arr is not None and arr.shape[0] < read_count:
                             query_complete = True  # we've gotten all the rows
-            if arr is not None and indx%self._buffer_rows < arr.shape[0]:
-                yield arr[indx%self._buffer_rows]
+            if arr is not None and indx % self._buffer_rows < arr.shape[0]:
+                yield arr[indx % self._buffer_rows]
+
 
 class Table(Dataset):
 
@@ -94,7 +95,6 @@ class Table(Dataset):
 
         if len(self._shape) > 1:
             raise ValueError("Table must be one-dimensional")
-
 
     @property
     def colnames(self):
@@ -118,7 +118,7 @@ class Table(Dataset):
             step = 1
         arr = self[start:stop:step]
         if field is not None:
-            #TBD - read just the field once the service supports it
+            # TBD - read just the field once the service supports it
             tmp = arr[field]
             arr = tmp
         if out is not None:
@@ -127,12 +127,12 @@ class Table(Dataset):
         else:
             return arr
 
-
-
-    def read_where(self, condition, condvars=None, field=None, start=None, stop=None, step=None, limit=0, include_index=True):
+    def read_where(self, condition, condvars=None, field=None,
+                   start=None, stop=None, step=None, limit=0, include_index=True):
         """Read rows from table using pytable-style condition
         """
         names = ()  # todo
+
         def readtime_dtype(basetype, names):
             """ Make a NumPy dtype appropriate for reading """
 
@@ -143,7 +143,7 @@ class Table(Dataset):
                 raise ValueError("Field names only allowed for compound types")
 
             for name in names:  # Check all names are legal
-                if not name in basetype.names:
+                if name not in basetype.names:
                     raise ValueError("Field %s does not appear in this type." % name)
 
             return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
@@ -158,7 +158,6 @@ class Table(Dataset):
         # todo - will need the following once we have binary transfers
         # mtype = h5t.py_create(new_dtype)
         rsp_type = getQueryDtype(mtype)
-        
 
         # Perform the dataspace selection
         if start or stop:
@@ -190,7 +189,7 @@ class Table(Dataset):
             if limit > 0:
                 params["Limit"] = limit - total_rows
             self.log.info("req - cursor: {} page_size: {}".format(cursor, page_size))
-            end_row = cursor+page_size
+            end_row = cursor + page_size
             if end_row > stop:
                 end_row = stop
             selection_arg = slice(cursor, end_row)
@@ -205,8 +204,8 @@ class Table(Dataset):
                 rsp = self.GET(req, params=params)
                 if isinstance(rsp, bytes):
                     # binary response
-                    arr = bytesToArray(rsp, rsp_type, None) 
-                    count = len(arr)   
+                    arr = bytesToArray(rsp, rsp_type, None)
+                    count = len(arr)
                     self.log.info(f"got {count} rows binary data")
                 else:
                     values = rsp["value"]
@@ -229,7 +228,7 @@ class Table(Dataset):
                         else:
                             e = values[i]
                         arr[i] = tuple(e)
-                        
+
                     self.log.info("got {} rows".format(count))
                 total_rows += count
                 data.append(arr)
@@ -263,13 +262,12 @@ class Table(Dataset):
             start = 0
             for arr in data:
                 nrows = len(arr)
-                ret_arr[start:(start+nrows)] = arr[:]
+                ret_arr[start:(start + nrows)] = arr[:]
                 start += nrows
         else:
             ret_arr = data[0]
 
         return ret_arr
-
 
     def update_where(self, condition, value, start=None, stop=None, step=None, limit=None):
         """Modify rows in table using pytable-style condition
@@ -317,12 +315,10 @@ class Table(Dataset):
 
         return arr
 
-    def create_cursor(self, condition=None,  start=None, stop=None):
+    def create_cursor(self, condition=None, start=None, stop=None):
         """Return a cursor for iteration
         """
         return Cursor(self, query=condition, start=start, stop=stop)
-
-
 
     def append(self, rows):
         """ Append rows to end of table
@@ -344,7 +340,7 @@ class Table(Dataset):
         try:
             val_dtype = val.dtype
         except AttributeError:
-            pass # not a numpy object, just leave dtype as None
+            pass  # not a numpy object, just leave dtype as None
 
         if isinstance(val, Reference):
             # h5pyd References are just strings
@@ -399,7 +395,6 @@ class Table(Dataset):
 
         params = {}
         body = {}
-
 
         format = "json"
 

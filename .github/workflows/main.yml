@@ -1,0 +1,90 @@
+name: h5pyd CI
+
+on:
+  push:
+  pull_request:
+    branches: [master]
+
+env:
+  ADMIN_PASSWORD: admin
+  ADMIN_USERNAME: admin
+  USER_NAME: test_user1
+  USER_PASSWORD: test
+  USER2_NAME: test_user2
+  USER2_PASSWORD: test
+  HSDS_USERNAME: test_user1
+  HSDS_PASSWORD: test
+  HSDS_ENDPOINT: http+unix://%2Ftmp%2Fhs%2Fsn_1.sock
+  ROOT_DIR: ${{github.workspace}}/hsds/hsds_root
+  BUCKET_NAME: hsds_bucket
+  HS_ENDPOINT: http+unix://%2Ftmp%2Fhs%2Fsn_1.sock
+  H5PYD_TEST_FOLDER: /home/test_user1/h5pyd_tests/
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest,]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install flake8 pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Lint with flake8
+        shell: bash
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --max-complexity=10 --max-line-length=127 --statistics # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+
+      - name: Install package
+        shell: bash
+        run: |
+          pip install -e .
+
+      - name: Checkout HSDS 
+        uses: actions/checkout@v3
+        with:
+          repository: HDFGroup/hsds
+          path: ${{github.workspace}}/hsds
+
+      - name: Install HSDS
+        shell: bash
+        run: |
+          cd ${{github.workspace}}/hsds
+          pip install -e .
+
+      - name: Start HSDS
+        shell: bash
+        run: |
+          cd ${{github.workspace}}/hsds
+          mkdir hsds_root
+          mkdir hsds_root/hsds_bucket
+          cp admin/config/groups.default admin/config/groups.txt
+          cp admin/config/passwd.default admin/config/passwd.txt
+          ./runall.sh --no-docker 1 &
+          sleep 11 # let the nodes get ready
+          python tests/integ/setup_test.py
+
+      - name: Create h5pyd test folder
+        shell: bash
+        run: |
+          HS_USERNAME=test_user1 HS_PASSWORD=test TEST2_USERNAME=test_user1 TEST2_PASSWORD=test hstouch -v /home/test_user1/h5pyd_tests/
+
+      - name: Run h5pyd tests
+        shell: bash
+        run: |
+          HS_USERNAME=test_user1 HS_PASSWORD=test TEST2_USERNAME=test_user1 TEST2_PASSWORD=test python testall.py
