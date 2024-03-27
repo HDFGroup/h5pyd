@@ -732,7 +732,6 @@ def create_chunktable(dset, dset_dims, ctx):
             chunks["file_uri"] = ctx["s3path"]
         chunks["dims"] = chunk_dims
         chunks["chunk_table"] = anon_dset.id.id
-        chunks["hyper_dims"] = dset.chunks
 
     elif num_chunks <= 1 and dset.chunks is None:
         # use contiguous mapping
@@ -1085,7 +1084,7 @@ def create_dataset(dobj, ctx):
                 np.prod(dobj.shape) > MIN_DSET_ELEMENTS_FOR_LINKING)):
 
             chunks = create_chunktable(dobj, tgt_shape, ctx)
-            logging.info(f"using chunk layout: {chunks}")
+            logging.debug(f"using chunk layout for link option: {chunks}")
 
         # use the source object layout if we are not using reference mapping
         if chunks is None and dobj.shape is not None and len(dobj.shape) > 0:
@@ -1105,15 +1104,25 @@ def create_dataset(dobj, ctx):
                     new_chunks = [1,]
                     new_chunks.extend(chunks)
                     chunks = tuple(new_chunks)
+                    logging.debug("extend chunks for preappend:", chunks)
             else:
                 if isinstance(chunks, dict):
                     if "dims" in chunks:
                         chunk_dims = chunks["dims"]
-                        if len(chunk_dims) == 1:
-                            # currently hyperchunks only supported for 1d datasets
-                            chunk_dims = expandChunk(chunk_dims, dobj.shape, dobj.dtype.itemsize)
-                            logging.debug(f"expanded chunks: {chunk_dims}")
-                            chunks["dims"] = chunk_dims
+                        layout_class = chunks.get("class")
+                        server_version = fout.serverver
+                        if server_version and server_version.startswith("0.9"):
+
+                            if layout_class == "H5D_CHUNKED_REF_INDIRECT":
+                                logging.debug("expand chunks for hyperchunksing")
+                                # currently hyperchunks only supported for 1d datasets
+                                logging.debug(f"hdf5 chunk dims: {chunk_dims}")
+                                chunks["hyper_dims"] = chunk_dims
+                                chunk_dims = expandChunk(chunk_dims, dobj.shape, dobj.dtype.itemsize)
+                                logging.debug(f"expanded chunks: {chunk_dims}")
+                                logging.debug(f"expanded chunks: {chunk_dims}")
+                                chunks["dims"] = chunk_dims
+                                logging.debug(f"updating for hyper_dims: {chunks}")
                     else:
                         # contiguous or compact, using dataset shape
                         pass
