@@ -142,7 +142,6 @@ def special_dtype(**kwds):
     name, val = kwds.popitem()
 
     if name == 'vlen':
-
         return np.dtype('O', metadata={'vlen': val})
 
     if name == 'enum':
@@ -441,6 +440,10 @@ def getTypeItem(dt):
             type_info['length'] = 'H5T_VARIABLE'
             type_info['charSet'] = 'H5T_CSET_UTF8'
             type_info['strPad'] = 'H5T_STR_NULLTERM'
+        elif vlen_check == np.int32:
+            type_info['class'] = 'H5T_VLEN'
+            type_info['size'] = 'H5T_VARIABLE'
+            type_info['base'] = 'H5T_STD_I32'
         elif vlen_check in (int, np.int64):
             type_info['class'] = 'H5T_VLEN'
             type_info['size'] = 'H5T_VARIABLE'
