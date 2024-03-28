@@ -22,7 +22,9 @@ def get_test_filenames():
             "scale_offset.h5",
             "fletcher32.h5",
             "undecodable_attr.h5",
-            "diamond.h5"
+            "diamond.h5",
+            "small1dchunk.h5",
+            "small2dchunk.h5"
             )
 
 
