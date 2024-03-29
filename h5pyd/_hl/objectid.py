@@ -191,7 +191,7 @@ class DatasetID(ObjectID):
     @property
     def layout(self):
         layout = None
-        
+
         if 'layout' in self.obj_json:
             layout = self.obj_json['layout']
         else:
