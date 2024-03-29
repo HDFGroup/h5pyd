@@ -571,7 +571,11 @@ class HttpConn:
             # binary write
             data = body
         else:
+            headers["Content-Type"] = "application/json"
+            # Must be explicitly specified for Windows
+            headers["Content-Type"] += "; charset=utf-8"
             data = json.dumps(body)
+
         self.log.info("PUT: {} format: {} [{} bytes]".format(req, format, len(data)))
 
         try:
