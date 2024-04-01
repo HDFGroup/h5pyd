@@ -15,6 +15,7 @@ from __future__ import absolute_import
 import os
 import time
 import json
+import pathlib
 
 from .objectid import GroupID
 from .group import Group
@@ -202,6 +203,11 @@ class File(Group):
 
             if not domain:
                 raise IOError(400, "no domain provided")
+
+            domain_path = pathlib.PurePath(domain)
+            if isinstance(domain_path, pathlib.PureWindowsPath):
+                # Standardize path root to POSIX-style path
+                domain = '/' + '/'.join(domain_path.parts[1:])
 
             if domain[0] != "/":
                 raise IOError(400, "relative paths are not valid")
