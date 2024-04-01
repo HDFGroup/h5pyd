@@ -233,7 +233,7 @@ def main():
                     "endpoint": cfg["hs_endpoint"],
                     "bucket": cfg["hs_bucket"],
                     "mode": mode,
-                    "retries": cfg["retries"],
+                    "retries": int(cfg["retries"]),
                 }
 
                 fout = h5pyd.File(tgt, **kwargs)

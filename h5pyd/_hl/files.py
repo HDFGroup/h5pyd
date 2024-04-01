@@ -215,7 +215,7 @@ class File(Group):
             # remove the trailing slash on endpoint if it exists
             if endpoint.endswith('/'):
                 endpoint = endpoint.strip('/')
-                
+
             if username is None:
                 if "H5SERV_USERNAME" in os.environ:
                     username = os.environ["H5SERV_USERNAME"]
