@@ -350,9 +350,7 @@ def visitDomains(domain, depth=1):
             if len(parts) > depth:
                 parts = parts[-depth:]
                 parts = parts[1:]
-                print("display_name pre:", display_name)
                 display_name = "/".join(parts)
-                print("display_name post:", display_name)
         num_bytes = ' '
         if d.is_folder:
             dir_class = "folder"
