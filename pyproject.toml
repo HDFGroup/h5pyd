@@ -1,0 +1,69 @@
+[build-system]
+requires = [
+    "setuptools >= 61",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "h5pyd"
+description = "h5py compatible client lib for HDF REST API"
+authors= [
+    {name = "John Readey", email = "jreadey@hdfgroup.org"},
+]
+maintainers = [
+    {name = "John Readey", email = "jreadey@hdfgroup.org"},
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: Unix",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.8"
+version = "0.18.0"
+
+dependencies = [
+    "numpy >= 1.17.3",
+    "requests_unixsocket",
+    "pytz",
+    "pyjwt",
+    "packaging"
+]
+
+[project.optional-dependencies]
+azure = [
+    "msrestazure",
+    "adal"
+]
+google = [
+    "google-api-python-client",
+    "google-auth-oauthlib",
+    "google-auth<2.0dev",
+]
+aws = ["s3fs",]
+hdf5 = ["h5py",]
+
+[project.readme]
+text="""\
+The h5pyd library provides a high-level interface to the HDF REST specification that is generally easier to use than invoking http calls directly.
+
+This package is based on the popular h5py package and aims to be source compatible with the h5py high level interface.
+"""
+content-type = "text/x-rst"
+
+[project.urls]
+Source = "https://github.com/HDFGroup/h5pyd"
+
+[tool.setuptools]
+packages=["h5pyd", "h5pyd._hl", "h5pyd._apps"]
+include-package-data = false

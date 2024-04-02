@@ -12,10 +12,10 @@ Introduction
 This repository contains library, test, and examples of h5pyd - a Python package for the
 HDF REST interface.
 
-The library is provides a high-level interface to the REST specification that is generally
+The h5pyd library provides a high-level interface to the REST specification that is generally
 easier to use than invoking http calls directly.
 
-The package is based on the popular h5py package and aims to be source compatible with
+This package is based on the popular h5py package and aims to be source compatible with
 the h5py high level interface.
 
 
@@ -45,7 +45,7 @@ Via pip::
 
 From a release tarball or Git checkout::
 
-   python setup.py install
+   pip install .
 
 By default the examples look for a local instance of HSDS.  See the  https://github.com/HDFGroup/hsds
 for instructions on installing and running HSDS.
