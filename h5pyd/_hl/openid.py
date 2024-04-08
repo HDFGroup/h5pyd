@@ -169,7 +169,7 @@ class AzureOpenID(OpenIDHandler):
         """Acquire a new Azure token."""
 
         if "adal" not in sys.modules:
-            msg = "adal module not found, run: python setup.py install -e '.[azure]'"
+            msg = "adal module not found, run: pip install -e . '.[azure]'"
             raise ModuleNotFoundError(msg)
 
         app_id = self.config["AD_APP_ID"]
@@ -252,7 +252,7 @@ class GoogleOpenID(OpenIDHandler):
         """Store configuration."""
 
         if "google.oauth2" not in sys.modules:
-            msg = "google.oauth2 module not found, run: python setup.py install -e '.[google]'"
+            msg = "google.oauth2 module not found, run: pip install -e . '.[google]'"
             raise ModuleNotFoundError(msg)
 
         # Configuration manager

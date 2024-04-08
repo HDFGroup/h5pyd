@@ -202,20 +202,15 @@ To build from a Git checkout:
 
 Clone the project::
 
-    $ git clone https://github.com/h5py/h5py.git
-    $ cd h5py
+    $ git clone https://github.com/HDFGroup/h5pyd.git
+    $ cd h5pyd
 
-(Optional) Choose which branch to build from (e.g. a stable branch)::
+Build and install the project::
 
-    $ git checkout 2.1
-
-Build the project. If given, /path/to/hdf5 should point to a directory
-containing a compiled, shared-library build of HDF5 (containing things like "include" and "lib")::
-
-    $ python setup.py build [--hdf5=/path/to/hdf5]
+    $ pip install .
 
 (Optional) Run the unit tests::
 
-    $ python setup.py test
+    $ python testall.py
 
-Report any failing tests to the mailing list (h5py at googlegroups), or by filing a bug report at GitHub.
+Report any failing tests by filing a bug report at GitHub.
