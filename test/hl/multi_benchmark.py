@@ -6,8 +6,9 @@ from concurrent.futures import as_completed
 import subprocess
 import re
 
-from h5pyd._hl.dataset import MultiManager
+from h5pyd import MultiManager
 import h5pyd as h5py
+from common import getTestFileName
 
 # Flag to stop resource usage collection thread after a benchmark finishes
 stop_stat_collection = False
@@ -244,12 +245,18 @@ def run_benchmark(test_name, test_func, stats, datasets, num_iters):
 if __name__ == '__main__':
     print("Executing multi read/write benchmark")
     shape = (100, 100, 100)
-    count = 64
+    count = 4 # 64
     num_iters = 50
     dt = np.int32
     stats = {}
 
-    fs = [h5py.File("/home/test_user1/h5pyd_multi_bm_" + str(i), mode='w') for i in range(count)]
+    fs = []
+
+    for i in range(count):
+        filename = getTestFileName(f"bm_{i:04d}", subfolder="multi_bm")
+        f = h5py.File(filename, mode='w')
+        fs.append(f)
+
     data_in = np.zeros(shape, dtype=dt)
     datasets = [f.create_dataset("data", shape, dtype=dt, data=data_in) for f in fs]
 
@@ -266,7 +273,8 @@ if __name__ == '__main__':
 
     print("Testing with shared HTTP connection...")
 
-    f = h5py.File("/home/test_user1/h5pyd_multi_bm_shared", mode='w')
+    filename = getTestFileName("bm_shared", subfolder="multi_bm")
+    f = h5py.File(filename, mode='w')
     datasets = [f.create_dataset("data" + str(i), data=data_in, dtype=dt) for i in range(count)]
 
     run_benchmark("Read Multi (Shared HttpConn)", read_datasets_multi, stats, datasets, num_iters)

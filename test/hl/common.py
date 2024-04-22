@@ -12,7 +12,6 @@
 
 from __future__ import absolute_import
 
-import sys
 import os
 import os.path as op
 import tempfile
@@ -37,6 +36,31 @@ else:
     os.unlink(fname)
     del fname
     del testfile
+
+def getTestFileName(basename, subfolder=None):
+        """
+        Get filepath for a test case given a testname
+        """
+
+        if config.get("use_h5py"):
+            filename = "out"
+            if not op.isdir(filename):
+                os.mkdir(filename)
+            if subfolder:
+                filename = op.join(filename, subfolder)
+                if not op.isdir(filename):
+                    os.mkdir(filename)
+            filename = op.join(filename, f"{basename}.h5")
+        else:
+            if "H5PYD_TEST_FOLDER" in os.environ:
+                filename = os.environ["H5PYD_TEST_FOLDER"]
+            else:
+                # default to the root folder
+                filename = "/"
+            if subfolder:
+                filename = op.join(filename, subfolder)
+            filename = op.join(filename, f"{basename}.h5")
+        return filename
 
 
 class TestCase(ut.TestCase):
@@ -201,23 +225,33 @@ class TestCase(ut.TestCase):
             with self.assertRaises(exc):
                 dset[s]
 
-    def getFileName(self, basename):
+    def getFileName(self, basename, subfolder=None):
         """
         Get filepath for a test case given a testname
         """
 
+        # Just call the external function
+        filename = getTestFileName(basename, subfolder=subfolder)
+
+
         if config.get("use_h5py"):
-            if not op.isdir("out"):
-                os.mkdir("out")
-            filename = "out/" + basename + ".h5"
+            filename = "out"
+            if not op.isdir(filename):
+                os.mkdir(filename)
+            if subfolder:
+                filename = op.join(filename, subfolder)
+                if not op.isdir(filename):
+                    os.mkdir(filename)
+            filename = op.join(filename, f"{basename}.h5")
         else:
             if "H5PYD_TEST_FOLDER" in os.environ:
-                domain = os.environ["H5PYD_TEST_FOLDER"]
+                filename = os.environ["H5PYD_TEST_FOLDER"]
             else:
                 # default to the root folder
-                domain = "/"
-            filename = op.join(domain, basename)
-            filename += ".h5"
+                filename = "/"
+            if subfolder:
+                filename = op.join(filename, subfolder)
+            filename = op.join(filename, f"{basename}.h5")
         return filename
 
     def getPathFromDomain(self, domain):

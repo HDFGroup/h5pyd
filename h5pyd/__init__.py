@@ -21,7 +21,7 @@ from ._hl.h5type import check_opaque_dtype, check_ref_dtype, check_dtype
 from ._hl.files import File, is_hdf5
 from ._hl.folders import Folder
 from ._hl.group import Group, SoftLink, ExternalLink, UserDefinedLink, HardLink
-from ._hl.dataset import Dataset
+from ._hl.dataset import Dataset, MultiManager
 from ._hl.table import Table
 from ._hl.datatype import Datatype
 from ._hl.attrs import AttributeManager

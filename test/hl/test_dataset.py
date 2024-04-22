@@ -23,11 +23,10 @@ import pathlib
 import sys
 import numpy as np
 import platform
-import warnings
 
 from common import ut, TestCase
-from h5pyd._hl.dataset import MultiManager
 import config
+from h5pyd import MultiManager
 
 if config.get("use_h5py"):
     from h5py import File, Dataset
@@ -35,6 +34,7 @@ if config.get("use_h5py"):
 else:
     from h5pyd import File, Dataset
     import h5pyd as h5py
+
 
 
 def is_empty_dataspace(obj):

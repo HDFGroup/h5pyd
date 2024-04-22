@@ -19,6 +19,7 @@ import time
 import base64
 import numpy
 import os
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 
@@ -1741,10 +1742,14 @@ class MultiManager():
     # Avoid overtaxing HSDS
     max_workers = 16
 
-    def __init__(self, datasets=None):
+    def __init__(self, datasets=None, logger=None):
         if (datasets is None) or (len(datasets) == 0):
             raise ValueError("MultiManager requires non-empty list of datasets")
         self.datasets = datasets
+        if logger is None:
+            self.log = logging
+        else:
+            self.log = logging.getLogger(logger)
 
     def read_dset_tl(self, args):
         """
