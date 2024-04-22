@@ -36,9 +36,9 @@ else:
     import h5pyd as h5py
 
 
-
 def is_empty_dataspace(obj):
     shape_json = obj.shape_json
+
     if "class" not in shape_json:
         raise KeyError()
     if shape_json["class"] == 'H5S_NULL':

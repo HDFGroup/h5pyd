@@ -245,7 +245,7 @@ def run_benchmark(test_name, test_func, stats, datasets, num_iters):
 if __name__ == '__main__':
     print("Executing multi read/write benchmark")
     shape = (100, 100, 100)
-    count = 4 # 64
+    count = 64
     num_iters = 50
     dt = np.int32
     stats = {}
