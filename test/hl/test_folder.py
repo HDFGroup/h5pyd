@@ -25,6 +25,10 @@ from common import ut, TestCase
 class TestFolders(TestCase):
 
     def test_list(self):
+        if config.get("use_h5py"):
+            # Folders not supported for h5py
+            return
+
         # loglevel = logging.DEBUG
         # logging.basicConfig( format='%(asctime)s %(message)s', level=loglevel)
         test_domain = self.getFileName("folder_test")
@@ -34,11 +38,6 @@ class TestFolders(TestCase):
         # create test file if not present.
         # on first run, this may take a minute before it is visible as a folder item
         f = h5py.File(filepath, mode='a')
-        if config.get("use_h5py"):
-            # Folders not supported for h5py
-            f.close()
-            return
-
         self.assertTrue(f.id.id is not None)
 
         f.close()
@@ -170,17 +169,15 @@ class TestFolders(TestCase):
         f.close()
 
     def test_create_folder(self):
+        if config.get("use_h5py"):
+            # Folders not supported for h5py
+            return
+
         empty = self.getFileName("empty")
         empty_path = self.getPathFromDomain(empty)
 
-        print("empty_path", empty_path)
-
         f = h5py.File(empty_path, mode='a')
         self.assertTrue(f.id.id is not None)
-        if config.get("use_h5py"):
-            # Folders not supported for h5py
-            f.close()
-            return
 
         f.close()
 
@@ -195,15 +192,15 @@ class TestFolders(TestCase):
         d.close()
 
     def test_root_folder(self):
+        if config.get("use_h5py"):
+            # Folders not supported for h5py
+            return
+
         test_domain = self.getFileName("folder_test")
 
         filepath = self.getPathFromDomain(test_domain)
         f = h5py.File(filepath, mode='a')
         self.assertTrue(f.id.id is not None)
-        if config.get("use_h5py"):
-            # Folders not supported for h5py
-            f.close()
-            return
 
         f.close()
 

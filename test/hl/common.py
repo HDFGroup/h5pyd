@@ -46,13 +46,13 @@ def getTestFileName(basename, subfolder=None):
 
     if config.get("use_h5py"):
         filename = "out"
-        if not op.isdir(filename):
+        if not os.path.isdir(filename):
             os.mkdir(filename)
         if subfolder:
-            filename = op.join(filename, subfolder)
-            if not op.isdir(filename):
+            filename = os.path.join(filename, subfolder)
+            if not os.path.isdir(filename):
                 os.mkdir(filename)
-        filename = op.join(filename, f"{basename}.h5")
+        filename = os.path.join(filename, f"{basename}.h5")
     else:
         if "H5PYD_TEST_FOLDER" in os.environ:
             filename = os.environ["H5PYD_TEST_FOLDER"]
@@ -60,8 +60,8 @@ def getTestFileName(basename, subfolder=None):
             # default to the root folder
             filename = "/"
         if subfolder:
-            filename = op.join(filename, subfolder)
-        filename = op.join(filename, f"{basename}.h5")
+            filename = os.path.join(filename, subfolder)
+        filename = os.path.join(filename, f"{basename}.h5")
     return filename
 
 
