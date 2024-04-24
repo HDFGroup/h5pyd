@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import sys
 
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -254,7 +255,11 @@ if __name__ == '__main__':
 
     for i in range(count):
         filename = getTestFileName(f"bm_{i:04d}", subfolder="multi_bm")
-        f = h5py.File(filename, mode='w')
+        try:
+            f = h5py.File(filename, mode='w')
+        except IOError:
+            print(f"unable to create domain at: {filename} - does the parent folder exist?")
+            sys.exit(1)
         fs.append(f)
 
     data_in = np.zeros(shape, dtype=dt)

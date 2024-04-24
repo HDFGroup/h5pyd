@@ -1798,7 +1798,7 @@ class MultiManager():
 
         except Exception as e:
             msg = f"{e}: Defaulting Number of SN_COREs to 1"
-            self.log.warning(msg)
+            self.log.debug(msg)
             num_endpoints = 1
 
         if (num_endpoints > 1):
@@ -1853,7 +1853,7 @@ class MultiManager():
                 raise ValueError("Malformed port range specification; must be sequential ports")
 
         except Exception as e:
-            print(f"{e}: Defaulting Number of SNs to 1")
+            self.log.debug(f"{e}: Defaulting Number of SNs to 1")
             num_endpoints = 1
 
         # TODO: Handle the case where some or all datasets share an HTTPConn object
