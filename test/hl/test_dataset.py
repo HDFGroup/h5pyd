@@ -23,11 +23,10 @@ import pathlib
 import sys
 import numpy as np
 import platform
-import warnings
 
 from common import ut, TestCase
-from h5pyd._hl.dataset import MultiManager
 import config
+from h5pyd import MultiManager
 
 if config.get("use_h5py"):
     from h5py import File, Dataset
@@ -39,6 +38,7 @@ else:
 
 def is_empty_dataspace(obj):
     shape_json = obj.shape_json
+
     if "class" not in shape_json:
         raise KeyError()
     if shape_json["class"] == 'H5S_NULL':

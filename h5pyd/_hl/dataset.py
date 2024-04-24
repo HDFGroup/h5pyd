@@ -19,6 +19,7 @@ import time
 import base64
 import numpy
 import os
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 
@@ -1741,10 +1742,14 @@ class MultiManager():
     # Avoid overtaxing HSDS
     max_workers = 16
 
-    def __init__(self, datasets=None):
+    def __init__(self, datasets=None, logger=None):
         if (datasets is None) or (len(datasets) == 0):
             raise ValueError("MultiManager requires non-empty list of datasets")
         self.datasets = datasets
+        if logger is None:
+            self.log = logging
+        else:
+            self.log = logging.getLogger(logger)
 
     def read_dset_tl(self, args):
         """
@@ -1793,7 +1798,7 @@ class MultiManager():
 
         except Exception as e:
             msg = f"{e}: Defaulting Number of SN_COREs to 1"
-            self.log.warning(msg)
+            self.log.debug(msg)
             num_endpoints = 1
 
         if (num_endpoints > 1):
@@ -1848,7 +1853,7 @@ class MultiManager():
                 raise ValueError("Malformed port range specification; must be sequential ports")
 
         except Exception as e:
-            print(f"{e}: Defaulting Number of SNs to 1")
+            self.log.debug(f"{e}: Defaulting Number of SNs to 1")
             num_endpoints = 1
 
         # TODO: Handle the case where some or all datasets share an HTTPConn object

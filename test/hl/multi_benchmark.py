@@ -1,13 +1,15 @@
 import numpy as np
 import time
+import sys
 
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 import subprocess
 import re
 
-from h5pyd._hl.dataset import MultiManager
+from h5pyd import MultiManager
 import h5pyd as h5py
+from common import getTestFileName
 
 # Flag to stop resource usage collection thread after a benchmark finishes
 stop_stat_collection = False
@@ -249,7 +251,17 @@ if __name__ == '__main__':
     dt = np.int32
     stats = {}
 
-    fs = [h5py.File("/home/test_user1/h5pyd_multi_bm_" + str(i), mode='w') for i in range(count)]
+    fs = []
+
+    for i in range(count):
+        filename = getTestFileName(f"bm_{i:04d}", subfolder="multi_bm")
+        try:
+            f = h5py.File(filename, mode='w')
+        except IOError:
+            print(f"unable to create domain at: {filename} - does the parent folder exist?")
+            sys.exit(1)
+        fs.append(f)
+
     data_in = np.zeros(shape, dtype=dt)
     datasets = [f.create_dataset("data", shape, dtype=dt, data=data_in) for f in fs]
 
@@ -266,7 +278,8 @@ if __name__ == '__main__':
 
     print("Testing with shared HTTP connection...")
 
-    f = h5py.File("/home/test_user1/h5pyd_multi_bm_shared", mode='w')
+    filename = getTestFileName("bm_shared", subfolder="multi_bm")
+    f = h5py.File(filename, mode='w')
     datasets = [f.create_dataset("data" + str(i), data=data_in, dtype=dt) for i in range(count)]
 
     run_benchmark("Read Multi (Shared HttpConn)", read_datasets_multi, stats, datasets, num_iters)
