@@ -218,8 +218,6 @@ def main():
     else:
         compress_filter = None
 
-    print("load_file, compressLevel:", compressLevel)
-
     try:
         # do the actual load
         load_file(
