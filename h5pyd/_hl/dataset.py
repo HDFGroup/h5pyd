@@ -1814,11 +1814,22 @@ class MultiManager():
                 if next_port > high_port:
                     next_port = low_port
 
-            # TODO: Handle the case where some or all datasets share an HTTPConn object
+        # TODO: Handle the case where some or all datasets share an HTTPConn object
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            read_futures = [executor.submit(self.read_dset_tl,
-                            (self.datasets[i], i, args)) for i in range(len(self.datasets))]
+            # Unwrap one-selection list
+            if (isinstance(args, list) and len(args) == 1):
+                args = args[0]
+
+            if not isinstance(args, list):
+                read_futures = [executor.submit(self.read_dset_tl,
+                                (self.datasets[i], i, args)) for i in range(len(self.datasets))]
+            elif isinstance(args, list) and len(args) == len(self.datasets):
+                read_futures = [executor.submit(self.read_dset_tl,
+                                (self.datasets[i], i, args[i])) for i in range(len(self.datasets))]
+            else:
+                raise ValueError("Number of selections must be one or equal number of datasets")
+
             ret_data = [None] * len(self.datasets)
 
             for future in as_completed(read_futures):
@@ -1853,7 +1864,8 @@ class MultiManager():
                 raise ValueError("Malformed port range specification; must be sequential ports")
 
         except Exception as e:
-            self.log.debug(f"{e}: Defaulting Number of SNs to 1")
+            msg = f"{e}: Defaulting Number of SN_COREs to 1"
+            self.log.debug(msg)
             num_endpoints = 1
 
         # TODO: Handle the case where some or all datasets share an HTTPConn object
@@ -1872,8 +1884,18 @@ class MultiManager():
                     next_port = low_port
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            write_futures = [executor.submit(self.write_dset_tl,
-                             (self.datasets[i], i, args, vals[i])) for i in range(len(self.datasets))]
+            # Unwrap one-selection list
+            if (isinstance(args, list) and len(args) == 1):
+                args = args[0]
+
+            if not isinstance(args, list):
+                write_futures = [executor.submit(self.write_dset_tl,
+                                 (self.datasets[i], i, args, vals[i])) for i in range(len(self.datasets))]
+            elif isinstance(args, list) and len(args) == len(self.datasets):
+                write_futures = [executor.submit(self.write_dset_tl,
+                                 (self.datasets[i], i, args[i], vals[i])) for i in range(len(self.datasets))]
+            else:
+                raise ValueError("Number of selections must be one or equal to number of datasets")
 
             for future in as_completed(write_futures):
                 try:
