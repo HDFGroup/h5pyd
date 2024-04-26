@@ -1,16 +1,18 @@
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/hdfgroup/h5pyd)
+
 h5pyd
 =====
 
 .. image:: https://travis-ci.org/HDFGroup/h5pyd.svg?branch=master
     :target: https://travis-ci.org/HDFGroup/h5pyd
 
-Python client library for HDF5 REST interface
+Python client library for HSDS
 
 
 Introduction
 ------------
-This repository contains library, test, and examples of h5pyd - a Python package for the
-HDF REST interface.
+This repository contains library, test, and examples of h5pyd - a Python package for HSDS 
+(Highly Scalable Data Service), or other HDF REST compatible web services.
 
 The h5pyd library provides a high-level interface to the REST specification that is generally
 easier to use than invoking http calls directly.
@@ -31,7 +33,6 @@ Related Projects
 ----------------
 
 * HSDS: https://github.com/HDFGroup/hsds
-* HDF Server: https://github.com/HDFGroup/h5serv
 * HDF5-JSON: https://github.com/HDFGroup/hdf5-json
 * h5py: https://github.com/h5py/h5py
 * REST API Documentation: https://github.com/HDFGroup/hdf-rest-api
@@ -50,10 +51,12 @@ From a release tarball or Git checkout::
 By default the examples look for a local instance of HSDS.  See the  https://github.com/HDFGroup/hsds
 for instructions on installing and running HSDS.
 
-These tests are also to designed to work with HSDS (see https://github.com/HDFGroup/hsds).  Install HSDS locally, or set environment variables (see next section)
-to point to an existing HSDS instance.
+These tests are also to designed to work with HSDS (see https://github.com/HDFGroup/hsds).  
+Install HSDS locally, or set environment variables (see next section)
+to point to an existing HSDS instance.  Alternatively, if you create as a Github codespace 
+(sell link above), HSDS will be automatically setup as part of the codespace.
 
-h5pyd can all be run in serverless mode with either AWS Lambda or direct mode (storage system accessed directly).
+Alternatively, h5pyd can all be run in serverless mode with either AWS Lambda or direct mode (storage system accessed directly).
 
 To use with AWS Lambda, set the HS_ENDPOINT to: "http+lambda://hslambda" where "hslambda" is the name
 of the lambda function.  When using AWS Lambda some additional environment variables need to be set:

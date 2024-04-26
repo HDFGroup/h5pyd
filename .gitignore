@@ -67,5 +67,5 @@ target/
 # macOS stuff
 .DS_Store
 
-# hsds config
-/.hsds/
+# hsds data
+data/
