@@ -36,7 +36,7 @@ def load_file():
     print("running command:", " ".join(run_cmd))
     result = subprocess.run(run_cmd)
     if result.returncode != 0:
-        print(f"unable able to hsload {s3_uri}, error: {run_cmd.returncode}")
+        print(f"unable able to hsload {s3_uri}, error: {result.returncode}")
         sys.exit(1)
     print("hsload complete")
     # now we should be able to open the domain

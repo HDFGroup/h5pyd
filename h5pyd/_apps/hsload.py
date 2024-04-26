@@ -192,14 +192,24 @@ def main():
                     sys.exit(1)
 
                 if not s3:
+                    kwargs = {"use_ssl": False}
                     key = os.environ.get("AWS_ACCESS_KEY_ID")
                     secret = os.environ.get("AWS_SECRET_ACCESS_KEY")
-                    aws_s3_gateway = os.environ.get("AWS_GATEWAY")
+
+                    if not key or not secret:
+                        kwargs["anon"] = True
+                    else:
+                        kwargs["key"] = key
+                        kwargs["secret"] = secret
+
                     client_kwargs = {}
+                    aws_s3_gateway = os.environ.get("AWS_GATEWAY")
                     if aws_s3_gateway:
                         client_kwargs["endpoint_url"] = aws_s3_gateway
+                    if client_kwargs:
+                        kwargs["client_kwargs"] = client_kwargs
 
-                    s3 = s3fs.S3FileSystem(use_ssl=False, key=key, secret=secret, client_kwargs=client_kwargs)
+                    s3 = s3fs.S3FileSystem(**kwargs)
                 try:
                     fin = h5py.File(s3.open(src_file, "rb"), moe="r")
                 except IOError as ioe:
