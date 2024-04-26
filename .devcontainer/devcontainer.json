@@ -4,7 +4,7 @@
     "cpus": 4
   },
   "dockerComposeFile": "docker-compose.yaml",
-  "updateContentCommand": "python3 -m pip install -r requirements.txt",
+  "updateContentCommand": "python3 -m pip install -r .devcontainer/requirements.txt",
   "postCreateCommand": "",
   "service": "app",
 	"workspaceFolder": "/workspace",

@@ -10,7 +10,6 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 from __future__ import print_function
-import math
 import numpy as np
 import logging
 import time
@@ -29,8 +28,9 @@ if len(sys.argv) == 1 or sys.argv[1] in ("-h", "--help"):
     s = f"usage: python {sys.argv[0]} "
     s += "[--ncols=n] "
     s += "[--nrows=m] "
-    s += "[--comp=none|gzip]"
-    s += "[--loglevel=debug|info|warn|error]"
+    s += "[--comp=none|gzip "
+    s += "[--loglevel=debug|info|warn|error] "
+    s += "<filepath>"
     print(s)
     print("for filepath, use hdf5:// prefix for h5pyd, posix path for h5py")
     print("defaults...")
@@ -101,40 +101,54 @@ if "dset2d" in f:
 
 if "dset2d" not in f:
     # create dataset
-    f.create_dataset("dset2d", (nrows, ncols), dtype=dt, chunks=CHUNKS, compression=compression)
+    shape = (nrows, ncols)
+    chunks = [nrows, ncols]
+    # chunk shape can't be larger than the dataset extents
+    for i in range(2):
+        if shape[i] > CHUNKS[i]:
+            chunks[i] = CHUNKS[i]
+    chunks = tuple(chunks)
+
+    f.create_dataset("dset2d", shape, dtype=dt, chunks=chunks, compression=compression)
 
 dset2d = f["dset2d"]
 
+print(dset2d)
+
+rng = np.random.default_rng()  # initialize random number generator
+
 # initialize numpy array to test values
 print("initialzing data")
+ts = time.time()  # starting time for the write
 
-arr = np.zeros((nrows, ncols), dtype=dt)
-exp = int(math.log10(ncols)) + 1
-for i in range(nrows):
-    row_start_value = i * 10 ** exp
-    for j in range(ncols):
-        arr[i, j] = row_start_value + j + 1
+for s in dset2d.iter_chunks():
+    # s is two element list of slices
+    n = s[0].stop - s[0].start
+    m = s[1].stop - s[1].start
+    element_cnt = n * m
+    # get random values less than a 1000 so the values are compressible
+    arr = rng.integers(low=0, high=1000, size=element_cnt)
+    arr2d = arr.reshape((n, m))  # reshape to two-dimensional
+    logging.info(f"writing selection: {s} data range: {arr2d.min()} - {arr2d.max()}")
+    dset2d[s] = arr2d[:, :]
 
-print("writing...")
-num_bytes = nrows * ncols * dt.itemsize
-ts = time.time()
-dset2d[:, :] = arr[:, :]
 elapsed = time.time() - ts
+print("done writing")
+num_bytes = nrows * ncols * dt.itemsize
+
 mb_per_sec = num_bytes / (1024 * 1024 * elapsed)
 print(f" elapsed: {elapsed:.2f} s, {mb_per_sec:.2f} MB/s")
 
 # read back the data as binary
 print("reading...")
+
 ts = time.time()
-arr_copy = dset2d[:, :]
+for s in dset2d.iter_chunks():
+    arr = dset2d[s]
+    logging.info(f"reading selection: {s} data range: {arr.min()} - {arr.max()}")
 
 elapsed = time.time() - ts
 mb_per_sec = num_bytes / (1024 * 1024 * elapsed)
 print(f" elapsed: {elapsed:.2f} s, {mb_per_sec:.2f} MB/s")
-
-if not np.array_equal(arr, arr_copy):
-    print("arrays don't match!")
-else:
-    print("passed!")
 
 f.close()
