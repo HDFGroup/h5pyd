@@ -1,4 +1,4 @@
-log_level: DEBUG 
+log_level: ERROR 
 bucket_name: hsdstest
 server_name: "HSDS for Github codespaces"
 aws_region: us-west-2 # (original was us-east-1)
