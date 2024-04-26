@@ -1,15 +1,15 @@
-name: hsds
+name: h5pyd tutorial
 channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.6
+  - python=3.11
   - h5py
   - jupyter
+  - matplotlib
   - nb_conda_kernels
   - pytz
   - requests
-  - matplotlib
+  - s3fs
   - pip:
-      - h5pyd  #latest release on PyPi
-#      - git+https://github.com/HDFGroup/h5pyd.git #latest from master
+      - h5pyd @ git+https://github.com/hdfgroup/h5pyd  # latest from master
