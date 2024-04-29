@@ -737,7 +737,6 @@ class TestCreateScaleOffset(BaseDataset):
 
     def test_float(self):
         """ Scaleoffset filter works for floating point data """
-        # TBD: Add support for scale offset filter
 
         scalefac = 4
         shape = (100, 300)
