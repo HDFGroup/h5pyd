@@ -12,32 +12,68 @@
 
 import h5pyd as h5py
 
+from pathlib import Path
+import subprocess
+import sys
+
+DOMAIN_PATH = "/home/test_user1/test/tall.h5"
+
+
+def load_file():
+    """ Load the HDF5 file from the S3 sample bucket to HSDS """
+
+    path = Path(DOMAIN_PATH)
+    parent_path = str(path.parent) + "/"  # HSDS folders must end with a '/'
+    try:
+        h5py.Folder(parent_path, mode="x")  # 'x' mode will create the folder if not present
+    except IOError as ioe:
+        print("ioe:", ioe)
+        sys.exit(1)
+
+    # run hsload
+    s3_uri = "s3://hdf5.sample/data/hdf5test/tall.h5"
+    run_cmd = ["hsload", s3_uri, parent_path]
+    print("running command:", " ".join(run_cmd))
+    result = subprocess.run(run_cmd)
+    if result.returncode != 0:
+        print(f"unable able to hsload {s3_uri}, error: {result.returncode}")
+        sys.exit(1)
+    print("hsload complete")
+    # now we should be able to open the domain
+    f = h5py.File(DOMAIN_PATH)
+    return f
+
 
 def visit_item(name):
-    print("visit:", name)
+    print(f"    {name}")
     return None
 
 
 def find_g1_2(name):
-    print("visit:", name)
+    print(f"    {name}")
     if name.endswith("g1.2"):
         return True  # stop iteration
 
 
 def visit_item_obj(name, obj):
-    print("visit:", name, obj.id.id)
+    print(f"    {name:20s}  id: {obj.id.id}")
     return None
 
 
-print("version:", h5py.version.version)
+# print the h5py version
+print("h5pyd version:", h5py.version.version)
 
-# this is the path specified in the "post-install instructions"
-# see:  "Test Data Setup" in:
-#  https://github.com/HDFGroup/hsds/blob/master/docs/post_install.md
-DOMAIN_PATH = "/home/test_user1/test/tall.h5"
 print("opening domain:", DOMAIN_PATH)
 
-f = h5py.File(DOMAIN_PATH, "r")
+try:
+    f = h5py.File(DOMAIN_PATH, "r")
+except IOError as ioe:
+    if ioe.errno in (404, 410):
+        # file hasn't been loaded into HSDS, get it now
+        f = load_file()
+    else:
+        print("unexpected error opening: {DOMAIN_PATH}: {ioe}")
+        sys.exit(1)
 
 print("name:", f.name)
 print("id:", f.id.id)
@@ -71,20 +107,20 @@ print("dset111 len:", len(dset111))
 arr = dset111[...]
 print("dset111 values:", arr)
 
-
 attr1 = dset111.attrs['attr1']
 print("attr1:", attr1)
 print("num attrs of dset1.1.1:", len(dset111.attrs))
-print("attr keys:", dset111.attrs.keys())
+print("dset1.1.1 attributes:")
 
-for attr in dset111.attrs:
-    print("name:", attr)
+for k in dset111.attrs:
+    v = dset111.attrs[k]
+    print(f"    {k}: {v}")
 
-print("visit...")
+print("\nvisit...")
 f.visit(visit_item)
 
-print("visititems...")
+print("\nvisititems...")
 f.visititems(visit_item_obj)
 
-print("search g1.2:")
+print("\nsearch g1.2:")
 f.visit(find_g1_2)
