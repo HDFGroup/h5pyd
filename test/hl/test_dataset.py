@@ -2353,10 +2353,10 @@ class TestMultiManager(BaseDataset):
         for i in range(count):
             np.testing.assert_array_equal(data_out[i][6:, 6:, 6:], data_in_original[i][6:, 6:, 6:])
 
-    """
-    TBD - Field selection in h5pyd seems to work slightly different than in h5py
     def test_multi_write_field_selection(self):
-        Testing writing to a field selection on multiple datasets
+        """
+        Test writing to a field selection on multiple datasets
+        """
         dt = np.dtype([('a', np.float32), ('b', np.int32), ('c', np.float32)])
         shape = (100,)
         data = np.ones(shape, dtype=dt)
@@ -2365,8 +2365,8 @@ class TestMultiManager(BaseDataset):
 
         for i in range(count):
             dset = self.f.create_dataset("data" + str(i), shape=shape,
-                                        data=np.zeros(shape, dtype=dt),
-                                        dtype=dt)
+                                         data=np.zeros(shape, dtype=dt),
+                                         dtype=dt)
             datasets.append(dset)
 
         # Perform write to field 'b'
@@ -2378,7 +2378,14 @@ class TestMultiManager(BaseDataset):
             np.testing.assert_array_equal(out['a'], np.zeros(shape, dtype=dt['a']))
             np.testing.assert_array_equal(out['b'], data['b'])
             np.testing.assert_array_equal(out['c'], np.zeros(shape, dtype=dt['c']))
-    """
+
+        # Test writing to entire compound type
+        data = np.zeros(shape, dtype=dt)
+        mm[...] = [data, data, data]
+
+        for i in range(count):
+            out = np.array(self.f["data" + str(i)], dtype=dt)
+            np.testing.assert_array_equal(out, data)
 
 
 if __name__ == '__main__':
