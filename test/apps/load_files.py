@@ -15,7 +15,7 @@ import os
 import sys
 import config
 import h5pyd
-
+from platform import system
 #
 # Main
 #
@@ -60,9 +60,19 @@ for filename in filenames:
             # wget from S3
             http_path = test_file_http_path + filename
             print("downloading:", http_path)
-            rc = os.system(f"wget -q https://s3.amazonaws.com/hdfgroup/data/hdf5test/{filename} -P {data_dir}")
+
+            if system() == "Windows":
+                get_cmd = f"curl.exe -o {filename}\
+                            https://s3.amazonaws.com/hdfgroup/data/hdf5test/{filename}\
+                            --create-dirs --output-dir {data_dir}"
+            else:
+                get_cmd = f"wget -q\
+                            https://s3.amazonaws.com/hdfgroup/data/hdf5test/{filename}\
+                            -P {data_dir}"
+
+            rc = os.system(f"{get_cmd}")
             if rc != 0:
-                sys.exit("Failed to retreive test data file")
+                sys.exit(f"Failed to retreive test data file with error code {rc}")
     # run hsload for each file
     print(f"running hsload for {hdf5_path} to {test_folder}")
     rc = os.system(f"python ../../h5pyd/_apps/hsload.py {hdf5_path} {test_folder}")

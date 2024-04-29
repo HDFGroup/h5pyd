@@ -571,7 +571,9 @@ class HttpConn:
             # binary write
             data = body
         else:
+            headers["Content-Type"] = "application/json"
             data = json.dumps(body)
+
         self.log.info("PUT: {} format: {} [{} bytes]".format(req, format, len(data)))
 
         try:
