@@ -735,7 +735,6 @@ class TestCreateScaleOffset(BaseDataset):
         with self.assertRaises(TypeError):
             self.f.create_dataset('foo', (20, 30), dtype=bool, scaleoffset=True)
 
-    @ut.expectedFailure
     def test_float(self):
         """ Scaleoffset filter works for floating point data """
         # TBD: Add support for scale offset filter
@@ -767,7 +766,6 @@ class TestCreateScaleOffset(BaseDataset):
         else:
             assert not (readdata == testdata).all()
 
-    @ut.expectedFailure
     def test_int(self):
         """ Scaleoffset filter works for integer data with default precision """
 
@@ -789,7 +787,6 @@ class TestCreateScaleOffset(BaseDataset):
         readdata = self.f['foo'][...]
         self.assertArrayEqual(readdata, testdata)
 
-    @ut.expectedFailure
     def test_int_with_minbits(self):
         """ Scaleoffset filter works for integer data with specified precision """
 
@@ -810,7 +807,6 @@ class TestCreateScaleOffset(BaseDataset):
         readdata = self.f['foo'][...]
         self.assertArrayEqual(readdata, testdata)
 
-    @ut.expectedFailure
     def test_int_with_minbits_lossy(self):
         """ Scaleoffset filter works for integer data with specified precision """
 
