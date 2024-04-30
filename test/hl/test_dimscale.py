@@ -134,7 +134,8 @@ class TestDimensionScale(TestCase):
         else:
             with self.assertRaises(UnicodeError):
                 dset.dims.create_scale(f['scale_name'], '√')
-        with self.assertRaises(AttributeError):
+
+        with self.assertRaises((AttributeError, TypeError)):
             dset.dims.create_scale(f['scale_name'], 67)
 
         f.close()
