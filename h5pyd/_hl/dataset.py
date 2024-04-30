@@ -189,32 +189,6 @@ def make_new_dset(
         layout = chunks
         chunks = None
 
-    if isinstance(dtype, Datatype):
-        # Named types are used as-is
-        type_json = dtype.id.type_json
-    else:
-        # Validate dtype
-        if dtype is None:
-            dtype = numpy.dtype("=f4")
-        else:
-            dtype = numpy.dtype(dtype)
-
-        if dtype.kind == "O" and dtype.metadata and "ref" in dtype.metadata:
-            type_json = {}
-            type_json["class"] = "H5T_REFERENCE"
-            meta_type = dtype.metadata["ref"]
-            if meta_type is Reference:
-                type_json["base"] = "H5T_STD_REF_OBJ"
-            elif meta_type is RegionReference:
-                type_json["base"] = "H5T_STD_REF_DSETREG"
-            else:
-                errmsg = "Unexpected metadata type"
-                raise ValueError(errmsg)
-        else:
-            type_json = getTypeItem(dtype)
-            # tid = h5t.py_create(dtype, logical=1)
-    body["type"] = type_json
-
     compressors = parent.id.http_conn.compressors
 
     # Legacy
