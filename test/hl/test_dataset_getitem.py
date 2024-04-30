@@ -553,11 +553,8 @@ class Test2DFloat(TestCase):
     def test_indexlist(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[:, [0, 1, 2]])
 
-    @ut.expectedFailure
     def test_index_emptylist(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[:, []])
-        # test with single empty list failing - but results seems compat
-        # with h5py 3.2.1 at least
         self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
 
 
