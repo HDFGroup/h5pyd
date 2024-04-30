@@ -56,7 +56,7 @@ class Group(HLObject, MutableMappingHDF5):
         """
 
         if not isinstance(bind, GroupID):
-            raise ValueError("%s is not a GroupID" % bind)
+            raise ValueError(f"{bind} is not a GroupID")
         HLObject.__init__(self, bind, **kwargs)
         self._req_prefix = "/groups/" + self.id.uuid
         self._link_db = {}  # cache for links
@@ -544,7 +544,7 @@ class Group(HLObject, MutableMappingHDF5):
             return self.create_group(name)
         grp = self[name]
         if not isinstance(grp, Group):
-            raise TypeError("Incompatible object (%s) already exists" % grp.__class__.__name__)
+            raise TypeError(f"Incompatible object ({grp.__class__.__name__}) already exists")
         return grp
 
     def getObjByUuid(self, uuid, collection_type=None):
@@ -1165,7 +1165,7 @@ class SoftLink(object):
         self._path = str(path)
 
     def __repr__(self):
-        return '<SoftLink to "%s">' % self.path
+        return f'<SoftLink to "{self.path}">'
 
 
 class ExternalLink(object):
@@ -1188,7 +1188,7 @@ class ExternalLink(object):
         self._path = str(path)
 
     def __repr__(self):
-        return '<ExternalLink to "%s" in file "%s">' % (self.path, self.filename)
+        return f'<ExternalLink to "{self.path}" in file "{self.filename}">'
 
 
 class UserDefinedLink(object):

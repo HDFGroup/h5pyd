@@ -400,7 +400,7 @@ class SimpleSelection(Selection):
         """
         if self._shape == ():
             if np.product(target_shape) != 1:
-                raise TypeError("Can't broadcast %s to scalar" % target_shape)
+                raise TypeError(f"Can't broadcast {target_shape} to scalar")
             self._id.select_all()
             yield self._id
             return
@@ -419,7 +419,7 @@ class SimpleSelection(Selection):
                 if t == 1 or count[-idx] == t:
                     tshape.append(t)
                 else:
-                    raise TypeError("Can't broadcast %s -> %s" % (target_shape, count))
+                    raise TypeError(f"Can't broadcast {target_shape} -> {count}")
         tshape.reverse()
         tshape = tuple(tshape)
 
@@ -708,7 +708,7 @@ def guess_shape(sid):
             return tuple()
 
     elif sel_class != 'H5S_SIMPLE':
-        raise TypeError("Unrecognized dataspace class %s" % sel_class)
+        raise TypeError(f"Unrecognized dataspace class {sel_class}")
 
     # We have a "simple" (rank >= 1) dataspace
 
@@ -727,7 +727,7 @@ def guess_shape(sid):
         return (N,)
 
     elif sel_type != H5S_SELECT_HYPERSLABS:
-        raise TypeError("Unrecognized selection method %s" % sel_type)
+        raise TypeError(f"Unrecognized selection method {sel_type}")
 
     # We have a hyperslab-based selection
 
