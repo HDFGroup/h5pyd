@@ -34,12 +34,12 @@ __version__ = version.version
 
 
 __doc__ = \
-    """
+    f"""
     This is the h5pyd package, a Python interface to the HDF REST Server.
 
-    Version %s
+    Version {version.version}
 
-    """ % (version.version)
+    """
 
 
 def enable_ipython_completer():

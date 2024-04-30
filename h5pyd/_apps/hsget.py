@@ -17,7 +17,7 @@ try:
     import h5py
     import h5pyd
 except ImportError as e:
-    sys.stderr.write("ERROR : %s : install it to use this utility...\n" % str(e))
+    sys.stderr.write(f"ERROR : {str(e)} : install it to use this utility...\n")
     sys.exit(1)
 
 if __name__ == "__main__":

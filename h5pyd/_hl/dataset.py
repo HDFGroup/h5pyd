@@ -50,7 +50,7 @@ def readtime_dtype(basetype, names):
         elif itemsize == 8:
             return numpy.dtype(numpy.complex64)
         else:
-            TypeError("Unsupported dtype for complex numbers: %s" % basetype)
+            TypeError(f"Unsupported dtype for complex numbers: {basetype}")
 
     if len(names) == 0:  # Not compound, or we want all fields
         return basetype
@@ -60,7 +60,7 @@ def readtime_dtype(basetype, names):
 
     for name in names:  # Check all names are legal
         if name not in basetype.names:
-            raise ValueError("Field %s does not appear in this type." % name)
+            raise ValueError(f"Field {name} does not appear in this type.")
 
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
 
@@ -721,7 +721,7 @@ class Dataset(HLObject):
         """Create a new Dataset object by binding to a low-level DatasetID."""
 
         if not isinstance(bind, DatasetID):
-            raise ValueError("%s is not a DatasetID" % bind)
+            raise ValueError(f"{bind} is not a DatasetID")
         HLObject.__init__(self, bind)
 
         self._dcpl = self.id.dcpl_json
@@ -781,7 +781,7 @@ class Dataset(HLObject):
 
         if axis is not None:
             if not (axis >= 0 and axis < self.id.rank):
-                raise ValueError("Invalid axis (0 to %s allowed)" % (self.id.rank - 1))
+                raise ValueError(f"Invalid axis (0 to {self.id.rank - 1} allowed)")
             try:
                 newlen = int(size)
             except TypeError:
@@ -1404,8 +1404,7 @@ class Dataset(HLObject):
         ):
             if self.dtype.kind != "V" or self.dtype.names != ("r", "i"):
                 raise TypeError(
-                    "Wrong dataset dtype for complex number values: %s"
-                    % self.dtype.fields
+                    f"Wrong dataset dtype for complex number values: {self.dtype.fields}"
                 )
             if isinstance(val, complex):
                 val = numpy.asarray(val, dtype=type(val))
@@ -1425,7 +1424,7 @@ class Dataset(HLObject):
             if len(names) == 1 and self.dtype.fields is not None:
                 # Single field selected for write, from a non-array source
                 if not names[0] in self.dtype.fields:
-                    raise ValueError("No such field for indexing: %s" % names[0])
+                    raise ValueError(f"No such field for indexing: {names[0]}")
                 dtype = self.dtype.fields[names[0]][0]
                 cast_compound = True
             else:
@@ -1456,8 +1455,8 @@ class Dataset(HLObject):
             shp = self.dtype.subdtype[1]   # type shape
             valshp = val.shape[-len(shp):]
             if valshp != shp:  # Last dimension has to match
-                raise TypeError("When writing to array types,\
-                                 last N dimensions have to match (got %s, but should be %s)" % (valshp, shp,))
+                raise TypeError(f"When writing to array types,\
+                                 last N dimensions have to match (got {valshp}, but should be {shp})")
             mtype = h5t.py_create(numpy.dtype((val.dtype, shp)))
             mshape = val.shape[0:len(val.shape)-len(shp)]
         """
@@ -1469,8 +1468,8 @@ class Dataset(HLObject):
                 raise TypeError("Illegal slicing argument (not a compound dataset)")
             mismatch = [x for x in names if x not in self.dtype.fields]
             if len(mismatch) != 0:
-                mismatch = ", ".join('"%s"' % x for x in mismatch)
-                raise ValueError("Illegal slicing argument (fields %s not in dataset type)" % mismatch)
+                mismatch = ", ".join(f"{x}" for x in mismatch)
+                raise ValueError(f"Illegal slicing argument (fields {mismatch} not in dataset type)")
 
         # Use mtype derived from array (let DatasetID.write figure it out)
         else:

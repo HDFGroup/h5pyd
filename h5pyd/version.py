@@ -31,26 +31,18 @@ version_tuple = _exp._version + (
 api_version_tuple = (0, 18, 0)
 api_version = "0.18.0"
 
-__doc__ = """\
-This is h5pyd **%s**
+__doc__ = f"""\
+This is h5pyd **{version}**
 
-""" % (
-    version
-)
+"""
 
-info = """\
+info = f"""\
 Summary of the h5pyd configuration
 ---------------------------------
 
-h5pyd    %(h5pyd)s
-Python  %(python)s
-sys.platform    %(platform)s
-sys.maxsize     %(maxsize)s
-numpy   %(numpy)s
-""" % {
-    "h5pyd": version,
-    "python": sys.version,
-    "platform": sys.platform,
-    "maxsize": sys.maxsize,
-    "numpy": numpy.__version__,
-}
+h5pyd    {version}
+Python  {sys.version}
+sys.platform    {sys.platform}
+sys.maxsize     {sys.maxsize}
+numpy   {numpy.__version__}
+"""
