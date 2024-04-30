@@ -68,6 +68,7 @@ jobs:
           pip install -e .
 
       - name: Start HSDS
+        shell: bash
         working-directory: ${{github.workspace}}/hsds
         run: |
           mkdir hsds_root
@@ -97,7 +98,6 @@ jobs:
           hstouch -v /home/test_user1/h5pyd_tests/
 
       - name: Run h5pyd tests
-        shell: bash
         id: h5pyd-tests
         env:
           HS_USERNAME: test_user1
@@ -108,13 +108,13 @@ jobs:
           python testall.py
       
       - name: Show HSDS Logs on Fail
+        working-directory: ${{github.workspace}}/hsds
         # Only run if the whole workflow failed due to h5pyd tests
         if: ${{failure() && steps.h5pyd-tests.outcome == 'failure'}}
         run: |
           cat hs.log
   
       - name: Run h5pyd tests with h5py
-        shell: bash
         env:
           HS_USERNAME: test_user1
           HS_PASSWORD: test
