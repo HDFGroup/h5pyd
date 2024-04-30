@@ -14,10 +14,10 @@ env:
   USER2_PASSWORD: test
   HSDS_USERNAME: test_user1
   HSDS_PASSWORD: test
-  HSDS_ENDPOINT: http+unix://%2Ftmp%2Fhs%2Fsn_1.sock
+  HSDS_ENDPOINT: http://127.0.0.1:5101
   ROOT_DIR: ${{github.workspace}}/hsds/hsds_root
   BUCKET_NAME: hsds_bucket
-  HS_ENDPOINT: http+unix://%2Ftmp%2Fhs%2Fsn_1.sock
+  HS_ENDPOINT: http://127.0.0.1:5101
   H5PYD_TEST_FOLDER: /home/test_user1/h5pyd_tests/
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest,]
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
     runs-on: ${{ matrix.os }}
@@ -62,36 +62,59 @@ jobs:
           path: ${{github.workspace}}/hsds
 
       - name: Install HSDS
+        working-directory: ${{github.workspace}}/hsds
         shell: bash
         run: |
-          cd ${{github.workspace}}/hsds
           pip install -e .
 
       - name: Start HSDS
         shell: bash
+        working-directory: ${{github.workspace}}/hsds
         run: |
-          cd ${{github.workspace}}/hsds
           mkdir hsds_root
           mkdir hsds_root/hsds_bucket
           cp admin/config/groups.default admin/config/groups.txt
           cp admin/config/passwd.default admin/config/passwd.txt
-          ./runall.sh --no-docker 1 &
-          sleep 11 # let the nodes get ready
+          hsds --root_dir hsds_root --host localhost --port 5101 --password_file admin/config/passwd.txt --logfile hs.log --loglevel DEBUG --config_dir=admin/config --count=4 &
+
+      - name: Wait for node startup
+        shell: bash
+        run: |
+          sleep 30
+      
+      - name: HSDS Setup
+        shell: bash
+        working-directory: ${{github.workspace}}/hsds
+        run: |
           python tests/integ/setup_test.py
 
       - name: Create h5pyd test folder
         shell: bash
+        env:
+          HS_USERNAME: test_user1
+          HS_PASSWORD: test
+          TEST2_USERNAME: test_user1
+          TEST2_PASSWORD: test
         run: |
-          HS_USERNAME=test_user1 HS_PASSWORD=test TEST2_USERNAME=test_user1 TEST2_PASSWORD=test hstouch -v /home/test_user1/h5pyd_tests/
+          hstouch -v /home/test_user1/h5pyd_tests/
 
       - name: Run h5pyd tests
         shell: bash
+        env:
+          HS_USERNAME: test_user1
+          HS_PASSWORD: test
+          TEST2_USERNAME: test_user1
+          TEST2_PASSWORD: test
         run: |
-          HS_USERNAME=test_user1 HS_PASSWORD=test TEST2_USERNAME=test_user1 TEST2_PASSWORD=test python testall.py
+          python testall.py
       
       - name: Run h5pyd tests with h5py
         shell: bash
         env:
+          HS_USERNAME: test_user1
+          HS_PASSWORD: test
+          TEST2_USERNAME: test_user1
+          TEST2_PASSWORD: test
           USE_H5PY: 1
         run: |
-          HS_USERNAME=test_user1 HS_PASSWORD=test TEST2_USERNAME=test_user1 TEST2_PASSWORD=test python testall.py
+          python testall.py
