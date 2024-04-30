@@ -88,3 +88,10 @@ jobs:
         shell: bash
         run: |
           HS_USERNAME=test_user1 HS_PASSWORD=test TEST2_USERNAME=test_user1 TEST2_PASSWORD=test python testall.py
+      
+      - name: Run h5pyd tests with h5py
+        shell: bash
+        env:
+          USE_H5PY: 1
+        run: |
+          HS_USERNAME=test_user1 HS_PASSWORD=test TEST2_USERNAME=test_user1 TEST2_PASSWORD=test python testall.py
