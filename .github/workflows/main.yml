@@ -92,7 +92,7 @@ jobs:
         env:
           HS_USERNAME: test_user1
           HS_PASSWORD: test
-          TEST2_USERNAME: test_user1
+          TEST2_USERNAME: test_user2
           TEST2_PASSWORD: test
         run: |
           hstouch -v /home/test_user1/h5pyd_tests/
@@ -102,7 +102,7 @@ jobs:
         env:
           HS_USERNAME: test_user1
           HS_PASSWORD: test
-          TEST2_USERNAME: test_user1
+          TEST2_USERNAME: test_user2
           TEST2_PASSWORD: test
         run: |
           python testall.py
@@ -118,7 +118,7 @@ jobs:
         env:
           HS_USERNAME: test_user1
           HS_PASSWORD: test
-          TEST2_USERNAME: test_user1
+          TEST2_USERNAME: test_user2
           TEST2_PASSWORD: test
           USE_H5PY: 1
         run: |
