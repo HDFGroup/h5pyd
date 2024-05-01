@@ -125,7 +125,7 @@ class TestCreateShape(BaseDataset):
         """ Confirm that the default dtype is float """
         dset = self.f.create_dataset('foo', (63,), dtype=np.longdouble)
         if platform.machine() in ['ppc64le']:
-            print("Storage of long double deactivated on %s" % platform.machine())
+            print(f"Storage of long double deactivated on {platform.machine()}")
         else:
             self.assertEqual(dset.dtype, np.longdouble)
 

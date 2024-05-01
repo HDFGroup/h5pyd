@@ -148,7 +148,7 @@ class TestCase(ut.TestCase):
                     if x == y:
                         match = True
                 if not match:
-                    raise AssertionError("Item '%s' appears in a but not b" % x)
+                    raise AssertionError(f"Item '{x}' appears in a but not b")
 
             for x in b:
                 match = False
@@ -156,7 +156,7 @@ class TestCase(ut.TestCase):
                     if x == y:
                         match = True
                 if not match:
-                    raise AssertionError("Item '%s' appears in b but not a" % x)
+                    raise AssertionError(f"Item '{x}' appears in b but not a")
 
     def assertArrayEqual(self, dset, arr, message=None, precision=None):
         """ Make sure dset and arr have the same shape, dtype and contents, to
@@ -169,41 +169,41 @@ class TestCase(ut.TestCase):
         if message is None:
             message = ''
         else:
-            message = ' (%s)' % message
+            message = f' ({message})'
 
         if np.isscalar(dset) or np.isscalar(arr):
             self.assertTrue(
                 np.isscalar(dset) and np.isscalar(arr),
-                'Scalar/array mismatch ("%r" vs "%r")%s' % (dset, arr, message)
+                f'Scalar/array mismatch ("{dset}" vs "{arr}"){message}'
             )
             self.assertTrue(
                 dset - arr < precision,
-                "Scalars differ by more than %.3f%s" % (precision, message)
+                f"Scalars differ by more than {precision:.3}{message}"
             )
             return
 
         self.assertTrue(
             dset.shape == arr.shape,
-            "Shape mismatch (%s vs %s)%s" % (dset.shape, arr.shape, message)
+            f"Shape mismatch ({dset.shape} vs {arr.shape}){message}"
         )
         self.assertTrue(
             dset.dtype == arr.dtype,
-            "Dtype mismatch (%s vs %s)%s" % (dset.dtype, arr.dtype, message)
+            f"Dtype mismatch ({dset.dtype} vs {arr.dtype}){message}"
         )
 
         if arr.dtype.names is not None:
             for n in arr.dtype.names:
-                message = '[FIELD %s] %s' % (n, message)
+                message = f'[FIELD {n}] {message}'
                 self.assertArrayEqual(dset[n], arr[n], message=message, precision=precision)
         elif arr.dtype.kind in ('i', 'f'):
             self.assertTrue(
                 np.all(np.abs(dset[...] - arr[...]) < precision),
-                "Arrays differ by more than %.3f%s" % (precision, message)
+                f"Arrays differ by more than {precision:.3}{message}"
             )
         else:
             self.assertTrue(
                 np.all(dset[...] == arr[...]),
-                "Arrays are not equal (dtype %s) %s" % (arr.dtype.str, message)
+                f"Arrays are not equal (dtype {arr.dtype.str}) {message}"
             )
 
     def assertNumpyBehavior(self, dset, arr, s):

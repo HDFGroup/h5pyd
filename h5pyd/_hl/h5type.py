@@ -168,7 +168,7 @@ def special_dtype(**kwds):
 
         return dt
 
-    raise TypeError('Unknown special type "%s"' % name)
+    raise TypeError(f'Unknown special type "{name}"')
 
 
 def check_vlen_dtype(dt):
@@ -265,7 +265,7 @@ def check_dtype(**kwds):
     name, dt = kwds.popitem()
 
     if name not in ('vlen', 'enum', 'ref'):
-        raise TypeError('Unknown special type "%s"' % name)
+        raise TypeError(f'Unknown special type "{name}"')
 
     try:
         return dt.metadata[name]

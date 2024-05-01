@@ -222,8 +222,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
             if is_complex:
                 raise TypeError(
-                    'Wrong committed datatype for complex numbers: %s' %
-                    dtype.name)
+                    f'Wrong committed datatype for complex numbers: {dtype.name}')
         elif dtype is None:
             if data.dtype.kind == 'U':
                 # use vlen for unicode strings
@@ -243,7 +242,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
                 # Make sure the subshape matches the last N axes' sizes.
                 if shape[-len(subshape):] != subshape:
-                    raise ValueError("Array dtype shape %s is incompatible with data shape %s" % (subshape, shape))
+                    raise ValueError(f"Array dtype shape {subshape} is incompatible with data shape {shape}")
 
                 # New "advertised" shape and dtype
                 shape = shape[0:len(shape) - len(subshape)]
@@ -383,4 +382,4 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     def __repr__(self):
         if not self._parent.id.id:
             return "<Attributes of closed HDF5 object>"
-        return "<Attributes of HDF5 object at %s>" % id(self._parent.id)
+        return f"<Attributes of HDF5 object at {id(self._parent.id)}>"

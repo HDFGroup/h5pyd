@@ -387,7 +387,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
     def __repr__(self):
         if not self._id:
             return '<Dimensions of closed HDF5 dataset>'
-        return '<Dimensions of HDF5 dataset at %s>' % self._id
+        return f'<Dimensions of HDF5 dataset at {self._id}>'
 
     def create_scale(self, dset, name=''):
         ''' Create a new dimension, from an initial scale.

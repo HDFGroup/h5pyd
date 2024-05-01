@@ -42,7 +42,7 @@ class Datatype(HLObject):
         """
         if not isinstance(bind, TypeID):
             # todo: distinguish type from other hl objects
-            raise ValueError("%s is not a TypeID" % bind)
+            raise ValueError(f"{bind} is not a TypeID")
         HLObject.__init__(self, bind)
 
         self._dtype = createDataType(self.id.type_json)
@@ -55,7 +55,7 @@ class Datatype(HLObject):
             namestr = '("anonymous")'
         else:
             name = pp.basename(pp.normpath(self.name))
-            namestr = '"%s"' % (name if name != '' else '/')
+            namestr = f"{name if name != '' else '/'}"
             if name:
                 namestr = f'"{name}"'
             else:

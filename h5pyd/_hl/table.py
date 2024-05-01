@@ -87,7 +87,7 @@ class Table(Dataset):
         """
 
         if not isinstance(bind, DatasetID):
-            raise ValueError("%s is not a DatasetID" % bind)
+            raise ValueError(f"{bind} is not a DatasetID")
         Dataset.__init__(self, bind)
 
         if len(self._dtype) < 1:
@@ -144,7 +144,7 @@ class Table(Dataset):
 
             for name in names:  # Check all names are legal
                 if name not in basetype.names:
-                    raise ValueError("Field %s does not appear in this type." % name)
+                    raise ValueError(f"Field {name} does not appear in this type.")
 
             return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
 
