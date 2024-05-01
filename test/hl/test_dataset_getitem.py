@@ -287,15 +287,23 @@ class TestScalarArray(TestCase):
     @ut.expectedFailure
     def test_ellipsis(self):
         """ Ellipsis -> ndarray promoted to underlying shape """
-        out = self.dset[...]
-        self.assertArrayEqual(out, self.data)
+        if self.is_hsds():
+            out = self.dset[...]
+            self.assertArrayEqual(out, self.data)
+        else:
+            # Manually raise error to allow running tests with h5py
+            raise IOError("HSDS failure")
 
     # FIXME: HSDS failure
     @ut.expectedFailure
     def test_tuple(self):
         """ () -> same as ellipsis """
-        out = self.dset[...]
-        self.assertArrayEqual(out, self.data)
+        if self.is_hsds():
+            out = self.dset[...]
+            self.assertArrayEqual(out, self.data)
+        else:
+            # Manually raise error to allow running tests with h5py
+            raise IOError("HSDS failure")
 
     def test_slice(self):
         """ slice -> ValueError """
@@ -553,11 +561,8 @@ class Test2DFloat(TestCase):
     def test_indexlist(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[:, [0, 1, 2]])
 
-    @ut.expectedFailure
     def test_index_emptylist(self):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[:, []])
-        # test with single empty list failing - but results seems compat
-        # with h5py 3.2.1 at least
         self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
 
 

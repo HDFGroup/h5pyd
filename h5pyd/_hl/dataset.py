@@ -1007,7 +1007,9 @@ class Dataset(HLObject):
         self.log.debug("selection_constructor")
 
         if selection.nselect == 0:
-            return numpy.ndarray(selection.mshape, dtype=new_dtype)
+            # force compliance with h5py selection behavior
+            shape = numpy.empty(self.shape)[args].shape
+            return numpy.ndarray(shape, dtype=new_dtype)
         # Up-converting to (1,) so that numpy.ndarray correctly creates
         # np.void rows in case of multi-field dtype. (issue 135)
         single_element = selection.mshape == ()

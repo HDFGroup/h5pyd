@@ -20,6 +20,7 @@ import config
 
 import numpy as np
 import unittest as ut
+from platform import system
 
 
 # Check if non-ascii filenames are supported
@@ -45,13 +46,13 @@ def getTestFileName(basename, subfolder=None):
 
     if config.get("use_h5py"):
         filename = "out"
-        if not op.isdir(filename):
+        if not os.path.isdir(filename):
             os.mkdir(filename)
         if subfolder:
-            filename = op.join(filename, subfolder)
-            if not op.isdir(filename):
+            filename = os.path.join(filename, subfolder)
+            if not os.path.isdir(filename):
                 os.mkdir(filename)
-        filename = op.join(filename, f"{basename}.h5")
+        filename = os.path.join(filename, f"{basename}.h5")
     else:
         if "H5PYD_TEST_FOLDER" in os.environ:
             filename = os.environ["H5PYD_TEST_FOLDER"]
@@ -59,8 +60,8 @@ def getTestFileName(basename, subfolder=None):
             # default to the root folder
             filename = "/"
         if subfolder:
-            filename = op.join(filename, subfolder)
-        filename = op.join(filename, f"{basename}.h5")
+            filename = os.path.join(filename, subfolder)
+        filename = os.path.join(filename, f"{basename}.h5")
     return filename
 
 
@@ -242,18 +243,25 @@ class TestCase(ut.TestCase):
         E.g. "mytest.h5pyd_test.hdfgroup.org" to
              "/org/hdfgroup/h5pyd_test/mytest
         """
-        if domain.find('/') > -1:
+        if (domain.find('/') > -1) or (domain.find(':') > -1):
             # looks like the domain already is specified as a path
             return domain
 
         names = domain.split('.')
         names.reverse()
-        path = '/'
+
+        # strip empty names
+        names = [name for name in names if name]
+
+        path = os.path.abspath(os.sep)
+
         for name in names:
-            if name:
-                path += name
-                path += '/'
-        path = path[:-1]  # strip trailing slash
+            path = os.path.join(path, name)
+
+        # strip trailing slash
+        if path[-1] == os.sep:
+            path = path[:-1]
+
         return path
 
     def is_hsds(self, id=None):

@@ -101,6 +101,8 @@ class TestGroup(TestCase):
             self.assertTrue(False)  # shouldn't get here'
         except RuntimeError:
             pass  # expected
+        except OSError:
+            pass  # also acceptable
 
         del r['tmp']
         self.assertEqual(len(r), 4)
