@@ -411,7 +411,6 @@ def copyElement(e, dt, buffer, offset, vlen=None):
         e_buf = e.tobytes()
         if len(e_buf) < dt.itemsize:
             # extend the buffer for fixed size strings
-            # print("extending buffer to {}".format(dt.itemsize))
             e_buf_ex = bytearray(dt.itemsize)
             for i in range(len(e_buf)):
                 e_buf_ex[i] = e_buf[i]

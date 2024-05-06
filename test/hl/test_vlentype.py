@@ -365,7 +365,7 @@ class TestVlenTypes(TestCase):
         # write data
         # In this case, data is a ndarray of ndarrays
         if isinstance(dset.id.id, str):
-            # and this is failing on h5py because h5py is try to 
+            # and this is failing on h5py because h5py is try to
             # broadcast (2,3) to (2,)
             dset[...] = data
         else:
