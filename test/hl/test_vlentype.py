@@ -129,7 +129,7 @@ class TestVlenTypes(TestCase):
         g1_3 = g1.create_group('g1_3')
         g1_3.attrs["name"] = 'g1_3'
 
-        # create a dataset that is a VLEN int32
+        # create a dataset that is a VLEN int16
         dtvlen = h5py.special_dtype(vlen=np.dtype('uint16'))
 
         dset1 = f.create_dataset("dset1", shape=(2,), dtype=dtvlen)
@@ -260,9 +260,7 @@ class TestVlenTypes(TestCase):
     def test_variable_len_str_attr(self):
         filename = self.getFileName("variable_len_str_dset")
         print("filename:", filename)
-        if config.get("use_h5py") and False:
-            # TBD - skipping as this core dumps in travis for some reason
-            return
+
         f = h5py.File(filename, "w")
 
         words = (b"one", b"two", b"three", b"four", b"five", b"six", b"seven", b"eight", b"nine", b"ten")
@@ -288,9 +286,7 @@ class TestVlenTypes(TestCase):
     def test_variable_len_str_dset(self):
         filename = self.getFileName("variable_len_str_dset")
         print("filename:", filename)
-        if config.get("use_h5py") and False:
-            # TBD - skipping as this core dumps in travis for some reason
-            return
+
         f = h5py.File(filename, "w")
 
         dims = (10,)
@@ -320,6 +316,84 @@ class TestVlenTypes(TestCase):
 
         for i in range(10):
             self.assertEqual(vals[i], words[i])
+
+        f.close()
+
+    def test_variable_len_float_dset(self):
+        filename = self.getFileName("variable_len_float_dset")
+        print("filename:", filename)
+
+        f = h5py.File(filename, "w")
+
+        dims = (2,)
+        dtvlen = h5py.special_dtype(vlen=float)
+        dset = f.create_dataset('variable_len_float_dset', dims, dtype=dtvlen)
+
+        self.assertEqual(dset.name, "/variable_len_float_dset")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 1)
+        self.assertEqual(dset.shape[0], 2)
+        self.assertEqual(str(dset.dtype), 'object')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 1)
+        self.assertEqual(dset.maxshape[0], 2)
+        self.assertFalse(dset.fillvalue)  # will  be 0 for HSDS, None for h5py
+        ret_val = dset[...]
+        self.assertTrue(isinstance(ret_val, np.ndarray))
+        self.assertEqual(len(ret_val), 2)
+        e0 = ret_val[0]
+        self.assertTrue(isinstance(e0, np.ndarray))
+        self.assertEqual(e0.shape, (0,))
+
+        e0 = np.array([1.1, 2.2, 3.3], dtype=np.float64)
+        e1 = np.array([1.9, 2.8, 3.7], dtype=np.float64)
+
+        data = np.array([e0, e1], dtype=dtvlen)
+        try:
+            # This will fail on HSDS because data is a ndarray of shape (2,3) of floats
+            dset[...] = data
+            if isinstance(dset.id.id, str):
+                # id is str for HSDS, int for h5py
+                self.assertTrue(False)
+        except ValueError:
+            pass  # expected
+
+        data = np.zeros((2,), dtype=dtvlen)
+        data[0] = e0
+        data[1] = e1
+
+        # write data
+        # In this case, data is a ndarray of ndarrays
+        if isinstance(dset.id.id, str):
+            # and this is failing on h5py because h5py is try to 
+            # broadcast (2,3) to (2,)
+            dset[...] = data
+        else:
+            dset[0] = e0
+            dset[1] = e1
+
+        # read back data
+        ret_val = dset[...]
+        self.assertTrue(isinstance(ret_val, np.ndarray))
+        self.assertEqual(len(ret_val), 2)
+        self.assertTrue(isinstance(ret_val[0], np.ndarray))
+        self.assertEqual(list(ret_val[0]), [1.1, 2.2, 3.3])
+        self.assertEqual(ret_val[0].dtype, np.dtype('float'))
+        self.assertTrue(isinstance(ret_val[1], np.ndarray))
+        self.assertEqual(ret_val[1].dtype, np.dtype('float'))
+
+        self.assertEqual(list(ret_val[1]), [1.9, 2.8, 3.7])
+
+        # Read back just one element
+        e0 = dset[0]
+        self.assertEqual(len(e0), 3)
+        self.assertEqual(list(e0), [1.1, 2.2, 3.3])
+
+        # try writing float lists into dataset
+        data = [42.24,]
+        dset[0] = data
+        ret_val = dset[...]
+        self.assertEqual(list(ret_val[0]), [42.24,])
 
         f.close()
 
@@ -376,7 +450,7 @@ class TestVlenTypes(TestCase):
         f.attrs.create('a1', words, shape=dims, dtype=dt)
 
         vals = f.attrs["a1"]  # read back
-        # print("type:", type(vals))
+
         self.assertTrue("vlen" in vals.dtype.metadata)
 
         for i in range(10):
@@ -387,6 +461,6 @@ class TestVlenTypes(TestCase):
 
 
 if __name__ == '__main__':
-    loglevel = logging.ERROR
+    loglevel = logging.DEBUG
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()
