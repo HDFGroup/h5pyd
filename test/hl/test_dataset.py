@@ -157,7 +157,7 @@ class TestCreateShape(BaseDataset):
     def test_long_double(self):
         """ Confirm that the default dtype is float """
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
+        if config.get('use_h5py') or platform.system() == 'Windows':
             self.assertTrue(False)
 
         dset = self.f.create_dataset('foo', (63,), dtype=np.longdouble)
@@ -1671,7 +1671,13 @@ class TestScalarCompound(BaseDataset):
 
 class TestVlen(BaseDataset):
     def test_int(self):
-        dt = h5py.vlen_dtype(int)
+        if platform.system() == "Windows":
+            # default np int type is 32 bit
+            dt = h5py.vlen_dtype(np.int32)
+        else:
+            # defualt np int type is 64 bit
+            dt = h5py.vlen_dtype(np.int64)
+
         ds = self.f.create_dataset('vlen', (4,), dtype=dt)
         ds[0] = np.arange(3)
         ds[1] = np.arange(0)
@@ -1708,7 +1714,12 @@ class TestVlen(BaseDataset):
         self.f.create_dataset('vlen2', (1,), self.f['vlen']['b'][()].dtype)
 
     def test_convert(self):
-        dt = h5py.vlen_dtype(int)
+        if platform.system() == "Windows":
+            # default np int type is 32 bit
+            dt = h5py.vlen_dtype(np.int32)
+        else:
+            # defualt np int type is 64 bit
+            dt = h5py.vlen_dtype(np.int64)
         ds = self.f.create_dataset('vlen', (3,), dtype=dt)
         ds[0] = np.array([1.4, 1.2])
         ds[1] = np.array([1.2])
@@ -1725,7 +1736,13 @@ class TestVlen(BaseDataset):
         self.assertArrayEqual(ds[1], np.arange(3))
 
     def test_multidim(self):
-        dt = h5py.vlen_dtype(int)
+        if platform.system() == "Windows":
+            # default np int type is 32 bit
+            dt = h5py.vlen_dtype(np.int32)
+        else:
+            # defualt np int type is 64 bit
+            dt = h5py.vlen_dtype(np.int64)
+
         ds = self.f.create_dataset('vlen', (2, 2), dtype=dt)
         # ds[0, 0] = np.arange(1)
         ds[:, :] = np.array([[np.arange(3), np.arange(2)],
