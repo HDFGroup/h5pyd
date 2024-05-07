@@ -27,7 +27,10 @@ class TestGroup(TestCase):
         # create main test file
         filename = self.getFileName("create_group")
         print("filename:", filename)
-        f = h5py.File(filename, 'w', use_cache=False)
+        if h5py.__name__ == "h5pyd":
+            f = h5py.File(filename, 'w', use_cache=False)
+        else:
+            f = h5py.File(filename, 'w')
         is_hsds = False
         if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
             is_hsds = True  # HSDS has different permission defaults
@@ -281,7 +284,10 @@ class TestGroup(TestCase):
         filename = self.getFileName("test_link_removal")
         print(filename)
 
-        f = h5py.File(filename, 'w', use_cache=False)
+        if h5py.__name__ == "h5pyd":
+            f = h5py.File(filename, 'w', use_cache=False)
+        else:
+            f = h5py.File(filename, 'w')
         g1 = f.create_group("g1")
         dset = g1.create_dataset('ds', (5, 7), dtype='f4')
 

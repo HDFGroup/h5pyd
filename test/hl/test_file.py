@@ -113,7 +113,10 @@ class TestFile(TestCase):
                 pass
 
         # re-open as read-write
-        f = h5py.File(filename, 'w', use_cache=False)
+        if h5py.__name__ == "h5pyd":
+            f = h5py.File(filename, 'w', use_cache=False)
+        else:
+            f = h5py.File(filename, 'w')
         self.assertTrue(f.id.id is not None)
         self.assertEqual(f.mode, 'r+')
         self.assertEqual(len(f.keys()), 0)
