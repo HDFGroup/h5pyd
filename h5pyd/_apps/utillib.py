@@ -1349,6 +1349,7 @@ def write_dataset(src, tgt, ctx):
         logging.debug(f"src dtype: {src.dtype}")
         logging.debug(f"des dtype: {tgt.dtype}")
 
+        empty_arr = None
         for src_s in it:
             logging.debug(f"src selection: {src_s}")
             if rank == 1 and isinstance(src_s, slice):
@@ -1377,7 +1378,8 @@ def write_dataset(src, tgt, ctx):
 
             arr = src[src_s]
             # don't write arr if it's all zeros (or the fillvalue if defined)
-            empty_arr = np.zeros(arr.shape, dtype=arr.dtype)
+            if empty_arr is None or empty_arr.shape != arr.shape:
+                empty_arr = np.zeros(arr.shape, dtype=arr.dtype)
             if fillvalue:
                 empty_arr.fill(fillvalue)
             if np.array_equal(arr, empty_arr):

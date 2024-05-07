@@ -1332,15 +1332,15 @@ class Dataset(HLObject):
         match.
         """
         self.log.info(f"Dataset __setitem__, args: {args}")
+
         use_base64 = True  # may need to set this to false below for some types
 
         args = args if isinstance(args, tuple) else (args,)
 
         # get the val dtype if we're passed a numpy array
         try:
-            self.log.debug(
-                f"val dtype: {val.dtype}, shape: {val.shape} metadata: {val.dtype.metadata}"
-            )
+            msg = f"val dtype: {val.dtype}, shape: {val.shape} metadata: {val.dtype.metadata}"
+            self.log.debug(msg)
             if numpy.prod(val.shape) == 0:
                 self.log.info("no elements in numpy array, skipping write")
         except AttributeError:
@@ -1370,20 +1370,22 @@ class Dataset(HLObject):
         # side.  However, for compound literals this is unavoidable.
         # For h5pyd, do extra check and convert type on client side for efficiency
         vlen = check_dtype(vlen=self.dtype)
-        if vlen is not None and vlen not in (bytes, str):
+
+        if not isinstance(val, numpy.ndarray) and vlen is not None and vlen not in (bytes, str):
             try:
                 val = numpy.asarray(val, dtype=vlen)
 
-            except ValueError:
+            except ValueError as ve:
+                self.log.debug(f"asarray ValueError: {ve}")
                 try:
                     val = numpy.array(
                         [numpy.array(x, dtype=self.dtype) for x in val],
                         dtype=self.dtype,
                     )
                 except ValueError as e:
-                    self.log.debug(
-                        f"valueError converting value element by element: {e} "
-                    )
+                    msg = f"ValueError converting value element by element: {e}"
+                    self.log.debug(msg)
+
             if vlen == val.dtype:
                 if val.ndim > 1:
                     tmp = numpy.empty(shape=val.shape[:-1], dtype=self.dtype)
@@ -1405,9 +1407,9 @@ class Dataset(HLObject):
             isinstance(val, complex) or getattr(getattr(val, "dtype", None), "kind", None) == "c"
         ):
             if self.dtype.kind != "V" or self.dtype.names != ("r", "i"):
-                raise TypeError(
-                    f"Wrong dataset dtype for complex number values: {self.dtype.fields}"
-                )
+                msg = f"Wrong dataset dtype for complex number values: {self.dtype.fields}"
+                raise TypeError(msg)
+
             if isinstance(val, complex):
                 val = numpy.asarray(val, dtype=type(val))
             tmp = numpy.empty(shape=val.shape, dtype=self.dtype)
@@ -1447,6 +1449,7 @@ class Dataset(HLObject):
                 tmp[...] = val[...]
                 val = tmp
         else:
+            self.log.debug(f"asarray for {self.dtype}")
             val = numpy.asarray(val, order="C", dtype=self.dtype)
 
         # Check for array dtype compatibility and convert
@@ -1474,9 +1477,6 @@ class Dataset(HLObject):
                 raise ValueError(f"Illegal slicing argument (fields {mismatch} not in dataset type)")
 
         # Use mtype derived from array (let DatasetID.write figure it out)
-        else:
-            mshape = val.shape
-            # mtype = None
 
         mshape = val.shape
         self.log.debug(f"mshape: {mshape}")

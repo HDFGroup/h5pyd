@@ -327,7 +327,7 @@ def getElementSize(e, dt):
     """
     Get number of byte needed for given element as a bytestream
     """
-    # print(f"getElementSize - e: {e}  dt: {dt} itemsize: {dt.itemsize}")
+
     if len(dt) > 1:
         count = 0
         for name in dt.names:
@@ -339,12 +339,8 @@ def getElementSize(e, dt):
     else:
         # variable length element
         vlen = dt.metadata["vlen"]
-        if isinstance(e, int):
-            if e == 0:
-                count = 4  # non-initialized element
-            else:
-                raise ValueError(f"Unexpected value: {e}")
-        elif isinstance(e, bytes):
+
+        if isinstance(e, bytes):
             count = len(e) + 4
         elif isinstance(e, str):
             count = len(e.encode('utf-8')) + 4
@@ -353,7 +349,7 @@ def getElementSize(e, dt):
             if e.dtype.kind != 'O':
                 count = e.dtype.itemsize * nElements
             else:
-                count = nElements * vlen.itemsize  # tbd - special case for strings?
+                count = nElements * vlen.itemsize
             count += 4  # byte count
         elif isinstance(e, list) or isinstance(e, tuple):
             if not e:
@@ -362,8 +358,12 @@ def getElementSize(e, dt):
             else:
                 count = len(e) * vlen.itemsize + 4  # +4 for byte count
         else:
+            # uninitialized element
+            if e and not np.isnan(e):
+                raise ValueError(f"Unexpected value: {e}")
+            else:
+                count = 4  # non-initialized element
 
-            raise TypeError(f"unexpected type: {type(e)}")
     return count
 
 
@@ -372,7 +372,7 @@ def getByteArraySize(arr):
     Get number of bytes needed to store given numpy array as a bytestream
     """
     if not isVlen(arr.dtype) and arr.dtype.kind != 'O':
-        print("not isVlen")
+        # not vlen just return itemsize * number of elements
         return arr.itemsize * np.prod(arr.shape)
     nElements = int(np.prod(arr.shape))
     # reshape to 1d for easier iteration
@@ -381,6 +381,7 @@ def getByteArraySize(arr):
     count = 0
     for e in arr1d:
         count += getElementSize(e, dt)
+
     return count
 
 
@@ -410,7 +411,6 @@ def copyElement(e, dt, buffer, offset, vlen=None):
         e_buf = e.tobytes()
         if len(e_buf) < dt.itemsize:
             # extend the buffer for fixed size strings
-            # print("extending buffer to {}".format(dt.itemsize))
             e_buf_ex = bytearray(dt.itemsize)
             for i in range(len(e_buf)):
                 e_buf_ex[i] = e_buf[i]
@@ -418,13 +418,7 @@ def copyElement(e, dt, buffer, offset, vlen=None):
         offset = copyBuffer(e_buf, buffer, offset)
     else:
         # variable length element
-        if isinstance(e, int):
-            if e == 0:
-                # write 4-byte integer 0 to buffer
-                offset = copyBuffer(b'\x00\x00\x00\x00', buffer, offset)
-            else:
-                raise ValueError("Unexpected value: {}".format(e))
-        elif isinstance(e, bytes):
+        if isinstance(e, bytes):
             count = np.int32(len(e))
             offset = copyBuffer(count.tobytes(), buffer, offset)
             offset = copyBuffer(e, buffer, offset)
@@ -451,9 +445,6 @@ def copyElement(e, dt, buffer, offset, vlen=None):
                 arr = np.asarray(arr1d, dtype=vlen)
                 offset = copyBuffer(arr.tobytes(), buffer, offset)
 
-                # for item in arr1d:
-                #    offset = copyElement(item, dt, buffer, offset)
-
         elif isinstance(e, list) or isinstance(e, tuple):
             count = np.int32(len(e) * vlen.itemsize)
             offset = copyBuffer(count.tobytes(), buffer, offset)
@@ -464,7 +455,12 @@ def copyElement(e, dt, buffer, offset, vlen=None):
             offset = copyBuffer(arr.tobytes(), buffer, offset)
 
         else:
-            raise TypeError("unexpected type: {}".format(type(e)))
+            # uninitialized variable length element
+            if e and not np.isnan(e):
+                raise ValueError(f"Unexpected value: {e}")
+            else:
+                # write 4-byte integer 0 to buffer
+                offset = copyBuffer(b'\x00\x00\x00\x00', buffer, offset)
         # print("buffer: {}".format(buffer))
     return offset
 
@@ -551,11 +547,12 @@ def arrayToBytes(arr, vlen=None):
         # can just return normal numpy bytestream
         return arr.tobytes()
 
-    nSize = getByteArraySize(arr)
-    buffer = bytearray(nSize)
-    offset = 0
     nElements = int(np.prod(arr.shape))
     arr1d = arr.reshape((nElements,))
+    nSize = getByteArraySize(arr1d)
+    buffer = bytearray(nSize)
+    offset = 0
+
     for e in arr1d:
         offset = copyElement(e, arr1d.dtype, buffer, offset, vlen=vlen)
     return buffer
