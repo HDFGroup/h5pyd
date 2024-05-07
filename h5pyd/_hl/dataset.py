@@ -1789,8 +1789,6 @@ class MultiManager():
                 if next_port > high_port:
                     next_port = low_port
 
-        # TODO: Handle the case where some or all datasets share an HTTPConn object
-
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             # Unwrap one-selection list
             if (isinstance(args, list) and len(args) == 1):
@@ -1843,8 +1841,6 @@ class MultiManager():
             self.log.debug(msg)
             num_endpoints = 1
 
-        # TODO: Handle the case where some or all datasets share an HTTPConn object
-        # For now, assume each connection is distinct
         if (num_endpoints > 1):
             next_port = low_port
             port_len = len(ports[0])

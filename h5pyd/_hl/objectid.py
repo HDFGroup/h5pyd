@@ -14,7 +14,9 @@ from __future__ import absolute_import
 from datetime import datetime
 import pytz
 import time
+from .httpconn import HttpConn
 from .h5type import createDataType
+from copy import copy
 
 
 def parse_lastmodified(datestr):
@@ -34,7 +36,7 @@ def parse_lastmodified(datestr):
 class ObjectID:
 
     """
-        Uniquely identifies an h5serv resource
+        Uniquely identifies an HSDS resource
     """
 
     @property
@@ -103,9 +105,10 @@ class ObjectID:
         self._obj_json = item
 
         if http_conn is not None:
-            self._http_conn = http_conn
+            self._http_conn = copy(http_conn)
         elif parent_id is not None and parent_id.http_conn is not None:
-            self._http_conn = parent_id.http_conn
+            # Create new connection with same parameters as parent
+            self._http_conn = copy(parent_id.http_conn)
         else:
             raise IOError("Expected parent to have http connector")
 

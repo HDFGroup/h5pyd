@@ -214,7 +214,6 @@ class Group(HLObject, MutableMappingHDF5):
             self.log.debug("create_group - iterate for link: {}".format(link))
             create_group = False
             req = "/groups/" + parent_uuid + "/links/" + link
-
             try:
                 rsp_json = self.GET(req)
             except IOError as ioe:

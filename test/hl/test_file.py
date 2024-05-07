@@ -118,13 +118,12 @@ class TestFile(TestCase):
         self.assertEqual(f.mode, 'r+')
         self.assertEqual(len(f.keys()), 0)
         root_grp = f['/']
-        # f.create_group("subgrp")
         root_grp.create_group("subgrp")
         self.assertEqual(len(f.keys()), 1)
         f.close()
         self.assertEqual(f.id.id, 0)
 
-        # rre-open in append mode
+        # re-open in append mode
         f = h5py.File(filename, "a")
         f.create_group("foo")
         del f["foo"]
@@ -135,6 +134,7 @@ class TestFile(TestCase):
             wait_time = 90  # change to >90 to test async updates
             print("waiting {wait_time:d} seconds for root scan sync".format(wait_time=wait_time))
             time.sleep(wait_time)  # let async process update obj number
+
         f = h5py.File(filename, 'r')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")

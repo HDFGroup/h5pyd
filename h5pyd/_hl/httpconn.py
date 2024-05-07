@@ -323,6 +323,29 @@ class HttpConn:
             else:
                 self.log.error("Unknown openid provider: {}".format(provider))
 
+    def __copy__(self):
+        new_conn = HttpConn(
+            self._domain,
+            endpoint=self._endpoint,
+            username=self._username,
+            password=self._password,
+            bucket=self._bucket,
+            api_key=self._api_key,
+            mode=self._mode,
+            use_session=self._use_session,
+            use_cache=True if self._cache is not None else False,
+            logger=self._logger,
+            retries=self._retries,
+            timeout=self._timeout,
+        )
+
+        # Share object cache between connections on the same file/domain
+        if self._cache is not None:
+            new_conn._cache = self._cache
+            new_conn._objdb = self._objdb
+
+        return new_conn
+
     def __del__(self):
         if self._hsds:
             self.log.debug("hsds stop")
