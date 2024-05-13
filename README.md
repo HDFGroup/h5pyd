@@ -3,9 +3,6 @@
 h5pyd
 =====
 
-.. image:: https://travis-ci.org/HDFGroup/h5pyd.svg?branch=master
-    :target: https://travis-ci.org/HDFGroup/h5pyd
-
 Python client library for HSDS
 
 
@@ -48,15 +45,15 @@ From a release tarball or Git checkout::
 
    pip install .
 
-By default the examples look for a local instance of HSDS.  See the  https://github.com/HDFGroup/hsds
-for instructions on installing and running HSDS.
+Run `hsconfigure` to setup the connection info (endpoint, username, and password) to HSDS.  
+If you don't have access to an HSDS instance, you can easily setup your own HSDS instance.
+See  https://github.com/HDFGroup/hsds for instructions on installing and running HSDS
+on locally or in the cloud.
+ 
+Alternatively, if you can run this repo as a Github Codespace 
+(see "Open in a Github Codespace" link above), and HSDS will be automatically setup as part of the codespace.
 
-These tests are also to designed to work with HSDS (see https://github.com/HDFGroup/hsds).  
-Install HSDS locally, or set environment variables (see next section)
-to point to an existing HSDS instance.  Alternatively, if you create as a Github codespace 
-(sell link above), HSDS will be automatically setup as part of the codespace.
-
-Alternatively, h5pyd can all be run in serverless mode with either AWS Lambda or direct mode (storage system accessed directly).
+Another option is to run h5pyd in serverless mode with either AWS Lambda or direct mode (storage system accessed directly).
 
 To use with AWS Lambda, set the HS_ENDPOINT to: "http+lambda://hslambda" where "hslambda" is the name
 of the lambda function.  When using AWS Lambda some additional environment variables need to be set:
@@ -90,7 +87,7 @@ To use "local" with Posix storage, define these variables:
 H5PYD Command Line Apps
 -----------------------
 
-Serveral utility applications are included with this package:
+Several utility applications are included with this package:
 
 * ``hsconfigure`` - save endpoint, username, and password in config files
 * ``hsacl`` - read/update ACL (access control list) for a given folder or domain
@@ -108,7 +105,12 @@ Use the ``--help`` option to get usage information for each command.
 
 Testing
 -------
-Setup the following environment variables that inform h5pyd which endpoint and username to use:
+
+By default the test suite will attempt to connect to a local instance of HSDS with the 
+`http://localhost:5101` endpoint.
+
+Use the following environment variables as needed to modify the default configuration
+for the test suite:
 
 * ``HS_ENDPOINT`` - "http://127.0.0.1:5000" for HSDS installed locally or appropriate remote endpoint
 * ``HS_USERNAME`` - "test_user1" or your preferred username
