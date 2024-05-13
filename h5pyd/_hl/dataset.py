@@ -717,7 +717,7 @@ class Dataset(HLObject):
         self._getVerboseInfo()
         return self._allocated_size
 
-    def __init__(self, bind):
+    def __init__(self, bind, track_order=False):
         """Create a new Dataset object by binding to a low-level DatasetID."""
 
         if not isinstance(bind, DatasetID):
@@ -732,6 +732,7 @@ class Dataset(HLObject):
         # make a numpy dtype out of the type json
         self._dtype = createDataType(self.id.type_json)
         self._item_size = getItemSize(self.id.type_json)
+        self._track_order = track_order
 
         self._shape = self.get_shape()
 

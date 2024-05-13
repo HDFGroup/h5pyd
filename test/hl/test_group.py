@@ -279,7 +279,7 @@ class TestGroup(TestCase):
             # for some reason this test is failing in Travis
             return
         filename = self.getFileName("test_link_removal")
-        print(filename)
+        print(f"filename: {filename}")
 
         f = h5py.File(filename, 'w')
         g1 = f.create_group("g1")
@@ -301,6 +301,104 @@ class TestGroup(TestCase):
         self.assertEqual(get_count(g1_clone), 0)
 
         f.close()
+
+
+class TestTrackOrder(TestCase):
+
+    def populate(self, g):
+        for i in range(100):
+            # Mix group and dataset creation.
+            if i % 10 == 0:
+                g.create_group(str(i))
+            else:
+                g[str(i)] = [i]
+
+    def populate_attrs(self, d):
+        for i in range(100):
+            d.attrs[str(i)] = i
+
+    def test_track_order(self):
+        filename = self.getFileName("test_track_order_group")
+        print(f"filename: {filename}")
+        self.f = h5py.File(filename, 'w')
+        g = self.f.create_group('order', track_order=True)  # creation order
+        self.populate(g)
+
+        ref = [str(i) for i in range(100)]
+        self.assertEqual(list(g), ref)
+        self.assertEqual(list(reversed(g)), list(reversed(ref)))
+
+    def test_no_track_order(self):
+        filename = self.getFileName("test_no_track_order_group")
+        print(f"filename: {filename}")
+        self.f = h5py.File(filename, 'w')
+        g = self.f.create_group('order', track_order=False)  # name alphanumeric
+        self.populate(g)
+
+        ref = sorted([str(i) for i in range(100)])
+        self.assertEqual(list(g), ref)
+        self.assertEqual(list(reversed(g)), list(reversed(ref)))
+
+    def test_get_dataset_track_order(self):
+
+        # h5py does not support track_order on group.get()
+        if config.get("use_h5py"):
+            return
+
+        filename = self.getFileName("test_get_dataset_track_order")
+        print(f"filename: {filename}")
+        self.f = h5py.File(filename, 'w')
+        g = self.f.create_group('order')
+
+        dset = g.create_dataset('dset', (10,), dtype='i4')
+        dset2 = g.create_dataset('dset2', (10,), dtype='i4')
+
+        self.populate_attrs(dset)
+        self.populate_attrs(dset2)
+
+        self.f.close()
+        self.f = h5py.File(filename, 'r')
+        g = self.f['order']
+
+        d = g.get('dset', track_order=True)
+        ref = [str(i) for i in range(100)]
+        self.assertEqual(list(d.attrs), ref)
+        self.assertEqual(list(reversed(d.attrs)), list(reversed(ref)))
+
+        d2 = g.get('dset2', track_order=False)
+        ref = sorted([str(i) for i in range(100)])
+        self.assertEqual(list(d2.attrs), ref)
+        self.assertEqual(list(reversed(d2.attrs)), list(reversed(ref)))
+
+    def test_get_group_track_order(self):
+        # h5py does not support track_order on group.get()
+        if config.get("use_h5py"):
+            return
+        filename = self.getFileName("test_get_group_track_order")
+        print(f"filename: {filename}")
+        self.f = h5py.File(filename, 'w')
+        g = self.f.create_group('order')
+
+        # create subgroup and populate it with links
+        g.create_group('subgroup')
+        self.populate(g['subgroup'])
+
+        self.f.close()
+        self.f = h5py.File(filename, 'r')
+        g = self.f['order']
+
+        subg = g.get('subgroup', track_order=True)
+        ref = [str(i) for i in range(100)]
+        self.assertEqual(list(subg), ref)
+        self.assertEqual(list(reversed(subg)), list(reversed(ref)))
+
+        self.f.close()
+        self.f = h5py.File(filename, 'r')
+        g = self.f['order']
+        subg2 = g.get('subgroup', track_order=False)
+        ref = sorted([str(i) for i in range(100)])
+        self.assertEqual(list(subg2), ref)
+        self.assertEqual(list(reversed(subg2)), list(reversed(ref)))
 
 
 if __name__ == '__main__':
