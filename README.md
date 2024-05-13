@@ -50,10 +50,11 @@ for instructions on installing and running HSDS.
 
 These tests are also to designed to work with HSDS (see https://github.com/HDFGroup/hsds).  
 Install HSDS locally, or set environment variables (see next section)
-to point to an existing HSDS instance.  Alternatively, if you create as a Github codespace 
-(see link above), HSDS will be automatically setup as part of the codespace.
+to point to an existing HSDS instance.  
+Alternatively, if you can run this repo as a Github Codespace 
+(see "Open in a Github Codespace" link above), and HSDS will be automatically setup as part of the codespace.
 
-Alternatively, h5pyd can all be run in serverless mode with either AWS Lambda or direct mode (storage system accessed directly).
+Another option is to run h5pyd in serverless mode with either AWS Lambda or direct mode (storage system accessed directly).
 
 To use with AWS Lambda, set the HS_ENDPOINT to: "http+lambda://hslambda" where "hslambda" is the name
 of the lambda function.  When using AWS Lambda some additional environment variables need to be set:
@@ -87,7 +88,7 @@ To use "local" with Posix storage, define these variables:
 H5PYD Command Line Apps
 -----------------------
 
-Serveral utility applications are included with this package:
+Several utility applications are included with this package:
 
 * ``hsconfigure`` - save endpoint, username, and password in config files
 * ``hsacl`` - read/update ACL (access control list) for a given folder or domain
