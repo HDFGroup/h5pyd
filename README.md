@@ -54,7 +54,7 @@ for instructions on installing and running HSDS.
 These tests are also to designed to work with HSDS (see https://github.com/HDFGroup/hsds).  
 Install HSDS locally, or set environment variables (see next section)
 to point to an existing HSDS instance.  Alternatively, if you create as a Github codespace 
-(sell link above), HSDS will be automatically setup as part of the codespace.
+(see link above), HSDS will be automatically setup as part of the codespace.
 
 Alternatively, h5pyd can all be run in serverless mode with either AWS Lambda or direct mode (storage system accessed directly).
 
