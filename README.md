@@ -3,9 +3,6 @@
 h5pyd
 =====
 
-.. image:: https://travis-ci.org/HDFGroup/h5pyd.svg?branch=master
-    :target: https://travis-ci.org/HDFGroup/h5pyd
-
 Python client library for HSDS
 
 
