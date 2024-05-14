@@ -1382,7 +1382,16 @@ def write_dataset(src, tgt, ctx):
                 empty_arr = np.zeros(arr.shape, dtype=arr.dtype)
             if fillvalue:
                 empty_arr.fill(fillvalue)
-            if np.array_equal(arr, empty_arr):
+
+            try:
+                is_equal = np.array_equal(arr, empty_arr)
+            except ValueError as ve:
+                msg = "ValueError on np.array_equal check - assuming not equal"
+                logging.warning(f"{msg}: {ve}")
+                if ctx["verbose"]:
+                    print(msg)
+                is_equal = False
+            if is_equal:
                 msg = f"skipping chunk for slice: {src_s}"
             else:
                 msg = f"writing dataset data for slice: {src_s}"
