@@ -60,6 +60,36 @@ class BaseDataset(TestCase):
         if self.f:
             self.f.close()
 
+    def check_h5_string(self, dset, cset, length):
+        if config.get('use_h5py'):
+            type_obj = dset.id.get_type()
+            self.assertEqual(type_obj.get_class(), h5py.h5t.STRING)
+            if cset == 'H5T_CSET_ASCII':
+                self.assertEqual(type_obj.get_cset(), h5py.h5t.CSET_ASCII)
+            elif cset == 'H5T_CSET_UTF8':
+                self.assertEqual(type_obj.get_cset(), h5py.h5t.CSET_UTF8)
+            else:
+                self.assertEqual(type_obj.get_cset(), h5py.h5t.CSET_ERROR)
+
+            if length:
+                self.assertEqual(type_obj.get_size(), length)
+
+        else:
+            type_json = dset.id.type_json
+            if "class" not in type_json:
+                raise TypeError()
+            self.assertEqual(type_json["class"], 'H5T_STRING')
+            if "charSet" not in type_json:
+                raise TypeError()
+            self.assertEqual(type_json["charSet"], cset)
+            if "length" not in type_json:
+                raise TypeError()
+            if length is None:
+                self.assertEqual(type_json["length"], 'H5T_VARIABLE')
+            else:
+                self.assertTrue(isinstance(type_json["length"], int))
+                self.assertEqual(type_json["length"], length)
+
 
 class TestRepr(BaseDataset):
     """
@@ -191,36 +221,6 @@ class TestCreateData(BaseDataset):
         " Binding Dataset to a non-DatasetID identifier fails with ValueError "
         with self.assertRaises(ValueError):
             Dataset(self.f['/'].id)
-
-    def check_h5_string(self, dset, cset, length):
-        if config.get('use_h5py'):
-            type_obj = dset.id.get_type()
-            self.assertEqual(type_obj.get_class(), h5py.h5t.STRING)
-            if cset == 'H5T_CSET_ASCII':
-                self.assertEqual(type_obj.get_cset(), h5py.h5t.CSET_ASCII)
-            elif cset == 'H5T_CSET_UTF8':
-                self.assertEqual(type_obj.get_cset(), h5py.h5t.CSET_UTF8)
-            else:
-                self.assertEqual(type_obj.get_cset(), h5py.h5t.CSET_ERROR)
-
-            if length:
-                self.assertEqual(type_obj.get_size(), length)
-
-        else:
-            type_json = dset.id.type_json
-            if "class" not in type_json:
-                raise TypeError()
-            self.assertEqual(type_json["class"], 'H5T_STRING')
-            if "charSet" not in type_json:
-                raise TypeError()
-            self.assertEqual(type_json["charSet"], cset)
-            if "length" not in type_json:
-                raise TypeError()
-            if length is None:
-                self.assertEqual(type_json["length"], 'H5T_VARIABLE')
-            else:
-                self.assertTrue(isinstance(type_json["length"], int))
-                self.assertEqual(type_json["length"], length)
 
     def test_create_bytestring(self):
         """ Creating dataset with byte string yields vlen ASCII dataset """
@@ -1212,31 +1212,20 @@ class TestStrings(BaseDataset):
         """ Vlen bytes dataset maps to vlen ascii in the file """
         dt = h5py.string_dtype(encoding='ascii')
         ds = self.f.create_dataset('x', (100,), dtype=dt)
-        type_json = ds.id.type_json
-        self.assertEqual(type_json["class"], 'H5T_STRING')
-        self.assertEqual(type_json['charSet'], 'H5T_CSET_ASCII')
-        string_info = h5py.check_string_dtype(ds.dtype)
-        self.assertEqual(string_info.encoding, 'ascii')
+        self.check_h5_string(ds, 'H5T_CSET_ASCII', None)
 
     def test_vlen_unicode(self):
         """ Vlen unicode dataset maps to vlen utf-8 in the file """
         dt = h5py.string_dtype()
         ds = self.f.create_dataset('x', (100,), dtype=dt)
-        type_json = ds.id.type_json
-        self.assertEqual(type_json["class"], 'H5T_STRING')
-        self.assertEqual(type_json['charSet'], 'H5T_CSET_UTF8')
-        string_info = h5py.check_string_dtype(ds.dtype)
-        self.assertEqual(string_info.encoding, 'utf-8')
+        self.check_h5_string(ds, 'H5T_CSET_UTF8', None)
 
     def test_fixed_ascii(self):
         """ Fixed-length bytes dataset maps to fixed-length ascii in the file
         """
         dt = np.dtype("|S10")
         ds = self.f.create_dataset('x', (100,), dtype=dt)
-        type_json = ds.id.type_json
-        self.assertEqual(type_json["class"], 'H5T_STRING')
-        self.assertEqual(type_json["length"], 10)
-        self.assertEqual(type_json['charSet'], 'H5T_CSET_ASCII')
+        self.check_h5_string(ds, 'H5T_CSET_ASCII', 10)
         string_info = h5py.check_string_dtype(ds.dtype)
         self.assertEqual(string_info.encoding, 'ascii')
         self.assertEqual(string_info.length, 10)
