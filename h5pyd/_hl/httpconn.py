@@ -2,7 +2,7 @@
 # Copyright by The HDF Group.                                                #
 # All rights reserved.                                                       #
 #                                                                            #
-# This file is part of H5Serv (HDF5 REST Server) Service, Libraries and      #
+# This file is part of HSDS (HDF5 REST Server) Service, Libraries and      #
 # Utilities.  The full HDF5 REST Server copyright notice, including          #
 # terms governing use, modification, and redistribution, is contained in     #
 # the file COPYING, which can be found at the root of the source code        #
@@ -200,8 +200,6 @@ class HttpConn:
         if endpoint is None:
             if "HS_ENDPOINT" in os.environ:
                 endpoint = os.environ["HS_ENDPOINT"]
-            elif "H5SERV_ENDPOINT" in os.environ:
-                endpoint = os.environ["H5SERV_ENDPOINT"]
 
         if not endpoint:
             msg = "no endpoint set"
@@ -265,8 +263,6 @@ class HttpConn:
         if username is None:
             if "HS_USERNAME" in os.environ:
                 username = os.environ["HS_USERNAME"]
-            elif "H5SERV_USERNAME" in os.environ:
-                username = os.environ["H5SERV_USERNAME"]
         if isinstance(username, str) and (not username or username.upper() == "NONE"):
             username = None
         self._username = username
@@ -274,8 +270,6 @@ class HttpConn:
         if password is None:
             if "HS_PASSWORD" in os.environ:
                 password = os.environ["HS_PASSWORD"]
-            elif "H5SERV_PASSWORD" in os.environ:
-                password = os.environ["H5SERV_PASSWORD"]
         if isinstance(password, str) and (not password or password.upper() == "NONE"):
             password = None
         self._password = password
