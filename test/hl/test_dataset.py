@@ -28,7 +28,7 @@ from common import ut, TestCase
 import config
 
 if config.get("use_h5py"):
-    from h5py import File, Dataset, MultiManager
+    from h5py import File, Dataset
     import h5py
 else:
     from h5pyd import File, Dataset, MultiManager
@@ -1970,6 +1970,7 @@ class TestCommutative(BaseDataset):
         assert (val != dset) == (dset != val)
 
 
+@ut.skipIf(config.get('use_h5py'), "h5py does not support MultiManager")
 class TestMultiManager(BaseDataset):
     def test_multi_read_scalar_dataspaces(self):
         """
@@ -2350,16 +2351,17 @@ class TestMultiManager(BaseDataset):
             out = self.f["data" + str(i)][...]
             np.testing.assert_array_equal(out[sel_idx, sel_idx], data_in + i)
 
-    def test_multi_selection_rw(self):
+    def test_multi_selection(self):
         """
-        Test reading and writing a unique selection in each dataset
+        Test using a different selection
+        for each dataset in a MultiManager
         """
         shape = (10, 10, 10)
         count = 3
         dt = np.int32
 
         # Create datasets
-        data_in = np.reshape(np.arange(np.prod(shape)), shape)
+        data_in = np.reshape(np.arange(np.prod(shape), dtype=dt), shape)
         data_in_original = data_in.copy()
         datasets = []
 
@@ -2368,7 +2370,7 @@ class TestMultiManager(BaseDataset):
                                          dtype=dt, data=data_in)
             datasets.append(dset)
 
-        mm = MultiManager(datasets=datasets)
+        mm = h5py.MultiManager(datasets=datasets)
 
         # Selections to read from
         sel = [np.s_[0:10, 0:10, 0:10], np.s_[0:5, 5:10, 1:4:2], np.s_[4, 5, 6]]
@@ -2379,7 +2381,7 @@ class TestMultiManager(BaseDataset):
 
         # If selection list has only a single element, apply it to all dsets
         sel = [np.s_[0:10, 0:10, 0:10]]
-        data_out = mm[sel[0]]
+        data_out = mm[sel]
 
         for d in data_out:
             np.testing.assert_array_equal(d, data_in[sel[0]])
@@ -2387,7 +2389,7 @@ class TestMultiManager(BaseDataset):
         # Selections to write to
         sel = [np.s_[0:10, 0:10, 0:10], np.s_[0:5, 0:5, 0:5], np.s_[0, 0, 0]]
         data_in = [np.zeros_like(data_in), np.ones_like(data_in), np.full_like(data_in, 2)]
-        mm[sel] = data_in
+        mm[sel] = [data_in[i][sel[i]] for i in range(count)]
 
         for i in range(count):
             np.testing.assert_array_equal(self.f["data" + str(i)][sel[i]], data_in[i][sel[i]])
