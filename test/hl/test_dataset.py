@@ -36,14 +36,18 @@ else:
 
 
 def is_empty_dataspace(obj):
-    shape_json = obj.shape_json
-
-    if "class" not in shape_json:
-        raise KeyError()
-    if shape_json["class"] == 'H5S_NULL':
-        return True
+    if config.get('use_h5py'):
+        space = obj.get_space()
+        return (space.get_simple_extent_type() == h5py.h5s.NULL)
     else:
-        return False
+        shape_json = obj.shape_json
+
+        if "class" not in shape_json:
+            raise KeyError()
+        if shape_json["class"] == 'H5S_NULL':
+            return True
+        else:
+            return False
 
 
 class BaseDataset(TestCase):
