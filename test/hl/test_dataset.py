@@ -122,6 +122,10 @@ class TestCreateShape(BaseDataset):
     @ut.expectedFailure
     def test_long_double(self):
         """ Confirm that the default dtype is float """
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         dset = self.f.create_dataset('foo', (63,), dtype=np.longdouble)
         if platform.machine() in ['ppc64le']:
             print(f"Storage of long double deactivated on {platform.machine()}")
@@ -132,6 +136,10 @@ class TestCreateShape(BaseDataset):
     @ut.expectedFailure
     def test_complex256(self):
         """ Confirm that the default dtype is float """
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         dset = self.f.create_dataset('foo', (63,),
                                      dtype=np.dtype('complex256'))
         self.assertEqual(dset.dtype, np.dtype('complex256'))
@@ -1203,6 +1211,10 @@ class TestStrings(BaseDataset):
 
     @ut.expectedFailure
     def test_fixed_utf8(self):
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         # TBD: Investigate
         dt = h5py.string_dtype(encoding='utf-8', length=5)
         ds = self.f.create_dataset('x', (100,), dtype=dt)
@@ -1365,6 +1377,10 @@ class TestCompound(BaseDataset):
 
     @ut.expectedFailure
     def test_assign(self):
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         # TBD: field assignment not working
         dt = np.dtype([('weight', (np.float64, 3)),
                        ('endpoint_type', np.uint8), ])
@@ -1384,6 +1400,10 @@ class TestCompound(BaseDataset):
 
     @ut.expectedFailure
     def test_fields(self):
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         # TBD: field assignment not working
         dt = np.dtype([
             ('x', np.float64),
@@ -1414,6 +1434,10 @@ class TestCompound(BaseDataset):
 class TestSubarray(BaseDataset):
     # TBD: Fix subarray
     def test_write_list(self):
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         ds = self.f.create_dataset("a", (1,), dtype="3int8")
         ds[0] = [1, 2, 3]
         np.testing.assert_array_equal(ds[:], [[1, 2, 3]])
@@ -1422,6 +1446,10 @@ class TestSubarray(BaseDataset):
         np.testing.assert_array_equal(ds[:], [[4, 5, 6]])
 
     def test_write_array(self):
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         ds = self.f.create_dataset("a", (1,), dtype="3int8")
         ds[0] = np.array([1, 2, 3])
         np.testing.assert_array_equal(ds[:], [[1, 2, 3]])
@@ -1589,6 +1617,10 @@ class TestAstype(BaseDataset):
 
     @ut.expectedFailure
     def test_astype_wrapper(self):
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         dset = self.f.create_dataset('x', (100,), dtype='i2')
         dset[...] = np.arange(100)
         arr = dset.astype('f4')[:]
@@ -1600,6 +1632,7 @@ class TestAstype(BaseDataset):
         self.assertEqual(100, len(dset.astype('f4')))
 
 
+# TBD: Supported now?
 @ut.skip("field name not supported")
 class TestScalarCompound(BaseDataset):
 
@@ -1641,6 +1674,10 @@ class TestVlen(BaseDataset):
 
     @ut.expectedFailure
     def test_reuse_struct_from_other(self):
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         # TBD: unable to resstore object array from mem buffer
         dt = [('a', int), ('b', h5py.vlen_dtype(int))]
         self.f.create_dataset('vlen', (1,), dtype=dt)
@@ -1742,6 +1779,10 @@ class TestVlen(BaseDataset):
     @ut.expectedFailure
     def test_non_contiguous_arrays(self):
         """Test that non-contiguous arrays are stored correctly"""
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         # TBD: boolean type not supported
         self.f.create_dataset('nc', (10,), dtype=h5py.vlen_dtype('bool'))
         x = np.array([True, False, True, True, False, False, False])
@@ -1868,6 +1909,10 @@ class TestCommutative(BaseDataset):
         Create a h5py dataset, extract one element convert to numpy
         Check that it returns symmetric response to == and !=
         """
+        # Expected failure on HSDS; skip with h5py
+        if config.get('use_h5py', True):
+            self.assertTrue(False)
+
         # TBD: investigate
         shape = (100, 1)
         dset = self.f.create_dataset("test", shape, dtype=float,
