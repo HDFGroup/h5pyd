@@ -123,7 +123,7 @@ class TestCreateShape(BaseDataset):
     def test_long_double(self):
         """ Confirm that the default dtype is float """
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         dset = self.f.create_dataset('foo', (63,), dtype=np.longdouble)
@@ -137,7 +137,7 @@ class TestCreateShape(BaseDataset):
     def test_complex256(self):
         """ Confirm that the default dtype is float """
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         dset = self.f.create_dataset('foo', (63,),
@@ -189,20 +189,34 @@ class TestCreateData(BaseDataset):
             Dataset(self.f['/'].id)
 
     def check_h5_string(self, dset, cset, length):
-        type_json = dset.id.type_json
-        if "class" not in type_json:
-            raise TypeError()
-        assert type_json["class"] == 'H5T_STRING'
-        if "charSet" not in type_json:
-            raise TypeError()
-        assert type_json['charSet'] == cset
-        if "length" not in type_json:
-            raise TypeError()
-        if length is None:
-            assert type_json["length"] == 'H5T_VARIABLE'
+        if config.get('use_h5py'):
+            type_obj = dset.id.get_type()
+            self.assertEqual(type_obj.get_class(), h5py.h5t.STRING)
+            if cset == 'H5T_CSET_ASCII':
+                self.assertEqual(type_obj.get_cset(), h5py.h5t.CSET_ASCII)
+            elif cset == 'H5T_CSET_UTF8':
+                self.assertEqual(type_obj.get_cset(), h5py.h5t.CSET_UTF8)
+            else:
+                self.assertEqual(type_obj.get_cset(), h5py.h5t.CSET_ERROR)
+
+            if length:
+                self.assertEqual(type_obj.get_size(), length)
+
         else:
-            assert isinstance(type_json["length"], int)
-            assert type_json["length"] == length
+            type_json = dset.id.type_json
+            if "class" not in type_json:
+                raise TypeError()
+            self.assertEqual(type_json["class"], 'H5T_STRING')
+            if "charSet" not in type_json:
+                raise TypeError()
+            self.assertEqual(type_json["charSet"], cset)
+            if "length" not in type_json:
+                raise TypeError()
+            if length is None:
+                self.assertEqual(type_json["length"], 'H5T_VARIABLE')
+            else:
+                self.assertTrue(isinstance(type_json["length"], int))
+                self.assertEqual(type_json["length"], length)
 
     def test_create_bytestring(self):
         """ Creating dataset with byte string yields vlen ASCII dataset """
@@ -915,17 +929,31 @@ class TestAutoCreate(BaseDataset):
         Feature: Datasets auto-created from data produce the correct types
     """
     def assert_string_type(self, ds, cset, variable=True):
-        type_json = ds.id.type_json
-        if "class" not in type_json:
-            raise TypeError()
-        self.assertEqual(type_json["class"], 'H5T_STRING')
-        if "charSet" not in type_json:
-            raise TypeError()
-        self.assertEqual(type_json["charSet"], cset)
-        if variable:
-            if "length" not in type_json:
+        if config.get('use_h5py'):
+            type_obj = ds.id.get_type()
+            self.assertEqual(type_obj.get_class(), h5py.h5t.STRING)
+
+            dset_cset = type_obj.get_cset()
+            if cset == 'H5T_CSET_ASCII':
+                expected_cset = h5py.h5t.CSET_ASCII
+            elif cset == 'H5T_CSET_UTF8':
+                expected_cset = h5py.h5t.CSET_UTF8
+            else:
+                expected_cset = h5py.h5t.CSET_ERROR
+
+            self.assertEqual(dset_cset, expected_cset)
+        else:
+            type_json = ds.id.type_json
+            if "class" not in type_json:
                 raise TypeError()
-            self.assertEqual(type_json["length"], 'H5T_VARIABLE')
+            self.assertEqual(type_json["class"], 'H5T_STRING')
+            if "charSet" not in type_json:
+                raise TypeError()
+            self.assertEqual(type_json["charSet"], cset)
+            if variable:
+                if "length" not in type_json:
+                    raise TypeError()
+                self.assertEqual(type_json["length"], 'H5T_VARIABLE')
 
     def test_vlen_bytes(self):
         """Assigning byte strings produces a vlen string ASCII dataset """
@@ -1212,7 +1240,7 @@ class TestStrings(BaseDataset):
     @ut.expectedFailure
     def test_fixed_utf8(self):
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         # TBD: Investigate
@@ -1378,7 +1406,7 @@ class TestCompound(BaseDataset):
     @ut.expectedFailure
     def test_assign(self):
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         # TBD: field assignment not working
@@ -1401,7 +1429,7 @@ class TestCompound(BaseDataset):
     @ut.expectedFailure
     def test_fields(self):
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         # TBD: field assignment not working
@@ -1435,7 +1463,7 @@ class TestSubarray(BaseDataset):
     # TBD: Fix subarray
     def test_write_list(self):
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         ds = self.f.create_dataset("a", (1,), dtype="3int8")
@@ -1447,7 +1475,7 @@ class TestSubarray(BaseDataset):
 
     def test_write_array(self):
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         ds = self.f.create_dataset("a", (1,), dtype="3int8")
@@ -1618,7 +1646,7 @@ class TestAstype(BaseDataset):
     @ut.expectedFailure
     def test_astype_wrapper(self):
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         dset = self.f.create_dataset('x', (100,), dtype='i2')
@@ -1675,7 +1703,7 @@ class TestVlen(BaseDataset):
     @ut.expectedFailure
     def test_reuse_struct_from_other(self):
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         # TBD: unable to resstore object array from mem buffer
@@ -1780,7 +1808,7 @@ class TestVlen(BaseDataset):
     def test_non_contiguous_arrays(self):
         """Test that non-contiguous arrays are stored correctly"""
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         # TBD: boolean type not supported
@@ -1910,7 +1938,7 @@ class TestCommutative(BaseDataset):
         Check that it returns symmetric response to == and !=
         """
         # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py', True):
+        if config.get('use_h5py'):
             self.assertTrue(False)
 
         # TBD: investigate
