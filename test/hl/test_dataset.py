@@ -26,13 +26,12 @@ import platform
 
 from common import ut, TestCase
 import config
-from h5pyd import MultiManager
 
 if config.get("use_h5py"):
-    from h5py import File, Dataset
+    from h5py import File, Dataset, MultiManager
     import h5py
 else:
-    from h5pyd import File, Dataset
+    from h5pyd import File, Dataset, MultiManager
     import h5pyd as h5py
 
 
