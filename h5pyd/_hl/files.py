@@ -120,6 +120,7 @@ class File(Group):
         logger=None,
         owner=None,
         linked_domain=None,
+        track_order=False,
         retries=10,
         timeout=180,
         **kwds,
@@ -155,6 +156,10 @@ class File(Group):
             by admin users
         linked_domain
             Create new domain using the root of the linked domain
+        track_order
+            Whether to track dataset/group/attribute creation order within this file. Objects will be iterated
+            in ascending creation order if this is enabled, otherwise in ascending alphanumeric order.
+
         retries
             Number of retry attempts to be used if a server request fails
         timeout
@@ -269,6 +274,8 @@ class File(Group):
                 params["include_attrs"] = "T"
             if bucket:
                 params["bucket"] = bucket
+
+            params["CreateOrder"] = "1" if track_order else "0"
 
             # need some special logic for the first request in local mode
             # to give the sockets time to initialize
@@ -393,8 +400,9 @@ class File(Group):
         self._verboseUpdated = None  # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
         self._dn_ids = dn_ids
+        self._track_order = track_order
 
-        Group.__init__(self, self._id)
+        Group.__init__(self, self._id, track_order=track_order)
 
     def _getVerboseInfo(self):
         now = time.time()
@@ -403,7 +411,7 @@ class File(Group):
         ):
             # resynch the verbose data
             req = "/?verbose=1"
-            rsp_json = self.GET(req, use_cache=False)
+            rsp_json = self.GET(req, use_cache=False, params={"CreateOrder": "1" if self._track_order else "0"})
 
             self.log.debug("get verbose info: {}".format(rsp_json))
             props = {}

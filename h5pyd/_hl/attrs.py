@@ -342,8 +342,16 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     def __iter__(self):
         """ Iterate over the names of attributes. """
         if self._objdb_attributes is not None:
+            if self._parent._track_order:
+                attrs = sorted(self._objdb_attributes.items(), key=lambda x: x[1]['created'])
+            else:
+                attrs = sorted(self._objdb_attributes.items())
 
-            for name in self._objdb_attributes:
+            ordered_attrs = {}
+            for a in attrs:
+                ordered_attrs[a[0]] = a[1]
+
+            for name in ordered_attrs:
                 yield name
 
         else:
@@ -351,7 +359,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             req = self._req_prefix
             # backup over the trailing slash in req
             req = req[:-1]
-            rsp = self._parent.GET(req)
+            rsp = self._parent.GET(req, params={"CreateOrder": "1" if self._parent._track_order else "0"})
             attributes = rsp['attributes']
 
             attrlist = []
@@ -383,3 +391,33 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if not self._parent.id.id:
             return "<Attributes of closed HDF5 object>"
         return f"<Attributes of HDF5 object at {id(self._parent.id)}>"
+
+    def __reversed__(self):
+        """ Iterate over the names of attributes in reverse order. """
+        if self._objdb_attributes is not None:
+            if self._parent._track_order:
+                attrs = sorted(self._objdb_attributes.items(), key=lambda x: x[1]['created'])
+            else:
+                attrs = sorted(self._objdb_attributes.items())
+
+            ordered_attrs = {}
+            for a in attrs:
+                ordered_attrs[a[0]] = a[1]
+
+            for name in reversed(ordered_attrs):
+                yield name
+
+        else:
+            # make server request
+            req = self._req_prefix
+            # backup over the trailing slash in req
+            req = req[:-1]
+            rsp = self._parent.GET(req, params={"CreateOrder": "1" if self._parent._track_order else "0"})
+            attributes = rsp['attributes']
+
+            attrlist = []
+            for attr in attributes:
+                attrlist.append(attr['name'])
+
+            for name in reversed(attrlist):
+                yield name

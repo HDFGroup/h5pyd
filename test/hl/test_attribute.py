@@ -119,6 +119,68 @@ class TestAttribute(TestCase):
         f.close()
 
 
+class TestTrackOrder(TestCase):
+
+    def fill_attrs(self, track_order):
+        attrs = self.f.create_group('test', track_order=track_order).attrs
+        for i in range(100):
+            attrs[str(i)] = i
+        return attrs
+
+    # https://forum.hdfgroup.org/t/bug-h5arename-fails-unexpectedly/4881
+    def test_track_order(self):
+        filename = self.getFileName("test_test_track_order_attribute")
+        print(f"filename: {filename}")
+        self.f = h5py.File(filename, 'w')
+        attrs = self.fill_attrs(track_order=True)  # creation order
+        self.assertEqual(list(attrs),
+                         [str(i) for i in range(100)])
+
+    def test_no_track_order(self):
+        filename = self.getFileName("test_test_no_track_order_attribute")
+        print(f"filename: {filename}")
+        self.f = h5py.File(filename, 'w')
+        attrs = self.fill_attrs(track_order=False)  # name alphanumeric
+        self.assertEqual(list(attrs),
+                         sorted([str(i) for i in range(100)]))
+
+    def fill_attrs2(self, track_order):
+        group = self.f.create_group('test', track_order=track_order)
+        for i in range(12):
+            group.attrs[str(i)] = i
+        return group
+
+    def test_track_order_overwrite_delete(self):
+        filename = self.getFileName("test_test_track_order_overwrite_delete")
+        print(f"filename: {filename}")
+        self.f = h5py.File(filename, 'w')
+        # issue h5py#1385
+        group = self.fill_attrs2(track_order=True)  # creation order
+        self.assertEqual(group.attrs["11"], 11)
+        # overwrite attribute
+        group.attrs['11'] = 42.0
+        self.assertEqual(group.attrs["11"], 42.0)
+        # delete attribute
+        self.assertIn('10', group.attrs)
+        del group.attrs['10']
+        self.assertNotIn('10', group.attrs)
+
+    def test_track_order_not_inherited(self):
+        """
+        Test that if a File has track order enabled and a sub group does not,
+        that alphanumeric order is used within the sub group
+        """
+        filename = self.getFileName("test_test_track_order_not_inherited")
+        print(f"filename: {filename}")
+        self.f = h5py.File(filename, 'w', track_order=True)
+        group = self.f.create_group('test')
+
+        for i in range(12):
+            group.attrs[str(i)] = i
+
+        self.assertEqual(list(group.attrs), sorted([str(i) for i in range(12)]))
+
+
 if __name__ == '__main__':
     loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
