@@ -349,14 +349,16 @@ class TestVlenTypes(TestCase):
         e1 = np.array([1.9, 2.8, 3.7], dtype=np.float64)
 
         data = np.array([e0, e1], dtype=dtvlen)
-        try:
-            # This will fail on HSDS because data is a ndarray of shape (2,3) of floats
+
+        if isinstance(dset.id.id, str):
+            # id is str for HSDS, int for h5py
             dset[...] = data
-            if isinstance(dset.id.id, str):
-                # id is str for HSDS, int for h5py
-                self.assertTrue(False)
-        except ValueError:
-            pass  # expected
+        else:
+            try:
+                # This will fail on h5py due to a different in internal array handling.
+                dset[...] = data
+            except ValueError:
+                pass  # expected on h5py
 
         data = np.zeros((2,), dtype=dtvlen)
         data[0] = e0

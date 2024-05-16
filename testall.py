@@ -18,6 +18,7 @@ import sys
 hl_tests = ('test_attribute',
             'test_committedtype',
             'test_complex_numbers',
+            'test_dataset',
             'test_dataset_compound',
             'test_dataset_create',
             'test_dataset_extend',
