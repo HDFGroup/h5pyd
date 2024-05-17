@@ -231,7 +231,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             if isinstance(values[i], Reference):
                 dtypes[i] = special_dtype(ref=Reference)
             if not isinstance(values[i], Empty):
-                print(f"Converting {values[i]} to numpy array with dtype {dtypes[i]}")
                 values[i] = numpy.asarray(values[i], dtype=dtypes[i], order='C')
 
             if shapes[i] is None and not isinstance(values[i], Empty):

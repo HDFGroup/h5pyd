@@ -26,7 +26,7 @@ from common import ut, TestCase
 class TestAttribute(TestCase):
 
     def test_create(self):
-        filename = self.getFileName("create_attribute")
+        filename = self.getFileName("create_attribfute")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
 
@@ -118,9 +118,10 @@ class TestAttribute(TestCase):
         # close file
         f.close()
 
-    # TODO: Skip if HSDS version below XXX
     def test_create_multiple(self):
-        if config.get('use_h5py'):
+        print(self.hsds_version())
+
+        if config.get('use_h5py') or self.hsds_version() < "0.9.0":
             return
 
         filename = self.getFileName("create_attribute_multiple")
