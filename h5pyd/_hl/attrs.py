@@ -221,9 +221,14 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
     def __delitem__(self, name):
         """ Delete an attribute (which must already exist). """
-        if isinstance(name, bytes):
-            name = name.decode("utf-8")
-        req = self._req_prefix + name
+        if isinstance(name, list):
+            names = [name.decode('utf-8') if isinstance(name, bytes) else name for name in name]
+            # Omit trailing slash
+            req = self._req_prefix[:-1] + "?attr_names=" + "/".join(names)
+        else:
+            if isinstance(name, bytes):
+                name = name.decode("utf-8")
+            req = self._req_prefix + name
         self._parent.DELETE(req)
 
     def create(self, names, values, shape=None, dtype=None):

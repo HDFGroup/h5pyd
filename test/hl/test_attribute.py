@@ -228,6 +228,44 @@ class TestAttribute(TestCase):
             self.assertTrue(names[i] in values_out)
             self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
 
+    def test_delete_multiple(self):
+        if config.get('use_h5py') or self.hsds_version() < "0.9.0":
+            return
+
+        filename = self.getFileName("delete_attribute_multiple")
+        print("filename:", filename)
+        f = h5py.File(filename, 'w')
+
+        # create attributes
+        num_attrs = 10
+        g1 = f.create_group('g1')
+        names = ['attr' + str(i) for i in range(num_attrs)]
+        values = [np.arange(50) for i in range(num_attrs)]
+
+        for i in range(10):
+            g1.attrs[names[i]] = values[i]
+
+        # delete the first five attributes
+        del g1.attrs[names[0:5]]
+
+        # check that the first five attributes are gone
+        for i in range(5):
+            self.assertFalse(names[i] in g1.attrs)
+
+        # check that the last five attributes are still there
+        for i in range(5, 10):
+            self.assertTrue(names[i] in g1.attrs)
+            self.assertTrue(np.array_equal(g1.attrs[names[i]], values[i]))
+
+        # delete single attribute
+        del g1.attrs[names[5]]
+
+        self.assertFalse(names[5] in g1.attrs)
+
+        for i in range(6, 10):
+            self.assertTrue(names[i] in g1.attrs)
+            self.assertTrue(np.array_equal(g1.attrs[names[i]], values[i]))
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR
