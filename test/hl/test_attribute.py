@@ -119,8 +119,6 @@ class TestAttribute(TestCase):
         f.close()
 
     def test_create_multiple(self):
-        print(self.hsds_version())
-
         if config.get('use_h5py') or self.hsds_version() < "0.9.0":
             return
 
@@ -160,6 +158,75 @@ class TestAttribute(TestCase):
             self.assertTrue(np.array_equal(g1.attrs[names[i]], values[i]))
             self.assertEqual(g1.attrs[names[i]].dtype, dtypes[i])
             self.assertEqual(g1.attrs[names[i]].shape, shapes[i])
+
+    def test_get_multiple(self):
+        if config.get('use_h5py') or self.hsds_version() < "0.9.0":
+            return
+
+        filename = self.getFileName("get_attribute_multiple")
+        print("filename:", filename)
+        f = h5py.File(filename, 'w')
+
+        # create attributes
+        num_attrs = 10
+        g1 = f.create_group('g1')
+        names = ['attr' + str(i) for i in range(num_attrs)]
+        values = [np.arange(50) for i in range(num_attrs)]
+
+        for i in range(10):
+            g1.attrs[names[i]] = values[i]
+
+        # get all attributes
+        values_out = g1.attrs.get_attributes()
+
+        self.assertEqual(len(values_out), 10)
+        for i in range(10):
+            self.assertTrue(names[i] in values_out)
+            self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
+
+        # get attributes from cache
+        values_out = g1.attrs.get_attributes(use_cache=True)
+        self.assertEqual(len(values_out), 10)
+        for i in range(10):
+            self.assertTrue(names[i] in values_out)
+            self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
+
+        # get attributes that match the pattern 'attr5'
+        pattern = "attr5"
+        values_out = g1.attrs.get_attributes(pattern=pattern, use_cache=False)
+
+        self.assertTrue("attr5" in values_out)
+        self.assertTrue(np.array_equal(values_out["attr5"], values[5]))
+
+        # get attributes that match the pattern 'att*' (all attributes)
+        pattern = "att*"
+        values_out = g1.attrs.get_attributes(pattern=pattern, use_cache=False)
+
+        self.assertEqual(len(values_out), 10)
+
+        for i in range(10):
+            self.assertTrue(names[i] in values_out)
+            self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
+
+        # get the first five attributes
+        limit = 5
+        values_out = g1.attrs.get_attributes(limit=limit, use_cache=False)
+
+        self.assertEqual(len(values_out), 5)
+
+        for i in range(5):
+            self.assertTrue(names[i] in values_out)
+            self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
+
+        # get all attributes after 'attr4
+        marker = "attr4"
+        values_out = g1.attrs.get_attributes(marker=marker, limit=limit, use_cache=False)
+
+        self.assertEqual(len(values_out), 5)
+
+        for i in range(6, 10):
+            self.assertTrue(names[i] in values_out)
+            self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
 
 
 if __name__ == '__main__':

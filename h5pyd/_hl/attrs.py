@@ -166,6 +166,50 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         return arr
 
+    def get_attributes(self, pattern=None, limit=None, marker=None, use_cache=True):
+        """
+        Get all attributes or a subset of attributes from the target object.
+        If 'use_cache' is True, use the objdb cache if available.
+        The cache cannot be used with pattern, limit, or marker parameters.
+        - if 'pattern' is provided, retrieve all attributes with names that match the pattern
+          according to Unix pathname pattern expansion rules.
+        - if 'limit' is provided, retrieve at most 'limit' attributes.
+        - if 'marker' is provided, retrieve attributes whose names occur after the name 'marker' in the target object
+        """
+        if use_cache and (pattern or limit or marker):
+            raise ValueError("use_cache cannot be used with pattern, limit, or marker parameters")
+
+        if self._objdb_attributes is not None:
+            # use the objdb cache
+            out = {}
+            for a in self._objdb_attributes:
+                name = a['name']
+                out[name] = self._objdb_attributes[name]
+            return out
+
+        # Omit trailing slash
+        req = self._req_prefix[:-1]
+
+        req += "?IncludeData=1"
+
+        if pattern:
+            req += "&pattern=" + pattern
+        if limit:
+            req += "&Limit=" + str(limit)
+        if marker:
+            req += "&Marker=" + marker
+
+        rsp = self._parent.GET(req)
+        attrs_json = rsp['attributes']
+        names = [attr['name'] for attr in attrs_json]
+        values = [attr['value'] for attr in attrs_json]
+        out = {}
+
+        for i in range(len(names)):
+            out[names[i]] = values[i]
+
+        return out
+
     def __setitem__(self, name, value):
         """ Set a new attribute, overwriting any existing attribute.
 
@@ -301,6 +345,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         body = {}
         if len(names) > 1:
             # Create multiple attributes
+            # Omit trailing slash
             req = self._req_prefix[:-1]
             attributes = {}
 
