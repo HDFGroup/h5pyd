@@ -855,12 +855,20 @@ class Group(HLObject, MutableMappingHDF5):
                 raise IOError("Not found")
 
         else:
-            # delete the link, not an object
-            req = "/groups/" + self.id.uuid + "/links/" + name
+            # delete the link(s), not an object
+            if isinstance(name, list):
+                # delete multiple links
+                req = "/groups/" + self.id.uuid + "/links?titles=" + '/'.join(name)
+            else:
+                # delete single link
+                req = "/groups/" + self.id.uuid + "/links/" + name
+
         self.DELETE(req)
-        if name.find('/') == -1 and name in self._link_db:
-            # remove from link cache
-            del self._link_db[name]
+
+        for n in name:
+            if n.find('/') == -1 and n in self._link_db:
+                # remove from link cache
+                del self._link_db[name]
 
     def __len__(self):
         """ Number of members attached to this group """
