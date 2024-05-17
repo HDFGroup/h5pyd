@@ -1020,7 +1020,7 @@ class HLObject(CommonStateObject):
                 else:
                     raise RuntimeError(rsp.reason)
             else:
-                raise IOError(rsp.reason)
+                raise IOError(f"{rsp.reason}:{rsp.status_code}")
 
         if rsp.text:
             rsp_json = json.loads(rsp.text)

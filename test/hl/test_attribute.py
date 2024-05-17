@@ -118,6 +118,48 @@ class TestAttribute(TestCase):
         # close file
         f.close()
 
+    # TODO: Skip if HSDS version below XXX
+    def test_create_multiple(self):
+        if config.get('use_h5py'):
+            return
+
+        filename = self.getFileName("create_attribute_multiple")
+        print("filename:", filename)
+        f = h5py.File(filename, 'w')
+
+        g1 = f.create_group('g1')
+
+        num_attrs = 10
+        # No shape or dtype specified
+        names = ['attr' + str(i) for i in range(num_attrs)]
+        values = [np.arange(50)] * num_attrs
+        g1.attrs.create(names, values)
+
+        for i in range(num_attrs):
+            self.assertTrue(names[i] in g1.attrs)
+            self.assertTrue(np.array_equal(g1.attrs[names[i]], values[i]))
+
+        # Test replacing existing attributes
+        new_values = [np.arange(100)] * num_attrs
+        g1.attrs.create(names, new_values)
+
+        for i in range(num_attrs):
+            self.assertTrue(names[i] in g1.attrs)
+            self.assertTrue(np.array_equal(g1.attrs[names[i]], new_values[i]))
+
+        # Test creating attributes with shape and dtype specified
+        names = ['attr' + str(i) for i in range(num_attrs, 2 * num_attrs)]
+        values = [np.arange(i + 1) for i in range(num_attrs)]
+        dtypes = [np.int32] * num_attrs
+        shapes = [(i + 1,) for i in range(num_attrs)]
+        g1.attrs.create(names, values, shapes, dtypes)
+
+        for i in range(num_attrs):
+            self.assertTrue(names[i] in g1.attrs)
+            self.assertTrue(np.array_equal(g1.attrs[names[i]], values[i]))
+            self.assertEqual(g1.attrs[names[i]].dtype, dtypes[i])
+            self.assertEqual(g1.attrs[names[i]].shape, shapes[i])
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR
