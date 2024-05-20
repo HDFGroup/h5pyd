@@ -417,6 +417,110 @@ class TestGroup(TestCase):
             self.assertEqual(link.path, links[i % num_links]._path)
             self.assertEqual(link.filename, links[i % num_links]._filename)
 
+    def test_link_get_multi(self):
+        if config.get("use_h5py"):
+            return
+
+        filename = self.getFileName("test_link_get_multi")
+        print(filename)
+
+        f = h5py.File(filename, 'w')
+        g1 = f.create_group("g1")
+
+        # Create subgroups
+        g2 = g1.create_group("g2")
+        g3 = g2.create_group("g3")
+
+        # Create links in each group
+
+        num_links = 20
+        names = ["link" + str(i) for i in range(num_links)]
+
+        for name in names:
+            g1[name] = g1
+            g2[name] = g2
+            g3[name] = g3
+
+        # Get all links from g1 only
+        links_out = g1.get(None, getlink=True)
+
+        self.assertEqual(len(links_out), num_links + 1)
+
+        for name in names:
+            self.assertTrue(name in links_out)
+            link = links_out[name]
+            self.assertEqual(link.id, g1.id.uuid)
+
+        # Get all links from g1 and subgroups
+        links_out = g1.get(None, getlink=True, follow_links=True)
+
+        # 3 groups containing links
+        self.assertEqual(len(links_out), 3)
+
+        for group_id in [g1.id.uuid, g2.id.uuid, g3.id.uuid]:
+            self.assertTrue(group_id in links_out)
+            links = links_out[group_id]
+
+            if group_id == g3.id.uuid:
+                self.assertEqual(len(links), num_links)
+            else:
+                self.assertEqual(len(links), num_links + 1)
+
+            for name in names:
+                self.assertTrue(name in links)
+                link = links[name]
+                self.assertEqual(link.id, group_id)
+
+        # Make sure cache does not erroneously return recursive links
+        links_out = g1.get(None, getlink=True)
+        self.assertEqual(len(links_out), num_links + 1)
+
+        # Return only 5 links from group
+
+        links_out = g1.get(None, getlink=True, limit=5)
+        self.assertEqual(len(links_out), 5)
+
+        self.assertTrue("g2" in links_out)
+        for name in sorted(names)[0:4]:
+            self.assertTrue(name in links_out)
+            link = links_out[name]
+            self.assertEqual(link.id, g1.id.uuid)
+
+        # Return next 5 links via marker
+        links_out = g1.get(None, getlink=True, limit=5, marker=sorted(names)[3])
+
+        self.assertEqual(len(links_out), 5)
+
+        for name in sorted(names)[4:9]:
+            self.assertTrue(name in links_out)
+            link = links_out[name]
+            self.assertEqual(link.id, g1.id.uuid)
+
+        # Return all links in g1 besides g2
+        links_out = g1.get(None, getlink=True, pattern="link*")
+        self.assertEqual(len(links_out), 20)
+
+        for name in names:
+            if name.startswith("link1"):
+                self.assertTrue(name in links_out)
+                link = links_out[name]
+                self.assertEqual(link.id, g1.id.uuid)
+
+        # Return all links in g1/g2/g3 except for the group links
+        links_out = g1.get(None, getlink=True, follow_links=True, pattern="link*")
+        self.assertEqual(len(links_out), 3)
+
+        for group_id in [g1.id.uuid, g2.id.uuid, g3.id.uuid]:
+            self.assertTrue(group_id in links_out)
+            links = links_out[group_id]
+
+            self.assertEqual(len(links), num_links)
+
+            for name in names:
+                self.assertTrue(name in links)
+                link = links[name]
+                self.assertEqual(link.id, group_id)
+
 
 class TestTrackOrder(TestCase):
 

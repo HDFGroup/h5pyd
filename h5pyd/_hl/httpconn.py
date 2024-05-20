@@ -437,6 +437,8 @@ class HttpConn:
         check_cache = self._cache is not None and use_cache and format == "json"
         check_cache = check_cache and params["domain"] == self._domain
         check_cache = check_cache and "select" not in params and "query" not in params
+        check_cache = check_cache and "follow_links" not in params and "pattern" not in params
+        check_cache = check_cache and "Limit" not in params and "Marker" not in params
 
         if check_cache:
             self.log.debug("httpcon - checking cache")
@@ -448,6 +450,7 @@ class HttpConn:
         self.log.info(
             f"GET: {self._endpoint + req} [{params['domain']}] timeout: {self._timeout}"
         )
+
         for k in params:
             if k != "domain":
                 v = params[k]
@@ -462,6 +465,7 @@ class HttpConn:
                 stream = False
             else:
                 stream = True
+
             rsp = s.get(
                 self._endpoint + req,
                 params=params,
@@ -497,6 +501,8 @@ class HttpConn:
 
             add_to_cache = content_type and content_type.startswith("application/json")
             add_to_cache = add_to_cache and content_length < MAX_CACHE_ITEM_SIZE and not req.endswith("/value")
+            add_to_cache = add_to_cache and "follow_links" not in params and "pattern" not in params
+            add_to_cache = add_to_cache and "Limit" not in params and "Marker" not in params
 
             if add_to_cache:
                 # add to our _cache
