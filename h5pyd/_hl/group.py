@@ -768,7 +768,27 @@ class Group(HLObject, MutableMappingHDF5):
             values are stored as scalar datasets. Raise ValueError if we
             can't understand the resulting array dtype.
         """
-        if name.find('/') != -1:
+        if isinstance(name, list) and isinstance(obj, list):
+            if len(name) != len(obj):
+                raise ValueError("name and object list lengths do not match")
+
+            links = {}
+
+            for i in range(len(name)):
+                if isinstance(obj[i], HLObject):
+                    links[name[i]] = {"id": obj[i].id.uuid}
+                elif isinstance(obj[i], SoftLink):
+                    links[name[i]] = {"h5path": obj[i].path}
+                elif isinstance(obj[i], ExternalLink):
+                    links[name[i]] = {"h5path": obj[i].path, "h5domain": obj[i].filename}
+                else:
+                    raise ValueError("only links are supported for multiple object creation")
+
+            body = {"links": links}
+            req = "/groups/" + self.id.uuid + "/links"
+            self.PUT(req, body=body)
+
+        elif name.find('/') != -1:
             parent_path = op.dirname(name)
             basename = op.basename(name)
             if not basename:

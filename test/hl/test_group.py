@@ -336,6 +336,87 @@ class TestGroup(TestCase):
 
         f.close()
 
+    def test_link_multi_create(self):
+        if config.get("use_h5py"):
+            return
+
+        filename = self.getFileName("test_link_multi_create")
+        print(filename)
+
+        f = h5py.File(filename, 'w')
+        g1 = f.create_group("g1")
+
+        # Create 10 soft links
+        num_links = 10
+        names = ["link" + str(i) for i in range(num_links)]
+        links = []
+
+        for name in names:
+            new_link = h5py.SoftLink("dummy_path_" + str(name))
+            links.append(new_link)
+
+        g1[names] = links
+
+        self.assertEqual(len(g1), num_links)
+
+        for i in range(num_links):
+            name = names[i]
+            self.assertTrue(name in g1)
+            self.assertEqual(g1.get(name, getlink=True).path, links[i].path)
+
+        # Create soft and hard links
+        names = ["link" + str(i) for i in range(num_links, 2 * num_links)]
+        links = []
+
+        for i in range(num_links, 2 * num_links):
+            if i % 2 == 0:
+                new_link = h5py.SoftLink("dummy_path_" + str(i))
+                # links.append({"h5path": "dummy_path_" + str(i)})
+            else:
+                # Hard link to g1
+                new_link = g1
+
+            links.append(new_link)
+
+        g1[names] = links
+
+        self.assertEqual(len(g1), num_links * 2)
+
+        for i in range(num_links, 2 * num_links):
+            name = "link" + str(i)
+            self.assertTrue(name in g1)
+
+            if i % 2 == 0:
+                link = g1.get(name, getlink=True)
+                self.assertEqual(link.path, links[i % num_links].path)
+            else:
+                g1_clone = g1.get(name)
+                self.assertEqual(len(g1_clone), len(g1))
+                self.assertEqual(g1_clone.id.id, g1.id.id)
+
+        # Create external links
+
+        names = ["link" + str(i) for i in range(num_links * 2, num_links * 3)]
+        links = []
+
+        for i in range(num_links * 2, num_links * 3):
+            filename = "dummy_filename_" + str(i)
+            path = "dummy_path_" + str(i)
+            new_link = h5py.ExternalLink(filename=filename, path=path)
+            links.append(new_link)
+
+        g1[names] = links
+
+        self.assertEqual(len(g1), num_links * 3)
+
+        for i in range(num_links * 2, num_links * 3):
+            name = "link" + str(i)
+            self.assertTrue(name in g1)
+
+            link = g1.get(name, getlink=True)
+            self.assertEqual(link.path, links[i % num_links]._path)
+            self.assertEqual(link.filename, links[i % num_links]._filename)
+
 
 class TestTrackOrder(TestCase):
 
