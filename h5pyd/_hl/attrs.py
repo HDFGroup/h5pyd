@@ -166,7 +166,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         return arr
 
-    def get_attributes(self, pattern=None, limit=None, marker=None, use_cache=True):
+    def get_attributes(self, names=None, pattern=None, limit=None, marker=None, use_cache=True):
         """
         Get all attributes or a subset of attributes from the target object.
         If 'use_cache' is True, use the objdb cache if available.
@@ -179,6 +179,9 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if use_cache and (pattern or limit or marker):
             raise ValueError("use_cache cannot be used with pattern, limit, or marker parameters")
 
+        if names and (pattern or limit or marker or use_cache):
+            raise ValueError("names cannot be used with pattern, limit, marker, or cache")
+
         if self._objdb_attributes is not None:
             # use the objdb cache
             out = {}
@@ -189,8 +192,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         # Omit trailing slash
         req = self._req_prefix[:-1]
-
         req += "?IncludeData=1"
+        body = {}
 
         if pattern:
             req += "&pattern=" + pattern
@@ -199,7 +202,21 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if marker:
             req += "&Marker=" + marker
 
-        rsp = self._parent.GET(req)
+        if names:
+            if isinstance(names, list):
+                names = [name.decode('utf-8') if isinstance(name, bytes) else name for name in names]
+            else:
+                if isinstance(names, bytes):
+                    names = names.decode("utf-8")
+                names = [names]
+
+            body['attr_names'] = names
+
+        if body:
+            rsp = self._parent.POST(req, body=body)
+        else:
+            rsp = self._parent.GET(req)
+
         attrs_json = rsp['attributes']
         names = [attr['name'] for attr in attrs_json]
         values = [attr['value'] for attr in attrs_json]

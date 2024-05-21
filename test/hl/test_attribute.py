@@ -198,7 +198,8 @@ class TestAttribute(TestCase):
         self.assertTrue("attr5" in values_out)
         self.assertTrue(np.array_equal(values_out["attr5"], values[5]))
 
-        # get attributes that match the pattern 'att*' (all attributes)
+        # get only attributes that match the pattern 'att*'
+        g1.attrs['new_attr'] = np.arange(100)
         pattern = "att*"
         values_out = g1.attrs.get_attributes(pattern=pattern, use_cache=False)
 
@@ -227,6 +228,18 @@ class TestAttribute(TestCase):
         for i in range(6, 10):
             self.assertTrue(names[i] in values_out)
             self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
+
+        # get set of attributes by name
+        names = ['attr5', 'attr7', 'attr9']
+
+        values_out = g1.attrs.get_attributes(names=names, use_cache=False)
+
+        self.assertEqual(len(values_out), 3)
+
+        for name in names:
+            self.assertTrue(name in values_out)
+            i = int(name[4])
+            self.assertTrue(np.array_equal(values_out[name], values[i]))
 
     def test_delete_multiple(self):
         if config.get('use_h5py') or self.hsds_version() < "0.9.0":
@@ -265,6 +278,16 @@ class TestAttribute(TestCase):
         for i in range(6, 10):
             self.assertTrue(names[i] in g1.attrs)
             self.assertTrue(np.array_equal(g1.attrs[names[i]], values[i]))
+
+        # delete attributes with name that must be URL-encoded
+        names = ['attr with spaces', 'attr%', 'unicode八attr']
+        for name in names:
+            g1.attrs[name] = np.arange(100)
+
+        del g1.attrs[names]
+
+        for name in names:
+            self.assertTrue(name not in g1.attrs)
 
 
 if __name__ == '__main__':
