@@ -736,7 +736,7 @@ class Group(HLObject, MutableMappingHDF5):
             except KeyError:
                 return default
 
-        if name is not None and name not in self:
+        if not isinstance(name, list) and name is not None and name not in self:
             return default
 
         elif getclass and not getlink:
@@ -753,13 +753,16 @@ class Group(HLObject, MutableMappingHDF5):
                 raise TypeError("Unknown object type")
 
         elif getlink:
-            if name is None:
+            if name is None or isinstance(name, list):
                 # Get all links in target group(s)
                 # Retrieve "limit", "marker", and "pattern" from kwds
                 limit = kwds.get("limit", None)
                 marker = kwds.get("marker", None)
                 pattern = kwds.get("pattern", None)
                 follow_links = kwds.get("follow_links", False)
+
+                if name and (limit or marker or pattern or follow_links):
+                    raise ValueError("Cannot specify 'name' along with 'limit', 'marker', 'pattern', or 'follow_links'")
 
                 req = "/groups/" + self.id.uuid + "/links"
                 params = {}
@@ -775,7 +778,15 @@ class Group(HLObject, MutableMappingHDF5):
                 if track_order:
                     params["CreateOrder"] = 1
 
-                rsp = self.GET(req, params=params)
+                if name:
+                    body = {}
+
+                    titles = [linkname.decode('utf-8') if
+                              isinstance(linkname, bytes) else linkname for linkname in name]
+                    body['titles'] = titles
+                    rsp = self.POST(req, body=body, params=params)
+                else:
+                    rsp = self.GET(req, params=params)
 
                 if "links" in rsp:
                     # Process list of link objects so they may be accessed by name
@@ -798,24 +809,24 @@ class Group(HLObject, MutableMappingHDF5):
                     raise ValueError("Can't parse server response to links query")
 
                 return links_out
-
-            parent_uuid, link_json = self._get_link_json(name)
-            typecode = link_json['class']
-
-            if typecode == 'H5L_TYPE_SOFT':
-                if getclass:
-                    return SoftLink
-
-                return SoftLink(link_json['h5path'])
-            elif typecode == 'H5L_TYPE_EXTERNAL':
-                if getclass:
-                    return ExternalLink
-
-                return ExternalLink(link_json['h5domain'], link_json['h5path'])
-            elif typecode == 'H5L_TYPE_HARD':
-                return HardLink if getclass else HardLink(link_json['id'])
             else:
-                raise TypeError("Unknown link type")
+                parent_uuid, link_json = self._get_link_json(name)
+                typecode = link_json['class']
+
+                if typecode == 'H5L_TYPE_SOFT':
+                    if getclass:
+                        return SoftLink
+
+                    return SoftLink(link_json['h5path'])
+                elif typecode == 'H5L_TYPE_EXTERNAL':
+                    if getclass:
+                        return ExternalLink
+
+                    return ExternalLink(link_json['h5domain'], link_json['h5path'])
+                elif typecode == 'H5L_TYPE_HARD':
+                    return HardLink if getclass else HardLink(link_json['id'])
+                else:
+                    raise TypeError("Unknown link type")
 
     def __setitem__(self, name, obj):
         """ Add an object to the group.  The name must not already be in use.

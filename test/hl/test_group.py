@@ -334,6 +334,17 @@ class TestGroup(TestCase):
             self.assertTrue(name in g1)
             self.assertTrue(name in g1_clone)
 
+        # delete links with names that must be URL-encoded
+        names = ['link with spaces', 'link%', 'unicode八link']
+
+        for name in names:
+            g1[name] = g1
+
+        del g1[names]
+
+        for name in names:
+            self.assertTrue(name not in g1)
+
         f.close()
 
     def test_link_multi_create(self):
@@ -520,6 +531,17 @@ class TestGroup(TestCase):
                 self.assertTrue(name in links)
                 link = links[name]
                 self.assertEqual(link.id, group_id)
+
+        # Retrieve a set of links by name
+        names = ["link" + str(i) for i in range(5, 15)]
+        links_out = g1.get(names, getlink=True)
+
+        self.assertEqual(len(links_out), 10)
+
+        for name in names:
+            self.assertTrue(name in links_out)
+            link = links_out[name]
+            self.assertEqual(link.id, g1.id.uuid)
 
 
 class TestTrackOrder(TestCase):
