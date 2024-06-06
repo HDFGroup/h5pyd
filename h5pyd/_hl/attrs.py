@@ -192,15 +192,16 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         # Omit trailing slash
         req = self._req_prefix[:-1]
-        req += "?IncludeData=1"
+
         body = {}
+        params = {"IncludeData": 1}
 
         if pattern:
-            req += "&pattern=" + pattern
+            params["pattern"] = pattern
         if limit:
-            req += "&Limit=" + str(limit)
+            params["Limit"] = limit
         if marker:
-            req += "&Marker=" + marker
+            params["Marker"] = marker
 
         if names:
             if isinstance(names, list):
@@ -213,9 +214,9 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             body['attr_names'] = names
 
         if body:
-            rsp = self._parent.POST(req, body=body)
+            rsp = self._parent.POST(req, body=body, params=params)
         else:
-            rsp = self._parent.GET(req)
+            rsp = self._parent.GET(req, params=params)
 
         attrs_json = rsp['attributes']
         names = [attr['name'] for attr in attrs_json]
@@ -268,6 +269,10 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if not isinstance(names, list):
             names = [names]
             values = [values]
+
+        # Do not permit duplicate names
+        if len(names) != len(set(names)):
+            raise ValueError("Duplicate attribute names are not allowed")
 
         if shape is not None and not isinstance(shape, list):
             shapes = [shape]

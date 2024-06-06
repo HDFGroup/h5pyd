@@ -434,9 +434,14 @@ class HttpConn:
         if format == "binary":
             headers["accept"] = "application/octet-stream"
 
+        # list of parameters which should disable cache usage
+        no_cache_params = ["select", "query", "Limit", "Marker", "pattern", "attr"]
+
         check_cache = self._cache is not None and use_cache and format == "json"
         check_cache = check_cache and params["domain"] == self._domain
-        check_cache = check_cache and "select" not in params and "query" not in params
+
+        if any(param in params for param in no_cache_params):
+            check_cache = False
 
         if check_cache:
             self.log.debug("httpcon - checking cache")
