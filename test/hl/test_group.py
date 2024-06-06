@@ -275,9 +275,6 @@ class TestGroup(TestCase):
                 count += 1
             return count
         # create a file for use as a link target
-        if config.get("use_h5py"):
-            # for some reason this test is failing in Travis
-            return
         filename = self.getFileName("test_link_removal")
         print(f"filename: {filename}")
 
@@ -382,7 +379,6 @@ class TestGroup(TestCase):
         for i in range(num_links, 2 * num_links):
             if i % 2 == 0:
                 new_link = h5py.SoftLink("dummy_path_" + str(i))
-                # links.append({"h5path": "dummy_path_" + str(i)})
             else:
                 # Hard link to g1
                 new_link = g1

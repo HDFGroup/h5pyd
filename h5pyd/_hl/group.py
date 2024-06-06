@@ -679,7 +679,7 @@ class Group(HLObject, MutableMappingHDF5):
                 tgt._name = name
         return tgt
 
-    def objectify_link_json(self, link_json):
+    def _objectify_link_Json(self, link_json):
         if "id" in link_json:
             link_obj = HardLink(link_json["id"])
         elif "h5path" in link_json and "h5domain" not in link_json:
@@ -695,7 +695,7 @@ class Group(HLObject, MutableMappingHDF5):
         """ Retrieve an item or other information.
 
         "name" given only:
-            Return the item, or "default" if it doesn't exist
+            Return the item with the given name, or "default" if nothing with that name exists
 
         "getclass" is True:
             Return the class of object (Group, Dataset, etc.), or "default"
@@ -798,13 +798,13 @@ class Group(HLObject, MutableMappingHDF5):
                             group_links = {}
 
                             for link in links[group_id]:
-                                group_links[link["title"]] = self.objectify_link_json(link)
+                                group_links[link["title"]] = self._objectify_link_Json(link)
 
                             links_out[group_id] = group_links
 
                     else:
                         for link in links:
-                            links_out[link["title"]] = self.objectify_link_json(link)
+                            links_out[link["title"]] = self._objectify_link_Json(link)
                 else:
                     raise ValueError("Can't parse server response to links query")
 
