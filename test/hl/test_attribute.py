@@ -185,7 +185,7 @@ class TestAttribute(TestCase):
             self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
 
         # get attributes from cache
-        values_out = g1.attrs.get_attributes(use_cache=True)
+        values_out = g1.attrs.get_attributes()
         self.assertEqual(len(values_out), 10)
         for i in range(10):
             self.assertTrue(names[i] in values_out)
@@ -193,7 +193,7 @@ class TestAttribute(TestCase):
 
         # get attributes that match the pattern 'attr5'
         pattern = "attr5"
-        values_out = g1.attrs.get_attributes(pattern=pattern, use_cache=False)
+        values_out = g1.attrs.get_attributes(pattern=pattern)
 
         self.assertTrue("attr5" in values_out)
         self.assertTrue(np.array_equal(values_out["attr5"], values[5]))
@@ -201,7 +201,7 @@ class TestAttribute(TestCase):
         # get only attributes that match the pattern 'att*'
         g1.attrs['new_attr'] = np.arange(100)
         pattern = "att*"
-        values_out = g1.attrs.get_attributes(pattern=pattern, use_cache=False)
+        values_out = g1.attrs.get_attributes(pattern=pattern)
 
         self.assertEqual(len(values_out), 10)
 
@@ -211,7 +211,7 @@ class TestAttribute(TestCase):
 
         # get the first five attributes
         limit = 5
-        values_out = g1.attrs.get_attributes(limit=limit, use_cache=False)
+        values_out = g1.attrs.get_attributes(limit=limit)
 
         self.assertEqual(len(values_out), 5)
 
@@ -221,7 +221,7 @@ class TestAttribute(TestCase):
 
         # get all attributes after 'attr4
         marker = "attr4"
-        values_out = g1.attrs.get_attributes(marker=marker, limit=limit, use_cache=False)
+        values_out = g1.attrs.get_attributes(marker=marker, limit=limit)
 
         self.assertEqual(len(values_out), 5)
 
@@ -232,7 +232,7 @@ class TestAttribute(TestCase):
         # get set of attributes by name
         names = ['attr5', 'attr7', 'attr9']
 
-        values_out = g1.attrs.get_attributes(names=names, use_cache=False)
+        values_out = g1.attrs.get_attributes(names=names)
 
         self.assertEqual(len(values_out), 3)
 

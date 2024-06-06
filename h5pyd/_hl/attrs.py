@@ -166,7 +166,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         return arr
 
-    def get_attributes(self, names=None, pattern=None, limit=None, marker=None, use_cache=True):
+    def get_attributes(self, names=None, pattern=None, limit=None, marker=None):
         """
         Get all attributes or a subset of attributes from the target object.
         If 'use_cache' is True, use the objdb cache if available.
@@ -176,11 +176,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         - if 'limit' is provided, retrieve at most 'limit' attributes.
         - if 'marker' is provided, retrieve attributes whose names occur after the name 'marker' in the target object
         """
-        if use_cache and (pattern or limit or marker):
-            raise ValueError("use_cache cannot be used with pattern, limit, or marker parameters")
-
-        if names and (pattern or limit or marker or use_cache):
-            raise ValueError("names cannot be used with pattern, limit, marker, or cache")
+        if names and (pattern or limit or marker):
+            raise ValueError("names cannot be used with pattern, limit or marker")
 
         if self._objdb_attributes is not None:
             # use the objdb cache
@@ -239,15 +236,18 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
     def __delitem__(self, name):
         """ Delete an attribute (which must already exist). """
+        params = {}
+
         if isinstance(name, list):
             names = [name.decode('utf-8') if isinstance(name, bytes) else name for name in name]
             # Omit trailing slash
-            req = self._req_prefix[:-1] + "?attr_names=" + "/".join(names)
+            req = self._req_prefix[:-1]
+            params["attr_names"] = "/".join(names)
         else:
             if isinstance(name, bytes):
                 name = name.decode("utf-8")
             req = self._req_prefix + name
-        self._parent.DELETE(req)
+        self._parent.DELETE(req, params=params)
 
     def create(self, names, values, shape=None, dtype=None):
         """ Create new attribute(s), overwriting any existing attributes.
@@ -363,71 +363,49 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             # Make HDF5 datatype and dataspace for the H5A calls
             if use_htype is None:
                 type_jsons[i] = getTypeItem(dtypes[i])
-                self._parent.log.debug("attrs.create type_json: {}".format(type_jsons[i]))
-
-        # This mess exists because you can't overwrite attributes in HDF5.
-        # So we write to a temporary attribute first, and then rename.
+                self._parent.log.debug(f"attrs.create type_json: {format(type_jsons[i])}")
 
         params = {}
         body = {}
+        params['replace'] = 1
+
+        attributes = {}
+
+        for i in range(len(names)):
+            attr = {}
+            attr['type'] = type_jsons[i]
+            if isinstance(values[i], Empty):
+                attr['shape'] = 'H5S_NULL'
+            else:
+                attr['shape'] = shapes[i]
+                if values[i].dtype.kind != 'c':
+                    attr['value'] = self._bytesArrayToList(values[i])
+                else:
+                    # Special case: complex numbers
+                    special_dt = createDataType(type_jsons[i])
+                    tmp = numpy.empty(shape=values[i].shape, dtype=special_dt)
+                    tmp['r'] = values[i].real
+                    tmp['i'] = values[i].imag
+                    attr['value'] = json.loads(json.dumps(tmp.tolist()))
+            attributes[names[i]] = attr
+
         if len(names) > 1:
             # Create multiple attributes
             # Omit trailing slash
             req = self._req_prefix[:-1]
-            attributes = {}
-
-            for i in range(len(names)):
-                attr = {}
-                attr['type'] = type_jsons[i]
-                if isinstance(values[i], Empty):
-                    attr['shape'] = 'H5S_NULL'
-                else:
-                    attr['shape'] = shapes[i]
-                    if values[i].dtype.kind != 'c':
-                        attr['value'] = self._bytesArrayToList(values[i])
-                    else:
-                        # Special case: complex numbers
-                        special_dt = createDataType(type_jsons[i])
-                        tmp = numpy.empty(shape=values[i].shape, dtype=special_dt)
-                        tmp['r'] = values[i].real
-                        tmp['i'] = values[i].imag
-                        attr['value'] = json.loads(json.dumps(tmp.tolist()))
-                attributes[names[i]] = attr
-
             body['attributes'] = attributes
-            params['replace'] = 1
 
         else:
             # Create single attribute
             req = self._req_prefix + names[0]
-            body['type'] = type_jsons[0]
-            if isinstance(values[0], Empty):
-                body['shape'] = 'H5S_NULL'
-            else:
-                body['shape'] = shapes[0]
-                if values[0].dtype.kind != 'c':
-                    body['value'] = self._bytesArrayToList(values[0])
-                else:
-                    # Special case: complex numbers
-                    special_dt = createDataType(type_jsons[0])
-                    tmp = numpy.empty(shape=values[0].shape, dtype=special_dt)
-                    tmp['r'] = values[0].real
-                    tmp['i'] = values[0].imag
-                    body['value'] = json.loads(json.dumps(tmp.tolist()))
+            for key in attributes[names[0]]:
+                body[key] = attributes[names[0]][key]
 
         try:
             self._parent.PUT(req, body=body, params=params)
         except RuntimeError:
-            if len(names) == 1:
-                # Resource already exist, try deleting it
-                self._parent.log.info(f"Update to existing attribute(s) ({names}), deleting it")
-                self._parent.DELETE(req)
-                # now add again
-                self._parent.PUT(req, body=body, params=params)
-            else:
-                # putAttributes uses replace parameter by default,
-                # so failure is not due to existing attribute
-                raise RuntimeError("Failued to create attributes")
+            # 'replace' parameter is used, so failure is not due to attribute already existing
+            raise RuntimeError("Failued to create attribute(s)")
 
     def modify(self, name, value):
         """ Change the value of an attribute while preserving its type.
