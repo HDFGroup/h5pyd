@@ -21,9 +21,6 @@ def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **k
 
     cfg = Config()  # get credentials from .hscfg file (if found)
 
-    if cfg.get("use_h5py"):
-        return None
-
     if endpoint is None and "hs_endpoint" in cfg:
         endpoint = cfg["hs_endpoint"]
 
