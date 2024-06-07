@@ -679,11 +679,23 @@ class Group(HLObject, MutableMappingHDF5):
                 tgt._name = name
         return tgt
 
-    def get(self, name, default=None, getclass=False, getlink=False, track_order=False):
+    def _objectify_link_Json(self, link_json):
+        if "id" in link_json:
+            link_obj = HardLink(link_json["id"])
+        elif "h5path" in link_json and "h5domain" not in link_json:
+            link_obj = SoftLink(link_json["h5path"])
+        elif "h5path" in link_json and "h5domain" in link_json:
+            link_obj = ExternalLink(link_json["h5domain"], link_json["h5path"])
+        else:
+            raise ValueError("Invalid link JSON")
+
+        return link_obj
+
+    def get(self, name, default=None, getclass=False, getlink=False, track_order=False, **kwds):
         """ Retrieve an item or other information.
 
         "name" given only:
-            Return the item, or "default" if it doesn't exist
+            Return the item with the given name, or "default" if nothing with that name exists
 
         "getclass" is True:
             Return the class of object (Group, Dataset, etc.), or "default"
@@ -697,6 +709,21 @@ class Group(HLObject, MutableMappingHDF5):
             Return HardLink, SoftLink and ExternalLink classes.  Return
             "default" if nothing with that name exists.
 
+        "limit" is an integer:
+            If "name" is None, this will return the first "limit" links in the group.
+
+        "marker" is a string:
+            If "name" is None, this will return only the links that come after the marker in the group's link ordering.
+
+        "pattern" is a string:
+            If "name" is None, this will return only the links that match the given pattern
+            in the target group (and subgroups, if follow_links is provided).
+            Matching is done according to Unix pathname expansion rules.
+
+        "follow_links" is True:
+            If "name" is None, subgroups of the target group will be recursively searched
+            for links that match the given names or pattern.
+
         Example:
 
         >>> cls = group.get('foo', getclass=True)
@@ -709,7 +736,7 @@ class Group(HLObject, MutableMappingHDF5):
             except KeyError:
                 return default
 
-        if name not in self:
+        if not isinstance(name, list) and name is not None and name not in self:
             return default
 
         elif getclass and not getlink:
@@ -726,23 +753,80 @@ class Group(HLObject, MutableMappingHDF5):
                 raise TypeError("Unknown object type")
 
         elif getlink:
-            parent_uuid, link_json = self._get_link_json(name)
-            typecode = link_json['class']
+            if name is None or isinstance(name, list):
+                # Get all links in target group(s)
+                # Retrieve "limit", "marker", and "pattern" from kwds
+                limit = kwds.get("limit", None)
+                marker = kwds.get("marker", None)
+                pattern = kwds.get("pattern", None)
+                follow_links = kwds.get("follow_links", False)
 
-            if typecode == 'H5L_TYPE_SOFT':
-                if getclass:
-                    return SoftLink
+                if name and (limit or marker or pattern or follow_links):
+                    raise ValueError("Cannot specify 'name' along with 'limit', 'marker', 'pattern', or 'follow_links'")
 
-                return SoftLink(link_json['h5path'])
-            elif typecode == 'H5L_TYPE_EXTERNAL':
-                if getclass:
-                    return ExternalLink
+                req = "/groups/" + self.id.uuid + "/links"
+                params = {}
 
-                return ExternalLink(link_json['h5domain'], link_json['h5path'])
-            elif typecode == 'H5L_TYPE_HARD':
-                return HardLink if getclass else HardLink()
+                if limit:
+                    params["Limit"] = limit
+                if marker:
+                    params["Marker"] = marker
+                if pattern:
+                    params["pattern"] = pattern
+                if follow_links:
+                    params["follow_links"] = 1
+                if track_order:
+                    params["CreateOrder"] = 1
+
+                if name:
+                    body = {}
+
+                    titles = [linkname.decode('utf-8') if
+                              isinstance(linkname, bytes) else linkname for linkname in name]
+                    body['titles'] = titles
+                    rsp = self.POST(req, body=body, params=params)
+                else:
+                    rsp = self.GET(req, params=params)
+
+                if "links" in rsp:
+                    # Process list of link objects so they may be accessed by name
+                    links = rsp['links']
+                    links_out = {}
+                    if all([isUUID(k) for k in links]):
+                        # Multiple groups queried, links are returned under group ids
+                        for group_id in links:
+                            group_links = {}
+
+                            for link in links[group_id]:
+                                group_links[link["title"]] = self._objectify_link_Json(link)
+
+                            links_out[group_id] = group_links
+
+                    else:
+                        for link in links:
+                            links_out[link["title"]] = self._objectify_link_Json(link)
+                else:
+                    raise ValueError("Can't parse server response to links query")
+
+                return links_out
             else:
-                raise TypeError("Unknown link type")
+                parent_uuid, link_json = self._get_link_json(name)
+                typecode = link_json['class']
+
+                if typecode == 'H5L_TYPE_SOFT':
+                    if getclass:
+                        return SoftLink
+
+                    return SoftLink(link_json['h5path'])
+                elif typecode == 'H5L_TYPE_EXTERNAL':
+                    if getclass:
+                        return ExternalLink
+
+                    return ExternalLink(link_json['h5domain'], link_json['h5path'])
+                elif typecode == 'H5L_TYPE_HARD':
+                    return HardLink if getclass else HardLink(link_json['id'])
+                else:
+                    raise TypeError("Unknown link type")
 
     def __setitem__(self, name, obj):
         """ Add an object to the group.  The name must not already be in use.
@@ -768,7 +852,27 @@ class Group(HLObject, MutableMappingHDF5):
             values are stored as scalar datasets. Raise ValueError if we
             can't understand the resulting array dtype.
         """
-        if name.find('/') != -1:
+        if isinstance(name, list) and isinstance(obj, list):
+            if len(name) != len(obj):
+                raise ValueError("name and object list lengths do not match")
+
+            links = {}
+
+            for i in range(len(name)):
+                if isinstance(obj[i], HLObject):
+                    links[name[i]] = {"id": obj[i].id.uuid}
+                elif isinstance(obj[i], SoftLink):
+                    links[name[i]] = {"h5path": obj[i].path}
+                elif isinstance(obj[i], ExternalLink):
+                    links[name[i]] = {"h5path": obj[i].path, "h5domain": obj[i].filename}
+                else:
+                    raise ValueError("only links are supported for multiple object creation")
+
+            body = {"links": links}
+            req = "/groups/" + self.id.uuid + "/links"
+            self.PUT(req, body=body)
+
+        elif name.find('/') != -1:
             parent_path = op.dirname(name)
             basename = op.basename(name)
             if not basename:
@@ -855,12 +959,20 @@ class Group(HLObject, MutableMappingHDF5):
                 raise IOError("Not found")
 
         else:
-            # delete the link, not an object
-            req = "/groups/" + self.id.uuid + "/links/" + name
+            # delete the link(s), not an object
+            if isinstance(name, list):
+                # delete multiple links
+                req = "/groups/" + self.id.uuid + "/links?titles=" + '/'.join(name)
+            else:
+                # delete single link
+                req = "/groups/" + self.id.uuid + "/links/" + name
+
         self.DELETE(req)
-        if name.find('/') == -1 and name in self._link_db:
-            # remove from link cache
-            del self._link_db[name]
+
+        for n in name:
+            if n.find('/') == -1 and n in self._link_db:
+                # remove from link cache
+                del self._link_db[name]
 
     def __len__(self):
         """ Number of members attached to this group """
@@ -1186,8 +1298,16 @@ class HardLink(object):
         Represents a hard link in an HDF5 file.  Provided only so that
         Group.get works in a sensible way.  Has no other function.
     """
+    @property
+    # The uuid of the target object
+    def id(self):
+        return self._id
 
-    pass
+    def __init__(self, id=None):
+        self._id = id
+
+    def __repr__(self):
+        return f'<HardLink to "{self.id}">'
 
 
 # TODO: implement equality testing for these
