@@ -33,7 +33,7 @@ pyparsing==3.1.2
 pyproject_hooks==1.0.0
 python-dateutil==2.9.0.post0
 pytz==2024.1
-requests==2.31.0
+requests==2.32.0
 requests-unixsocket==0.3.0
 s3fs==2024.3.1
 six==1.16.0

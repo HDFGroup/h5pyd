@@ -1020,7 +1020,7 @@ class HLObject(CommonStateObject):
                 else:
                     raise RuntimeError(rsp.reason)
             else:
-                raise IOError(rsp.reason)
+                raise IOError(f"{rsp.reason}:{rsp.status_code}")
 
         if rsp.text:
             rsp_json = json.loads(rsp.text)
@@ -1053,14 +1053,14 @@ class HLObject(CommonStateObject):
             rsp_json = json.loads(rsp.text)
             return rsp_json
 
-    def DELETE(self, req):
+    def DELETE(self, req, params=None):
         if self.id.http_conn is None:
             raise IOError("object not initialized")
 
         # try to do a DELETE of the resource
 
         self.log.info("DEL: {} [{}]".format(req, self.id.domain))
-        rsp = self.id._http_conn.DELETE(req)
+        rsp = self.id._http_conn.DELETE(req, params=params)
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
