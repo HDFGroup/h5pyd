@@ -21,7 +21,7 @@ import config
 import numpy as np
 import unittest as ut
 from platform import system
-
+from h5pyd import getServerInfo
 
 # Check if non-ascii filenames are supported
 # Evidently this is the most reliable way to check
@@ -275,3 +275,10 @@ class TestCase(ut.TestCase):
             return True
         else:
             return False
+
+    def hsds_version(self):
+        """ Return the version of the HSDS server, or None if not HSDS.
+        """
+
+        rsp = getServerInfo()
+        return rsp["hsds_version"]
