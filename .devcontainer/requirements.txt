@@ -23,7 +23,7 @@ kiwisolver==1.4.5
 matplotlib==3.8.4
 mccabe==0.7.0
 multidict==6.0.5
-numpy==1.26.4
+numpy>=1.26.4,<2.0.0
 packaging==24.0
 pillow==10.3.0
 pycodestyle==2.11.1

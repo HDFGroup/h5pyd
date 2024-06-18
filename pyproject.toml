@@ -33,7 +33,7 @@ requires-python = ">=3.8"
 version = "0.18.0"
 
 dependencies = [
-    "numpy >= 1.17.3",
+    "numpy >= 1.17.3, < 2.0.0",
     "requests_unixsocket",
     "pytz",
     "pyjwt",
