@@ -45,7 +45,18 @@ default_cfg = {
         "help": "storage Bucket to use (S3 Bucket, Azure Container, or top-level directory)",
         "choices": ["BUCKET",]
     },
-
+    "hs_keycloak_client_id": {
+        "default": None,
+        "help": "Keycloak Client ID",
+    },
+    "hs_keycloak_realm": {
+        "default": None,
+        "help": "Keycloak Realm",
+    },
+    "hs_keycloak_uri": {
+        "default": None,
+        "help": "Keycloak instance base URL",
+    },
     "loglevel": {
         "default": "error",
         "flags": ["--loglevel",],
@@ -128,7 +139,7 @@ class Config:
                     k = fields[0].strip()
                     v = fields[1].strip()
                     if k not in self._names:
-                        raise ValueError(f"undefined option: {name}")
+                        raise ValueError(f"undefined option: {k}")
                     if k in self._choices:
                         choices = self._choices[k]
                         if len(choices) > 1 and v not in self._choices:
