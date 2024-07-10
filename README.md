@@ -49,22 +49,16 @@ Run `hsconfigure` to setup the connection info (endpoint, username, and password
 If you don't have access to an HSDS instance, you can easily setup your own HSDS instance.
 See  https://github.com/HDFGroup/hsds for instructions on installing and running HSDS
 on locally or in the cloud.
- 
-Alternatively, if you can run this repo as a Github Codespace 
-(see "Open in a Github Codespace" link above), and HSDS will be automatically setup as part of the codespace.
 
-Another option is to run h5pyd in serverless mode with either AWS Lambda or direct mode (storage system accessed directly).
+Direct Mode
+-----------
+The h5pyd package can be used without an explicit HSDS connection.  Rather, the storage system will
+be accessed directly.
+  
+To use in direct mode, set the HS_ENDPOINT to "local" (or "local[n]" where n is the number of desired
+sub-processes).  
 
-To use with AWS Lambda, set the HS_ENDPOINT to: "http+lambda://hslambda" where "hslambda" is the name
-of the lambda function.  When using AWS Lambda some additional environment variables need to be set:
-
-* ``AWS_LAMBDA_GATEWAY`` - AWS Lambda endpoint, e.g.: ``https://lambda.us-west-2.amazonaws.com``
-* ``AWS_REGION`` - Region where the Lambda function is installed, e.g.: ``us-west-2``
-* ``AWS_SECRET_ACCESS_KEY`` - Your AWS secret access AWS_SECRET_ACCESS_KEY
-* ``AWS_ACCESS_KEY_ID`` - Your AWS access key ID
-
-
-To use in direct mode, set the HS_ENDPOINT to "local".  For direct mode, some additional environment
+For direct mode, some additional environment
 variables are needed to be defined:
 
 * ``BUCKET_NAME`` - name of the S3 Bucket, Azure Container, or Posix top level folder
@@ -83,6 +77,7 @@ To use "local" mode with Azure, defined these variables:
 To use "local" with Posix storage, define these variables:
 
 * ``ROOT_DIR`` - The top level directory used for storage (i.e. the parent directory of "buckets")
+
 
 H5PYD Command Line Apps
 -----------------------
