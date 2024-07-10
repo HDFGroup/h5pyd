@@ -1,4 +1,5 @@
 import h5pyd
+import logging
 import numpy as np
 import random
 import time
@@ -34,8 +35,8 @@ def benchmark_multimanager(h5file, num=10):
     using the MultiManager.
     """
     ds_names = list(h5file.keys())
-    datsets = [h5file[name] for name in ds_names]
-    mm = h5pyd.MultiManager(datsets)
+    datasets = [h5file[name] for name in ds_names]
+    mm = h5pyd.MultiManager(datasets)
 
     # prepare queries to exclude from runtime
     queries = []
@@ -98,6 +99,9 @@ def run_benchmark(f):
 #
 # main
 #
+
+loglevel = logging.WARNING
+logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
 
 # create domain if it does not exist already
 with h5pyd.File(DOMAIN_PATH, "a") as f:
