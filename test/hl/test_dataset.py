@@ -2468,6 +2468,6 @@ class TestMultiManager(BaseDataset):
 
 
 if __name__ == '__main__':
-    loglevel = logging.ERROR
+    loglevel = logging.DEBUG
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

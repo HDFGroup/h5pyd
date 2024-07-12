@@ -16,7 +16,6 @@ import posixpath as pp
 from copy import copy
 import sys
 import time
-import base64
 import numpy
 import os
 import logging
@@ -673,10 +672,8 @@ class Dataset(HLObject):
         else:
             dims = shape_json["maxdims"]
 
-        # HSDS returns H5S_UNLIMITED for ulimitied dims, h5serv, returns 0
+        # HSDS returns H5S_UNLIMITED for ulimited dims
         return tuple(x if (x != 0 and x != "H5S_UNLIMITED") else None for x in dims)
-        # dims = space.get_simple_extent_dims(True)
-        # return tuple(x if x != h5s.UNLIMITED else None for x in dims)
 
     @property
     def fillvalue(self):
@@ -844,7 +841,7 @@ class Dataset(HLObject):
                 numrows = BUFFER_SIZE
                 if shape[0] - i < numrows:
                     numrows = shape[0] - i
-                self.log.debug("get {} iter items".format(numrows))
+                self.log.debug(f"get {numrows} iter items")
                 arr = self[i: numrows + i]
 
             yield arr[i % BUFFER_SIZE]
@@ -905,9 +902,9 @@ class Dataset(HLObject):
             except TypeError:
                 pass  # ignore
             if arg_len < 3:
-                self.log.debug("arg: {} type: {}".format(arg, type(arg)))
+                self.log.debug(f"arg: {arg} type: {type(arg)}")
             else:
-                self.log.debug("arg: [{},...] type: {}".format(arg[0], type(arg)))
+                self.log.debug(f"arg: [{arg[0]},...] type: {type(arg)}")
 
         # Sort field indices from the rest of the args.
         names = tuple(x for x in args if isinstance(x, str))
@@ -920,7 +917,7 @@ class Dataset(HLObject):
             # This is necessary because in the case of array types, NumPy
             # discards the array information at the top level.
             new_dtype = readtime_dtype(self.dtype, names)
-            self.log.debug("new_dtype: {}".format(new_dtype))
+            self.log.debug(f"new_dtype: {new_dtype}")
         if new_dtype.kind == "S" and check_dtype(ref=self.dtype):
             new_dtype = special_dtype(ref=Reference)
 
@@ -1229,14 +1226,13 @@ class Dataset(HLObject):
                 arr = jsonToArray(mshape, mtype, data)
                 self.log.debug(f"jsontoArray returned: {arr}")
         elif isinstance(selection, sel.PointSelection):
-            format = "json"  # default as JSON request since h5serv does not yet support binary
+            format = "binary"  # default binary
             body = {}
 
             points = selection.points.tolist()
             rank = len(self._shape)
             # verify the points are in range and strictly monotonic (for the 1d case)
             last_point = -1
-            delistify = False
 
             if len(points) == rank and isinstance(points[0], int) and rank > 1:
                 # Single point selection - need to wrap this in an array
@@ -1255,11 +1251,8 @@ class Dataset(HLObject):
                             if point[i] < 0 or point[i] >= self._shape[i]:
                                 raise IndexError("point out of range")
                         if rank == 1:
-                            delistify = True
                             if point[0] <= last_point:
-                                raise TypeError(
-                                    "index points must be strictly increasing"
-                                )
+                                raise TypeError("index points must be strictly increasing")
                             last_point = point[0]
 
                     elif rank == 1 and isinstance(point, int):
@@ -1271,41 +1264,26 @@ class Dataset(HLObject):
                     else:
                         raise ValueError("invalid point argument")
 
-            if self.id.id.startswith("d-"):
-                # send points as binary request for HSDS
-                format = "binary"
-                arr_points = numpy.asarray(
-                    points, dtype="u8"
-                )  # must use unsigned 64-bit int
-                body = arr_points.tobytes()
-                self.log.info(f"point select binary request, num bytes: {len(body)}")
-            else:
-                if delistify:
-                    self.log.info("delistifying point selection")
-                    # convert to int if needed
-                    body["points"] = []
-                    for point in points:
-                        if isinstance(point, (list, tuple)):
-                            body["points"].append(point[0])
-                        else:
-                            body["points"] = point
-                else:
-                    # can just assign
-                    body["points"] = points
-                self.log.info(f"sending point selection request: {body}")
+            # send points as binary request for HSDS
+            arr_points = numpy.asarray(points, dtype="u8")  # must use unsigned 64-bit int
+            body = arr_points.tobytes()
+            self.log.info(f"point select binary request, num bytes: {len(body)}")
+
             rsp = self.POST(req, format=format, body=body)
             if type(rsp) in (bytes, bytearray):
-                if len(rsp) // mtype.itemsize != selection.mshape[0]:
-                    raise IOError(
-                        "Expected {} elements, but got {}".format(
-                            selection.mshape[0], (len(rsp) // mtype.itemsize)
-                        )
-                    )
+                elements_received = len(rsp) // mtype.itemsize
+                elements_expected = selection.mshape[0]
+                if elements_received != elements_expected:
+                    msg = f"Expected {elements_expected} elements, but got {elements_received}"
+                    self.log.warn(msg)
+                    raise IOError(msg)
+
                 arr = numpy.frombuffer(rsp, dtype=mtype)
             else:
                 data = rsp["value"]
                 if len(data) != selection.mshape[0]:
                     msg = f"Expected {selection.mshape[0]} elements, but got {len(data)}"
+                    self.log.warn(msg)
                     raise IOError(msg)
                 arr = numpy.asarray(data, dtype=mtype, order="C")
 
@@ -1333,8 +1311,6 @@ class Dataset(HLObject):
         match.
         """
         self.log.info(f"Dataset __setitem__, args: {args}")
-
-        use_base64 = True  # may need to set this to false below for some types
 
         args = args if isinstance(args, tuple) else (args,)
 
@@ -1494,26 +1470,6 @@ class Dataset(HLObject):
         if selection.nselect == 0:
             return
 
-        # Broadcast scalars if necessary.
-        if mshape == () and selection.mshape is not None and selection.mshape != ():
-            self.log.debug("broadcast scalar")
-            if self.dtype.subdtype is not None:
-                raise TypeError("Scalar broadcasting is not supported for array dtypes")
-            val2 = numpy.empty(selection.mshape, dtype=val.dtype)
-            val2[...] = val
-            val = val2
-            mshape = val.shape
-
-        # Perform the write, with broadcasting
-        # Be careful to pad memory shape with ones to avoid HDF5 chunking
-        # glitch, which kicks in for mismatched memory/file selections
-        """
-        # TBD: do we need this adjustment?
-        if(len(mshape) < len(self._shape)):
-            mshape_pad = (1,)*(len(self._shape)-len(mshape)) + mshape
-        else:
-            mshape_pad = mshape
-        """
         req = "/datasets/" + self.id.uuid + "/value"
 
         params = {}
@@ -1521,27 +1477,28 @@ class Dataset(HLObject):
 
         format = "json"
 
-        if use_base64:
+        # Broadcast scalars if necessary.
 
-            if self.id.uuid.startswith("d-"):
-                # server is HSDS, use binary data, use param values for selection
-                format = "binary"
-                body = arrayToBytes(val, vlen=vlen_base_class)
-                self.log.debug(f"writing binary data, {len(body)}")
+        if mshape == () and selection.mshape is not None and selection.mshape != ():
+
+            if self.dtype.subdtype is not None:
+                raise TypeError("Scalar broadcasting is not supported for array dtypes")
+            server_ver = self.id.http_conn.server_version()
+            if server_ver and server_ver.startswith("0.9") or server_ver.startswith("1."):
+                # Perform the write, with broadcasting
+                self.log.debug("scalar will be broadcast on server")
+                params["element_count"] = 1
             else:
-                # h5serv, base64 encode, body json for selection
-                # TBD - replace with above once h5serv supports binary req
-                data = val.tobytes()
-                data = base64.b64encode(data)
-                data = data.decode("ascii")
-                body["value_base64"] = data
-                self.log.debug(f"writing base64 data, {len(data)} bytes")
-        else:
-            if type(val) is not list:
-                val = val.tolist()
-            val = _decode(val)
-            self.log.debug(f"writing json data, {len(val)} elements")
-            body["value"] = val
+                self.log.debug("broadcast scalar on client")
+                val2 = numpy.empty(selection.mshape, dtype=val.dtype)
+                val2[...] = val
+                val = val2
+                mshape = val.shape
+
+        # server is HSDS, use binary data, use param values for selection
+        format = "binary"
+        body = arrayToBytes(val, vlen=vlen_base_class)
+        self.log.debug(f"writing binary data, {len(body)}")
 
         if selection.select_type != sel.H5S_SELECT_ALL:
             select_param = selection.getQueryParam()
@@ -1553,11 +1510,6 @@ class Dataset(HLObject):
             params["fields"] = ":".join(names)
 
         self.PUT(req, body=body, format=format, params=params)
-        """
-        mspace = h5s.create_simple(mshape_pad, (h5s.UNLIMITED,)*len(mshape_pad))
-        for fspace in selection.broadcast(mshape):
-            self.id.write(mspace, fspace, val, mtype)
-        """
 
     def read_direct(self, dest, source_sel=None, dest_sel=None):
         """Read data directly from HDF5 into an existing NumPy array.
@@ -1568,8 +1520,6 @@ class Dataset(HLObject):
         Broadcasting is supported for simple indexing.
         """
 
-        # TBD: avoid data copy
-        # TBD: support broadcast
         if self._is_empty:
             raise TypeError("Empty datasets have no numpy representation")
         if not isinstance(dest, numpy.ndarray):
@@ -1601,8 +1551,6 @@ class Dataset(HLObject):
         arr = self.__getitem__(source_sel)
         dest.__setitem__(slices, arr)
 
-        # TBD - broadcast support
-
     def write_direct(self, source, source_sel=None, dest_sel=None):
         """Write data directly to HDF5 from a NumPy array.
 
@@ -1612,7 +1560,6 @@ class Dataset(HLObject):
         Broadcasting is supported for simple indexing.
         """
 
-        # TBD: avoid data copy
         if self._is_empty:
             raise TypeError("Empty datasets cannot be written to")
         if not isinstance(source, numpy.ndarray):
@@ -1643,8 +1590,6 @@ class Dataset(HLObject):
 
         data = source.__getitem__(slices)
         self.__setitem__(dest_sel, data)
-
-        # TBD: support broadcast
 
     def __array__(self, dtype=None):
         """Create a Numpy array containing the whole dataset.  DON'T THINK
@@ -1677,11 +1622,8 @@ class Dataset(HLObject):
 
     def refresh(self):
         """Refresh the dataset metadata by reloading from the file.
-
-        This is part of the SWMR features and only exist when the HDF5
-        librarary version >=1.9.178
         """
-        pass  # todo
+        pass
 
     def flush(self):
         """Flush the dataset data and metadata to the file.

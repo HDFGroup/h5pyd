@@ -379,7 +379,6 @@ class HttpConn:
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
         server_info = rsp.json()
-        print("server_info:", server_info)
         if server_info:
             self._server_info = server_info
         return server_info

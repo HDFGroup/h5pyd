@@ -135,8 +135,6 @@ class ObjectID:
         """ cleanup """
         self.close()
 
-    __nonzero__ = __bool__  # Python 2.7 compat
-
 
 class TypeID(ObjectID):
 
