@@ -98,20 +98,20 @@ class Group(HLObject, MutableMappingHDF5):
         if objdb:
             # _objdb is meta-data pulled from the domain on open.
             # see if we can extract the link json from there
-            self.log.debug("searching objdb for {}".format(h5path))
+            self.log.debug(f"searching objdb for {h5path}")
             group_uuid = parent_uuid
 
             for name in path:
                 if not name:
                     continue
                 if group_uuid not in objdb:
-                    self.log.warn("objdb search: {} not found in objdb".format(group_uuid))
+                    self.log.warn(f"objdb search: {group_uuid} not found in objdb")
                     tgt_json = None
                     break
                 group_json = objdb[group_uuid]
                 group_links = group_json["links"]
                 if name not in group_links:
-                    self.log.debug("objdb search: {} not found".format(name))
+                    self.log.debug(f"objdb search: {name} not found")
                     tgt_json = None
                     break
                 tgt_json = group_links[name]
@@ -177,7 +177,7 @@ class Group(HLObject, MutableMappingHDF5):
         if not objdb:
             return None
         if self.id.id not in objdb:
-            self.log.warn("{} not found in objdb".format(self.id.id))
+            self.log.warn(f"{self.id.id} not found in objdb")
             return None
         group_json = objdb[self.id.id]
         return group_json["links"]
@@ -205,27 +205,27 @@ class Group(HLObject, MutableMappingHDF5):
             parent_uuid = self.id.id
             parent_name = self._name
 
-        self.log.info("create_group: {}".format(h5path))
+        self.log.info(f"create_group: {h5path}")
 
         links = h5path.split('/')
         sub_group = None  # the object we'll return
         for link in links:
             if not link:
                 continue  # skip
-            self.log.debug("create_group - iterate for link: {}".format(link))
+            self.log.debug(f"create_group - iterate for link: {link}")
             create_group = False
             req = "/groups/" + parent_uuid + "/links/" + link
 
             try:
                 rsp_json = self.GET(req)
             except IOError as ioe:
-                self.log.debug("Got ioe: {}".format(ioe))
+                self.log.debug(f"Got ioe: {ioe}")
                 create_group = True
 
             if create_group:
                 link_json = {'id': parent_uuid, 'name': link}
                 body = {'link': link_json}
-                self.log.debug("create group with body: {}".format(body))
+                self.log.debug(f"create group with body: {body}")
                 rsp = self.POST('/groups', body=body)
 
                 group_json = rsp
@@ -236,13 +236,13 @@ class Group(HLObject, MutableMappingHDF5):
                         parent_name = parent_name + link
                     else:
                         parent_name = parent_name + '/' + link
-                    self.log.debug("create group - parent name: {}".format(parent_name))
+                    self.log.debug(f"create group - parent name: {parent_name}")
                     sub_group._name = parent_name
                 sub_group._track_order = track_order
                 parent_uuid = sub_group.id.id
             else:
                 # sub-group already exsits
-                self.log.debug("create group - found subgroup: {}".format(link))
+                self.log.debug(f"create group - found subgroup: {link}")
                 if "link" not in rsp_json:
                     raise IOError("Unexpected Error")
                 link_json = rsp_json["link"]
@@ -255,7 +255,7 @@ class Group(HLObject, MutableMappingHDF5):
                         parent_name = parent_name + link_json["title"]
                     else:
                         parent_name = parent_name + '/' + link_json["title"]
-                    self.log.debug("create group - parent name: {}".format(parent_name))
+                    self.log.debug(f"create group - parent name: {parent_name}")
 
         if sub_group is None:
             # didn't actually create anything
@@ -1204,7 +1204,7 @@ class Group(HLObject, MutableMappingHDF5):
                 if objdb:
                     # should be able to retrieve from cache obj
                     if parent.id.uuid not in objdb:
-                        raise IOError("expected to find id {} in objdb".format(parent.id.uuid))
+                        raise IOError(f"expected to find id {parent.id.uuid} in objdb")
                     group_json = objdb[parent.id.uuid]
                     # make this look like the server response
                     links_json = group_json["links"]
@@ -1290,6 +1290,11 @@ class Group(HLObject, MutableMappingHDF5):
 
             for name in reversed(ordered_links):
                 yield name
+
+    def refresh(self):
+        """Refresh the group metadata by reloading from the file.
+        """
+        self.id.refresh()
 
 
 class HardLink(object):

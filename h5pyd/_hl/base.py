@@ -811,7 +811,7 @@ class HLObject(CommonStateObject):
 
         root_uuid = self._id.http_conn.root_uuid
         objid = self._id.uuid
-        self.log.debug("_getNameFromObjDb: find name for: {}".format(objid))
+        self.log.debug(f"_getNameFromObjDb: find name for: {objid}")
         objids = set()
         objids.add(objid)
         h5path = ""
@@ -819,9 +819,9 @@ class HLObject(CommonStateObject):
             found_link = False
             for id in objdb:
                 if id == objid:
-                    self.log.debug("_getNameFromObjDb - skipping id {} - obj cannot link to itself".format(id))
+                    self.log.debug(f"_getNameFromObjDb - skipping id {id} - obj cannot link to itself")
                     continue
-                self.log.debug("_getNameFromObjDb - searching id: {}".format(id))
+                self.log.debug(f"_getNameFromObjDb - searching id: {id}")
                 if not id.startswith("g-"):
                     continue  # not a group, so no links
                 if id in objids:
@@ -829,10 +829,11 @@ class HLObject(CommonStateObject):
                 obj = objdb[id]
                 links = obj["links"]
                 for title in links:
-                    self.log.debug("_getNameFromObjDb - looking at linK: {}".format(title))
+                    self.log.debug(f"_getNameFromObjDb - looking at linK: {title}")
                     link = links[title]
-                    if link["class"] != 'H5L_TYPE_HARD':
-                        self.log.debug("_getNameFromObjDb - skipping link type: {}".format(link['class']))
+                    link_class = link["class"]
+                    if link_class != 'H5L_TYPE_HARD':
+                        self.log.debug(f"_getNameFromObjDb - skipping link type: {link_class}")
                         continue
                     if link["id"] == objid:
                         # found a link to our target
@@ -841,21 +842,21 @@ class HLObject(CommonStateObject):
                             h5path = title
                         else:
                             h5path = title + '/' + h5path
-                        self.log.debug("_getNameFromObjDb - update h5path: {}".format(h5path))
+                        self.log.debug(f"_getNameFromObjDb - update h5path: {h5path}")
                         objids.add(id)
                         if id == root_uuid:
                             h5path = '/' + h5path  # we got to root
                             self.log.debug("_getNameFromObjDb - found root")
                         else:
                             objid = id
-                            self.log.debug("_getNameFromObjDb - now looking for link to: {}".format(objid))
+                            self.log.debug(f"_getNameFromObjDb - now looking for link to: {objid}")
                         break
             if not found_link:
                 self.log.info("_getNameFromObjDb - could not find link")
                 break
         if h5path.startswith("/"):
             # found path to obj
-            self.log.debug("_getNameFromObjDb - returning: {}".format(h5path))
+            self.log.debug(f"_getNameFromObjDb - returning: {h5path}")
             return h5path
         else:
             self.log.debug("_getNameFromObjDb - could not find path")
@@ -1099,7 +1100,6 @@ class HLObject(CommonStateObject):
     def __bool__(self):
         with phil:
             return bool(self.id)
-    __nonzero__ = __bool__  # Python 2.7 compat
 
     def getACL(self, username):
         req = self._req_prefix + '/acls/' + username

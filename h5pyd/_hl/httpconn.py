@@ -190,11 +190,10 @@ class HttpConn:
             self.log = logging
         else:
             self.log = logging.getLogger(logger)
-        self.log.debug(
-            "HttpConn.init(domain: {} use_session: {} use_cache: {} retries: {})".format(
-                domain_name, use_session, use_cache, retries
-            )
-        )
+        msg = f"HttpConn.init(domain: {domain_name} use_session: {use_session} "
+        msg += f"use_cache: {use_cache} retries: {retries}"
+        self.log.debug(msg)
+
         if self._timeout != DEFAULT_TIMEOUT:
             self.log.info(f"HttpConn.init - timeout = {self._timeout}")
         if endpoint is None:
@@ -379,7 +378,6 @@ class HttpConn:
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
         server_info = rsp.json()
-        print("server_info:", server_info)
         if server_info:
             self._server_info = server_info
         return server_info
@@ -449,9 +447,7 @@ class HttpConn:
                 rsp = self._cache[req]
                 return rsp
 
-        self.log.info(
-            f"GET: {self._endpoint + req} [{params['domain']}] timeout: {self._timeout}"
-        )
+        self.log.info(f"GET: {self._endpoint + req} [{params['domain']}] timeout: {self._timeout}")
 
         for k in params:
             if k != "domain":

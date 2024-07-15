@@ -64,13 +64,11 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         else:
             # "unknown id"
             self._req_prefix = "<unknown>"
+        objid = self._parent.id.uuid
         objdb = self._parent.id.http_conn.getObjDb()
-        if objdb:
+        if objdb and objid in objdb:
             # _objdb is meta-data pulled from the domain on open.
-            # see if we can extract the link json from there
-            objid = self._parent.id.uuid
-            if objid not in objdb:
-                raise IOError("Expected to find {} in objdb".format(objid))
+            # use the link json from there if present
             obj_json = objdb[objid]
             self._objdb_attributes = obj_json["attributes"]
         else:

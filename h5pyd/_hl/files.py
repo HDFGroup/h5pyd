@@ -79,9 +79,7 @@ class File(Group):
     @property
     def libver(self):
         """File format version bounds (2-tuple: low, high)"""
-        # bounds = self.id.get_access_plist().get_libver_bounds()
-        # return tuple(libver_dict_r[x] for x in bounds)
-        return ("0.0.1",)
+        return ("0.0.1", "0.0.1")
 
     @property
     def serverver(self):
@@ -106,6 +104,24 @@ class File(Group):
     def limits(self):
         return self._limits
 
+    @property
+    def swmr_mode(self):
+        """ Controls use of cached metadata """
+        return self._swmr_mode
+
+    @swmr_mode.setter
+    def swmr_mode(self, value):
+        # enforce the same rule as h5py - swrm_mode can't be changed after opening the file
+        mode = self.id.http_conn.mode
+        if mode == "r":
+            # read only mode
+            msg = "SWMR mode can't be changed after file open"
+            raise ValueError(msg)
+        if self._swmr_mode and not value:
+            msg = "SWMR mode can only be set to off by closing the file"
+            raise ValueError(msg)
+        self._swmr_mode = True
+
     def __init__(
         self,
         domain,
@@ -117,6 +133,8 @@ class File(Group):
         api_key=None,
         use_session=True,
         use_cache=True,
+        swmr=False,
+        libver=None,
         logger=None,
         owner=None,
         linked_domain=None,
@@ -149,6 +167,12 @@ class File(Group):
         use_cache
             save attribute and links values rather than retreiving from server each time they are accessed.
             Set to False if the storage content is expected to change due to another application
+        swmr
+            For compatibility with h5py - has the effect of overriding use_cache so that metadata
+            will always be synchronized with the server
+        libver
+            For compatibility with h5py - library version bounds.  Has no effect other
+            than returning given value as property
         logger
             supply log handler to be used
         owner
@@ -218,9 +242,7 @@ class File(Group):
                 raise IOError(400, "relative paths are not valid")
 
             if endpoint is None:
-                if "H5SERV_ENDPOINT" in os.environ:
-                    endpoint = os.environ["H5SERV_ENDPOINT"]
-                elif "hs_endpoint" in cfg:
+                if "hs_endpoint" in cfg:
                     endpoint = cfg["hs_endpoint"]
 
             # remove the trailing slash on endpoint if it exists
@@ -228,15 +250,11 @@ class File(Group):
                 endpoint = endpoint.strip('/')
 
             if username is None:
-                if "H5SERV_USERNAME" in os.environ:
-                    username = os.environ["H5SERV_USERNAME"]
-                elif "hs_username" in cfg:
+                if "hs_username" in cfg:
                     username = cfg["hs_username"]
 
             if password is None:
-                if "H5SERV_PASSWORD" in os.environ:
-                    password = os.environ["H5SERV_PASSWORD"]
-                elif "hs_password" in cfg:
+                if "hs_password" in cfg:
                     password = cfg["hs_password"]
 
             if api_key is None and "hs_api_key" in cfg:
@@ -247,6 +265,9 @@ class File(Group):
                     bucket = os.environ["HS_BUCKET"]
                 elif "hs_bucket" in cfg:
                     bucket = cfg["hs_bucket"]
+
+            if swmr:
+                use_cache = False  # disable metadata caching in swmr mode
 
             http_conn = HttpConn(
                 domain,
@@ -401,6 +422,7 @@ class File(Group):
         self._lastScan = None  # when summary stats where last updated by server
         self._dn_ids = dn_ids
         self._track_order = track_order
+        self._swmr_mode = swmr
 
         Group.__init__(self, self._id, track_order=track_order)
 
@@ -413,7 +435,7 @@ class File(Group):
             req = "/?verbose=1"
             rsp_json = self.GET(req, use_cache=False, params={"CreateOrder": "1" if self._track_order else "0"})
 
-            self.log.debug("get verbose info: {}".format(rsp_json))
+            self.log.debug("get verbose info")
             props = {}
             for k in (
                 "num_objects",
@@ -610,29 +632,27 @@ class File(Group):
     def flush(self):
         """Tells the service to complete any pending updates to permanent storage"""
         self.log.debug("flush")
-        if self._id.id.startswith("g-"):
-            # Currently flush only works with HSDS
-            self.log.info("sending PUT flush request")
-            req = "/"
-            body = {"flush": 1, "getdnids": 1}
-            rsp = self.PUT(req, body=body)
-            if "dn_ids" in rsp:
-                dn_ids = rsp["dn_ids"]
-                orig_ids = set(self._dn_ids)
-                current_ids = set(dn_ids)
-                self._dn_ids = current_ids
-                if orig_ids and orig_ids != current_ids:
-                    self.log.debug("original dn_ids: {}".format(orig_ids))
-                    self.log.debug("current dn_ids: {}".format(current_ids))
-                    self.log.warn("HSDS nodes have changed")
-                    raise IOError(500, "Unexpected Error")
-            self.log.info("PUT flush complete")
+        self.log.info("sending PUT flush request")
+        req = "/"
+        body = {"flush": 1, "getdnids": 1}
+        rsp = self.PUT(req, body=body)
+        if "dn_ids" in rsp:
+            dn_ids = rsp["dn_ids"]
+            orig_ids = set(self._dn_ids)
+            current_ids = set(dn_ids)
+            self._dn_ids = current_ids
+            if orig_ids and orig_ids != current_ids:
+                self.log.debug(f"original dn_ids: {orig_ids}")
+                self.log.debug(f"current dn_ids: {current_ids}")
+                self.log.warn("HSDS nodes have changed")
+                raise IOError(500, "Unexpected Error")
+        self.log.info("PUT flush complete")
 
     def close(self, flush=None):
         """Clears reference to remote resource."""
         # this will close the socket of the http_conn singleton
 
-        self.log.debug("close, mode: {}".format(self.mode))
+        self.log.debug(f"close, mode: {self.mode}")
         if flush is None:
             # set flush to true if this is a direct connect and file
             # is writable
