@@ -242,9 +242,7 @@ class File(Group):
                 raise IOError(400, "relative paths are not valid")
 
             if endpoint is None:
-                if "H5SERV_ENDPOINT" in os.environ:
-                    endpoint = os.environ["H5SERV_ENDPOINT"]
-                elif "hs_endpoint" in cfg:
+                if "hs_endpoint" in cfg:
                     endpoint = cfg["hs_endpoint"]
 
             # remove the trailing slash on endpoint if it exists
