@@ -30,7 +30,7 @@ class TestDatasetSwmrRead(TestCase):
     """
 
     def setUp(self):
-        
+
         filename = self.getFileName("test_dataset_swmr_read")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
@@ -68,6 +68,7 @@ class TestDatasetSwmrRead(TestCase):
             self.f.swmr_mode = False
         self.assertTrue(self.f.swmr_mode)
 
+
 class TestDatasetSwmrWrite(TestCase):
     """ Testing SWMR functions when reading a dataset.
     Skip this test if the HDF5 library does not have the SWMR features.
@@ -77,17 +78,16 @@ class TestDatasetSwmrWrite(TestCase):
         """ First setup a file with a small chunked and empty dataset.
         No data written yet.
         """
-        
+
         filename = self.getFileName("test_data_swmr_write")
         print("filename:", filename)
-       
+
         # Note that when creating the file, the swmr=True is not required for
         # write, but libver='latest' is required.
         self.f = h5py.File(filename, 'w', libver='latest')
 
         self.data = np.arange(4).astype('f')
         self.dset = self.f.create_dataset('data', shape=(0,), dtype=self.data.dtype, chunks=(2,), maxshape=(None,))
-
 
     def test_initial_swmr_mode_off(self):
         """ Verify that the file is not initially in SWMR mode"""
@@ -114,7 +114,7 @@ class TestDatasetSwmrWrite(TestCase):
         self.f.swmr_mode = True
         self.assertTrue(self.f.swmr_mode)
 
-        self.dset.resize( self.data.shape )
+        self.dset.resize(self.data.shape)
         self.dset[:] = self.data
         self.dset.flush()
 
@@ -127,7 +127,7 @@ class TestDatasetSwmrWrite(TestCase):
         self.f.swmr_mode = True
         self.assertTrue(self.f.swmr_mode)
 
-        self.dset.resize( (4,) )
+        self.dset.resize((4,))
         self.dset[0:] = self.data
         self.dset.flush()
 
@@ -135,7 +135,7 @@ class TestDatasetSwmrWrite(TestCase):
         self.dset.refresh()
         self.assertArrayEqual(self.dset, self.data)
 
-        self.dset.resize( (8,) )
+        self.dset.resize((8,))
         self.dset[4:] = self.data
         self.dset.flush()
 

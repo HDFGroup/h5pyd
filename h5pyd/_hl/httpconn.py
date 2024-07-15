@@ -193,7 +193,7 @@ class HttpConn:
         msg = f"HttpConn.init(domain: {domain_name} use_session: {use_session} "
         msg += f"use_cache: {use_cache} retries: {retries}"
         self.log.debug(msg)
-    
+
         if self._timeout != DEFAULT_TIMEOUT:
             self.log.info(f"HttpConn.init - timeout = {self._timeout}")
         if endpoint is None:

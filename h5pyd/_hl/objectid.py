@@ -68,7 +68,7 @@ class ObjectID:
     def http_conn(self):
         """ http connector """
         return self._http_conn
-    
+
     @property
     def collection_type(self):
         """ Return collection type based on uuid """
@@ -82,8 +82,7 @@ class ObjectID:
             raise IOError(f"Unexpected uuid: {self._uuid}")
         return collection_type
 
-    def __init__(self, parent, item, # objtype_code=None,
-                 http_conn=None, **kwds):
+    def __init__(self, parent, item, http_conn=None, **kwds):
 
         """Create a new objectId.
         """
@@ -114,8 +113,6 @@ class ObjectID:
         else:
             raise IOError("Expected parent to have http connector")
 
-        #self._objtype_code = objtype_code
-
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self._uuid == other._uuid
@@ -124,10 +121,10 @@ class ObjectID:
 
     def __ne__(self, other):
         return not self.__eq__(other)
-    
+
     def refresh(self):
         """ get the latest obj_json data from server """
-       
+
         # will need to get JSON from server
         req = f"/{self.collection_type}/{self.id}"
         # make server request
@@ -143,7 +140,6 @@ class ObjectID:
         if objdb and self.id in objdb:
             # delete any cached data from objdb so that gets will reflect server state
             del objdb[self.id]
-        
 
     def close(self):
         """Remove handles to id.

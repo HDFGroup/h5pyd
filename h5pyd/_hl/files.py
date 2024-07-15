@@ -79,9 +79,7 @@ class File(Group):
     @property
     def libver(self):
         """File format version bounds (2-tuple: low, high)"""
-        # bounds = self.id.get_access_plist().get_libver_bounds()
-        # return tuple(libver_dict_r[x] for x in bounds)
-        return ("0.0.1",)
+        return ("0.0.1", "0.0.1")
 
     @property
     def serverver(self):
@@ -105,16 +103,11 @@ class File(Group):
     @property
     def limits(self):
         return self._limits
-    
+
     @property
     def swmr_mode(self):
         """ Controls use of cached metadata """
         return self._swmr_mode
-    
-    @property
-    def libver(self):
-        """ Returns libver settings """
-        return self._libver
 
     @swmr_mode.setter
     def swmr_mode(self, value):
@@ -175,10 +168,10 @@ class File(Group):
             save attribute and links values rather than retreiving from server each time they are accessed.
             Set to False if the storage content is expected to change due to another application
         swmr
-            For compatibility with h5py - has the effect of overriding use_cache so that metadata 
+            For compatibility with h5py - has the effect of overriding use_cache so that metadata
             will always be synchronized with the server
         libver
-            For compatibility with h5py - library version bounds.  Has no effect other 
+            For compatibility with h5py - library version bounds.  Has no effect other
             than returning given value as property
         logger
             supply log handler to be used
@@ -432,7 +425,6 @@ class File(Group):
         self._dn_ids = dn_ids
         self._track_order = track_order
         self._swmr_mode = swmr
-        self._libver = libver
 
         Group.__init__(self, self._id, track_order=track_order)
 
