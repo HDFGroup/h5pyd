@@ -741,9 +741,7 @@ class Dataset(HLObject):
 
     def _getVerboseInfo(self):
         now = time.time()
-        if (
-            self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME
-        ):
+        if (self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME):
             # resynch the verbose data
             req = "/datasets/" + self.id.uuid + "?verbose=1"
             rsp_json = self.GET(req)
@@ -1623,16 +1621,17 @@ class Dataset(HLObject):
     def refresh(self):
         """Refresh the dataset metadata by reloading from the file.
         """
-        pass
+        self.id.refresh()
+        self._shape = self.get_shape()
+        self._num_chunks = None  # aditional state we'll get when requested
+        self._allocated_size = None  # as above
+        self._verboseUpdated = None  # when the verbose data was fetched
 
     def flush(self):
         """Flush the dataset data and metadata to the file.
         If the dataset is chunked, raw data chunks are written to the file.
-
-        This is part of the SWMR features and only exist when the HDF5
-        librarary version >=1.9.178
         """
-        pass  # todo
+        self.file.flush()  # this will flush any inprogress dataset updates
 
     def make_scale(self, name=""):
         """Make this dataset an HDF5 dimension scale.

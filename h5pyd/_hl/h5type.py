@@ -78,14 +78,8 @@ class Reference():
             raise TypeError("Expected string id")
         item = None
 
-        if self._id.objtype_code == 'd':
-            item = "datasets/" + self._id.id
-        elif self._id.objtype_code == 'g':
-            item = "groups/" + self._id.id
-        elif self._id.objtype_code == 't':
-            item = "datatypes/" + self._id.id
-        else:
-            raise TypeError("Unexpected id type")
+        collection_type = self._id.collection_type
+        item = f"{collection_type}/{self._id.id}"
         return item
 
     def tolist(self):
