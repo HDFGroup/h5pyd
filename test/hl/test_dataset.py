@@ -2432,9 +2432,9 @@ class TestMultiManager(BaseDataset):
         for i in range(count):
             np.testing.assert_array_equal(data_out[i][6:, 6:, 6:], data_in_original[i][6:, 6:, 6:])
 
-    def test_multi_write_field_selection(self):
+    def test_multi_field_selection(self):
         """
-        Test writing to a field selection on multiple datasets
+        Test reading/writing to a field selection on multiple datasets
         """
         dt = np.dtype([('a', np.float32), ('b', np.int32), ('c', np.float32)])
         shape = (100,)
@@ -2447,6 +2447,14 @@ class TestMultiManager(BaseDataset):
                                          data=np.zeros(shape, dtype=dt),
                                          dtype=dt)
             datasets.append(dset)
+
+        # Perform read from field 'b'
+        mm = MultiManager(datasets=datasets)
+        out = mm[..., 'b']
+
+        # Verify data returned
+        for i in range(count):
+            np.testing.assert_array_equal(out[i], np.zeros(shape, dtype=dt['b']))
 
         # Perform write to field 'b'
         mm = MultiManager(datasets=datasets)
