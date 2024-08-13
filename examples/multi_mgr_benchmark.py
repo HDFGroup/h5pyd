@@ -50,7 +50,7 @@ def benchmark_multimanager(h5file, num=10):
         mm[query]
 
     runtime = time.time() - t0
-    print(f"Mean runtime multimanager: {runtime/num:.4f} s")
+    print(f"Mean runtime multimanager: {runtime / num:.4f} s")
     # 100ms for case with 6 datasets
 
 
@@ -75,7 +75,7 @@ def benchmark_sequential_ds(h5file, num=10):
             ds[indices]
 
     runtime = time.time() - t0
-    print(f"Mean runtime sequentially: {runtime/num:.4f} s")
+    print(f"Mean runtime sequentially: {runtime / num:.4f} s")
     # ~ 400ms for case with 6 datasests
 
 
