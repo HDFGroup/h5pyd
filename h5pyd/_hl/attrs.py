@@ -250,10 +250,10 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     def create(self, names, values, shape=None, dtype=None):
         """ Create new attribute(s), overwriting any existing attributes.
 
-        name
-            Name of the new attribute (required)
-        data
-            An array to initialize the attribute (required)
+        names
+            Name of the new attribute or list of names (required)
+        values
+            Array to initialize the attribute or list of arrays (required)
         shape
             Shape of the attribute.  Overrides data.shape if both are
             given, in which case the total number of points must be unchanged.
