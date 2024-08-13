@@ -465,7 +465,6 @@ class FancySelection(Selection):
 
     def __init__(self, shape, *args, **kwds):
         Selection.__init__(self, shape, *args, **kwds)
-        # self._mshape = self._shape
         self._slices = []
 
     def __getitem__(self, args):
@@ -479,6 +478,7 @@ class FancySelection(Selection):
         # Create list of slices and/or coordinates
         slices = []
         mshape = []
+        num_coordinates = None
         for idx, arg in enumerate(args):
             length = self._shape[idx]
             if isinstance(arg, slice):
@@ -513,17 +513,18 @@ class FancySelection(Selection):
                 select_type = H5S_SELLECT_FANCY
             elif isinstance(arg, list) or hasattr(arg, 'dtype'):
                 # coordinate selection
-                prev = None
+                slices.append(arg)
                 for x in arg:
-                    # if not isinstance(x, int):
-                    #    raise TypeError(f'Illegal coordinate index "{arg}" must be a list of integers')
-
                     if x < 0 or x >= length:
                         raise IndexError(f"Index ({arg}) out of range (0-{length - 1})")
-                    if prev is not None and x <= prev:
-                        raise TypeError("Indexing elements must be in increasing order")
-                    prev = x
-                slices.append(arg)
+                if num_coordinates is None:
+                    num_coordinates = len(arg)
+                elif num_coordinates == len(arg):
+                    # second set of coordinates doesn't effect mshape
+                    continue
+                else:
+                    # this shouldn't happen since HSDS would have thrown an error
+                    raise ValueError("coordinate num element missmatch")
                 mshape.append(len(arg))
                 select_type = H5S_SELLECT_FANCY
             elif isinstance(arg, int):
