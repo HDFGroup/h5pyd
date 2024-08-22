@@ -31,10 +31,10 @@ except ImportError:
 
 if __name__ == "__main__":
     from config import Config
-    from utillib import load_file
+    from utillib import load_file, load_h5image
 else:
     from .config import Config
-    from .utillib import load_file
+    from .utillib import load_file, load_h5image
 
 from urllib.parse import urlparse
 
@@ -70,7 +70,7 @@ def usage():
         if help_msg:
             print(f"    {help_msg}")
     print("")
-    print("Note about --link option:")
+    print("Note about --link and --fastlink option:")
     print("    --link enables just the source HDF5 metadata to be ingested while the dataset data")
     print("     is left in the original file and fetched as needed.")
     print("     When used with files stored in AWS S3, the source file can be specified using the S3")
@@ -79,6 +79,8 @@ def usage():
     print("     For Posix or Azure deployments, the source file needs to be copied to a regular file,")
     print("     and the --linkpath option should be used to specifiy the Azure container name and path, or ")
     print("     (for HSDS deployed with POSIX) the file path relative to the server ROOT_DIR")
+    print("    --fastlink works like --link except metadata about chunk locations will be determined as")
+    print("      as needed.  This will lesen the time needed for hsload for files containing many chunks.")
     print("")
     print(cfg.get_see_also(cmd))
     print("")
@@ -110,6 +112,7 @@ def main():
                 help="Link to dataset data without initializing chunk locations (will be set server side)")
     cfg.setitem("linkpath", None, flags=["--linkpath",], choices=["PATH_URI",],
                 help="Use the given URI for the link references rather than the src path")
+    cfg.setitem("h5image", False, flags=["--h5image"], help="store as hdf5 file image")
     cfg.setitem("compression", None, flags=["--compression",], choices=COMPRESSION_FILTERS,
                 help="use the given compression algorithm for -z option (lz4 is default)")
     cfg.setitem("ignorefilters", False, flags=["--ignore-filters"], help="ignore any filters used by source dataset")
@@ -164,9 +167,7 @@ def main():
     if cfg["link"]:
         logging.info("checking libversion")
 
-        if (
-            h5py.version.version_tuple.major == 2 and h5py.version.version_tuple.minor < 10
-        ):
+        if (h5py.version.version_tuple.major == 2 and h5py.version.version_tuple.minor < 10):
             abort("link option requires h5py version 2.10 or higher")
 
         if h5py.version.hdf5_version_tuple < (1, 10, 6):
@@ -225,7 +226,10 @@ def main():
                 else:
                     s3path = None
                 try:
-                    fin = h5py.File(src_file, mode="r")
+                    if cfg["h5image"]:
+                        fin = open(src_file, "rb")   # open the file image
+                    else:
+                        fin = h5py.File(src_file)
                 except IOError as ioe:
                     abort(f"Error opening file {src_file}: {ioe}")
 
@@ -288,21 +292,29 @@ def main():
             else:
                 compression_opts = None
 
-            # do the actual load
-            kwargs = {
-                "verbose": cfg["verbose"],
-                "dataload": dataload,
-                "s3path": s3path,
-                "compression": compression,
-                "compression_opts": compression_opts,
-                "ignorefilters": cfg["ignorefilters"],
-                "append": cfg["append"],
-                "extend_dim": cfg["extend_dim"],
-                "extend_offset": cfg["extend_offset"],
-                "ignore_error": cfg["ignore_error"],
-                "no_clobber": no_clobber
-            }
-            load_file(fin, fout, **kwargs)
+            if cfg["h5image"]:
+                kwargs = {
+                    "verbose": cfg["verbose"],
+                    "dataload": dataload,
+                    "s3path": s3path,
+                }
+                load_h5image(fin, fout, **kwargs)
+            else:
+                # regular load to shared data format
+                kwargs = {
+                    "verbose": cfg["verbose"],
+                    "dataload": dataload,
+                    "s3path": s3path,
+                    "compression": compression,
+                    "compression_opts": compression_opts,
+                    "ignorefilters": cfg["ignorefilters"],
+                    "append": cfg["append"],
+                    "extend_dim": cfg["extend_dim"],
+                    "extend_offset": cfg["extend_offset"],
+                    "ignore_error": cfg["ignore_error"],
+                    "no_clobber": no_clobber,
+                }
+                load_file(fin, fout, **kwargs)
 
             msg = f"File {src_file} uploaded to domain: {tgt}"
             logging.info(msg)
