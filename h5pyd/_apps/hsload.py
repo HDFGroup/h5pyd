@@ -212,7 +212,11 @@ def main():
 
                     s3 = s3fs.S3FileSystem(**kwargs)
                 try:
-                    fin = h5py.File(s3.open(src_file, "rb"), moe="r")
+                    fs = s3.open(src_file, "rb")  # get s3 file handle
+                    if cfg["h5image"]:
+                        fin = fs  # just use the fs handle
+                    else:
+                        fin = h5py.File(fs)  # return h5py file handle
                 except IOError as ioe:
                     abort(f"Error opening file {src_file}: {ioe}")
 
