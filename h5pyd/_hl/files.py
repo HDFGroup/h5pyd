@@ -12,10 +12,11 @@
 
 from __future__ import absolute_import
 
+import io
 import os
-import time
 import json
 import pathlib
+import time
 
 from .objectid import GroupID
 from .group import Group
@@ -38,6 +39,115 @@ def is_hdf5(domain, **kwargs):
     except IOError:
         pass  # ignore any non-200 error
     return found
+
+
+class H5Image(io.RawIOBase):
+    def __init__(self, domain_path, h5path="h5image", logger=None):
+        self._cursor = 0
+        if domain_path.startswith("hdf5::/"):
+            self._domain_path = domain_path
+        else:
+            self._domain_path = "hdf5:/" + domain_path
+        f = File(domain_path)
+        if h5path not in f:
+            raise IOError("Expected 'data' dataset")
+        dset = f[h5path]
+        if len(dset.shape) != 1:
+            raise IOError("Expected one-dimensional dataset")
+        self._dset = dset
+        num_chunks = -(dset.shape[0] // -dset.chunks[0])
+        self._page_cache = [None,] * num_chunks
+        self._logger = logger
+        if self._logger:
+            self._logger.info(f"domain {self._domain_path} opened")
+
+    def __repr__(self):
+        return f'<{self._domain_path}>'
+
+    def readable(self):
+        return True
+
+    def seekable(self):
+        return True
+
+    @property
+    def size(self):
+        return self._dset.shape[0]
+
+    @property
+    def page_size(self):
+        return self._dset.chunks[0]
+
+    def tell(self):
+        return self._cursor
+
+    def seek(self, offset, whence=io.SEEK_SET):
+        if whence == io.SEEK_SET:
+            if self._logger:
+                self._logger.debug(f"SEEK_SET({offset})")
+            self._cursor = offset
+        elif whence == io.SEEK_CUR:
+            if self._logger:
+                self._logger.debug(f"SEEK_CUR({offset})")
+            self._cursor += offset
+        elif whence == io.SEEK_END:
+            if self._logger:
+                self._logger.debug(f"SEEK_END({offset})")
+            self._cursor = self.size + offset
+        else:
+            raise ValueError(f'{whence}: Unknown whence value')
+        if self._logger:
+            self._logger.debug(f"cursor: {self._cursor}")
+        return self._cursor
+
+    def _get_page(self, page_number):
+        if self._page_cache[page_number] is None:
+            if self._logger:
+                self._logger.info(f"reading page {page_number} from server")
+            offset = page_number * self.page_size
+            arr = self._dset[offset:offset + self.page_size]
+            self._page_cache[page_number] = arr.tobytes()
+        if self._logger:
+            self._logger.debug(f"fetching page {page_number} from cache")
+        return self._page_cache[page_number]
+
+    def read(self, size=-1):
+        start = self._cursor
+        if size < 0 or self._cursor + size >= self.size:
+            stop = self.size
+            self.seek(offset=0, whence=io.SEEK_END)
+        else:
+            stop = start + size
+            self.seek(offset=size, whence=io.SEEK_CUR)
+
+        if self._logger:
+            self._logger.debug(f">>GET {start}:{stop}")
+
+        buffer = bytearray(stop - start)
+        offset = start
+        while offset - start < size:
+            page_number = offset // self.page_size
+            page_bytes = self._get_page(page_number)
+            num_bytes = ((offset + 1) + self.page_size // self.page_size) + self.page_size
+            if offset + num_bytes - start > size:
+                num_bytes = start + size - offset
+            page_start = offset % self.page_size
+            page_stop = page_start + num_bytes
+            buffer_start = offset - start
+            buffer_stop = buffer_start + num_bytes
+            buffer[buffer_start:buffer_stop] = page_bytes[page_start:page_stop]
+            offset += num_bytes
+
+        if self._logger:
+            self._logger.debug(f"returning: {len(buffer)} bytes")
+        return buffer
+
+    def readinto(self, buff):
+        if self._logger:
+            self._logger.debug(f"readinto({len(buff)})")
+        data = self.read(len(buff))
+        buff[:len(data)] = data
+        return len(data)
 
 
 class File(Group):
@@ -183,7 +293,6 @@ class File(Group):
         track_order
             Whether to track dataset/group/attribute creation order within this file. Objects will be iterated
             in ascending creation order if this is enabled, otherwise in ascending alphanumeric order.
-
         retries
             Number of retry attempts to be used if a server request fails
         timeout
