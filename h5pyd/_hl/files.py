@@ -50,7 +50,7 @@ class H5Image(io.RawIOBase):
             self._domain_path = "hdf5:/" + domain_path
         f = File(domain_path)
         if h5path not in f:
-            raise IOError("Expected 'data' dataset")
+            raise IOError(f"Expected '{h5path}' dataset")
         dset = f[h5path]
         if len(dset.shape) != 1:
             raise IOError("Expected one-dimensional dataset")
