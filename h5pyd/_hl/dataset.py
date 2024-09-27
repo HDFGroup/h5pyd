@@ -1350,17 +1350,16 @@ class Dataset(HLObject):
                 # Attempt to directly convert the input array of vlen data to its base class
                 val = numpy.asarray(val, dtype=vlen_base_class)
 
-            except ValueError as ve:
+            except (ValueError, TypeError):
                 # Failed to convert input array to vlen base class directly, instead create a new array where
                 # each element is an array of the Dataset's dtype
-                self.log.debug(f"asarray ValueError: {ve}")
                 try:
                     # Force output shape
                     tmp = numpy.empty(shape=val.shape, dtype=self.dtype)
                     tmp[:] = [numpy.array(x, dtype=self.dtype) for x in val]
                     val = tmp
-                except ValueError as e:
-                    msg = f"ValueError converting value element by element: {e}"
+                except (ValueError, TypeError):
+                    msg = "ValueError converting value element by element"
                     self.log.debug(msg)
 
             if vlen_base_class == val.dtype:
@@ -1589,19 +1588,21 @@ class Dataset(HLObject):
         data = source.__getitem__(slices)
         self.__setitem__(dest_sel, data)
 
-    def __array__(self, dtype=None):
-        """Create a Numpy array containing the whole dataset.  DON'T THINK
-        THIS MEANS DATASETS ARE INTERCHANGABLE WITH ARRAYS.  For one thing,
-        you have to read the whole dataset everytime this method is called.
-        """
-        arr = numpy.empty(self._shape, dtype=self.dtype if dtype is None else dtype)
+    def __array__(self, dtype=None, copy=True):
+        if copy is False:
+            raise ValueError(
+                f"AstypeWrapper.__array__ received {copy=} "
+                f"but memory allocation cannot be avoided on read"
+            )
 
         # Special case for (0,)*-shape datasets
         if self._shape is None or numpy.prod(self._shape) == 0:
-            return arr
+            return numpy.empty(self._shape, dtype=self.dtype if dtype is None else dtype)
 
-        self.read_direct(arr)
-        return arr
+        data = self[:]
+        if dtype is not None:
+            return data.astype(dtype, copy=False)
+        return data
 
     def __repr__(self):
         if not self:

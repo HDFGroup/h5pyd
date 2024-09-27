@@ -99,7 +99,8 @@ class TestCreateDataset(TestCase):
         dset[...] = arr
 
         arr = dset[...]  # read back
-        val = arr[2, 4]   # test one value
+        # test one value
+        val = float(arr[2, 4])   # convert to float since np.float16 types not comparable
         self.assertTrue(val > 20.4 - 0.01)
         self.assertTrue(val < 20.4 + 0.01)
 

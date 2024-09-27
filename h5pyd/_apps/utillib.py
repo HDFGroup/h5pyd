@@ -338,7 +338,7 @@ def copy_array(src_arr, ctx):
 
     if has_reference(src_arr.dtype):
         # flatten array to simplify iteration
-        count = np.product(src_arr.shape)
+        count = int(np.prod(src_arr.shape))
         tgt_arr_flat = tgt_arr.reshape((count,))
         src_arr_flat = src_arr.reshape((count,))
         for i in range(count):
