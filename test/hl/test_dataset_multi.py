@@ -36,6 +36,7 @@ class TestMultiManager(TestCase):
         """
         filename = self.getFileName("multi_read_scalar_dataspaces")
         print("filename:", filename)
+        print(f"numpy version: {np.version.version}")
         f = h5py.File(filename, 'w')
         shape = ()
         count = 3
