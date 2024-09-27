@@ -65,8 +65,7 @@ jobs:
         working-directory: ${{github.workspace}}/hsds
         shell: bash
         run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install -e .
+          pip install git+https://github.com/hdfgroup/hsds
 
       - name: Start HSDS
         shell: bash
