@@ -87,10 +87,11 @@ jobs:
 
       - name: Install package
         shell: bash
+        working-directory: ${{github.workspace}}/hsds
         run: |
           pip install -e .
 
-        - name: Create h5pyd test folder
+      - name: Create h5pyd test folder
         env:
           HS_USERNAME: test_user1
           HS_PASSWORD: test
