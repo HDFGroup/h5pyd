@@ -219,8 +219,8 @@ class TestMultiManager(TestCase):
 
         for i in range(count):
             self.assertEqual(out[i].dtype, dt)
-            out[i] = np.reshape(out[i], shape=np.prod(shape))
-            out[i] = np.reshape(np.array([s.decode() for s in out[i]], dtype=dt), shape=shape)
+            out[i] = out[i].reshape(np.prod(shape))
+            out[i] = np.array([s.decode() for s in out[i]], dtype=dt).reshape(shape)
             np.testing.assert_array_equal(out[i], data_in)
 
     def test_multi_read_mixed_shapes(self):
@@ -234,7 +234,7 @@ class TestMultiManager(TestCase):
         count = 3
         dt = np.int32
         data = np.arange(150, dtype=dt)
-        data_in = [np.reshape(data, shape=s) for s in shapes]
+        data_in = [data.reshape(s) for s in shapes]
         datasets = []
         sel_idx = 2
 
@@ -296,12 +296,12 @@ class TestMultiManager(TestCase):
         zeros = np.zeros(shape, dtype=dt)
         data_in = []
         datasets = []
-
+        arr = np.arange(np.prod(shape), dtype=dt)
+        arr = arr.reshape(shape)
         for i in range(count):
             dset = f.create_dataset("data" + str(i), shape, dtype=dt, data=zeros)
             datasets.append(dset)
-
-            d_in = np.array(np.reshape(np.arange(np.prod(shape)), shape) + i, dtype=dt)
+            d_in = arr + i
             data_in.append(d_in)
 
         mm = MultiManager(datasets)
@@ -393,11 +393,12 @@ class TestMultiManager(TestCase):
 
         # Verify
         for i in range(count):
-            out = f["data" + str(i)][...]
-            self.assertEqual(out.dtype, dt)
+            arr = f["data" + str(i)][...]
+            self.assertEqual(arr.dtype, dt)
 
-            out = np.reshape(out, shape=np.prod(shape))
-            out = np.reshape(np.array([s.decode() for s in out], dtype=dt), shape=shape)
+            arr = arr.reshape(np.prod(shape))
+            out = np.array([s.decode() for s in arr], dtype=dt)
+            out = out.reshape(shape)
             np.testing.assert_array_equal(out, data_in_vlen)
 
     def test_multi_write_mixed_shapes(self):
