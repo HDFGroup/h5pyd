@@ -49,11 +49,6 @@ jobs:
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics # stop the build if there are Python syntax errors or undefined names
           flake8 . --count --max-complexity=10 --max-line-length=127 --statistics # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
 
-      - name: Install package
-        shell: bash
-        run: |
-          pip install -e .
-
       - name: Checkout HSDS 
         uses: actions/checkout@v4
         with:
@@ -64,7 +59,7 @@ jobs:
         working-directory: ${{github.workspace}}/hsds
         shell: bash
         run: |
-          pip install git+https://github.com/hdfgroup/hsds
+          pip install -e .
 
       - name: Start HSDS
         shell: bash
@@ -83,6 +78,9 @@ jobs:
       
       - name: HSDS Setup
         shell: bash
+        env:
+          ADMIN_PASSWORD: admin
+          ADMIN_USERNAME: admin
         working-directory: ${{github.workspace}}/hsds
         run: |
           python tests/integ/setup_test.py
@@ -95,6 +93,11 @@ jobs:
           TEST2_PASSWORD: test
         run: |
           hstouch -v /home/test_user1/h5pyd_tests/
+
+      - name: Install package
+        shell: bash
+        run: |
+          pip install -e .
 
       - name: Run h5pyd tests
         id: h5pyd-tests
