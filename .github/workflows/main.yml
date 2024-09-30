@@ -85,7 +85,12 @@ jobs:
         run: |
           python tests/integ/setup_test.py
 
-      - name: Create h5pyd test folder
+      - name: Install package
+        shell: bash
+        run: |
+          pip install -e .
+
+        - name: Create h5pyd test folder
         env:
           HS_USERNAME: test_user1
           HS_PASSWORD: test
@@ -93,11 +98,6 @@ jobs:
           TEST2_PASSWORD: test
         run: |
           hstouch -v /home/test_user1/h5pyd_tests/
-
-      - name: Install package
-        shell: bash
-        run: |
-          pip install -e .
 
       - name: Run h5pyd tests
         id: h5pyd-tests
