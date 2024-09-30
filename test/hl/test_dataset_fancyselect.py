@@ -110,7 +110,6 @@ class TestFancySelectDataset(TestCase):
         f = h5py.File(filename, "w")
         # create a dataset
         dset = f.create_dataset("dset", (5, 1000, 1000), dtype="i4", compression="gzip")
-        print(dset.id.id)
         # write some values to the dataset
         dset[:, 1, 10] = [95, 96, 97, 98, 99]
         dset[:, 10, 100] = [195, 196, 197, 198, 199]
@@ -123,19 +122,27 @@ class TestFancySelectDataset(TestCase):
         self.assertTrue((arr[:, 1] == [195, 196, 197, 198, 199]).all())
         self.assertTrue((arr[:, 2] == [0, 0, 0, 0, 0]).all())
 
-        # non-increasing indexes
-        arr = dset[:, 10, [100, 10, 500]]
-        self.assertEqual(arr.shape, (5, 3))
-        self.assertTrue((arr[:, 0] == [195, 196, 197, 198, 199]).all())
-        self.assertTrue((arr[:, 1] == [0, 0, 0, 0, 0]).all())
-        self.assertTrue((arr[:, 2] == [0, 0, 0, 0, 0]).all())
+        try:
+            # non-increasing indexes
+            arr = dset[:, 10, [100, 10, 500]]
+            self.assertEqual(arr.shape, (5, 3))
+            self.assertTrue((arr[:, 0] == [195, 196, 197, 198, 199]).all())
+            self.assertTrue((arr[:, 1] == [0, 0, 0, 0, 0]).all())
+            self.assertTrue((arr[:, 2] == [0, 0, 0, 0, 0]).all())
 
-        # test multiple coordinates
-        arr = dset[:, [1, 10, 100], [10, 100, 500]]
-        self.assertEqual(arr.shape, (5, 3))
-        self.assertTrue((arr[:, 0] == [95, 96, 97, 98, 99]).all())
-        self.assertTrue((arr[:, 1] == [195, 196, 197, 198, 199]).all())
-        self.assertTrue((arr[:, 2] == [295, 296, 297, 298, 299]).all())
+            # test multiple coordinates
+            arr = dset[:, [1, 10, 100], [10, 100, 500]]
+            self.assertEqual(arr.shape, (5, 3))
+            self.assertTrue((arr[:, 0] == [95, 96, 97, 98, 99]).all())
+            self.assertTrue((arr[:, 1] == [195, 196, 197, 198, 199]).all())
+            self.assertTrue((arr[:, 2] == [295, 296, 297, 298, 299]).all())
+        except TypeError:
+            if config.get("use_h5py"):
+                pass  # multiple indexing vectors not allowed with h5py
+            else:
+                self.assertTrue(False)  # but should be ok with h5pyd/hsds
+
+        f.close()
 
 
 if __name__ == '__main__':
