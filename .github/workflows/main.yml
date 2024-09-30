@@ -85,9 +85,8 @@ jobs:
         run: |
           python tests/integ/setup_test.py
 
-      - name: Install package
+      - name: Install h5pyd package
         shell: bash
-        working-directory: ${{github.workspace}}/hsds
         run: |
           pip install -e .
 
