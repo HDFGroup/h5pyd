@@ -37,7 +37,7 @@ requests==2.32.0
 requests-unixsocket==0.3.0
 s3fs==2024.3.1
 six==1.16.0
-urllib3==2.2.1
+urllib3==2.2.2
 wrapt==1.16.0
 xarray==2024.5.0
 yarl==1.9.4
