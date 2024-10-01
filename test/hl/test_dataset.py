@@ -1671,28 +1671,23 @@ class TestScalarCompound(BaseDataset):
 
 class TestVlen(BaseDataset):
     def test_int(self):
-        if platform.system() == "Windows":
-            # default np int type is 32 bit
-            dt = h5py.vlen_dtype(np.int32)
-        else:
-            # defualt np int type is 64 bit
-            dt = h5py.vlen_dtype(np.int64)
-
-        ds = self.f.create_dataset('vlen', (4,), dtype=dt)
+        dt_int = np.int32
+        dt_vlen = h5py.vlen_dtype(dt_int)
+        ds = self.f.create_dataset('vlen', (4,), dtype=dt_vlen)
         ds[0] = np.arange(3)
         ds[1] = np.arange(0)
         ds[2] = [1, 2, 3]
         ds[3] = np.arange(1)
-        self.assertArrayEqual(ds[0], np.arange(3))
-        self.assertArrayEqual(ds[1], np.arange(0))
-        self.assertArrayEqual(ds[2], np.array([1, 2, 3]))
-        self.assertArrayEqual(ds[1], np.arange(0))
+        self.assertArrayEqual(ds[0], np.arange(3, dtype=dt_int))
+        self.assertArrayEqual(ds[1], np.arange(0, dtype=dt_int))
+        self.assertArrayEqual(ds[2], np.array([1, 2, 3], dtype=dt_int))
+        self.assertArrayEqual(ds[1], np.arange(0, dtype=dt_int))
         ds[0:2] = np.array([np.arange(5), np.arange(4)], dtype=object)
-        self.assertArrayEqual(ds[0], np.arange(5))
-        self.assertArrayEqual(ds[1], np.arange(4))
+        self.assertArrayEqual(ds[0], np.arange(5, dtype=dt_int))
+        self.assertArrayEqual(ds[1], np.arange(4, dtype=dt_int))
         ds[0:2] = np.array([np.arange(3), np.arange(3)])
-        self.assertArrayEqual(ds[0], np.arange(3))
-        self.assertArrayEqual(ds[1], np.arange(3))
+        self.assertArrayEqual(ds[0], np.arange(3, dtype=dt_int))
+        self.assertArrayEqual(ds[1], np.arange(3, dtype=dt_int))
 
     def test_reuse_from_other(self):
         dt = h5py.vlen_dtype(int)
