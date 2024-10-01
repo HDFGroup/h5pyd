@@ -1191,6 +1191,20 @@ class Dataset(HLObject):
 
         elif isinstance(selection, sel.FancySelection):
             select = selection.getQueryParam()
+            num_coords = 0
+            for s in select:
+                if isinstance(s, list):
+                    num_coords += 1
+            if num_coords > 1:
+                # multi coordinates are only supported with recent HSDS versions, so check first
+                server_ver = self.id.http_conn.server_version()
+                if server_ver and server_ver.startswith("0.9") or server_ver.startswith("1."):
+                    pass  # ok
+                else:
+                    msg = "Fancy selection with multiple coordinates is only supported in HSDS 0.9+"
+                    self.log.warn(msg)
+                    raise IOError(msg)
+
             params["select"] = select
             MAX_SELECT_QUERY_LEN = 100
             if len(select) > MAX_SELECT_QUERY_LEN:
