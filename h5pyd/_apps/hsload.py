@@ -137,7 +137,7 @@ def main():
     logging.basicConfig(filename=logfname, format='%(levelname)s %(asctime)s %(message)s', level=loglevel)
     logging.debug(f"set log_level to {loglevel}")
 
-    if cfg["linkpath"] and not cfg["link"]:
+    if cfg["linkpath"] and not (cfg["link"] or cfg["fastlink"]):
         abort("--linkpath option can only be used with --link")
 
     if cfg["extend_offset"] and cfg["extend_dim"] is None:
