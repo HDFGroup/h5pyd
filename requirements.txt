@@ -1,0 +1,11 @@
+certifi==2024.8.30
+charset-normalizer==3.3.2
+h5py==3.12.1
+idna==3.10
+numpy==2.1.1
+packaging==24.1
+PyJWT==2.9.0
+pytz==2024.2
+requests==2.32.3
+requests-unixsocket==0.3.0
+urllib3==2.2.3

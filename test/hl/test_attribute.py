@@ -26,7 +26,7 @@ from common import ut, TestCase
 class TestAttribute(TestCase):
 
     def test_create(self):
-        filename = self.getFileName("create_attribfute")
+        filename = self.getFileName("create_attribute")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
 
@@ -61,7 +61,7 @@ class TestAttribute(TestCase):
         self.assertEqual(value, "Hello HDF")
 
         # create attribute with as a fixed length string
-        g1.attrs.create('d1', np.string_("This is a numpy string"))
+        g1.attrs.create('d1', np.bytes_("This is a numpy string"))
         value = g1.attrs['d1']
         self.assertEqual(value, b"This is a numpy string")
 
@@ -89,7 +89,7 @@ class TestAttribute(TestCase):
             self.assertEqual(arr[i], 1)
 
         # array of strings
-        g1.attrs['strings'] = [np.string_("Hello"), np.string_("Good-bye")]
+        g1.attrs['strings'] = [np.bytes_("Hello"), np.bytes_("Good-bye")]
         arr = g1.attrs['strings']
         self.assertEqual(arr.shape, (2,))
         self.assertEqual(arr[0], b"Hello")

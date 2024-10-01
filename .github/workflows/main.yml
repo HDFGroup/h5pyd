@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -42,18 +42,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install flake8 pytest
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Lint with flake8
         shell: bash
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics # stop the build if there are Python syntax errors or undefined names
           flake8 . --count --max-complexity=10 --max-line-length=127 --statistics # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-
-      - name: Install package
-        shell: bash
-        run: |
-          pip install -e .
 
       - name: Checkout HSDS 
         uses: actions/checkout@v4
@@ -84,9 +78,17 @@ jobs:
       
       - name: HSDS Setup
         shell: bash
+        env:
+          ADMIN_PASSWORD: admin
+          ADMIN_USERNAME: admin
         working-directory: ${{github.workspace}}/hsds
         run: |
           python tests/integ/setup_test.py
+
+      - name: Install h5pyd package
+        shell: bash
+        run: |
+          pip install -e .
 
       - name: Create h5pyd test folder
         env:
