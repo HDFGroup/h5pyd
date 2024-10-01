@@ -795,10 +795,10 @@ class TestCreateScaleOffset(BaseDataset):
 
         nbits = 12
         shape = (100, 300)
-        testdata = np.random.randint(0, 2 ** nbits - 1, size=shape)
+        testdata = np.random.randint(0, 2 ** nbits - 1, size=shape, dtype=np.int32)
 
         # Create dataset; note omission of nbits (for library-determined precision)
-        dset = self.f.create_dataset('foo', shape, dtype=int, scaleoffset=True)
+        dset = self.f.create_dataset('foo', shape, dtype=np.int32, scaleoffset=True)
 
         # Dataset reports scaleoffset enabled
         assert dset.scaleoffset is not None
@@ -816,9 +816,9 @@ class TestCreateScaleOffset(BaseDataset):
 
         nbits = 12
         shape = (100, 300)
-        testdata = np.random.randint(0, 2 ** nbits, size=shape)
+        testdata = np.random.randint(0, 2 ** nbits, size=shape, dtype=np.int32)
 
-        dset = self.f.create_dataset('foo', shape, dtype=int, scaleoffset=nbits)
+        dset = self.f.create_dataset('foo', shape, scaleoffset=nbits, dtype=np.int32)
 
         # Dataset reports scaleoffset enabled with correct precision
         self.assertTrue(dset.scaleoffset == 12)
@@ -838,7 +838,7 @@ class TestCreateScaleOffset(BaseDataset):
         shape = (100, 300)
         testdata = np.random.randint(0, 2 ** (nbits + 1) - 1, size=shape)
 
-        dset = self.f.create_dataset('foo', shape, dtype=int, scaleoffset=nbits)
+        dset = self.f.create_dataset('foo', shape, dtype=np.int32, scaleoffset=nbits)
 
         # Dataset reports scaleoffset enabled with correct precision
         self.assertTrue(dset.scaleoffset == 12)
@@ -1714,27 +1714,25 @@ class TestVlen(BaseDataset):
         self.f.create_dataset('vlen2', (1,), self.f['vlen']['b'][()].dtype)
 
     def test_convert(self):
-        if platform.system() == "Windows":
-            # default np int type is 32 bit
-            dt = h5py.vlen_dtype(np.int32)
-        else:
-            # defualt np int type is 64 bit
-            dt = h5py.vlen_dtype(np.int64)
-        ds = self.f.create_dataset('vlen', (3,), dtype=dt)
+        # default int type is 32bit on Windows and 64bit on Linux, so use explicit types
+        dt_int = np.int32
+        dt_vlen = h5py.vlen_dtype(dt_int)
+
+        ds = self.f.create_dataset('vlen', (3,), dtype=dt_vlen)
         ds[0] = np.array([1.4, 1.2])
         ds[1] = np.array([1.2])
         ds[2] = [1.2, 2, 3]
-        self.assertArrayEqual(ds[0], np.array([1, 1]))
-        self.assertArrayEqual(ds[1], np.array([1]))
-        self.assertArrayEqual(ds[2], np.array([1, 2, 3]))
+        self.assertArrayEqual(ds[0], np.array([1, 1], dtype=dt_int))
+        self.assertArrayEqual(ds[1], np.array([1], dtype=dt_int))
+        self.assertArrayEqual(ds[2], np.array([1, 2, 3], dtype=dt_int))
         test_arr = np.array([[0.1, 1.1, 2.1, 3.1, 4], np.arange(4)], dtype=object)
         ds[0:2] = test_arr
-        self.assertArrayEqual(ds[0], np.arange(5))
-        self.assertArrayEqual(ds[1], np.arange(4))
-        ds[0:2] = np.array([np.array([0.1, 1.2, 2.2]),
-                            np.array([0.2, 1.2, 2.2])])
-        self.assertArrayEqual(ds[0], np.arange(3))
-        self.assertArrayEqual(ds[1], np.arange(3))
+        self.assertArrayEqual(ds[0], np.arange(5, dtype=dt_int))
+        self.assertArrayEqual(ds[1], np.arange(4, dtype=dt_int))
+        ds[0:2] = np.array([np.array([0.1, 1.2, 2.2], dtype=dt_int),
+                            np.array([0.2, 1.2, 2.2], dtype=dt_int)])
+        self.assertArrayEqual(ds[0], np.arange(3, dtype=dt_int))
+        self.assertArrayEqual(ds[1], np.arange(3, dtype=dt_int))
 
     def test_multidim(self):
         if platform.system() == "Windows":
