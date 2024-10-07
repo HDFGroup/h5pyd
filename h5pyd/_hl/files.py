@@ -46,7 +46,7 @@ class H5Image(io.RawIOBase):
         Can be used as a subsitute for a file path in h5py.File(filepath).  E.g.:
         f = h5py.File(H5Image("hdf5:/myhsds_domain"))   """
 
-    def __init__(self, domain_path, h5path="h5image", logger=None):
+    def __init__(self, domain_path, h5path="h5image", chunks_per_page=1, logger=None):
         """ verify dataset can be accessed and set logger if supplied """
         self._cursor = 0
         if domain_path.startswith("hdf5::/"):
@@ -61,7 +61,15 @@ class H5Image(io.RawIOBase):
             raise IOError("Expected one-dimensional dataset")
         self._dset = dset
         num_chunks = -(dset.shape[0] // -dset.chunks[0])
-        self._page_cache = [None,] * num_chunks
+        if chunks_per_page < 1:
+            chunks_per_page = 1
+        elif chunks_per_page > num_chunks:
+            chunks_per_page = num_chunks  # use the entire file as one page
+        else:
+            pass  # accept requested values
+        num_pages = -(num_chunks // -chunks_per_page)
+        self._page_cache = [None,] * num_pages
+        self._chunks_per_page = chunks_per_page
         self._logger = logger
         if self._logger:
             self._logger.info(f"domain {self._domain_path} opened")
@@ -71,20 +79,25 @@ class H5Image(io.RawIOBase):
         return f'<{self._domain_path}>'
 
     def readable(self):
+        """ it is """
         return True
 
     def seekable(self):
+        """ seek is ok """
         return True
 
     @property
     def size(self):
+        """ return size of HDF5 image in bytes """
         return self._dset.shape[0]
 
     @property
     def page_size(self):
-        return self._dset.chunks[0]
+        """ return page_size in element count"""
+        return self._dset.chunks[0] * self._chunks_per_page
 
     def tell(self):
+        """ return the current cursor position """
         return self._cursor
 
     def seek(self, offset, whence=io.SEEK_SET):
