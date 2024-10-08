@@ -7,8 +7,9 @@ import numpy as np
 import time
 import logging
 
-CHUNKS_PER_PAGE = 8 # chunks_per_page for H5Image
-USE_CACHE = False  # use_cache setting for h5pyd.File
+CHUNKS_PER_PAGE = 8  # chunks_per_page for H5Image
+USE_CACHE = False    # use_cache setting for h5pyd.File
+
 
 def is_dataset(obj):
     # this should work with either h5py or h5pyd
@@ -16,6 +17,7 @@ def is_dataset(obj):
         return True
     else:
         return False
+
 
 def visit(name, obj):
     if not is_dataset(obj):
@@ -35,10 +37,10 @@ def visit(name, obj):
 
 
 def main():
-    
+
     loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
-    
+
     if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
         print(f"usage: python {sys.argv[0]} <file_path>")
         sys.exit(1)
@@ -72,5 +74,6 @@ def main():
     stop_time = time.time()
     print("")
     print(f"done - {(stop_time - start_time):4.3f} s")
-       
+
+
 main()
