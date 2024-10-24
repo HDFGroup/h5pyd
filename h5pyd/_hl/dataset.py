@@ -1388,7 +1388,7 @@ class Dataset(HLObject):
         args = args if isinstance(args, tuple) else (args,)
 
         # get the val dtype if we're passed a numpy array
-        self.log.debug(f"is ndarray: {isinstance(val, numpy.ndarray) }")
+        self.log.debug(f"is ndarray: {isinstance(val, numpy.ndarray)}")
         try:
             msg = f"val dtype: {val.dtype}, shape: {val.shape} kind: {val.dtype.kind} metadata: {val.dtype.metadata}"
             self.log.debug(msg)
