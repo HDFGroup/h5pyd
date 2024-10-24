@@ -29,8 +29,6 @@ class TestFolders(TestCase):
             # Folders not supported for h5py
             return
 
-        # loglevel = logging.DEBUG
-        # logging.basicConfig( format='%(asctime)s %(message)s', level=loglevel)
         test_domain = self.getFileName("folder_test")
 
         filepath = self.getPathFromDomain(test_domain)

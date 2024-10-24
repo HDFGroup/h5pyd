@@ -1396,13 +1396,7 @@ class TestCompound(BaseDataset):
         self.assertTrue(np.all(outdata == testdata))
         self.assertEqual(outdata.dtype, testdata.dtype)
 
-    @ut.expectedFailure
     def test_assign(self):
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
-        # TBD: field assignment not working
         dt = np.dtype([('weight', (np.float64, 3)),
                        ('endpoint_type', np.uint8), ])
 
@@ -1419,13 +1413,7 @@ class TestCompound(BaseDataset):
         self.assertTrue(np.all(outdata == testdata))
         self.assertEqual(outdata.dtype, testdata.dtype)
 
-    @ut.expectedFailure
     def test_fields(self):
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
-        # TBD: field assignment not working
         dt = np.dtype([
             ('x', np.float64),
             ('y', np.float64),
