@@ -122,8 +122,7 @@ class TestScalarCompound(TestCase):
             np.testing.assert_array_equal(outdata, testdata[key])
             self.assertEqual(outdata.dtype, testdata[key].dtype)
 
-    """
-    TBD
+    @ut.expectedFailure
     def test_nested_compound_vlen(self):
         dt_inner = np.dtype([('a', h5py.vlen_dtype(np.int32)),
                             ('b', h5py.vlen_dtype(np.int32))])
@@ -147,7 +146,6 @@ class TestScalarCompound(TestCase):
         # Specifying check_alignment=False because vlen fields have 8 bytes of padding
         # because the vlen datatype in hdf5 occupies 16 bytes
         self.assertArrayEqual(out, data, check_alignment=False)
-    """
 
 
 if __name__ == '__main__':
