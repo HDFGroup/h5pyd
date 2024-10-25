@@ -297,9 +297,9 @@ def make_new_dset(
     return dset_id
 
 
-class AstypeWrapper(object):
-    """Wrapper to convert data on reading from a dataset."""
-
+class AstypeWrapper:
+    """Wrapper to convert data on reading from a dataset.
+    """
     def __init__(self, dset, dtype):
         self._dset = dset
         self._dtype = numpy.dtype(dtype)
@@ -307,25 +307,24 @@ class AstypeWrapper(object):
     def __getitem__(self, args):
         return self._dset.__getitem__(args, new_dtype=self._dtype)
 
-    def __enter__(self):
-        # pylint: disable=protected-access
-        print(
-            "Using astype() as a context manager is deprecated. "
-            "Slice the returned object instead, like: ds.astype(np.int32)[:10]"
-        )
-        self._dset._local.astype = self._dtype
-        return self
-
-    def __exit__(self, *args):
-        # pylint: disable=protected-access
-        self._dset._local.astype = None
-
     def __len__(self):
-        """Get the length of the underlying dataset
+        """ Get the length of the underlying dataset
 
         >>> length = len(dataset.astype('f8'))
         """
         return len(self._dset)
+
+    def __array__(self, dtype=None, copy=True):
+        if copy is False:
+            raise ValueError(
+                f"AstypeWrapper.__array__ received {copy=} "
+                f"but memory allocation cannot be avoided on read"
+            )
+
+        data = self[:]
+        if dtype is not None:
+            return data.astype(dtype, copy=False)
+        return data
 
 
 class AsStrWrapper:
@@ -357,6 +356,43 @@ class AsStrWrapper:
         """Get the length of the underlying dataset
 
         >>> length = len(dataset.asstr())
+        """
+        return len(self._dset)
+
+
+class FieldsWrapper:
+    """Wrapper to extract named fields from a dataset with a struct dtype"""
+    extract_field = None
+
+    def __init__(self, dset, prior_dtype, names):
+        self._dset = dset
+        if isinstance(names, str):
+            self.extract_field = names
+            names = [names]
+        self.read_dtype = readtime_dtype(prior_dtype, names)
+
+    def __array__(self, dtype=None, copy=True):
+        if copy is False:
+            raise ValueError(
+                f"FieldsWrapper.__array__ received {copy=} "
+                f"but memory allocation cannot be avoided on read"
+            )
+        data = self[:]
+        if dtype is not None:
+            return data.astype(dtype, copy=False)
+        else:
+            return data
+
+    def __getitem__(self, args):
+        data = self._dset.__getitem__(args, new_dtype=self.read_dtype)
+        if self.extract_field is not None:
+            data = data[self.extract_field]
+        return data
+
+    def __len__(self):
+        """ Get the length of the underlying dataset
+
+        >>> length = len(dataset.fields(['x', 'y']))
         """
         return len(self._dset)
 
@@ -485,6 +521,19 @@ class Dataset(HLObject):
                 encoding = "ascii"
 
         return AsStrWrapper(self, encoding, errors=errors)
+
+    def fields(self, names, *, _prior_dtype=None):
+        """Get a wrapper to read a subset of fields from a compound data type:
+
+        >>> 2d_coords = dataset.fields(['x', 'y'])[:]
+
+        If names is a string, a single field is extracted, and the resulting
+        arrays will have that dtype. Otherwise, it should be an iterable,
+        and the read data will have a compound dtype.
+        """
+        if _prior_dtype is None:
+            _prior_dtype = self.dtype
+        return FieldsWrapper(self, _prior_dtype, names)
 
     @property
     def dims(self):
@@ -890,7 +939,7 @@ class Dataset(HLObject):
         * Boolean "mask" array indexing
         """
         if new_dtype is not None:
-            self.log.warning("new_dtype is not supported")
+            self.log.debug(f"getitem.new_dtype: {new_dtype}")
         args = args if isinstance(args, tuple) else (args,)
         self.log.debug("dataset.__getitem__")
         for arg in args:
@@ -906,8 +955,20 @@ class Dataset(HLObject):
 
         # Sort field indices from the rest of the args.
         names = tuple(x for x in args if isinstance(x, str))
-        args = tuple(x for x in args if not isinstance(x, str))
+        if names:
+            self.log.debug(f"names: {names}")
+            # Read a subset of the fields in this structured dtype
+            if len(names) == 1:
+                names = names[0]  # Read with simpler dtype of this field
+            args = tuple(x for x in args if not isinstance(x, str))
+            return self.fields(names, _prior_dtype=new_dtype)[args]
 
+        if new_dtype is None:
+            new_dtype = self.dtype
+        else:
+            self.log.debug(f"new_dtype: {new_dtype}")
+
+        """
         new_dtype = getattr(self._local, "astype", None)
         if new_dtype is not None:
             new_dtype = readtime_dtype(new_dtype, names)
@@ -916,6 +977,7 @@ class Dataset(HLObject):
             # discards the array information at the top level.
             new_dtype = readtime_dtype(self.dtype, names)
             self.log.debug(f"new_dtype: {new_dtype}")
+        """
         if new_dtype.kind == "S" and check_dtype(ref=self.dtype):
             new_dtype = special_dtype(ref=Reference)
 
@@ -1015,14 +1077,14 @@ class Dataset(HLObject):
 
         self.log.debug(f"dataset shape: {self._shape}")
         self.log.debug(f"mshape: {mshape}")
-        self.log.debug(f"single_element: {single_element}")
+
         # Perfom the actual read
         rsp = None
         req = "/datasets/" + self.id.uuid + "/value"
         params = {}
 
-        if len(names) > 0:
-            params["fields"] = ":".join(names)
+        if mtype.names != self.dtype.names:
+            params["fields"] = ":".join(mtype.names)
 
         if self.id._http_conn.mode == "r" and self.id._http_conn.cache_on:
             # enables lambda to be used on server
@@ -1152,7 +1214,6 @@ class Dataset(HLObject):
                         # got binary response
                         # TBD - check expected number of bytes
                         self.log.info(f"binary response, {len(rsp)} bytes")
-                        # arr1d = numpy.frombuffer(rsp, dtype=mtype)
                         arr1d = bytesToArray(rsp, mtype, page_mshape)
                         page_arr = numpy.reshape(arr1d, page_mshape)
                     else:
@@ -1328,7 +1389,7 @@ class Dataset(HLObject):
 
         # get the val dtype if we're passed a numpy array
         try:
-            msg = f"val dtype: {val.dtype}, shape: {val.shape} metadata: {val.dtype.metadata}"
+            msg = f"val dtype: {val.dtype}, shape: {val.shape} kind: {val.dtype.kind} metadata: {val.dtype.metadata}"
             self.log.debug(msg)
             if numpy.prod(val.shape) == 0:
                 self.log.info("no elements in numpy array, skipping write")
@@ -1360,6 +1421,7 @@ class Dataset(HLObject):
         # For h5pyd, do extra check and convert type on client side for efficiency
         vlen_base_class = check_dtype(vlen=self.dtype)
         if vlen_base_class is not None and vlen_base_class not in (bytes, str):
+            self.log.debug(f"asarray to base_class: {vlen_base_class}")
             try:
                 # Attempt to directly convert the input array of vlen data to its base class
                 val = numpy.asarray(val, dtype=vlen_base_class)
@@ -1417,6 +1479,7 @@ class Dataset(HLObject):
             # TBD: Do we need something like the following in the above if condition:
             # (self.dtype.str != val.dtype.str)
             # for cases where the val is a numpy array but different type than self?
+
             if len(names) == 1 and self.dtype.fields is not None:
                 # Single field selected for write, from a non-array source
                 if not names[0] in self.dtype.fields:
@@ -1427,9 +1490,12 @@ class Dataset(HLObject):
                 dtype = self.dtype
                 cast_compound = False
 
-            val = numpy.asarray(val, dtype=dtype, order="C")
+            self.log.debug(f"asarray dtype: {dtype}, cast_compound: {cast_compound}")
+            val = numpy.asarray(val, dtype=dtype.base, order="C")
             if cast_compound:
-                val = val.astype(numpy.dtype([(names[0], dtype)]))
+                # val = val.astype(numpy.dtype([(names[0], dtype)]))
+                val = val.view(numpy.dtype([(names[0], dtype)]))
+                val = val.reshape(val.shape[:len(val.shape) - len(dtype.shape)])
 
         elif isinstance(val, numpy.ndarray):
             # convert array if needed
@@ -1447,17 +1513,16 @@ class Dataset(HLObject):
 
         # Check for array dtype compatibility and convert
         mshape = None
-        """
-        # TBD..
+        self.log.debug(f"self.dtype.subdtype: {self.dtype.subdtype}")
         if self.dtype.subdtype is not None:
             shp = self.dtype.subdtype[1]   # type shape
             valshp = val.shape[-len(shp):]
             if valshp != shp:  # Last dimension has to match
                 raise TypeError(f"When writing to array types,\
                                  last N dimensions have to match (got {valshp}, but should be {shp})")
-            mtype = h5t.py_create(numpy.dtype((val.dtype, shp)))
-            mshape = val.shape[0:len(val.shape)-len(shp)]
-        """
+            mtype = numpy.dtype((val.dtype, shp))
+            self.log.debug(f"mtype for subdtype: {mtype}")
+            mshape = val.shape[0:len(val.shape) - len(shp)]
 
         # Check for field selection
         if len(names) != 0:
