@@ -182,6 +182,36 @@ class Group(HLObject, MutableMappingHDF5):
         group_json = objdb[self.id.id]
         return group_json["links"]
 
+    def _make_group(self, parent_id=None, parent_name=None, link=None):
+        """ helper function to make a group """
+
+        link_json = {}
+        if parent_id:
+            link_json["id"] = parent_id
+
+        if link:
+            link_json["name"] = link
+
+        body = {}
+        if link_json:
+            body["link"] = link_json
+        self.log.debug(f"create group with body: {body}")
+        rsp = self.POST('/groups', body=body)
+        
+        group_json = rsp
+        groupId = GroupID(self, group_json)
+        sub_group = Group(groupId)
+        if parent_name:
+            if parent_name[-1] == '/':
+                parent_name = parent_name + link
+            else:
+                parent_name = parent_name + '/' + link
+            self.log.debug(f"create group - parent name: {parent_name}")
+            sub_group._name = parent_name
+        
+        return sub_group
+
+
     def create_group(self, h5path, track_order=False):
         """ Create and return a new subgroup.
 
@@ -192,12 +222,15 @@ class Group(HLObject, MutableMappingHDF5):
         if isinstance(h5path, bytes):
             h5path = h5path.decode('utf-8')
 
-        # if self.__contains__(name):
-        #    raise ValueError("Unable to create link (Name alredy exists)")
+        if h5path is None:
+            # anonymous group
+            sub_group = self._make_group()
+            sub_group._track_order = track_order
+            return sub_group
+    
         if h5path[-1] == '/':
             raise ValueError("Invalid path for create_group")
-
-        if h5path[0] == '/':
+        elif h5path[0] == '/':
             # absolute path
             parent_uuid = self.file.id.id   # uuid of root group
             parent_name = "/"
@@ -223,23 +256,10 @@ class Group(HLObject, MutableMappingHDF5):
                 create_group = True
 
             if create_group:
-                link_json = {'id': parent_uuid, 'name': link}
-                body = {'link': link_json}
-                self.log.debug(f"create group with body: {body}")
-                rsp = self.POST('/groups', body=body)
-
-                group_json = rsp
-                groupId = GroupID(self, group_json)
-                sub_group = Group(groupId)
-                if parent_name:
-                    if parent_name[-1] == '/':
-                        parent_name = parent_name + link
-                    else:
-                        parent_name = parent_name + '/' + link
-                    self.log.debug(f"create group - parent name: {parent_name}")
-                    sub_group._name = parent_name
+                sub_group = self._make_group(parent_id=parent_uuid, parent_name=parent_name, link=link)
                 sub_group._track_order = track_order
                 parent_uuid = sub_group.id.id
+                
             else:
                 # sub-group already exsits
                 self.log.debug(f"create group - found subgroup: {link}")
@@ -327,63 +347,8 @@ class Group(HLObject, MutableMappingHDF5):
             # convert byte input to string
             name = name.decode("utf-8")
 
-        """
-        group = self
-        if name:
-            if '/' in name.lstrip('/'):
-                parent_path, name = name.rsplit('/', 1)
-                group = self.require_group(parent_path)
-
-        dsid = dataset.make_new_dset(group, shape, dtype, data, name, **kwds)
-        dset = dataset.Dataset(dsid)
-        return dset
-        """
-
-        """
-        if isinstance(shape, int):
-            # convert to a one-element list
-            shape = (shape,)
-
-        # Convert data to a C-contiguous ndarray
-        if data is None:
-            if shape is None:
-                raise TypeError("One of data, shape or dtype must be specified")
-        else:
-            if isinstance(data, Empty):
-                if dtype is None:
-                    dtype = data.dtype
-            else:
-                if dtype is None:
-                    dtype = guess_dtype(data)
-                if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
-                    data = numpy.asarray(data, order="C", dtype=dtype)
-                    dtype = data.dtype
-                self.log.info(f"data dtype: {data.dtype}")
-
-        # Validate shape
-        if isinstance(data, Empty):
-            if shape:
-                raise ValueError("Shape tuple is incompatible with Empty object")
-        else:
-            if shape is None:
-                if  data is None:
-                    pass # null space dataset
-                else:
-                    shape = data.shape
-            else:
-                shape = tuple(shape)
-
-            if data is not None and not isinstance(data, Empty) and (numpy.product(shape) != numpy.product(data.shape)):
-                raise ValueError("Shape tuple is incompatible with data")
-        """
         dsid = dataset.make_new_dset(self, shape=shape, dtype=dtype, data=data, **kwds)
         dset = dataset.Dataset(dsid)
-
-        """
-        if data is not None:
-            self.log.info("initialize data")
-            dset[...] = data
-        """
 
         if name is not None:
             items = name.split('/')
