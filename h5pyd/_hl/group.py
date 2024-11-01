@@ -197,7 +197,7 @@ class Group(HLObject, MutableMappingHDF5):
             body["link"] = link_json
         self.log.debug(f"create group with body: {body}")
         rsp = self.POST('/groups', body=body)
-        
+
         group_json = rsp
         groupId = GroupID(self, group_json)
         sub_group = Group(groupId)
@@ -208,9 +208,8 @@ class Group(HLObject, MutableMappingHDF5):
                 parent_name = parent_name + '/' + link
             self.log.debug(f"create group - parent name: {parent_name}")
             sub_group._name = parent_name
-        
-        return sub_group
 
+        return sub_group
 
     def create_group(self, h5path, track_order=False):
         """ Create and return a new subgroup.
@@ -227,7 +226,7 @@ class Group(HLObject, MutableMappingHDF5):
             sub_group = self._make_group()
             sub_group._track_order = track_order
             return sub_group
-    
+
         if h5path[-1] == '/':
             raise ValueError("Invalid path for create_group")
         elif h5path[0] == '/':
@@ -259,7 +258,7 @@ class Group(HLObject, MutableMappingHDF5):
                 sub_group = self._make_group(parent_id=parent_uuid, parent_name=parent_name, link=link)
                 sub_group._track_order = track_order
                 parent_uuid = sub_group.id.id
-                
+
             else:
                 # sub-group already exsits
                 self.log.debug(f"create group - found subgroup: {link}")
