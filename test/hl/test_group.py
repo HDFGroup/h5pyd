@@ -179,6 +179,10 @@ class TestGroup(TestCase):
         if h5py.__name__ == "h5pyd":
             self.assertTrue(isinstance(g1.modified, datetime))
 
+        # try creating an anon group
+        anon_group = g1.create_group(None)
+        anon_group_id = anon_group.id.id
+
         f.close()
 
         # re-open file in read-only mode
@@ -199,6 +203,11 @@ class TestGroup(TestCase):
             self.assertEqual(softlink.path, '/g1/g1.1')
         linked_obj = f["mysoftlink"]
         self.assertEqual(linked_obj.id, g1_1.id)
+
+        if is_hsds:
+            # for h5pyd we should be able to retrieve the anon group
+            anon_group = f[f"groups/{anon_group_id}"]
+            self.assertEqual(anon_group_id, anon_group.id.id)
         f.close()
 
     def test_nested_create(self):
