@@ -1540,23 +1540,6 @@ def write_dataset(src, tgt, ctx):
     if ctx["verbose"]:
         print(msg)
     try:
-        """
-        if src.chunks is None:
-            # contiguous dataset, fake an iterator by creating a list
-            # with one slice
-            slices = []
-            for dim in range(rank):
-                extent = src.shape[dim]
-                s = slice(0, extent, 1)
-                slices.append(s)
-            slices = tuple(slices)
-            if rank == 1:
-                it = [slices[0],]
-            else:
-                it = [slices,]
-        else:
-            it = src.iter_chunks()
-        """
         logging.debug(f"src dtype: {src.dtype}")
         logging.debug(f"des dtype: {tgt.dtype}")
 
