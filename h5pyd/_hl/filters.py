@@ -255,14 +255,11 @@ def generate_dcpl(
                 for k in compression_opts:
                     filter[k] = compression_opts[k]
             else:
-                if compression_opts in range(10):
-                    level = compression_opts
-                else:
-                    raise ValueError(
-                        "compression setting must be a dict or integer from 0-9, not {}".format(
-                            compression_opts
-                        )
-                    )
+                if compression_opts not in range(10):
+                    msg = "compression setting must be a dict or integer from 0-9, "
+                    msg += f"not {compression_opts}"
+                    raise ValueError(msg)
+                level = compression_opts
                 filter["level"] = level
         filters.append(filter)
 

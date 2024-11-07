@@ -265,7 +265,7 @@ def make_new_dset(
             maxshape = tuple(m if m is not None else 0 for m in maxshape)
             body["maxdims"] = maxshape
         else:
-            print("Warning: maxshape provided but no shape")
+            print("maxshape provided but no shape")
 
     req = "/datasets"
 
