@@ -23,11 +23,17 @@ except ImportError as e:
     sys.exit(1)
 
 try:
+    # this package is used when reading HDF5 files on S3
     import s3fs
-
     S3FS_IMPORT = True
 except ImportError:
     S3FS_IMPORT = False
+
+try:
+    # this package is useful for HDF5 compresssed with blosc, etc.
+    import hdf5plugin
+except ImportError:
+    pass
 
 if __name__ == "__main__":
     from config import Config

@@ -26,7 +26,8 @@ MIN_DSET_ELEMENTS_FOR_LINKING = 512
 
 # adjust chunk shape to fit between min and max chunk sizes when possible
 MIN_CHUNK_SIZE = 1 * 1024 * 1024
-MAC_CHUNK_SIZE = 8 * 1024 * 1024
+MAX_CHUNK_SIZE = 8 * 1024 * 1024
+CHUNK_BASE = 64 * 1024    # Multiplier by which chunks are adjusted
 
 H5Z_FILTER_MAP = {
     32001: "blosclz",
@@ -233,6 +234,139 @@ def convert_dtype(srcdt, ctx):
         else:
             tgt_dt = srcdt
     return tgt_dt
+
+
+def guess_chunk(shape, typesize):
+    """ Guess an appropriate chunk layout for a dataset, given its shape and
+    the size of each element in bytes.  Will allocate chunks only as large
+    as MAX_SIZE.  Chunks are generally close to some power-of-2 fraction of
+    each axis, slightly favoring bigger values for the last index.
+
+    Undocumented and subject to change without warning.
+    """
+
+    # For unlimited dimensions we have to guess 1024
+    shape = tuple((x if x != 0 else 1024) for i, x in enumerate(shape))
+
+    ndims = len(shape)
+    if ndims == 0:
+        raise ValueError("Chunks not allowed for scalar datasets.")
+
+    chunks = np.array(shape, dtype='=f8')
+    if not np.all(np.isfinite(chunks)):
+        raise ValueError("Illegal value in chunk tuple")
+
+    # Determine the optimal chunk size in bytes using a PyTables expression.
+    # This is kept as a float.
+    dset_size = np.prod(chunks) * typesize
+    target_size = CHUNK_BASE * (2 ** np.log10(dset_size / (1024. * 1024)))
+
+    if target_size > MIN_CHUNK_SIZE:
+        target_size = MAX_CHUNK_SIZE
+    elif target_size < MIN_CHUNK_SIZE:
+        target_size = MIN_CHUNK_SIZE
+
+    idx = 0
+    while True:
+        # Repeatedly loop over the axes, dividing them by 2.  Stop when:
+        # 1a. We're smaller than the target chunk size, OR
+        # 1b. We're within 50% of the target chunk size, AND
+        #  2. The chunk is smaller than the maximum chunk size
+
+        chunk_bytes = np.prod(chunks) * typesize
+
+        if (chunk_bytes < target_size or abs(chunk_bytes - target_size) / target_size < 0.5) and \
+           chunk_bytes < MAX_CHUNK_SIZE:
+            break
+
+        if np.prod(chunks) == 1:
+            break  # Element size larger than CHUNK_MAX
+        chunks[idx % ndims] = np.ceil(chunks[idx % ndims] / 2.0)
+        idx += 1
+
+    return tuple(int(x) for x in chunks)
+
+
+class ChunkIterator(object):
+    """
+    Class to iterate through list of chunks of a given dataset
+    """
+
+    def __init__(self, dset, source_sel=None):
+        self._shape = dset.shape
+        rank = len(dset.shape)
+
+        if not dset.chunks:
+            # coniguous layout - create some psuedo-chunks so we do't
+            # try to read to much data in one selection
+            self._layout = guess_chunk(dset.shape, dset.dtype.itemsize)
+        elif isinstance(dset.chunks, dict):
+            self._layout = dset.chunks["dims"]
+        else:
+            self._layout = dset.chunks
+
+        if source_sel is None:
+            # select over entire dataset
+            slices = []
+            for dim in range(rank):
+                slices.append(slice(0, self._shape[dim]))
+            self._sel = tuple(slices)
+        else:
+            if isinstance(source_sel, slice):
+                self._sel = (source_sel,)
+            else:
+                self._sel = source_sel
+        if len(self._sel) != rank:
+            raise ValueError(
+                "Invalid selection - selection region must have same rank as dataset"
+            )
+        self._chunk_index = []
+        for dim in range(rank):
+            s = self._sel[dim]
+            if s.start < 0 or s.stop > self._shape[dim] or s.stop <= s.start:
+                msg = "Invalid selection - selection region must be within dataset space"
+                raise ValueError(msg)
+            index = s.start // self._layout[dim]
+            self._chunk_index.append(index)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        rank = len(self._shape)
+        slices = []
+        if rank == 0 or self._chunk_index[0] * self._layout[0] >= self._sel[0].stop:
+            # ran past the last chunk, end iteration
+            raise StopIteration()
+
+        for dim in range(rank):
+            s = self._sel[dim]
+            start = self._chunk_index[dim] * self._layout[dim]
+            stop = (self._chunk_index[dim] + 1) * self._layout[dim]
+            # adjust the start if this is an edge chunk
+            if start < s.start:
+                start = s.start
+            if stop > s.stop:
+                stop = s.stop  # trim to end of the selection
+            s = slice(start, stop, 1)
+            slices.append(s)
+
+        # bump up the last index and carry forward if we run outside the selection
+        dim = rank - 1
+        while dim >= 0:
+            s = self._sel[dim]
+            self._chunk_index[dim] += 1
+
+            chunk_end = self._chunk_index[dim] * self._layout[dim]
+            if chunk_end < s.stop:
+                # we still have room to extend along this dimensions
+                return tuple(slices)
+
+            if dim > 0:
+                # reset to the start and continue iterating with higher dimension
+                self._chunk_index[dim] = 0
+            dim -= 1
+        return tuple(slices)
 
 
 # ----------------------------------------------------------------------------------
@@ -1262,8 +1396,12 @@ def create_dataset(dobj, ctx):
                             # supported non-standard compressor
                             kwargs["compression"] = filter_name
                             logging.info(f"using compressor: {filter_name} for {dobj.name}")
-                            kwargs["compression_opts"] = filter_opts
-                            logging.info(f"compression_opts: {filter_opts}")
+                            if isinstance(filter_opts, int) or isinstance(filter_opts, dict):
+                                kwargs["compression_opts"] = filter_opts
+                                logging.info(f"compression_opts: {filter_opts}")
+                            else:
+                                msg = f"ignoring compression_opts for filter: {filter_name}"
+                                logging.warn(msg)
                     else:
                         logging.warning(f"filter id {filter_id} for {dobj.name} not supported")
 
@@ -1402,26 +1540,11 @@ def write_dataset(src, tgt, ctx):
     if ctx["verbose"]:
         print(msg)
     try:
-        if src.chunks is None:
-            # contiguous dataset, fake an iterator by creating a list
-            # with one slice
-            slices = []
-            for dim in range(rank):
-                extent = src.shape[dim]
-                s = slice(0, extent, 1)
-                slices.append(s)
-            slices = tuple(slices)
-            if rank == 1:
-                it = [slices[0],]
-            else:
-                it = [slices,]
-        else:
-            it = src.iter_chunks()
-
         logging.debug(f"src dtype: {src.dtype}")
         logging.debug(f"des dtype: {tgt.dtype}")
 
         empty_arr = None
+        it = ChunkIterator(src)
         for src_s in it:
             logging.debug(f"src selection: {src_s}")
             if rank == 1 and isinstance(src_s, slice):
