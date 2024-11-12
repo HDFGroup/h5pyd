@@ -70,7 +70,7 @@ class SwmrReader(Process):
                     last_count = row_count
                 else:
                     self.log.info(f"Read - sleeping for {self._sleep_time}")
-                    time.sleep(self._sleep_time)  # no updates so sleep for a bi
+                    time.sleep(self._sleep_time)  # no updates so sleep for a bit
                 if row_count >= self._total_rows:
                     self.log.info("Read - all data consumed")
                     break
@@ -138,9 +138,12 @@ if __name__ == "__main__":
     compression = None
     if len(sys.argv) > 1:
         if sys.argv[1] in ("-h", "--help"):
-            print(f"usage: {sys.argv[0]} [filename] [blocksize] [loopcount]")
+            print(f"usage: {sys.argv[0]} [filename] [blocksize] [loopcount] [compression]")
             sys.exit(0)
         fname = sys.argv[1]
+        if not fname.endswith(".h5"):
+            print("use .h5 extension for filename")
+            sys.exit(0)
     if len(sys.argv) > 2:
         block_size = int(sys.argv[2])
     if len(sys.argv) > 3:
@@ -156,7 +159,7 @@ if __name__ == "__main__":
 
     logging.info("Starting reader")
     reader.start()
-    logging.info("Starting reader")
+    logging.info("Starting writer")
     writer.start()
 
     logging.info("Waiting for writer to finish")
