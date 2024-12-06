@@ -57,18 +57,15 @@ for filename in filenames:
     if filename not in data_dir:
         # check to see if the file has already been downloaded
         if not os.path.isfile(hdf5_path):
-            # wget from S3
+            # get from S3
             http_path = test_file_http_path + filename
             print("downloading:", http_path)
 
-            if system() == "Windows":
-                get_cmd = f"curl.exe -o {filename}\
+            curl_exe = "curl.exe" if system() == "Windows" else "curl"
+
+            get_cmd = f"{curl_exe} -o {filename}\
                             https://s3.amazonaws.com/hdfgroup/data/hdf5test/{filename}\
                             --create-dirs --output-dir {data_dir}"
-            else:
-                get_cmd = f"wget -q\
-                            https://s3.amazonaws.com/hdfgroup/data/hdf5test/{filename}\
-                            -P {data_dir}"
 
             rc = os.system(f"{get_cmd}")
             if rc != 0:

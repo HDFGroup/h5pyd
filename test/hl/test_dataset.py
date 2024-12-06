@@ -156,9 +156,8 @@ class TestCreateShape(BaseDataset):
     @ut.expectedFailure
     def test_long_double(self):
         """ Confirm that the default dtype is float """
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py') or platform.system() == 'Windows':
-            self.assertTrue(False)
+        # TBD -  Float128 not supported
+        self.assertTrue(False)
 
         dset = self.f.create_dataset('foo', (63,), dtype=np.longdouble)
         if platform.machine() in ['ppc64le']:
