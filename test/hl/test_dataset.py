@@ -153,7 +153,7 @@ class TestCreateShape(BaseDataset):
         with self.assertRaises(TypeError):
             self.f.create_dataset('foo')
 
-    @ut.expectedFailure
+    # @ut.expectedFailure
     def test_long_double(self):
         """ Confirm that the default dtype is float """
         # Expected failure on HSDS; skip with h5py
