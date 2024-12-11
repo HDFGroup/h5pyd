@@ -105,7 +105,7 @@ class Group(HLObject, MutableMappingHDF5):
                 if not name:
                     continue
                 if group_uuid not in objdb:
-                    self.log.warn(f"objdb search: {group_uuid} not found in objdb")
+                    self.log.warning(f"objdb search: {group_uuid} not found in objdb")
                     tgt_json = None
                     break
                 group_json = objdb[group_uuid]
@@ -177,7 +177,7 @@ class Group(HLObject, MutableMappingHDF5):
         if not objdb:
             return None
         if self.id.id not in objdb:
-            self.log.warn(f"{self.id.id} not found in objdb")
+            self.log.warning(f"{self.id.id} not found in objdb")
             return None
         group_json = objdb[self.id.id]
         return group_json["links"]
@@ -445,7 +445,7 @@ class Group(HLObject, MutableMappingHDF5):
                 dtype = numpy.float32
             if not isinstance(data, numpy.ndarray) or dtype != data.dtype:
                 data = numpy.asarray(data, order="C", dtype=dtype)
-            self.log.info("data dtype: {}".format(data.dtype))
+            self.log.info(f"data dtype: {data.dtype}")
             if len(data.shape) != 1:
                 ValueError("Table must be one-dimensional")
             if numrows and numrows != data.shape[0]:

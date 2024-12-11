@@ -188,7 +188,7 @@ class Table(Dataset):
             params["query"] = condition
             if limit > 0:
                 params["Limit"] = limit - total_rows
-            self.log.info("req - cursor: {} page_size: {}".format(cursor, page_size))
+            self.log.info(f"req - cursor: {cursor} page_size: {page_size}")
             end_row = cursor + page_size
             if end_row > stop:
                 end_row = stop
@@ -196,11 +196,11 @@ class Table(Dataset):
             selection = sel.select(self, selection_arg)
 
             sel_param = selection.getQueryParam()
-            self.log.debug("query param: {}".format(sel_param))
+            self.log.debug(f"query param: {sel_param}")
             if sel_param:
                 params["select"] = sel_param
             try:
-                self.log.debug("params: {}".format(params))
+                self.log.debug(f"params: {params}")
                 rsp = self.GET(req, params=params)
                 if isinstance(rsp, bytes):
                     # binary response
@@ -229,7 +229,7 @@ class Table(Dataset):
                             e = values[i]
                         arr[i] = tuple(e)
 
-                    self.log.info("got {} rows".format(count))
+                    self.log.info(f"got {count} rows")
                 total_rows += count
                 data.append(arr)
 
@@ -241,13 +241,13 @@ class Table(Dataset):
                     # if it is not already relatively small (1024)
                     page_size //= 2
                     page_size += 1  # bump up to avoid tiny pages in the last iteration
-                    self.log.info("Got 413, reducing page_size to: {}".format(page_size))
+                    self.log.info(f"Got 413, reducing page_size to: {page_size}")
                 else:
                     # otherwise, just raise the exception
-                    self.log.info("Unexpected exception: {}".format(ioe.errno))
+                    self.log.info(f"Unexpected exception: {ioe.errno}")
                     raise ioe
             if cursor >= stop or (limit > 0 and total_rows == limit):
-                self.log.info("completed iteration, returning: {} rows".format(len(data)))
+                self.log.info(f"completed iteration, returning: {len(data)} rows")
                 break
 
         # need some special conversion for compound types --
@@ -375,7 +375,7 @@ class Table(Dataset):
             # TBD - need to handle cases where the type shape is different
             self.log.debug("got numpy array")
             if val.dtype != self.dtype and val.dtype.shape == self.dtype.shape:
-                self.log.info("converting {} to {}".format(val.dtype, self.dtype))
+                self.log.info(f"converting {val.dtype} to {self.dtype}")
                 # convert array
                 tmp = numpy.empty(val.shape, dtype=self.dtype)
                 tmp[...] = val[...]
@@ -383,8 +383,8 @@ class Table(Dataset):
         else:
             val = numpy.asarray(val, order='C', dtype=self.dtype)
 
-        self.log.debug("rows shape: {}".format(val.shape))
-        self.log.debug("data dtype: {}".format(val.dtype))
+        self.log.debug(f"rows shape: {val.shape}")
+        self.log.debug(f"data dtype: {val.dtype}")
 
         if len(val.shape) != 1:
             raise ValueError("rows must be one-dimensional")
@@ -403,14 +403,13 @@ class Table(Dataset):
             # server is HSDS, use binary data, use param values for selection
             format = "binary"
             body = val.tobytes()
-            self.log.debug("writing binary data, {} bytes".format(len(body)))
+            self.log.debug(f"writing binary data, {len(body)} bytes")
             params["append"] = numrows
         else:
             if type(val) is not list:
                 val = val.tolist()
             val = _decode(val)
-            self.log.debug("writing json data, {} elements".format(len(val)))
-            self.log.debug("data: {}".format(val))
+            self.log.debug(f"writing json data, {len(val)} elements")
             body['value'] = val
             body['append'] = numrows
 

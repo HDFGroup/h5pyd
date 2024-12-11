@@ -1263,7 +1263,7 @@ class Dataset(HLObject):
                     pass  # ok
                 else:
                     msg = "Fancy selection with multiple coordinates is only supported in HSDS 0.9+"
-                    self.log.warn(msg)
+                    self.log.warning(msg)
                     raise IOError(msg)
 
             params["select"] = select
@@ -1348,7 +1348,7 @@ class Dataset(HLObject):
                 elements_expected = selection.mshape[0]
                 if elements_received != elements_expected:
                     msg = f"Expected {elements_expected} elements, but got {elements_received}"
-                    self.log.warn(msg)
+                    self.log.warning(msg)
                     raise IOError(msg)
 
                 arr = numpy.frombuffer(rsp, dtype=mtype)
@@ -1356,7 +1356,7 @@ class Dataset(HLObject):
                 data = rsp["value"]
                 if len(data) != selection.mshape[0]:
                     msg = f"Expected {selection.mshape[0]} elements, but got {len(data)}"
-                    self.log.warn(msg)
+                    self.log.warning(msg)
                     raise IOError(msg)
                 arr = numpy.asarray(data, dtype=mtype, order="C")
 

@@ -19,9 +19,9 @@ cfg = Config()
 
 def intToStr(n):
     if cfg["human_readable"]:
-        s = "{:,}".format(n)
+        s = f"{n:,}"
     else:
-        s = "{}".format(n)
+        s = f"{n}"
     return s
 
 
@@ -38,9 +38,9 @@ def format_size(n):
             break
         n /= 1024
     if symbol == 'B':
-        return "{:7}B".format(n)
+        return f"{n:7}B"
     else:
-        return "{:7.1f}{}".format(n, symbol)
+        return f"{n:7.1f}{symbol}"
 
 
 def getShapeText(dset):
@@ -81,17 +81,17 @@ def visititems(name, grp, visited):
             except IOError:
                 # object deleted but hardlink left?
                 desc = "{Missing hardlink object}"
-                print("{0:24} {1} {2}".format(item_name, class_name, desc))
+                print(f"{item_name:24} {class_name} {desc}")
 
         elif class_name == "SoftLink":
             desc = '{' + item.path + '}'
-            print("{0:24} {1} {2}".format(item_name, class_name, desc))
+            print(f"{item_name:24} {class_name} {desc}")
         elif class_name == "ExternalLink":
             desc = '{' + item.path + '//' + item.filename + '}'
-            print("{0:24} {1} {2}".format(item_name, class_name, desc))
+            print(f"{item_name:24} {class_name} {desc}")
         else:
             desc = '{Unknown Link Type}'
-            print("{0:24} {1} {2}".format(item_name, class_name, desc))
+            print(f"{item_name:24} {class_name} {desc}")
 
 
 def getTypeStr(dt):
@@ -107,7 +107,7 @@ def dump(name, obj, visited=None):
         obj_id = obj.id.id
         if visited and obj_id in visited:
             same_as = visited[obj_id]
-            print("{0:24} {1}, same as {2}".format(name, class_name, same_as))
+            print(f"{name:24} {class_name}, same as {same_as}")
             return
     elif class_name in ("ExternalLink", "SoftLink"):
         pass
@@ -131,12 +131,13 @@ def dump(name, obj, visited=None):
         desc = '{' + obj.filename + '//' + obj.path + '}'
 
     if desc is None:
-        print("{0} {1}".format(name, class_name))
+        print(f"{name} {class_name}")
     else:
-        print("{0} {1} {2}".format(name, class_name, desc))
+        print(f"{name} {class_name} {desc}")
 
     if cfg["verbose"] and obj_id is not None:
-        print("    {0:>32}: {1}".format("UUID", obj_id))
+        uuid_str = "UUID"
+        print(f"    {uuid_str:>32}: {obj_id}")
 
     if cfg["verbose"] and is_dataset and obj.shape is not None \
             and obj.chunks is not None:
@@ -262,7 +263,8 @@ def dumpACL(acl):
         perms += 'p'
     else:
         perms += '-'
-    print("    acl: {0:24} {1}".format(acl["userName"], perms))
+    acl_username = acl["username"]
+    print(f"    acl: {acl_username:24} {perms}")
 
 
 def dumpAcls(obj):
@@ -288,12 +290,12 @@ def dumpAttrs(obj):
             rank = 0  # scalar data
         if rank > 1:
             val = "[" * rank + el + "]" * rank
-            print("   attr: {0:24} {1}".format(attr_name, val))
+            print(f"   attr: {attr_name:24} {val}")
         elif rank == 1 and attr.shape[0] > 1:
-            val = "[{},{}]".format(attr[0], el)
-            print("   attr: {0:24} {1}".format(attr_name, val))
+            val = f"[{attr[0]},{el}]"
+            print(f"   attr: {attr_name:24} {val}")
         else:
-            print("   attr: {0:24} {1}".format(attr_name, attr))
+            print(f"   attr: {attr_name:24} {attr}")
 
 
 def getFolder(domain):
@@ -371,9 +373,9 @@ def visitDomains(domain, depth=1):
             timestamp = datetime.fromtimestamp(int(d.modified))
 
         if not cfg["names_only"]:
-            print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
-                                                  dir_class, timestamp,
-                                                  display_name))
+            msg = f"{owner:35} {format_size(num_bytes):15} {dir_class:8} "
+            msg += f"{timestamp} {display_name}"
+            print(msg)
         count += 1
         if cfg["showacls"]:
             dumpAcls(d)
@@ -401,9 +403,9 @@ def visitDomains(domain, depth=1):
                 # just print the name...
                 print(full_path)
             else:
-                print("{:35} {:15} {:8} {} {}".format(owner, format_size(num_bytes),
-                                                      dir_class, timestamp,
-                                                      full_path))
+                msg = f"{owner:35} {format_size(num_bytes):15} {dir_class:8} "
+                msg += f"{timestamp} {full_path}"
+                print(msg)
             if cfg["showacls"]:
                 if dir_class == "folder":
                     with getFolder(domain + '/' + name + '/') as f:

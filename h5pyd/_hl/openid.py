@@ -188,7 +188,7 @@ class AzureOpenID(OpenIDHandler):
                 code = context.acquire_user_code(resource_id, app_id)
 
         except Exception as e:
-            eprint("unable to process AD token: {}".format(e))
+            eprint(f"unable to process AD token: {e}")
             self._token = None
             self.write_token_cache()
             raise
@@ -424,8 +424,8 @@ class KeycloakOpenID(OpenIDHandler):
         rsp = requests.post(keycloak_url, data=body, headers=headers)
 
         if rsp.status_code not in (200, 201):
-            print("POST error: {}".format(rsp.status_code))
-            raise IOError("Keycloak response: {}".format(rsp.status_code))
+            print(f"POST error: {rsp.status_code}")
+            raise IOError(f"Keycloak response: {rsp.status_code}")
 
         creds = rsp.json()  # TBD: catch json format errors?
         self._token = self._parse(creds)

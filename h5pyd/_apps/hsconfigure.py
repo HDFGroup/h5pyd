@@ -1,10 +1,16 @@
 import os
 import json
+import sys
+
 import h5pyd
 if __name__ == "__main__":
     from config import Config
 else:
     from .config import Config
+
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 
 #
@@ -21,23 +27,23 @@ def get_input(prompt):
 def saveConfig(username, password, endpoint, api_key):
 
     filepath = os.path.expanduser('~/.hscfg')
-    print("Saving config file to: {}".format(filepath))
+    print(f"Saving config file to: {filepath}")
     with open(filepath, 'w') as file:
         file.write("# HDFCloud configuration file\n")
         if endpoint:
-            file.write("hs_endpoint = {}\n".format(endpoint))
+            file.write(f"hs_endpoint = {endpoint}\n")
         else:
             file.write("hs_endpoint = \n")
         if username:
-            file.write("hs_username = {}\n".format(username))
+            file.write(f"hs_username = {username}\n")
         else:
             file.write("hs_username = \n")
         if password:
-            file.write("hs_password = {}\n".format(password))
+            file.write(f"hs_password = {password}\n")
         else:
             file.write("hs_password = \n")
         if api_key:
-            file.write("hs_api_key = {}\n".format(api_key))
+            file.write(f"hs_api_key = {api_key}\n")
         else:
             file.write("hs_api_key = \n")
 
@@ -67,7 +73,7 @@ def pingServer(username, password, endpoint, api_key):
             print("forbidden (account not setup?)")
             return False
         elif ioe.errno:
-            print("Unexpected error: {}".format(ioe.errno))
+            eprint(f"Unexpected error: {ioe.errno}")
             return False
         else:
             print("Couldn't connect to server")
@@ -103,27 +109,27 @@ def main():
     while not done:
         print("Enter new values or accept defaults in brackets with Enter.")
         print("")
-        new_endpoint = get_input("Server endpoint [{}]: ".format(hs_endpoint))
+        new_endpoint = get_input(f"Server endpoint [{hs_endpoint}]: ")
         if new_endpoint:
-            print("Updated endpoint [{}]:".format(new_endpoint))
+            print(f"Updated endpoint [{new_endpoint}]:")
             hs_endpoint = new_endpoint
             dirty = True
 
-        new_username = get_input("Username [{}]: ".format(hs_username))
+        new_username = get_input(f"Username [{hs_username}]: ")
         if new_username:
-            print("Updated username: [{}]".format(new_username))
+            print(f"Updated username: [{new_username}]")
             hs_username = new_username
             dirty = True
 
-        new_password = get_input("Password [{}]: ".format(hs_password))
+        new_password = get_input(f"Password [{hs_password}]: ")
         if new_password:
-            print("updated password: [{}]".format(new_password))
+            print(f"Updated password: [{new_password}]")
             hs_password = new_password
             dirty = True
 
-        new_api_key = get_input("API Key [{}]: ".format(hs_api_key))
+        new_api_key = get_input(f"API Key [{hs_api_key}]: ")
         if new_api_key:
-            print("updated api key: [{}]".format(new_api_key))
+            print(f"Updated api key: [{new_api_key}]")
             hs_api_key = new_api_key
             dirty = True
         if hs_api_key and hs_api_key.lower() == "none":
