@@ -222,7 +222,7 @@ class Folder:
         elif rsp.status_code != 200:
             # folder must exist
             if rsp.status_code < 500:
-                self.log.warning("status_code: {}".format(rsp.status_code))
+                self.log.warning(f"folder put status_code: {rsp.status_code}")
             else:
                 self.log.error("status_code: {}".format(rsp.status_code))
             raise IOError(rsp.status_code, rsp.reason)

@@ -18,6 +18,11 @@ if __name__ == "__main__":
 else:
     from .config import Config
 
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+
 cfg = Config()
 
 
@@ -49,7 +54,7 @@ def getACL(f, username="default"):
         elif ioe.errno == 404 or not ioe.errno:
             return None
         else:
-            print("unexpected error: {}".format(ioe))
+            eprint(f"unexpected error: {ioe}")
             sys.exit(1)
     if acl and "domain" in acl:
         # remove the domain key

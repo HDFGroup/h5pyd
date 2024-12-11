@@ -11,6 +11,11 @@
 ##############################################################################
 import os
 import json
+import sys
+
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 
 class Config:
@@ -39,7 +44,7 @@ class Config:
                         continue
                     index = line.find('=')
                     if index <= 0:
-                        print("config file: {} line: {} is not valid".format(self._config_file, line_number))
+                        eprint(f"config file: {self._config_file} line: {line_number} is not valid")
                         continue
                     k = line[:index].strip()
                     v = line[(index + 1):].strip()

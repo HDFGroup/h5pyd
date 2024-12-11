@@ -314,7 +314,7 @@ class HttpConn:
                     endpoint, config=api_key, username=username, password=password
                 )
             else:
-                self.log.error("Unknown openid provider: {}".format(provider))
+                self.log.error(f"Unknown openid provider: {provider}")
 
     def __del__(self):
         if self._hsds:
@@ -353,7 +353,7 @@ class HttpConn:
                 auth_string = b"Bearer " + token.encode("ascii")
                 headers["Authorization"] = auth_string
         elif username is not None and password is not None:
-            self.log.debug("use basic auth with username: {}".format(username))
+            self.log.debug(f"use basic auth with username: {username}")
             auth_string = username + ":" + password
             auth_string = auth_string.encode("utf-8")
             auth_string = base64.b64encode(auth_string)
@@ -425,9 +425,8 @@ class HttpConn:
             params["bucket"] = self._bucket
         if self._api_key and not isinstance(self._api_key, dict):
             params["api_key"] = self._api_key
-        self.log.debug(
-            "GET: {} [{}] bucket: {}".format(req, params["domain"], self._bucket)
-        )
+        domain = params["domain"]
+        self.log.debug(f"GET: {req} [{domain}] bucket: {self._bucket}")
 
         if format == "binary":
             headers["accept"] = "application/octet-stream"
@@ -472,11 +471,11 @@ class HttpConn:
                 timeout=self._timeout,
                 verify=self.verifyCert(),
             )
-            self.log.info("status: {}".format(rsp.status_code))
+            self.log.info(f"status: {rsp.status_code}")
             if self._hsds:
                 self._hsds.run()
         except ConnectionError as ce:
-            self.log.error("connection error: {}".format(ce))
+            self.log.error(f"connection error: {ce}")
             raise IOError("Connection Error")
         except Exception as e:
             self.log.error(f"got {type(e)} exception: {e}")
@@ -545,7 +544,7 @@ class HttpConn:
             # update invalidate everything in cache
             self._cache = {}
         if params:
-            self.log.info("PUT params: {}".format(params))
+            self.log.info(f"PUT params: {params}")
         else:
             params = {}
 
@@ -572,7 +571,7 @@ class HttpConn:
             headers["Content-Type"] = "application/json"
             data = json.dumps(body)
 
-        self.log.info("PUT: {} format: {} [{} bytes]".format(req, format, len(data)))
+        self.log.info(f"PUT: {req} format: {format} [{len(data)} bytes]")
 
         try:
             if self._hsds:
@@ -585,17 +584,17 @@ class HttpConn:
                 params=params,
                 verify=self.verifyCert(),
             )
-            self.log.info("status: {}".format(rsp.status_code))
+            self.log.info(f"status: {rsp.status_code}")
             if self._hsds:
                 self._hsds.run()
         except ConnectionError as ce:
-            self.log.error("connection error: {}".format(ce))
+            self.log.error(f"connection error: {ce}")
             raise IOError("Connection Error")
 
         if rsp.status_code == 201 and req == "/":
             self.log.info("clearing domain_json cache")
             self._domain_json = None
-        self.log.info("PUT returning: {}".format(rsp))
+        self.log.info(f"PUT returning: {rsp}")
         return rsp
 
     def POST(self, req, body=None, format="json", params=None, headers=None):
@@ -656,11 +655,11 @@ class HttpConn:
                 verify=self.verifyCert(),
             )
         except ConnectionError as ce:
-            self.log.warn("connection error: ", ce)
+            self.log.warning(f"connection error: {ce}")
             raise IOError(str(ce))
 
         if rsp.status_code not in (200, 201):
-            self.log.error("POST error: {}".format(rsp.status_code))
+            self.log.error(f"POST error: {rsp.status_code}")
 
         return rsp
 
@@ -697,9 +696,9 @@ class HttpConn:
                 params=params,
                 verify=self.verifyCert(),
             )
-            self.log.info("status: {}".format(rsp.status_code))
+            self.log.info(f"status: {rsp.status_code}")
         except ConnectionError as ce:
-            self.log.error("connection error: {}".format(ce))
+            self.log.error(f"connection error: {ce}")
             raise IOError("Connection Error")
 
         if rsp.status_code == 200 and req == "/":

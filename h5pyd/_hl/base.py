@@ -213,7 +213,8 @@ def copyToArray(arr, rank, index, data, vlen_base=None):
     """
     nlen = arr.shape[rank]
     if len(data) != nlen:
-        raise ValueError("Array len of {} at index: {} doesn't match data length: {}".format(nlen, index, len(data)))
+        msg = f"Array len of {nlen} at index: {index} doesn't match data length: {len(data)}"
+        raise ValueError(msg)
     for i in range(nlen):
         index[rank] = i
         if rank < len(arr.shape) - 1:
@@ -298,7 +299,7 @@ def jsonToArray(data_shape, data_dtype, data_json):
         # numpy is ok with this
         if arr.size != npoints:
             msg = "Input data doesn't match selection number of elements"
-            msg += " Expected {}, but received: {}".format(npoints, arr.size)
+            msg += f" Expected {npoints}, but received: {arr.size}"
             raise ValueError(msg)
         if arr.shape != data_shape:
             arr = arr.reshape(data_shape)  # reshape to match selection
@@ -874,7 +875,7 @@ class HLObject(CommonStateObject):
                 self._name = obj_name  # save this
             if not obj_name:
                 # query the server for the name
-                self.log.debug("querying server for name to: {}".format(self._id.id))
+                self.log.debug(f"querying server for name to: {self._id.id}")
                 req = None
                 if self._id.id.startswith("g-"):
                     req = "/groups/" + self._id.id
@@ -884,7 +885,7 @@ class HLObject(CommonStateObject):
                     req = "/datatypes/" + self._id
                 if req:
                     params = params = {"getalias": 1}
-                    self.log.info("sending get alias request for id: {}".format(self._id.id))
+                    self.log.info(f"sending get alias request for id: {self._id.id}")
                     obj_json = self.GET(req, params, use_cache=False)
                     if "alias" in obj_json:
                         alias = obj_json["alias"]
@@ -1033,13 +1034,13 @@ class HLObject(CommonStateObject):
 
         # try to do a POST to the domain
 
-        self.log.info("POST: {} [{}]".format(req, self.id.domain))
+        self.log.info(f"POST: {req} [{self.id.domain}]")
 
         rsp = self.id._http_conn.POST(req, body=body, params=params, format=format)
         if rsp.status_code == 409:
             raise ValueError("name already exists")
         if rsp.status_code not in (200, 201):
-            self.log.error("POST error - status_code: {}, reason: {}".format(rsp.status_code, rsp.reason))
+            self.log.error(f"POST error - status_code: {rsp.status_code}, reason: {rsp.reason}")
             raise IOError(rsp.reason)
 
         if 'Content-Type' in rsp.headers and rsp.headers['Content-Type'] == "application/octet-stream":
@@ -1060,7 +1061,7 @@ class HLObject(CommonStateObject):
 
         # try to do a DELETE of the resource
 
-        self.log.info("DEL: {} [{}]".format(req, self.id.domain))
+        self.log.info(f"DEL: {req} [{self.id.domain}]")
         rsp = self.id._http_conn.DELETE(req, params=params)
         # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
         if rsp.status_code != 200:

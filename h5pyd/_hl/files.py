@@ -781,7 +781,7 @@ class File(Group):
             if orig_ids and orig_ids != current_ids:
                 self.log.debug(f"original dn_ids: {orig_ids}")
                 self.log.debug(f"current dn_ids: {current_ids}")
-                self.log.warn("HSDS nodes have changed")
+                self.log.warning("HSDS nodes have changed")
                 raise IOError(500, "Unexpected Error")
         self.log.info("PUT flush complete")
 

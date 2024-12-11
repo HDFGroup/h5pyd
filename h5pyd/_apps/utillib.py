@@ -414,7 +414,7 @@ def copy_element(val, src_dt, tgt_dt, ctx):
                 h5path = fin_obj.name
                 if not h5path:
                     msg = "No path found for ref object"
-                    logging.warn(msg)
+                    logging.warning(msg)
                     if ctx["verbose"]:
                         print(msg)
                 else:
@@ -1401,7 +1401,7 @@ def create_dataset(dobj, ctx):
                                 logging.info(f"compression_opts: {filter_opts}")
                             else:
                                 msg = f"ignoring compression_opts for filter: {filter_name}"
-                                logging.warn(msg)
+                                logging.warning(msg)
                     else:
                         logging.warning(f"filter id {filter_id} for {dobj.name} not supported")
 
@@ -1644,7 +1644,7 @@ def create_links(gsrc, gdes, ctx):
                     # can return different id's.  This will cause HDF5 files with
                     # multilinks to not load correctly
                     msg = f"could not find map item to src id: {src_obj_id_hash}"
-                    logging.warn(msg)
+                    logging.warning(msg)
                     if ctx["verbose"]:
                         print("WARNING: " + msg)
         elif link_classname == "SoftLink":
