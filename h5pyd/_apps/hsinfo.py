@@ -69,11 +69,11 @@ def getUpTime(start_time):
     if days:
         ret_str = f"{days} days, {hrs} hours {mins} min {sec} sec"
     elif hrs:
-        ret_str = f"{hrs} hours {min} min {sec} sec"
+        ret_str = f"{hrs} hours {mins} min {sec} sec"
     elif mins:
-        ret_str = f"{min} min {sec} sec"
+        ret_str = f"{mins} min {sec} sec"
     else:
-        ret_str = "{sec} sec"
+        ret_str = f"{sec} sec"
 
     return ret_str
 
