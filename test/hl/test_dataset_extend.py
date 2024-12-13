@@ -63,6 +63,24 @@ class TestExtendDataset(TestCase):
 
         f.close()
 
+    def test_extend_multidim_dset(self):
+        filename = self.getFileName("extend_multidim_dset")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+
+        dset = f.create_dataset('dset', (0, 3, 0), maxshape=(None, 3, None), dtype='i8')
+
+        maxshape = dset.maxshape
+        self.assertEqual(maxshape, (None, 3, None))
+
+        # extend first dimension of dataset
+        dset.resize(2, axis=0)
+
+        shape = dset.shape
+        self.assertEqual(shape, (2, 3, 0))
+
+        f.close()
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR
