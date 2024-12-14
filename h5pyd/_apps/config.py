@@ -141,6 +141,10 @@ class Config:
                         continue
                     k = fields[0].strip()
                     v = fields[1].strip()
+                    words = v.split()
+                    if len(words) > 1 and words[1].startswith("#"):
+                        # ignore any inline comment
+                        v = words[0]
                     if k not in self._names:
                         raise ValueError(f"undefined option: {k}")
                     if k in self._choices:
