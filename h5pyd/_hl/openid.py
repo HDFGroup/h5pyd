@@ -380,7 +380,7 @@ class KeycloakOpenID(OpenIDHandler):
             raise KeyError("keycloak client_id not set")
 
         url = self.config['keycloak_uri']
-        url += "/auth/realms/"
+        url += "/realms/"
         url += self.config['keycloak_realm']
         url += "/protocol/openid-connect/token"
 
