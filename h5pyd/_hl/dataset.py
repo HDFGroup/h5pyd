@@ -1022,7 +1022,7 @@ class Dataset(HLObject):
             req = "/datasets/" + self.id.uuid + "/value"
             rsp = self.GET(req, format="binary")
 
-            if isinstance(rsp, bytes):
+            if type(rsp) in (bytes, bytearray):
                 # got binary response
                 self.log.info("got binary response for scalar selection")
                 # arr = numpy.frombuffer(rsp, dtype=new_dtype)
