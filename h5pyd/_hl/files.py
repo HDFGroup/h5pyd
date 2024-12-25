@@ -21,7 +21,7 @@ import time
 from .objectid import GroupID
 from .group import Group
 from .httpconn import HttpConn
-from .config import Config
+from .. import config
 
 VERBOSE_REFRESH_TIME = 1.0  # 1 second
 
@@ -276,7 +276,7 @@ class File(Group):
         logger=None,
         owner=None,
         linked_domain=None,
-        track_order=False,
+        track_order=None,
         retries=10,
         timeout=180,
         **kwds,
@@ -320,7 +320,8 @@ class File(Group):
             Create new domain using the root of the linked domain
         track_order
             Whether to track dataset/group/attribute creation order within this file. Objects will be iterated
-            in ascending creation order if this is enabled, otherwise in ascending alphanumeric order.
+            in ascending creation order if this is True, if False in ascending alphanumeric order.
+            If None use global default get_config().track_order.
         retries
             Number of retry attempts to be used if a server request fails
         timeout
@@ -341,7 +342,7 @@ class File(Group):
             if mode is None:
                 mode = "r"
 
-            cfg = Config()  # pulls in state from a .hscfg file (if found).
+            cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
 
             # accept domain values in the form:
             #   http://server:port/home/user/myfile.h5
@@ -406,6 +407,9 @@ class File(Group):
             if swmr:
                 use_cache = False  # disable metadata caching in swmr mode
 
+            if track_order is None:
+                track_order = cfg.track_order
+
             http_conn = HttpConn(
                 domain,
                 endpoint=endpoint,
@@ -432,8 +436,6 @@ class File(Group):
                 params["include_attrs"] = "T"
             if bucket:
                 params["bucket"] = bucket
-
-            params["CreateOrder"] = "1" if track_order else "0"
 
             # need some special logic for the first request in local mode
             # to give the sockets time to initialize
@@ -487,6 +489,10 @@ class File(Group):
                     body["owner"] = owner
                 if linked_domain:
                     body["linked_domain"] = linked_domain
+                if track_order:
+                    create_props = {"CreateOrder": 1}
+                    group_body = {"creationProperties": create_props}
+                    body["group"] = group_body
                 rsp = http_conn.PUT(req, params=params, body=body)
                 if rsp.status_code != 201:
                     http_conn.close()

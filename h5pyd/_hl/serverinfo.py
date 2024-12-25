@@ -14,12 +14,12 @@ from __future__ import absolute_import
 
 import time
 from .httpconn import HttpConn
-from .config import Config
+from .. import config
 
 
 def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **kwds):
 
-    cfg = Config()  # get credentials from .hscfg file (if found)
+    cfg = config.get_config()  # get credentials from .hscfg file (if found)
 
     if endpoint is None and "hs_endpoint" in cfg:
         endpoint = cfg["hs_endpoint"]

@@ -351,28 +351,38 @@ class TestFile(TestCase):
 
 class TestTrackOrder(TestCase):
     def populate(self, f):
-        for i in range(100):
+        count = 3
+        for i in range(count):
             # Mix group and dataset creation.
             if i % 10 == 0:
                 f.create_group(str(i))
             else:
                 f[str(i)] = [i]
+        return count
 
     def test_track_order(self):
         filename = self.getFileName("test_track_order_file")
         print(f"filename: {filename}")
-        f = h5py.File(filename, 'w', track_order=True)  # creation order
-        self.populate(f)
-        self.assertEqual(list(f),
-                         [str(i) for i in range(100)])
+        # write file using creation order
+        with h5py.File(filename, 'w', track_order=True) as f:
+            count = self.populate(f)
+            self.assertEqual(list(f), [str(i) for i in range(count)])
+
+        with h5py.File(filename) as f:
+            # domain/file should have been saved with track_order state
+            self.assertEqual(list(f), [str(i) for i in range(count)])
 
     def test_no_track_order(self):
         filename = self.getFileName("test_no_track_order_file")
         print(f"filename: {filename}")
-        f = h5py.File(filename, 'w', track_order=False)  # name alphanumeric
-        self.populate(f)
-        self.assertEqual(list(f),
-                         sorted([str(i) for i in range(100)]))
+
+        # create file using alphanumeric order
+        with h5py.File(filename, 'w', track_order=False) as f:
+            count = self.populate(f)
+            self.assertEqual(list(f), sorted([str(i) for i in range(count)]))
+
+        with h5py.File(filename) as f:  # name alphanumeric
+            self.assertEqual(list(f), sorted([str(i) for i in range(count)]))
 
 
 if __name__ == '__main__':

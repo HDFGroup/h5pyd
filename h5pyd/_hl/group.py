@@ -25,6 +25,7 @@ from . import table
 from .table import Table
 from .datatype import Datatype
 from . import h5type
+from .. import config
 
 
 def isUUID(name):
@@ -49,7 +50,7 @@ class Group(HLObject, MutableMappingHDF5):
     """ Represents an HDF5 group.
     """
 
-    def __init__(self, bind, track_order=False, **kwargs):
+    def __init__(self, bind, track_order=None, **kwargs):
         # print "group init, bind:", bind
 
         """ Create a new Group object by binding to a low-level GroupID.
@@ -58,7 +59,20 @@ class Group(HLObject, MutableMappingHDF5):
         if not isinstance(bind, GroupID):
             raise ValueError(f"{bind} is not a GroupID")
         HLObject.__init__(self, bind, **kwargs)
-        self._track_order = track_order
+
+        if track_order is None:
+            # set order based on group creation props
+            gcpl = self.id.gcpl_json
+            if "CreateOrder" in gcpl:
+                createOrder = gcpl["CreateOrder"]
+                if not createOrder or createOrder == "0":
+                    self._track_order = False
+                else:
+                    self._track_order = True
+            else:
+                self._track_order = False
+        else:
+            self._track_order = track_order
         self._req_prefix = "/groups/" + self.id.uuid
         self._link_db = {}  # cache for links
 
@@ -182,9 +196,10 @@ class Group(HLObject, MutableMappingHDF5):
         group_json = objdb[self.id.id]
         return group_json["links"]
 
-    def _make_group(self, parent_id=None, parent_name=None, link=None):
+    def _make_group(self, parent_id=None, parent_name=None, link=None, track_order=None):
         """ helper function to make a group """
 
+        cfg = config.get_config()
         link_json = {}
         if parent_id:
             link_json["id"] = parent_id
@@ -195,6 +210,9 @@ class Group(HLObject, MutableMappingHDF5):
         body = {}
         if link_json:
             body["link"] = link_json
+        if track_order or cfg.track_order:
+            body["creationProperties"] = {"CreateOrder": 1}
+
         self.log.debug(f"create group with body: {body}")
         rsp = self.POST('/groups', body=body)
 
@@ -211,7 +229,7 @@ class Group(HLObject, MutableMappingHDF5):
 
         return sub_group
 
-    def create_group(self, h5path, track_order=False):
+    def create_group(self, h5path, track_order=None):
         """ Create and return a new subgroup.
 
         Name may be absolute or relative.  Fails if the target name already
@@ -223,8 +241,7 @@ class Group(HLObject, MutableMappingHDF5):
 
         if h5path is None:
             # anonymous group
-            sub_group = self._make_group()
-            sub_group._track_order = track_order
+            sub_group = self._make_group(track_order=track_order)
             return sub_group
 
         if h5path[-1] == '/':
@@ -514,7 +531,7 @@ class Group(HLObject, MutableMappingHDF5):
             raise TypeError(f"Incompatible object ({grp.__class__.__name__}) already exists")
         return grp
 
-    def getObjByUuid(self, uuid, collection_type=None, track_order=False):
+    def getObjByUuid(self, uuid, collection_type=None, track_order=None):
         """ Utility method to get an obj based on collection type and uuid """
         self.log.debug(f"getObjByUuid({uuid})")
         obj_json = None
@@ -549,7 +566,10 @@ class Group(HLObject, MutableMappingHDF5):
             # will need to get JSON from server
             req = f"/{collection_type}/{uuid}"
             # make server request
-            obj_json = self.GET(req, params={"CreateOrder": "1" if track_order else "0"})
+            params = {}
+            if track_order is not None:
+                params["CreateOrder"] = "1" if track_order else "0"
+            obj_json = self.GET(req, params=params)
 
         if collection_type == 'groups':
             tgt = Group(GroupID(self, obj_json), track_order=track_order)
@@ -568,7 +588,7 @@ class Group(HLObject, MutableMappingHDF5):
 
         return tgt
 
-    def __getitem__(self, name, track_order=False):
+    def __getitem__(self, name, track_order=None):
         """ Open an object in the file """
         # convert bytes to str for PY3
         if isinstance(name, bytes):
@@ -655,7 +675,7 @@ class Group(HLObject, MutableMappingHDF5):
 
         return link_obj
 
-    def get(self, name, default=None, getclass=False, getlink=False, track_order=False, **kwds):
+    def get(self, name, default=None, getclass=False, getlink=False, track_order=None, **kwds):
         """ Retrieve an item or other information.
 
         "name" given only:
@@ -739,8 +759,8 @@ class Group(HLObject, MutableMappingHDF5):
                     params["pattern"] = pattern
                 if follow_links:
                     params["follow_links"] = 1
-                if track_order:
-                    params["CreateOrder"] = 1
+                if track_order is not None:
+                    params["CreateOrder"] = "1" if track_order else "0"
 
                 if name:
                     body = {}
@@ -848,7 +868,10 @@ class Group(HLObject, MutableMappingHDF5):
                 raise IOError("cannot create subgroup of softlink")
             parent_uuid = link_json["id"]
             req = "/groups/" + parent_uuid
-            group_json = self.GET(req, params={"CreateOrder": "1" if self._track_order else "0"})
+            params = {}
+            if self._track_order is not None:
+                params["CreateOrder"] = "1" if self._track_order else "0"
+            group_json = self.GET(req, params=params)
             tgt = Group(GroupID(self, group_json))
             tgt[basename] = obj
 
@@ -946,7 +969,10 @@ class Group(HLObject, MutableMappingHDF5):
             return len(links_json)
 
         req = "/groups/" + self.id.uuid
-        rsp_json = self.GET(req, params={"CreateOrder": "1" if self._track_order else "0"})
+        params = {}
+        if self._track_order is not None:
+            params["CreateOrder"] = "1" if self._track_order else "0"
+        rsp_json = self.GET(req, params=params)
         return rsp_json['linkCount']
 
     def __iter__(self):
@@ -955,7 +981,10 @@ class Group(HLObject, MutableMappingHDF5):
 
         if links is None:
             req = "/groups/" + self.id.uuid + "/links"
-            rsp_json = self.GET(req, params={"CreateOrder": "1" if self._track_order else "0"})
+            params = {}
+            if self._track_order is not None:
+                params["CreateOrder"] = "1" if self._track_order else "0"
+            rsp_json = self.GET(req, params=params)
             links = rsp_json['links']
 
             # reset the link cache
@@ -1180,7 +1209,10 @@ class Group(HLObject, MutableMappingHDF5):
                 else:
                     # request from server
                     req = "/groups/" + parent.id.uuid + "/links"
-                    rsp_json = self.GET(req, params={"CreateOrder": "1" if self._track_order else "0"})
+                    params = {}
+                    if self._track_order is not None:
+                        params["CreateOrder"] = "1" if self._track_order else "0"
+                    rsp_json = self.GET(req, params=params)
                     links = rsp_json['links']
                 for link in links:
                     obj = None

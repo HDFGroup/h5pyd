@@ -168,6 +168,14 @@ class TypeID(ObjectID):
         dtype = createDataType(type_json)
         return dtype
 
+    @property
+    def tcpl_json(self):
+        if 'creationProperties' in self._obj_json:
+            tcpl = self._obj_json['creationProperties']
+        else:
+            tcpl = {}
+        return tcpl
+
     def __init__(self, parent, item, **kwds):
         """Create a new TypeID.
         """
@@ -255,3 +263,11 @@ class GroupID(ObjectID):
 
         if self.collection_type != "groups":
             raise IOError(f"Unexpected collection_type: {self._collection_type}")
+
+    @property
+    def gcpl_json(self):
+        if 'creationProperties' in self._obj_json:
+            gcpl = self._obj_json['creationProperties']
+        else:
+            gcpl = {}
+        return gcpl

@@ -28,7 +28,8 @@ except ModuleNotFoundError:
     pass  # change this to the eprint below to see the import error
     # eprint("Unable to import google auth packages")
 
-from .config import Config
+
+from .. import config as hsconfig
 
 
 class OpenIDHandler(ABC):
@@ -136,7 +137,7 @@ class AzureOpenID(OpenIDHandler):
         """Store configuration."""
 
         # Configuration manager
-        hs_config = Config()
+        hs_config = hsconfig.get_config()
 
         # Config is a dictionary.
         if isinstance(config, dict):
@@ -256,7 +257,7 @@ class GoogleOpenID(OpenIDHandler):
             raise ModuleNotFoundError(msg)
 
         # Configuration manager
-        hs_config = Config()
+        hs_config = hsconfig.get_config()
 
         if scopes is None:
             scopes = hs_config.get('hs_google_scopes', 'openid').split()
@@ -345,7 +346,7 @@ class KeycloakOpenID(OpenIDHandler):
         """Store configuration."""
 
         # Configuration manager
-        hs_config = Config()
+        hs_config = hsconfig.get_config()
 
         if scopes is None:
             scopes = hs_config.get('hs_keycloak_scopes', 'openid').split()

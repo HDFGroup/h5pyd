@@ -17,7 +17,7 @@ import json
 import time
 import logging
 from .httpconn import HttpConn
-from .config import Config
+from .. import config
 
 
 class Folder:
@@ -143,7 +143,7 @@ class Folder:
         if mode is None:
             mode = "r"
 
-        cfg = Config()  # pulls in state from a .hscfg file (if found).
+        cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
 
         if endpoint is None and "hs_endpoint" in cfg:
             endpoint = cfg["hs_endpoint"]
