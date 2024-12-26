@@ -327,7 +327,6 @@ class File(Group):
         timeout
             Timeout value in seconds
         """
-
         groupid = None
         dn_ids = []
         # if we're passed a GroupId as domain, just initialize the file object
@@ -406,9 +405,6 @@ class File(Group):
 
             if swmr:
                 use_cache = False  # disable metadata caching in swmr mode
-
-            if track_order is None:
-                track_order = cfg.track_order
 
             http_conn = HttpConn(
                 domain,
@@ -489,7 +485,7 @@ class File(Group):
                     body["owner"] = owner
                 if linked_domain:
                     body["linked_domain"] = linked_domain
-                if track_order:
+                if track_order or cfg.track_order:
                     create_props = {"CreateOrder": 1}
                     group_body = {"creationProperties": create_props}
                     body["group"] = group_body
@@ -558,22 +554,20 @@ class File(Group):
 
             groupid = GroupID(None, group_json, http_conn=http_conn)
         # end else
+
         self._name = "/"
         self._id = groupid
-        self._verboseInfo = None  # aditional state we'll get when requested
+        self._verboseInfo = None  # additional state we'll get when requested
         self._verboseUpdated = None  # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
         self._dn_ids = dn_ids
-        self._track_order = track_order
         self._swmr_mode = swmr
 
         Group.__init__(self, self._id, track_order=track_order)
 
     def _getVerboseInfo(self):
         now = time.time()
-        if (
-            self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME
-        ):
+        if (self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME):
             # resynch the verbose data
             req = "/?verbose=1"
             rsp_json = self.GET(req, use_cache=False, params={"CreateOrder": "1" if self._track_order else "0"})

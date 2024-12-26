@@ -292,49 +292,68 @@ class TestAttribute(TestCase):
 
 class TestTrackOrder(TestCase):
 
-    def fill_attrs(self, track_order):
-        attrs = self.f.create_group('test', track_order=track_order).attrs
-        for i in range(100):
-            attrs[str(i)] = i
-        return attrs
+    titles = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
 
-    # https://forum.hdfgroup.org/t/bug-h5arename-fails-unexpectedly/4881
+    def fill_attrs(self, obj):
+        count = len(self.titles)
+        attrs = obj.attrs
+        for i in range(count):
+            title = self.titles[i]
+            val = i + 1
+            attrs[title] = val
+
     def test_track_order(self):
         filename = self.getFileName("test_test_track_order_attribute")
         print(f"filename: {filename}")
-        self.f = h5py.File(filename, 'w')
-        attrs = self.fill_attrs(track_order=True)  # creation order
-        self.assertEqual(list(attrs),
-                         [str(i) for i in range(100)])
+        with h5py.File(filename, 'w') as f:
+            g1 = f.create_group('test', track_order=True)
+            self.fill_attrs(g1)
+            self.assertEqual(list(g1.attrs), list(self.titles))
+        # group should return track order
+        with h5py.File(filename) as f:
+            g1 = f['test']
+            self.assertEqual(list(g1.attrs), list(self.titles))
+
+    def test_track_order_cfg(self):
+        filename = self.getFileName("test_test_track_order_attribute")
+        print(f"filename: {filename}")
+        cfg = h5py.get_config()
+        with h5py.File(filename, 'w') as f:
+            cfg.track_order = True
+            g1 = f.create_group('test')
+            cfg.track_order = False  # reset
+
+            self.fill_attrs(g1)
+            self.assertEqual(list(g1.attrs), list(self.titles))
+
+        with h5py.File(filename) as f:
+            g1 = f['test']
+            self.assertEqual(list(g1.attrs), list(self.titles))
 
     def test_no_track_order(self):
         filename = self.getFileName("test_test_no_track_order_attribute")
         print(f"filename: {filename}")
-        self.f = h5py.File(filename, 'w')
-        attrs = self.fill_attrs(track_order=False)  # name alphanumeric
-        self.assertEqual(list(attrs),
-                         sorted([str(i) for i in range(100)]))
-
-    def fill_attrs2(self, track_order):
-        group = self.f.create_group('test', track_order=track_order)
-        for i in range(12):
-            group.attrs[str(i)] = i
-        return group
+        f = h5py.File(filename, 'w')
+        g1 = f.create_group('test')  # name alphanumeric
+        self.fill_attrs(g1)
+        self.assertEqual(list(g1.attrs), sorted(list(self.titles)))
 
     def test_track_order_overwrite_delete(self):
         filename = self.getFileName("test_test_track_order_overwrite_delete")
         print(f"filename: {filename}")
-        self.f = h5py.File(filename, 'w')
-        # issue h5py#1385
-        group = self.fill_attrs2(track_order=True)  # creation order
-        self.assertEqual(group.attrs["11"], 11)
+        f = h5py.File(filename, 'w')
+
+        g1 = f.create_group("g1", track_order=True)  # creation order
+        self.fill_attrs(g1)
+        title = 'three'
+        self.assertEqual(g1.attrs[title], 3)
         # overwrite attribute
-        group.attrs['11'] = 42.0
-        self.assertEqual(group.attrs["11"], 42.0)
+        g1.attrs[title] = 42.0
+        self.assertEqual(g1.attrs[title], 42.0)
         # delete attribute
-        self.assertIn('10', group.attrs)
-        del group.attrs['10']
-        self.assertNotIn('10', group.attrs)
+        self.assertIn(title, g1.attrs)
+        del g1.attrs[title]
+        self.assertNotIn(title, g1.attrs)
 
     def test_track_order_not_inherited(self):
         """
@@ -343,13 +362,11 @@ class TestTrackOrder(TestCase):
         """
         filename = self.getFileName("test_test_track_order_not_inherited")
         print(f"filename: {filename}")
-        self.f = h5py.File(filename, 'w', track_order=True)
-        group = self.f.create_group('test')
+        f = h5py.File(filename, 'w', track_order=True)
+        g1 = f.create_group('test')
+        self.fill_attrs(g1)
 
-        for i in range(12):
-            group.attrs[str(i)] = i
-
-        self.assertEqual(list(group.attrs), sorted([str(i) for i in range(12)]))
+        self.assertEqual(list(g1.attrs), sorted(list(self.titles)))
 
 
 if __name__ == '__main__':

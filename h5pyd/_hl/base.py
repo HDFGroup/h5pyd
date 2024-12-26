@@ -14,6 +14,7 @@ from __future__ import absolute_import
 
 import posixpath
 import os
+import sys
 import json
 import numpy as np
 import logging
@@ -26,6 +27,10 @@ from .h5type import Reference, check_dtype, special_dtype
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
 numpy_float_types = (np.float16, np.float32, np.float64)
+
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
 
 
 class FakeLock():
@@ -506,7 +511,7 @@ def readElement(buffer, offset, arr, index, dt):
             e = np.frombuffer(bytes(e_buffer), dtype=dt)
             arr[index] = e[0]
         except ValueError:
-            print(f"ERROR: ValueError setting {e_buffer} and dtype: {dt}")
+            eprint(f"ERROR: ValueError setting {e_buffer} and dtype: {dt}")
             raise
     else:
         # variable length element
@@ -533,7 +538,7 @@ def readElement(buffer, offset, arr, index, dt):
                 try:
                     e = np.frombuffer(bytes(e_buffer), dtype=vlen)
                 except ValueError:
-                    print("ValueError -- e_buffer:", e_buffer, "dtype:", vlen)
+                    eprint("ValueError -- e_buffer:", e_buffer, "dtype:", vlen)
                     raise
                 arr[index] = e
 

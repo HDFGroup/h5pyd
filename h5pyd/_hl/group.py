@@ -200,6 +200,7 @@ class Group(HLObject, MutableMappingHDF5):
         """ helper function to make a group """
 
         cfg = config.get_config()
+
         link_json = {}
         if parent_id:
             link_json["id"] = parent_id
@@ -219,6 +220,8 @@ class Group(HLObject, MutableMappingHDF5):
         group_json = rsp
         groupId = GroupID(self, group_json)
         sub_group = Group(groupId)
+        if track_order or cfg.track_order:
+            sub_group._track_order = True
         if parent_name:
             if parent_name[-1] == '/':
                 parent_name = parent_name + link
@@ -272,8 +275,12 @@ class Group(HLObject, MutableMappingHDF5):
                 create_group = True
 
             if create_group:
-                sub_group = self._make_group(parent_id=parent_uuid, parent_name=parent_name, link=link)
-                sub_group._track_order = track_order
+                kwargs = {}
+                kwargs["parent_id"] = parent_uuid
+                kwargs["parent_name"] = parent_name
+                kwargs["link"] = link
+                kwargs["track_order"] = track_order
+                sub_group = self._make_group(**kwargs)
                 parent_uuid = sub_group.id.id
 
             else:
@@ -593,7 +600,7 @@ class Group(HLObject, MutableMappingHDF5):
         # convert bytes to str for PY3
         if isinstance(name, bytes):
             name = name.decode('utf-8')
-        self.log.debug(f"group.__getitem__({name})")
+        self.log.debug(f"group.__getitem__({name}, track_order={track_order})")
 
         tgt = None
         if isinstance(name, h5type.Reference):
@@ -716,7 +723,7 @@ class Group(HLObject, MutableMappingHDF5):
         """
         if not (getclass or getlink):
             try:
-                return self.__getitem__(name, track_order)
+                return self.__getitem__(name, track_order=track_order)
             except KeyError:
                 return default
 
