@@ -49,7 +49,7 @@ class H5Image(io.RawIOBase):
     def __init__(self, domain_path, h5path="h5image", chunks_per_page=1, logger=None):
         """ verify dataset can be accessed and set logger if supplied """
         self._cursor = 0
-        if domain_path.startswith("hdf5::/"):
+        if domain_path and domain_path.startswith("hdf5::/"):
             self._domain_path = domain_path
         else:
             self._domain_path = "hdf5:/" + domain_path
@@ -354,7 +354,7 @@ class File(Group):
             #
             #  For http prefixed values, extract the endpont and use the rest as domain path
             for protocol in ("http://", "https://", "hdf5://", "http+unix://"):
-                if domain.startswith(protocol):
+                if domain and domain.startswith(protocol):
                     if protocol.startswith("http"):
                         domain = domain[len(protocol):]
                         # extract the endpoint
@@ -436,7 +436,7 @@ class File(Group):
             # need some special logic for the first request in local mode
             # to give the sockets time to initialize
 
-            if endpoint.startswith("local"):
+            if endpoint and endpoint.startswith("local"):
                 connect_backoff = [0.5, 1, 2, 4, 8, 16]
             else:
                 connect_backoff = []
