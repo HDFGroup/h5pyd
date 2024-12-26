@@ -383,7 +383,7 @@ class File(Group):
                     endpoint = cfg["hs_endpoint"]
 
             # remove the trailing slash on endpoint if it exists
-            if endpoint.endswith('/'):
+            if endpoint and endpoint.endswith('/'):
                 endpoint = endpoint.strip('/')
 
             if username is None:
