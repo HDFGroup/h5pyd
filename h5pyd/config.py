@@ -55,6 +55,11 @@ class Config:
                     else:
                         Config._cfg[k] = v
 
+        # add standard keys if not already picked up
+        for k in ("hs_endpoint", "hs_username", "hs_password", "hs_api_key"):
+            if k not in Config._cfg:
+                Config._cfg[k] = ""
+
         # override any config values with environment variable if found
         for k in Config._cfg.keys():
             if k.upper() in os.environ:
