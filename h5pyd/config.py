@@ -17,7 +17,7 @@ class Config:
     """
     User Config state
     """
-    _cfg = {} # global state
+    _cfg = {}  # global state
 
     def __init__(self, config_file=None, **kwargs):
         if Config._cfg:
@@ -109,23 +109,23 @@ class Config:
 
     def keys(self):
         return Config._cfg.keys()
-    
+
     @property
     def hs_endpoint(self):
         return Config._cfg.get("hs_endpoint")
-    
+
     @property
     def hs_username(self):
         return Config._cfg.get("hs_username")
-    
+
     @property
     def hs_password(self):
         return Config._cfg.get("hs_password")
-    
+
     @property
     def hs_api_key(self):
         return Config._cfg.get("hs_api_key")
-    
+
     @property
     def bool_names(self):
         if "bool_names" in Config._cfg:
@@ -133,7 +133,7 @@ class Config:
         else:
             names = (b"FALSE", b"TRUE")
         return names
-    
+
     @bool_names.setter
     def bool_names(self, value):
         if isinstance(value, str):
@@ -149,7 +149,7 @@ class Config:
         else:
             names = value
         Config._cfg["bool_names"] = tuple(names)
-    
+
     @property
     def complex_names(self):
         if "complex_names" in Config._cfg:
@@ -157,7 +157,7 @@ class Config:
         else:
             names = ("r", "i")
         return names
-    
+
     @complex_names.setter
     def complex_names(self, value):
         if isinstance(value, str):
@@ -182,7 +182,7 @@ class Config:
         else:
             track = False
         return track
-    
+
     @track_order.setter
     def track_order(self, value):
         if isinstance(value, str):
@@ -194,7 +194,7 @@ class Config:
         else:
             track = bool(value)
         Config._cfg["track_order"] = track
-    
-    
+
+
 def get_config(config_file=None, **kwargs):
     return Config(config_file=config_file, **kwargs)
