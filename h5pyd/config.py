@@ -17,8 +17,11 @@ class Config:
     """
     User Config state
     """
+    _cfg = {}  # global state
+
     def __init__(self, config_file=None, **kwargs):
-        self._cfg = {}
+        if Config._cfg:
+            return  # already initialized
         if config_file:
             self._config_file = config_file
         elif os.path.isfile(".hscfg"):
@@ -39,51 +42,164 @@ class Config:
                         continue
                     fields = s.split('=')
                     if len(fields) < 2:
-                        print("config file: {} line: {} is not valid".format(self._config_file, line_number))
+                        print(f"config file: {self._config_file} line: {line_number} is not valid")
                         continue
                     k = fields[0].strip()
                     v = fields[1].strip()
-                    self._cfg[k] = v
-        # override any config values with environment variable if found
-        for k in self._cfg.keys():
-            if k.upper() in os.environ:
-                self._cfg[k] = os.environ[k.upper()]
+                    if k == "complex_names":
+                        self.complex_names = v
+                    elif k == "bool_names":
+                        self.bool_names = v
+                    elif k == "track_order":
+                        self.track_order = v
+                    else:
+                        Config._cfg[k] = v
 
-        # finally update any values that are passed in to the constructor
+        # add standard keys if not already picked up
+        for k in ("hs_endpoint", "hs_username", "hs_password", "hs_api_key"):
+            if k not in Config._cfg:
+                Config._cfg[k] = ""
+
+        # override any config values with environment variable if found
+        for k in Config._cfg.keys():
+            if k.upper() in os.environ:
+                Config._cfg[k] = os.environ[k.upper()]
+
+        # update any values that are passed in to the constructor
         for k in kwargs.keys():
-            self._cfg[k] = kwargs[k]
+            Config._cfg[k] = kwargs[k]
+
+        # finally, set defaults for any expected keys that are not already set
+        for k in ("hs_endpoint", "hs_username", "hs_endpoint"):
+            if k not in Config._cfg:
+                Config._cfg[k] = None
+        if "bool_names" not in Config._cfg:
+            Config._cfg["bool_names"] = (b"FALSE", b"TRUE")
+        if "complex_names" not in Config._cfg:
+            Config._cfg["complex_names"] = ("r", "i")
+        if "track_order" not in Config._cfg:
+            Config._cfg["track_order"] = False
 
     def __getitem__(self, name):
         """ Get a config item  """
-        if name not in self._cfg:
+        if name not in Config._cfg:
             if name.upper() in os.environ:
-                self._cfg[name] = os.environ[name.upper()]
+                Config._cfg[name] = os.environ[name.upper()]
             else:
                 return None
-        return self._cfg[name]
+        return Config._cfg[name]
 
     def __setitem__(self, name, obj):
         """ set config item """
-        self._cfg[name] = obj
+        Config._cfg[name] = obj
 
     def __delitem__(self, name):
         """ Delete option. """
-        del self._cfg[name]
+        del Config._cfg[name]
 
     def __len__(self):
-        return len(self._cfg)
+        return len(Config._cfg)
 
     def __iter__(self):
         """ Iterate over config names """
-        keys = self._cfg.keys()
+        keys = Config._cfg.keys()
         for key in keys:
             yield key
 
     def __contains__(self, name):
-        return name in self._cfg
+        return name in Config._cfg
 
     def __repr__(self):
-        return json.dumps(self._cfg)
+        return json.dumps(Config._cfg)
 
     def keys(self):
-        return self._cfg.keys()
+        return Config._cfg.keys()
+
+    @property
+    def hs_endpoint(self):
+        return Config._cfg.get("hs_endpoint")
+
+    @property
+    def hs_username(self):
+        return Config._cfg.get("hs_username")
+
+    @property
+    def hs_password(self):
+        return Config._cfg.get("hs_password")
+
+    @property
+    def hs_api_key(self):
+        return Config._cfg.get("hs_api_key")
+
+    @property
+    def bool_names(self):
+        if "bool_names" in Config._cfg:
+            names = Config._cfg["bool_names"]
+        else:
+            names = (b"FALSE", b"TRUE")
+        return names
+
+    @bool_names.setter
+    def bool_names(self, value):
+        if isinstance(value, str):
+            names = value.split(())
+            if len(names) < 2:
+                raise ValueError("bool_names must have two items")
+            elif len(names) == 2:
+                pass
+            else:
+                names = names[:2]  # just use the first two items
+        elif len(value) != 2:
+            raise ValueError("expected two-element list for bool_names")
+        else:
+            names = value
+        Config._cfg["bool_names"] = tuple(names)
+
+    @property
+    def complex_names(self):
+        if "complex_names" in Config._cfg:
+            names = Config._cfg["complex_names"]
+        else:
+            names = ("r", "i")
+        return names
+
+    @complex_names.setter
+    def complex_names(self, value):
+        if isinstance(value, str):
+            names = value.split()
+            if len(names) < 2:
+                raise ValueError("complex_names must have two items")
+            elif len(names) == 2:
+                pass
+            else:
+                names = names[:2]  # just use the first two items
+        elif len(value) != 2:
+            raise ValueError("complex_names must have two values")
+        else:
+            names = value
+
+        Config._cfg["complex_names"] = tuple(names)
+
+    @property
+    def track_order(self):
+        if "track_order" in Config._cfg:
+            track = Config._cfg["track_order"]
+        else:
+            track = False
+        return track
+
+    @track_order.setter
+    def track_order(self, value):
+        if isinstance(value, str):
+            tokens = value.split()
+            if len(tokens) == 0:
+                track = False
+            else:
+                track = bool(tokens[0])  # strip any comments
+        else:
+            track = bool(value)
+        Config._cfg["track_order"] = track
+
+
+def get_config(config_file=None, **kwargs):
+    return Config(config_file=config_file, **kwargs)

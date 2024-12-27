@@ -350,29 +350,65 @@ class TestFile(TestCase):
 
 
 class TestTrackOrder(TestCase):
+    titles = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+
     def populate(self, f):
-        for i in range(100):
+        count = len(self.titles)
+        # create count datasets/groups
+        for i in range(count):
+            title = self.titles[i]
             # Mix group and dataset creation.
-            if i % 10 == 0:
-                f.create_group(str(i))
+            if i % 2 == 0:
+                f.create_group(title)
             else:
-                f[str(i)] = [i]
+                f[title] = [i]
+        # create count attributes
+        for i in range(count):
+            title = self.titles[i]
+            f.attrs[title] = i
 
     def test_track_order(self):
         filename = self.getFileName("test_track_order_file")
         print(f"filename: {filename}")
-        f = h5py.File(filename, 'w', track_order=True)  # creation order
-        self.populate(f)
-        self.assertEqual(list(f),
-                         [str(i) for i in range(100)])
+        # write file using creation order
+        with h5py.File(filename, 'w', track_order=True) as f:
+            self.populate(f)
+            self.assertEqual(list(f), list(self.titles))
+            self.assertEqual(list(f.attrs), list(self.titles))
+
+        with h5py.File(filename) as f:
+            # domain/file should have been saved with track_order state
+            self.assertEqual(list(f), list(self.titles))
+            self.assertEqual(list(f.attrs), list(self.titles))
+
+    def test_cfg_track_order(self):
+        filename = self.getFileName("test_cfg_track_order_file")
+        print(f"filename: {filename}")
+        # write file using creation order
+        cfg = h5py.get_config()
+        cfg.track_order = True
+        with h5py.File(filename, 'w') as f:
+            self.populate(f)
+            self.assertEqual(list(f), list(self.titles))
+            self.assertEqual(list(f.attrs), list(self.titles))
+        cfg.track_order = False  # reset
+
+        with h5py.File(filename) as f:
+            # domain/file should have been saved with track_order state
+            self.assertEqual(list(f), list(self.titles))
+            self.assertEqual(list(f.attrs), list(self.titles))
 
     def test_no_track_order(self):
         filename = self.getFileName("test_no_track_order_file")
         print(f"filename: {filename}")
-        f = h5py.File(filename, 'w', track_order=False)  # name alphanumeric
-        self.populate(f)
-        self.assertEqual(list(f),
-                         sorted([str(i) for i in range(100)]))
+
+        # create file using alphanumeric order
+        with h5py.File(filename, 'w', track_order=False) as f:
+            self.populate(f)
+            self.assertEqual(list(f), sorted(self.titles))
+
+        with h5py.File(filename) as f:  # name alphanumeric
+            self.assertEqual(list(f), sorted(self.titles))
 
 
 if __name__ == '__main__':

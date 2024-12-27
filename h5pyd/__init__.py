@@ -29,7 +29,8 @@ from ._hl.serverinfo import getServerInfo
 from . import h5ds
 
 
-from .config import Config
+from .config import get_config
+
 __version__ = version.version
 
 

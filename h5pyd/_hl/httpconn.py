@@ -25,7 +25,7 @@ import json
 import logging
 
 from . import openid
-from .config import Config
+from .. import config
 from . import requests_lambda
 
 MAX_CACHE_ITEM_SIZE = 10000  # max size of an item to put in the cache
@@ -73,7 +73,7 @@ def getAzureApiKey():
     api_key = None
 
     # if Azure AD ids are set, pass them to HttpConn via api_key dict
-    cfg = Config()  # pulls in state from a .hscfg file (if found).
+    cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
 
     ad_app_id = None  # Azure AD HSDS Server id
     if "HS_AD_APP_ID" in os.environ:
@@ -114,7 +114,7 @@ def getAzureApiKey():
 
 def getKeycloakApiKey():
     # check for keycloak next
-    cfg = Config()  # pulls in state from a .hscfg file (if found).
+    cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
     api_key = None
     # check to see if we are configured for keycloak authentication
     if "HS_KEYCLOAK_URI" in os.environ:
@@ -293,7 +293,6 @@ class HttpConn:
         if isinstance(api_key, dict):
             # Maintain Azure-defualt backwards compatibility, but allow
             # both environment variable and kwarg override.
-            # provider = Config().get('hs_openid_provider', 'azure')
             provider = api_key.get("openid_provider", "azure")
             if provider == "azure":
                 self.log.debug("creating OpenIDHandler for Azure")
@@ -327,6 +326,7 @@ class HttpConn:
             self._s = None
 
     def getHeaders(self, username=None, password=None, headers=None):
+
         if headers is None:
             headers = {}
         elif "Authorization" in headers:

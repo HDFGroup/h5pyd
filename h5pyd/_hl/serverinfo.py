@@ -14,12 +14,12 @@ from __future__ import absolute_import
 
 import time
 from .httpconn import HttpConn
-from .config import Config
+from .. import config
 
 
 def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **kwds):
 
-    cfg = Config()  # get credentials from .hscfg file (if found)
+    cfg = config.get_config()  # get credentials from .hscfg file (if found)
 
     if endpoint is None and "hs_endpoint" in cfg:
         endpoint = cfg["hs_endpoint"]
@@ -40,7 +40,7 @@ def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **k
 
     # need some special logic for the first request in local mode
     # to give the sockets time to initialize
-    if endpoint.startswith("local"):
+    if endpoint and endpoint.startswith("local"):
         connect_backoff = [0.5, 1, 2, 4, 8, 16]
     else:
         connect_backoff = []

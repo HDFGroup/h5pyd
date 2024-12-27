@@ -313,7 +313,7 @@ class TestGroup(TestCase):
         if config.get("use_h5py"):
             return
         filename = self.getFileName("test_link_multi_removal")
-        print(filename)
+        print(f"filename: {filename}")
 
         f = h5py.File(filename, 'w')
         g1 = f.create_group("g1")
@@ -358,7 +358,7 @@ class TestGroup(TestCase):
             return
 
         filename = self.getFileName("test_link_multi_create")
-        print(filename)
+        print(f"filename: {filename}")
 
         f = h5py.File(filename, 'w')
         g1 = f.create_group("g1")
@@ -438,7 +438,7 @@ class TestGroup(TestCase):
             return
 
         filename = self.getFileName("test_link_get_multi")
-        print(filename)
+        print(f"filename: {filename}")
 
         f = h5py.File(filename, 'w')
         g1 = f.create_group("g1")
@@ -550,40 +550,87 @@ class TestGroup(TestCase):
 
 
 class TestTrackOrder(TestCase):
+    titles = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
 
     def populate(self, g):
-        for i in range(100):
+        count = len(self.titles)
+        for i in range(count):
             # Mix group and dataset creation.
-            if i % 10 == 0:
-                g.create_group(str(i))
+            if i % 2 == 0:
+                g.create_group(self.titles[i])
             else:
-                g[str(i)] = [i]
+                g[self.titles[i]] = [i]
 
     def populate_attrs(self, d):
-        for i in range(100):
-            d.attrs[str(i)] = i
+        count = len(self.titles)
+        for i in range(count):
+            d.attrs[self.titles[i]] = i
 
     def test_track_order(self):
         filename = self.getFileName("test_track_order_group")
         print(f"filename: {filename}")
-        self.f = h5py.File(filename, 'w')
-        g = self.f.create_group('order', track_order=True)  # creation order
-        self.populate(g)
+        with h5py.File(filename, 'w') as f:
+            g = f.create_group('order', track_order=True)  # creation order
+            self.populate(g)
 
-        ref = [str(i) for i in range(100)]
-        self.assertEqual(list(g), ref)
-        self.assertEqual(list(reversed(g)), list(reversed(ref)))
+            ref = self.titles
+            self.assertEqual(tuple(g), ref)
+            i = 0
+            for title in g:
+                self.assertEqual(title, self.titles[i])
+                i += 1
+
+        # re-opening the file should retain the track_order setting
+        with h5py.File(filename) as f:
+            g = f['order']
+            self.assertEqual(len(g), len(self.titles))
+            self.assertEqual(tuple(g), self.titles)
+            self.assertEqual(tuple(reversed(g)), tuple(reversed(self.titles)))
+            i = 0
+            for title in g:
+                self.assertEqual(title, self.titles[i])
+                i += 1
+
+    def test_track_order_cfg(self):
+        filename = self.getFileName("test_track_order_cfg_group")
+        print(f"filename: {filename}")
+        cfg = h5py.get_config()
+        with h5py.File(filename, 'w') as f:
+            cfg.track_order = True  # creation order
+            g = f.create_group('order')
+            cfg.track_order = False  # reset
+            self.populate(g)
+            self.assertEqual(tuple(g), self.titles)
+            i = 0
+            for title in g:
+                self.assertEqual(title, self.titles[i])
+                i += 1
+
+        # re-opening the file should retain the track_order setting
+        with h5py.File(filename) as f:
+            g = f['order']
+            self.assertEqual(len(g), len(self.titles))
+            self.assertEqual(tuple(g), self.titles)
+            i = 0
+            for title in g:
+                self.assertEqual(title, self.titles[i])
+                i += 1
 
     def test_no_track_order(self):
         filename = self.getFileName("test_no_track_order_group")
         print(f"filename: {filename}")
-        self.f = h5py.File(filename, 'w')
-        g = self.f.create_group('order', track_order=False)  # name alphanumeric
-        self.populate(g)
+        with h5py.File(filename, 'w') as f:
+            g = f.create_group('order', track_order=False)  # name alphanumeric
+            self.populate(g)
+            ref = sorted(self.titles)
+            self.assertEqual(list(g), ref)
+            self.assertEqual(list(reversed(g)), list(reversed(ref)))
 
-        ref = sorted([str(i) for i in range(100)])
-        self.assertEqual(list(g), ref)
-        self.assertEqual(list(reversed(g)), list(reversed(ref)))
+        with h5py.File(filename) as f:
+            g = f['order']  # name alphanumeric
+            ref = sorted(self.titles)
+            self.assertEqual(list(g), ref)
+            self.assertEqual(list(reversed(g)), list(reversed(ref)))
 
     def test_get_dataset_track_order(self):
 
@@ -593,28 +640,24 @@ class TestTrackOrder(TestCase):
 
         filename = self.getFileName("test_get_dataset_track_order")
         print(f"filename: {filename}")
-        self.f = h5py.File(filename, 'w')
-        g = self.f.create_group('order')
+        with h5py.File(filename, 'w') as f:
+            g = f.create_group('order')
 
-        dset = g.create_dataset('dset', (10,), dtype='i4')
-        dset2 = g.create_dataset('dset2', (10,), dtype='i4')
+            dset = g.create_dataset('dset', (10,), dtype='i4')
+            dset2 = g.create_dataset('dset2', (10,), dtype='i4')
 
-        self.populate_attrs(dset)
-        self.populate_attrs(dset2)
+            self.populate_attrs(dset)
+            self.populate_attrs(dset2)
 
-        self.f.close()
-        self.f = h5py.File(filename, 'r')
-        g = self.f['order']
+        with h5py.File(filename) as f:
+            g = f['order']
 
-        d = g.get('dset', track_order=True)
-        ref = [str(i) for i in range(100)]
-        self.assertEqual(list(d.attrs), ref)
-        self.assertEqual(list(reversed(d.attrs)), list(reversed(ref)))
+            d = g.get('dset', track_order=True)
+            self.assertEqual(list(d.attrs), list(self.titles))
 
-        d2 = g.get('dset2', track_order=False)
-        ref = sorted([str(i) for i in range(100)])
-        self.assertEqual(list(d2.attrs), ref)
-        self.assertEqual(list(reversed(d2.attrs)), list(reversed(ref)))
+            d2 = g.get('dset2', track_order=False)
+            ref = sorted(self.titles)
+            self.assertEqual(list(d2.attrs), ref)
 
     def test_get_group_track_order(self):
         # h5py does not support track_order on group.get()
@@ -622,29 +665,21 @@ class TestTrackOrder(TestCase):
             return
         filename = self.getFileName("test_get_group_track_order")
         print(f"filename: {filename}")
-        self.f = h5py.File(filename, 'w')
-        g = self.f.create_group('order')
+        with h5py.File(filename, 'w') as f:
+            g = f.create_group('order')
+            # create subgroup and populate it with links
+            g.create_group('subgroup')
+            self.populate(g['subgroup'])
 
-        # create subgroup and populate it with links
-        g.create_group('subgroup')
-        self.populate(g['subgroup'])
+        with h5py.File(filename) as f:
+            g = f['order']
+            subg = g.get('subgroup', track_order=True)
+            self.assertEqual(tuple(subg), self.titles)
 
-        self.f.close()
-        self.f = h5py.File(filename, 'r')
-        g = self.f['order']
-
-        subg = g.get('subgroup', track_order=True)
-        ref = [str(i) for i in range(100)]
-        self.assertEqual(list(subg), ref)
-        self.assertEqual(list(reversed(subg)), list(reversed(ref)))
-
-        self.f.close()
-        self.f = h5py.File(filename, 'r')
-        g = self.f['order']
-        subg2 = g.get('subgroup', track_order=False)
-        ref = sorted([str(i) for i in range(100)])
-        self.assertEqual(list(subg2), ref)
-        self.assertEqual(list(reversed(subg2)), list(reversed(ref)))
+        with h5py.File(filename) as f:
+            g = f['order']
+            subg2 = g.get('subgroup', track_order=False)
+            self.assertEqual(list(subg2), sorted(self.titles))
 
 
 if __name__ == '__main__':

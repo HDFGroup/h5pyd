@@ -21,7 +21,7 @@ import time
 from .objectid import GroupID
 from .group import Group
 from .httpconn import HttpConn
-from .config import Config
+from .. import config
 
 VERBOSE_REFRESH_TIME = 1.0  # 1 second
 
@@ -49,7 +49,7 @@ class H5Image(io.RawIOBase):
     def __init__(self, domain_path, h5path="h5image", chunks_per_page=1, logger=None):
         """ verify dataset can be accessed and set logger if supplied """
         self._cursor = 0
-        if domain_path.startswith("hdf5::/"):
+        if domain_path and domain_path.startswith("hdf5::/"):
             self._domain_path = domain_path
         else:
             self._domain_path = "hdf5:/" + domain_path
@@ -276,7 +276,7 @@ class File(Group):
         logger=None,
         owner=None,
         linked_domain=None,
-        track_order=False,
+        track_order=None,
         retries=10,
         timeout=180,
         **kwds,
@@ -320,13 +320,13 @@ class File(Group):
             Create new domain using the root of the linked domain
         track_order
             Whether to track dataset/group/attribute creation order within this file. Objects will be iterated
-            in ascending creation order if this is enabled, otherwise in ascending alphanumeric order.
+            in ascending creation order if this is True, if False in ascending alphanumeric order.
+            If None use global default get_config().track_order.
         retries
             Number of retry attempts to be used if a server request fails
         timeout
             Timeout value in seconds
         """
-
         groupid = None
         dn_ids = []
         # if we're passed a GroupId as domain, just initialize the file object
@@ -341,7 +341,7 @@ class File(Group):
             if mode is None:
                 mode = "r"
 
-            cfg = Config()  # pulls in state from a .hscfg file (if found).
+            cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
 
             # accept domain values in the form:
             #   http://server:port/home/user/myfile.h5
@@ -354,7 +354,7 @@ class File(Group):
             #
             #  For http prefixed values, extract the endpont and use the rest as domain path
             for protocol in ("http://", "https://", "hdf5://", "http+unix://"):
-                if domain.startswith(protocol):
+                if domain and domain.startswith(protocol):
                     if protocol.startswith("http"):
                         domain = domain[len(protocol):]
                         # extract the endpoint
@@ -383,7 +383,7 @@ class File(Group):
                     endpoint = cfg["hs_endpoint"]
 
             # remove the trailing slash on endpoint if it exists
-            if endpoint.endswith('/'):
+            if endpoint and endpoint.endswith('/'):
                 endpoint = endpoint.strip('/')
 
             if username is None:
@@ -433,12 +433,10 @@ class File(Group):
             if bucket:
                 params["bucket"] = bucket
 
-            params["CreateOrder"] = "1" if track_order else "0"
-
             # need some special logic for the first request in local mode
             # to give the sockets time to initialize
 
-            if endpoint.startswith("local"):
+            if endpoint and endpoint.startswith("local"):
                 connect_backoff = [0.5, 1, 2, 4, 8, 16]
             else:
                 connect_backoff = []
@@ -487,6 +485,10 @@ class File(Group):
                     body["owner"] = owner
                 if linked_domain:
                     body["linked_domain"] = linked_domain
+                if track_order or cfg.track_order:
+                    create_props = {"CreateOrder": 1}
+                    group_body = {"creationProperties": create_props}
+                    body["group"] = group_body
                 rsp = http_conn.PUT(req, params=params, body=body)
                 if rsp.status_code != 201:
                     http_conn.close()
@@ -552,22 +554,20 @@ class File(Group):
 
             groupid = GroupID(None, group_json, http_conn=http_conn)
         # end else
+
         self._name = "/"
         self._id = groupid
-        self._verboseInfo = None  # aditional state we'll get when requested
+        self._verboseInfo = None  # additional state we'll get when requested
         self._verboseUpdated = None  # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
         self._dn_ids = dn_ids
-        self._track_order = track_order
         self._swmr_mode = swmr
 
         Group.__init__(self, self._id, track_order=track_order)
 
     def _getVerboseInfo(self):
         now = time.time()
-        if (
-            self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME
-        ):
+        if (self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME):
             # resynch the verbose data
             req = "/?verbose=1"
             rsp_json = self.GET(req, use_cache=False, params={"CreateOrder": "1" if self._track_order else "0"})
