@@ -9,6 +9,8 @@ File objects serve as your entry point into the world of HDF5.  In addition
 to the File-specific capabilities listed here, every File instance is
 also an :ref:`HDF5 group <group>` representing the `root group` of the file.
 
+Note: Python "File-like" objects are not supported.
+
 .. _file_open:
 
 Opening & creating files
@@ -96,67 +98,37 @@ of supported drivers and their options:
           Raw data filename extension. Default is '-r.h5'.
 
     'ros3'
-        Allows read only access to HDF5 files on S3. Keywords:
+        Enables read-only access to HDF5 files in the AWS S3 or S3-compatible object
+        stores. HDF5 file name must be one of \http://, \https://, or s3://
+        resource location. An s3:// location will be translated into an AWS
+        `path-style <https://docs.aws.amazon.com/AmazonS3/latest/userguide/VirtualHosting.html#path-style-access>`_
+        location by h5py. Keywords:
 
         aws_region:
-          Name of the AWS "region" where the S3 bucket with the file is, e.g. ``b"us-east-1"``. Default is ``b''``.
+          AWS region of the S3 bucket with the file, e.g. ``b"us-east-1"``.
+          Default is ``b''``. Required for s3:// locations.
 
         secret_id:
-          "Access ID" for the resource. Default is ``b''``.
+          AWS access key ID. Default is ``b''``.
 
         secret_key:
-          "Secret Access Key" associated with the ID and resource. Default is ``b''``.
+          AWS secret access key. Default is ``b''``.
 
-        The argument values must be ``bytes`` objects.
+        session_token:
+          AWS temporary session token. Default is ``b''``.' Must be used
+          together with temporary secret_id and secret_key. Available from HDF5 1.14.2.
 
+        The argument values must be ``bytes`` objects. Arguments aws_region,
+        secret_id, and secret_key are required to activate AWS authentication.
 
-.. _file_fileobj:
-
-Python file-like objects
-------------------------
-
-.. versionadded:: 2.9
-
-The first argument to :class:`File` may be a Python file-like object, such as
-an :class:`io.BytesIO` or :class:`tempfile.TemporaryFile` instance.
-This is a convenient way to create temporary HDF5 files, e.g. for testing or to
-send over the network.
-
-The file-like object must be open for binary I/O, and must have these methods:
-``read()`` (or ``readinto()``), ``write()``, ``seek()``, ``tell()``,
-``truncate()`` and ``flush()``.
+        .. note::
+           Pre-built h5py packages on PyPI do not include ros3 driver support. If
+           you want this feature, you could use packages from conda-forge, or
+           :ref:`build h5py from source <source_install>` against an HDF5 build
+           with ros3. Alternatively, use the :ref:`file-like object
+           <file_fileobj>` support with a package like s3fs.
 
 
-    >>> tf = tempfile.TemporaryFile()
-    >>> f = h5py.File(tf, 'w')
-
-Accessing the :class:`File` instance after the underlying file object has been
-closed will result in undefined behaviour.
-
-When using an in-memory object such as :class:`io.BytesIO`, the data written
-will take up space in memory. If you want to write large amounts of data,
-a better option may be to store temporary data on disk using the functions in
-:mod:`tempfile`.
-
-.. literalinclude:: ../../examples/bytesio.py
-
-.. warning::
-
-   When using a Python file-like object for an HDF5 file, make sure to close
-   the HDF5 file before closing the file object it's wrapping. If there is an
-   error while trying to close the HDF5 file, segfaults may occur.
-
-.. note::
-
-   Using a Python file-like object for HDF5 is internally more complex,
-   as the HDF5 C code calls back into Python to access it. It inevitably
-   has more ways to go wrong, and the failures may be less clear when it does.
-   For some common use cases, you can easily avoid it:
-
-   - To create a file in memory and never write it to disk, use the ``'core'``
-     driver with ``mode='w', backing_store=False`` (see :ref:`file_driver`).
-   - To use a temporary file securely, make a temporary directory and
-     :ref:`open a file path <file_open>` inside it.
 
 .. _file_version:
 
@@ -308,10 +280,10 @@ given dataset's chunks are controlled when creating the dataset, but it is
 possible to adjust the behavior of the chunk *cache* when opening the file.
 
 The parameters controlling this behavior are prefixed by ``rdcc``, for *raw data
-chunk cache*.
+chunk cache*. They apply to all datasets unless specifically changed for each one.
 
 * ``rdcc_nbytes`` sets the total size (measured in bytes) of the raw data chunk
-  cache for each dataset.  The default size is 1 MB.
+  cache for each dataset.  The default size is 1 MiB.
   This should be set to the size of each chunk times the number of
   chunks that are likely to be needed in cache.
 * ``rdcc_w0`` sets the policy for chunks to be
@@ -346,8 +318,41 @@ chunk cache*.
   approximately 100 times that number of chunks. The default value is 521.
 
 Chunks and caching are described in greater detail in the `HDF5 documentation
-<https://portal.hdfgroup.org/display/HDF5/Chunking+in+HDF5>`_.
+<https://support.hdfgroup.org/documentation/hdf5-docs/advanced_topics/chunking_in_hdf5.html>`_.
 
+.. _file_alignment:
+
+Data alignment
+--------------
+
+When creating datasets within files, it may be advantageous to align the offset
+within the file itself. This can help optimize read and write times if the data
+become aligned with the underlying hardware, or may help with parallelism with
+MPI. Unfortunately, aligning small variables to large blocks can leave a lot of
+empty space in a file. To this effect, application developers are left with two
+options to tune the alignment of data within their file.  The two variables
+``alignment_threshold`` and ``alignment_interval``  in the :class:`File`
+constructor help control the threshold in bytes where the data alignment policy
+takes effect and the alignment in bytes within the file. The alignment is
+measured from the end of the user block.
+
+For more information, see the official HDF5 documentation `H5P_SET_ALIGNMENT
+<https://support.hdfgroup.org/documentation/hdf5/latest/group___f_a_p_l.html#gab99d5af749aeb3896fd9e3ceb273677a>`_.
+
+.. _file_meta_block_size:
+
+Meta block size
+---------------
+
+Space for metadata is allocated in blocks within the HDF5 file. The argument
+``meta_block_size`` of the :class:`File` constructor sets the minimum size of
+these blocks.  Setting a large value can consolidate metadata into a small
+number of regions. Setting a small value can reduce the overall file size,
+especially in combination with the ``libver`` option. This controls how the
+overall data and metadata are laid out within the file.
+
+For more information, see the official HDF5 documentation `H5P_SET_META_BLOCK_SIZE
+<https://support.hdfgroup.org/documentation/hdf5/latest/group___f_a_p_l.html#ga8822e3dedc8e1414f20871a87d533cb1>`_.
 
 Reference
 ---------
@@ -358,15 +363,17 @@ Reference
     HDF5 name of the root group, "``/``". To access the on-disk name, use
     :attr:`File.filename`.
 
-.. class:: File(name, mode=None, driver=None, libver=None, \
-    userblock_size=None, swmr=False, rdcc_nslots=None, rdcc_nbytes=None, \
-    rdcc_w0=None, track_order=None, fs_strategy=None, fs_persist=False, \
-    fs_threshold=1, **kwds)
+.. class:: File(name, mode='r', driver=None, libver=None, userblock_size=None, \
+    swmr=False, rdcc_nslots=None, rdcc_nbytes=None, rdcc_w0=None, \
+    track_order=None, fs_strategy=None, fs_persist=False, fs_threshold=1, \
+    fs_page_size=None, page_buf_size=None, min_meta_keep=0, min_raw_keep=0, \
+    locking=None, alignment_threshold=1, alignment_interval=1, **kwds)
 
     Open or create a new file.
 
-    Note that in addition to the File-specific methods and properties listed
-    below, File objects inherit the full interface of :class:`Group`.
+    Note that in addition to the :class:`File`-specific methods and properties
+    listed below, :class:`File` objects inherit the full interface of
+    :class:`Group`.
 
     :param name:    Name of file (`bytes` or `str`), or an instance of
                     :class:`h5f.FileID` to bind to an existing
@@ -392,13 +399,47 @@ Reference
                     ``h5.get_config().track_order``.
     :param fs_strategy: The file space handling strategy to be used.
             Only allowed when creating a new file. One of "fsm", "page",
-            "aggregate", "none", or None (to use the HDF5 default).
+            "aggregate", "none", or ``None`` (to use the HDF5 default).
     :param fs_persist: A boolean to indicate whether free space should be
             persistent or not. Only allowed when creating a new file. The
             default is False.
+    :param fs_page_size: File space page size in bytes. Only use when
+            fs_strategy="page". If ``None`` use the HDF5 default (4096 bytes).
     :param fs_threshold: The smallest free-space section size that the free
             space manager will track. Only allowed when creating a new file.
             The default is 1.
+    :param page_buf_size: Page buffer size in bytes. Only allowed for HDF5 files
+            created with fs_strategy="page". Must be a power of two value and
+            greater or equal than the file space page size when creating the
+            file. It is not used by default.
+    :param min_meta_keep: Minimum percentage of metadata to keep in the page
+            buffer before allowing pages containing metadata to be evicted.
+            Applicable only if ``page_buf_size`` is set. Default value is zero.
+    :param min_raw_keep: Minimum percentage of raw data to keep in the page
+            buffer before allowing pages containing raw data to be evicted.
+            Applicable only if ``page_buf_size`` is set. Default value is zero.
+    :param locking: The file locking behavior. One of:
+
+            - False (or "false") --  Disable file locking
+            - True (or "true")   --  Enable file locking
+            - "best-effort"      --  Enable file locking but ignore some errors
+            - None               --  Use HDF5 defaults
+
+            .. warning::
+
+                The HDF5_USE_FILE_LOCKING environment variable can override
+                this parameter.
+
+            Only available with HDF5 >= 1.12.1 or 1.10.x >= 1.10.7.
+    :param alignment_threshold: Together with ``alignment_interval``, this
+            property ensures that any file object greater than or equal
+            in size to the alignment threshold (in bytes) will be
+            aligned on an address which is a multiple of alignment interval.
+    :param alignment_interval: This property should be used in conjunction with
+            ``alignment_threshold``. See the description above. For more
+            details, see :ref:`file_alignment`.
+    :param meta_block_size: Determines the current minimum size, in bytes, of
+            new metadata block allocations. See :ref:`file_meta_block_size`.
     :param kwds:    Driver-specific keywords; see :ref:`file_driver`.
 
     .. method:: __bool__()
@@ -452,3 +493,8 @@ Reference
     .. attribute:: userblock_size
 
         Size of user block (in bytes).  Generally 0.  See :ref:`file_userblock`.
+
+    .. attribute:: meta_block_size
+
+        Minimum size, in bytes, of metadata block allocations. Default: 2048.
+        See :ref:`file_meta_block_size`.

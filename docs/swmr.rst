@@ -37,7 +37,7 @@ creating the file.
 
 
 The HDF Group has documented the SWMR features in details on the website:
-`Single-Writer/Multiple-Reader (SWMR) Documentation <https://support.hdfgroup.org/HDF5/docNewFeatures/NewFeaturesSwmrDocs.html>`_.
+`Single-Writer/Multiple-Reader (SWMR) Documentation <https://support.hdfgroup.org/documentation/hdf5/latest/_s_w_m_r.html>`_.
 This is highly recommended reading for anyone intending to use the SWMR feature
 even through h5py. For production systems in particular pay attention to the
 file system requirements regarding POSIX I/O semantics.
@@ -99,7 +99,7 @@ example uses the the linux inotify
 (`pyinotify <https://pypi.python.org/pypi/pyinotify>`_ python bindings) to
 receive a signal each time the target file has been updated.
 
-.. literalinclude:: ../examples/swmr_inotify_example.py
+.. literalinclude:: ../examples/swmr_multiprocess.py
 
 Multiprocess concurrent write and read
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -1,4 +1,5 @@
 # Makefile for Sphinx documentation
+#
 
 # You can set these variables from the command line.
 SPHINXOPTS    = -W
@@ -84,17 +85,17 @@ qthelp:
 	@echo
 	@echo "Build finished; now you can run "qcollectiongenerator" with the" \
 	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
-	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/h5py.qhcp"
+	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/h5pyd.qhcp"
 	@echo "To view the help file:"
-	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/h5py.qhc"
+	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/h5pyd.qhc"
 
 devhelp:
 	$(SPHINXBUILD) -b devhelp $(ALLSPHINXOPTS) $(BUILDDIR)/devhelp
 	@echo
 	@echo "Build finished."
 	@echo "To view the help file:"
-	@echo "# mkdir -p $$HOME/.local/share/devhelp/h5py"
-	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/h5py"
+	@echo "# mkdir -p $$HOME/.local/share/devhelp/h5pyd"
+	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/h5pyd"
 	@echo "# devhelp"
 
 epub:
@@ -174,3 +175,6 @@ pseudoxml:
 	$(SPHINXBUILD) -b pseudoxml $(ALLSPHINXOPTS) $(BUILDDIR)/pseudoxml
 	@echo
 	@echo "Build finished. The pseudo-XML files are in $(BUILDDIR)/pseudoxml."
+
+show:
+	@python -m webbrowser -t "file://$(shell pwd)/_build/html/index.html"
