@@ -228,8 +228,8 @@ class TestFile(TestCase):
         self.assertEqual(g.filename, f.filename)
         self.assertEqual(g.id.id, f.id.id)
         self.assertTrue("g1" in g)
-        #  print("f version:", f._version)
-        #  print("g version:", g._version)
+        print("f version:", f._version)
+        print("g version:", g._version)
 
         f.close()
         g.close()

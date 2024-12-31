@@ -25,7 +25,6 @@ Where to start
 --------------
 
 * :ref:`Quick-start guide <quick>`
-* :ref:`Installation <install>`
 
 
 Other resources
@@ -44,7 +43,6 @@ Introductory info
     :maxdepth: 1
 
     quick
-    build
 
 
 High-level API reference

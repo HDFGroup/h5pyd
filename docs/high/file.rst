@@ -106,11 +106,7 @@ Reference
     HDF5 name of the root group, "``/``". To access the domain  name, use
     :attr:`File.filename`.
 
-.. class:: File(name, mode='r', driver=None, libver=None, userblock_size=None, \
-    swmr=False, rdcc_nslots=None, rdcc_nbytes=None, rdcc_w0=None, \
-    track_order=None, fs_strategy=None, fs_persist=False, fs_threshold=1, \
-    fs_page_size=None, page_buf_size=None, min_meta_keep=0, min_raw_keep=0, \
-    locking=None, alignment_threshold=1, alignment_interval=1, **kwds)
+.. class:: File(name, mode='r',  swmr=False,  track_order=None)
 
     Open or create a new HSDS domain.
 
@@ -120,70 +116,15 @@ Reference
 
     :param name:    Name of domain (`str`), or an instance of
                     :class:`h5f.FileID` to bind to an existing
-                    file identifier, or a file-like object
-                    (see :ref:`file_fileobj`).
+                    file identifier.
     :param mode:    Mode in which to open file; one of
                     ("w", "r", "r+", "a", "w-").  See :ref:`file_open`.
-    :param driver:  File driver to use; see :ref:`file_driver`.
-    :param libver:  Compatibility bounds; see :ref:`file_version`.
-    :param userblock_size:  Size (in bytes) of the user block.  If nonzero,
-                    must be a power of 2 and at least 512.  See
-                    :ref:`file_userblock`.
     :param swmr:    If ``True`` open the file in single-writer-multiple-reader
                     mode. Only used when mode="r".
-    :param rdcc_nbytes:  Total size of the raw data chunk cache in bytes. The
-                    default size is :math:`1024^2` (1 MiB) per dataset.
-    :param rdcc_w0: Chunk preemption policy for all datasets.  Default value is
-                    0.75.
-    :param rdcc_nslots:  Number of chunk slots in the raw data chunk cache for
-                    this file.  Default value is 521.
     :param track_order:  Track dataset/group/attribute creation order under
                     root group if ``True``.  Default is
                     ``h5.get_config().track_order``.
-    :param fs_strategy: The file space handling strategy to be used.
-            Only allowed when creating a new file. One of "fsm", "page",
-            "aggregate", "none", or ``None`` (to use the HDF5 default).
-    :param fs_persist: A boolean to indicate whether free space should be
-            persistent or not. Only allowed when creating a new file. The
-            default is False.
-    :param fs_page_size: File space page size in bytes. Only use when
-            fs_strategy="page". If ``None`` use the HDF5 default (4096 bytes).
-    :param fs_threshold: The smallest free-space section size that the free
-            space manager will track. Only allowed when creating a new file.
-            The default is 1.
-    :param page_buf_size: Page buffer size in bytes. Only allowed for HDF5 files
-            created with fs_strategy="page". Must be a power of two value and
-            greater or equal than the file space page size when creating the
-            file. It is not used by default.
-    :param min_meta_keep: Minimum percentage of metadata to keep in the page
-            buffer before allowing pages containing metadata to be evicted.
-            Applicable only if ``page_buf_size`` is set. Default value is zero.
-    :param min_raw_keep: Minimum percentage of raw data to keep in the page
-            buffer before allowing pages containing raw data to be evicted.
-            Applicable only if ``page_buf_size`` is set. Default value is zero.
-    :param locking: The file locking behavior. One of:
-
-            - False (or "false") --  Disable file locking
-            - True (or "true")   --  Enable file locking
-            - "best-effort"      --  Enable file locking but ignore some errors
-            - None               --  Use HDF5 defaults
-
-            .. warning::
-
-                The HDF5_USE_FILE_LOCKING environment variable can override
-                this parameter.
-
-            Only available with HDF5 >= 1.12.1 or 1.10.x >= 1.10.7.
-    :param alignment_threshold: Together with ``alignment_interval``, this
-            property ensures that any file object greater than or equal
-            in size to the alignment threshold (in bytes) will be
-            aligned on an address which is a multiple of alignment interval.
-    :param alignment_interval: This property should be used in conjunction with
-            ``alignment_threshold``. See the description above. For more
-            details, see :ref:`file_alignment`.
-    :param meta_block_size: Determines the current minimum size, in bytes, of
-            new metadata block allocations. See :ref:`file_meta_block_size`.
-    :param kwds:    Driver-specific keywords; see :ref:`file_driver`.
+    
 
     .. method:: __bool__()
 
@@ -224,20 +165,8 @@ Reference
        True if the file access is using :doc:`/swmr`. Use :attr:`mode` to
        distinguish SWMR read from write.
 
-    .. attribute:: driver
 
-        String giving the driver used to open the file.  Refer to
-        :ref:`file_driver` for a list of drivers.
+    .. attribute:: version
 
-    .. attribute:: libver
+        HSDS version string
 
-        2-tuple with library version settings.  See :ref:`file_version`.
-
-    .. attribute:: userblock_size
-
-        Size of user block (in bytes).  Generally 0.  See :ref:`file_userblock`.
-
-    .. attribute:: meta_block_size
-
-        Minimum size, in bytes, of metadata block allocations. Default: 2048.
-        See :ref:`file_meta_block_size`.
