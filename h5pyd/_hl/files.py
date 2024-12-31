@@ -561,19 +561,31 @@ class File(Group):
         self._swmr_mode = swmr
 
         if not root_json:
-            root_json = self.id.obj_json
-        if root_json:
-            if "dn_ids" in root_json:
-                dn_ids = root_json["dn_ids"]
+            # fetch the root_json
+            req = "/"
+            params = {"getdnids": 1}  # return dn ids if available
 
-            if "limits" in root_json:
-                self._limits = root_json["limits"]
-            else:
-                self._limits = None
-            if "version" in root_json:
-                self._version = root_json["version"]
-            else:
-                self._version = None
+            if use_cache and mode == "r":
+                params["getobjs"] = "T"
+                params["include_attrs"] = "T"
+            if bucket:
+                params["bucket"] = bucket
+            rsp = self.id.http_conn.GET(req, params=params)
+            if rsp.status_code != 200:
+                raise IOError(rsp.status_code, rsp.reason)
+            root_json = json.loads(rsp.text)
+
+        if "dn_ids" in root_json:
+            dn_ids = root_json["dn_ids"]
+
+        if "limits" in root_json:
+            self._limits = root_json["limits"]
+        else:
+            self._limits = None
+        if "version" in root_json:
+            self._version = root_json["version"]
+        else:
+            self._version = None
 
         Group.__init__(self, self._id, track_order=track_order)
 
