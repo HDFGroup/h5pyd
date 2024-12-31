@@ -20,7 +20,7 @@ You can install ``h5pyd`` via pip::
 
   pip install h5py
 
-If you will be running your own HSDS, install the ``hsds`` package as well::
+If you will be running your own HSDS instance, install the ``hsds`` package as well::
 
     pip install hsds
 
@@ -45,12 +45,14 @@ When you are ready to shut down HSDS, just hit Ctlr-C in the terminal window whe
 h5pyd configuration
 -------------------
 
-Typically, http requests to HSDS need to authenticated (likely you wouldn't want just anyone messing around with your HDF data!).
-HSDS supports several authentication protocols, but the simplest (if not most secure) to use when getting started is what is 
+Typically, http requests to HSDS need to authenticated (likely you don't want just anyone messing around with your HDF data!).
+HSDS supports several authentication protocols, but the simplest (if not the most secure) to use when getting started is what is 
 known as HTTP Basic Authentication.  In this protocol, your HSDS username and password is encoded in the HTTP header of 
-each request.  The h5pyd package will do this automatically, storing your credentials in the file ``~/.hscfg``.  
+each request.  On receiving the request, HSDS will decode the autentication header and then compare with a list of valid 
+usernames/passwords stored in a text file.  The h5pyd package will do this automatically, using your credentials stored 
+in the file ``~/.hscfg`` to add the authentication header to each HSDS request.  
 
-You can edit this file by hand, or use the hsconfigure tool included with h5pyd:
+You can edit hscfg file by hand, or use the hsconfigure tool included with h5pyd as follows:
 
 * Start the app by running: ``hsconfigure`` in a terminal
 * You'll be prompted for a server endpoint.  If running HSDS locally, enter: ``http://localhost:5101`` 
@@ -77,27 +79,45 @@ To make keeping track of everything  easier, HSDS manages storage using three le
 * Folders live in buckets are work much like directories in a POSIX file system
 * Domains are the equivalent to HDF5 files
 
-Buckets are setup by the HSDS administrator and will correspond to AWS S3 Buckets, Azure Blob Containers, or POSIX directories.
+Buckets are the top-level of storage used by HSDS and will correspond to AWS S3 Buckets, Azure Blob Containers, or POSIX directories.
 Buckets can not be created using the h5pyd package (these need to be setup by the HSDS administrator), 
 but the h5pyd File and Folder object have an optional bucket parameter to specify which
 bucket to access.  Typically HSDS will be setup with a default bucket that will be used if no bucket name is given explicitly. 
 
-Folders can be created using h5pyd (or the hstouch CLI tool).  Likewise Domains can be created using ``h5pyd.File`` or the 
-hstouch CLI tool, e.g. ``hstouch /home/$USER/myfile.h5``.  
+Folders can be created using h5pyd (or the hstouch CLI tool).  To use hstouch to create a folder, run hstouch followed by
+the path to the desired folder.  E.g. ``hstouch /home/$USER/myfolder/``.  In h5oyd, there no 'current folder' concept,
+so the path must always start with ``/`` (or if desired, ``hdf5://`` to distinguish from a POSIX path).  Also, to create
+folder, the path must end in a slash.  To view the contents of a folder, use the ``hsls`` tool.  E.g.:
+``hsls /home/$USER/myfolder/``. 
 
-As with HDF5 files, HSDS domains are containers for two kinds of objects: `datasets`, which are
+Folder can contain sub-folders, but also domains (equivalent to an HDF5 file).  As with HDF5 files, 
+HSDS domains are containers for two kinds of objects: `datasets`, which are
 array-like collections of data, and `groups`, which are folder-like containers
 that hold datasets and other groups. The most fundamental thing to remember
-when using h5py(d) is:
+when using h5pyd (as with h5py) is:
 
     **Groups work like dictionaries, and datasets work like NumPy arrays**
 
-Suppose someone has sent you a HDF5 file, :code:`mytestfile.hdf5`. (To create this file, read `Appendix: Creating a file`_.) The very first thing you'll need to do is to open the file for reading::
+Domains can be created programmatically, or using the CLI tools.  E.g. ``hstouch /home/$USER/myfolder/mytestfile.h5``.
+To convert an HDF5 file to an HSDS domain, you can use the hscp command: ``hscp mytestfile.h5 /home/$USER/myfolder/``.
 
-    >>> import h5py
-    >>> f = h5py.File('mytestfile.hdf5', 'r')
+A quick note on domain permissions:  When you create a new domain, it will only be accessible using your 
+credentials.  You can enable who else can access the domain using the hsacl tool.  For example, to enable 
+other users to read a domain (but not modify it) use: ``hsacl /home/$USER/myfolder/mytest.h5 +r default``.  
+For details of using hsacl, see: tbd.
 
-The :ref:`File object <file>` is your starting point. What is stored in this file? Remember :py:class:`h5py.File` acts like a Python dictionary, thus we can check the keys,
+To programmatically access a domain for reading for reading, use the h5pyd.File object::
+
+    >>> import h5pyd as h5py
+    >>> f = h5py.File('/home/test_user1/mytestfile.h5', 'r')  # replace test_user1 with your user name
+
+The :ref:`File object <file>` is your starting point. If you are familiar with h5py, the rest of this section will be 
+exactly the same as to what you'd expect opening an HDF5 file.  In you are not familiar with h5py, keep reading, but
+keep in mind that this will apply to both h5py and h5pyd.
+   
+
+What is stored in the domain? Remember :py:class:`h5pyd.File` 
+acts like a Python dictionary, thus we can check the keys,
 
     >>> list(f.keys())
     ['mydataset']
@@ -128,11 +148,10 @@ from a dataset in the file::
 
 For more, see :ref:`file` and :ref:`dataset`.
 
-Appendix: Creating a file
-+++++++++++++++++++++++++
+Creating a domain programmatically
+++++++++++++++++++++++++++++++++++
 
-At this point, you may wonder how :code:`mytestdata.hdf5` is created.
-We can create a file by setting the :code:`mode` to :code:`w` when
+You can create a domain by setting the :code:`mode` to :code:`w` when
 the File object is initialized. Some other modes are :code:`a`
 (for read/write/create access), and
 :code:`r+` (for read/write access).
@@ -140,7 +159,7 @@ A full list of file access modes and their meanings is at :ref:`file`. ::
 
     >>> import h5py
     >>> import numpy as np
-    >>> f = h5py.File("mytestfile.hdf5", "w")
+    >>> f = h5py.File("/home/test_user1/myfolder/mytestfile.hdf5", "w")
 
 The :ref:`File object <file>` has a couple of methods which look interesting. One of them is ``create_dataset``, which
 as the name suggests, creates a data set of given shape and dtype ::
@@ -173,7 +192,7 @@ created is itself a group, in this case the `root group`, named ``/``:
 
 Creating a subgroup is accomplished via the aptly-named ``create_group``. But we need to open the file in the "append" mode first (Read/write if exists, create otherwise) ::
 
-    >>> f = h5py.File('mydataset.hdf5', 'a')
+    >>> f = h5py.File('/home/test_user1/myfolder/mydataset.h5', 'a')
     >>> grp = f.create_group("subgroup")
 
 All ``Group`` objects also have the ``create_*`` methods like File::

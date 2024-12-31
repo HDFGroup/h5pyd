@@ -4,17 +4,19 @@ HDF5 for the Cloud
 The h5pyd package is a Python interface for accessing the Highly Scalable Data Service (HSDS)
 (https://www.hdfgroup.org/solutions/highly-scalable-data-service-hsds/).  Whereas the HDF5 library enables
 complex scientific data to be stored in files, HSDS uses a cloud-native storage model that works well with 
-object storage systems such as AWS S3 and Azure Blob Storage (regular POSIX stores are also supported).
+object storage systems such as AWS S3 and Azure Blob Storage (regular POSIX stores are also supported).  As 
+a service, HSDS can be running on the same system as the application using h5pyd, or it can be running on a server 
+(e.g. running in an AWS data center co-located with S3 storage) while clients send requests over the network.
 
 The native interface for HSDS is the HDF REST API (https://github.com/HDFGroup/hdf-rest-api), but the h5pyd package 
-provides a convienent mode of access using the same API as the popular h5py package (https://docs.h5py.org/en/stable/index.html) 
+provides a convenient mode of access using the same API as the popular h5py package (https://docs.h5py.org/en/stable/index.html) 
 that provides a Pythonic interface to the HDF5 library.  In fact, many applications that use h5py can be 
-converted to using h5py, just by adding the statment ``import h5pyd as h5py``.
+converted to using h5py, just by adding the statement ``import h5pyd as h5py``.
 
 However, not every h5py feature is supported in h5pyd (at least not yet!).  For example Virtual Datasets are not supported.
 For a complete list see the: :ref:`FAQ <faq>`.  In addition, there are some features that are supported, like Parallel HDF5,
 but work somewhat differently from the HDF5 library.  And finally, there are features of h5pyd, that don't have any 
-correspondance to h5py, such as Folders.
+correspondence to h5py, such as Folders.
 
 The h5pyd package also includes a set of command line tools, for doing common tasks such as uploading HDF5 files to HSDS.
 See: tbd for a description of the CLI tools. 

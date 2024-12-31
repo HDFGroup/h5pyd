@@ -13,16 +13,16 @@ Note: Python "File-like" objects are not supported.
 
 .. _file_open:
 
-Opening & creating files
-------------------------
+Opening & creating domains
+--------------------------
 
-HDF5 files work generally like standard Python file objects.  They support
+HSDS domains work generally like standard Python file objects.  They support
 standard modes like r/w/a, and should be closed when they are no longer in
 use.  However, there is obviously no concept of "text" vs "binary" mode.
 
     >>> f = h5py.File('myfile.hdf5','r')
 
-The file name may be a byte string or unicode string. Valid modes are:
+The file name may be a string (i.e. Python 3 unicode string). Valid modes are:
 
     ========  ================================================
      r        Readonly, file must exist (default)
@@ -32,138 +32,35 @@ The file name may be a byte string or unicode string. Valid modes are:
      a        Read/write if exists, create otherwise
     ========  ================================================
 
-.. versionchanged:: 3.0
-   Files are now opened read-only by default. Earlier versions of h5py would
-   pick different modes depending on the presence and permissions of the file.
+   Files are opened read-only by default. So the file mode parameter is 
+   only required for one of the writable modes.
 
 .. _file_driver:
 
-File drivers
-------------
+Unsupported options
+-------------------
 
-HDF5 ships with a variety of different low-level drivers, which map the logical
-HDF5 address space to different storage mechanisms.  You can specify which
-driver you want to use when the file is opened::
+The following options are used with h5py.File, but are not supported with h5pyd:
 
-    >>> f = h5py.File('myfile.hdf5', driver=<driver name>, <driver_kwds>)
+* driver
+* libver
+* userblock_size
+* rdcc_nbytes
+* rdcc_w0
+* rdcc_nslots
+* fs_strategy
+* fs_persist
+* fs_page_size
+* fs_threshold
+* page_buf_size
+* min_meta_keep
+* min_raw_keep
+* locking
+* alignment_threshold
+* alignment_interval
+* meta_block_size
 
-For example, the HDF5 "core" driver can be used to create a purely in-memory
-HDF5 file, optionally written out to disk when it is closed.  Here's a list
-of supported drivers and their options:
-
-    None
-        **Strongly recommended.** Use the standard HDF5 driver appropriate
-        for the current platform. On UNIX, this is the H5FD_SEC2 driver;
-        on Windows, it is H5FD_WINDOWS.
-
-    'sec2'
-        Unbuffered, optimized I/O using standard POSIX functions.
-
-    'stdio'
-        Buffered I/O using functions from stdio.h.
-
-    'core'
-        Store and manipulate the data in memory, and optionally write it
-        back out when the file is closed. Using this with an existing file
-        and a reading mode will read the entire file into memory. Keywords:
-
-        backing_store:
-          If True (default), save changes to the real file at the specified
-          path on :meth:`~.File.close` or :meth:`~.File.flush`.
-          If False, any changes are discarded when the file is closed.
-
-        block_size:
-          Increment (in bytes) by which memory is extended. Default is 64k.
-
-    'family'
-        Store the file on disk as a series of fixed-length chunks.  Useful
-        if the file system doesn't allow large files.  Note: the filename
-        you provide *must* contain a printf-style integer format code
-        (e.g. %d"), which will be replaced by the file sequence number.
-        Keywords:
-
-        memb_size:  Maximum file size (default is 2**31-1).
-
-    'fileobj'
-        Store the data in a Python file-like object; see below.
-        This is the default if a file-like object is passed to :class:`File`.
-
-    'split'
-        Splits the meta data and raw data into separate files. Keywords:
-
-        meta_ext:
-          Metadata filename extension. Default is '-m.h5'.
-
-        raw_ext:
-          Raw data filename extension. Default is '-r.h5'.
-
-    'ros3'
-        Enables read-only access to HDF5 files in the AWS S3 or S3-compatible object
-        stores. HDF5 file name must be one of \http://, \https://, or s3://
-        resource location. An s3:// location will be translated into an AWS
-        `path-style <https://docs.aws.amazon.com/AmazonS3/latest/userguide/VirtualHosting.html#path-style-access>`_
-        location by h5py. Keywords:
-
-        aws_region:
-          AWS region of the S3 bucket with the file, e.g. ``b"us-east-1"``.
-          Default is ``b''``. Required for s3:// locations.
-
-        secret_id:
-          AWS access key ID. Default is ``b''``.
-
-        secret_key:
-          AWS secret access key. Default is ``b''``.
-
-        session_token:
-          AWS temporary session token. Default is ``b''``.' Must be used
-          together with temporary secret_id and secret_key. Available from HDF5 1.14.2.
-
-        The argument values must be ``bytes`` objects. Arguments aws_region,
-        secret_id, and secret_key are required to activate AWS authentication.
-
-        .. note::
-           Pre-built h5py packages on PyPI do not include ros3 driver support. If
-           you want this feature, you could use packages from conda-forge, or
-           :ref:`build h5py from source <source_install>` against an HDF5 build
-           with ros3. Alternatively, use the :ref:`file-like object
-           <file_fileobj>` support with a package like s3fs.
-
-
-
-.. _file_version:
-
-Version bounding
-----------------
-
-HDF5 has been evolving for many years now.  By default, the library will write
-objects in the most compatible fashion possible, so that older versions will
-still be able to read files generated by modern programs.  However, there can be
-feature or performance advantages if you are willing to forgo a certain level of
-backwards compatibility.  By using the "libver" option to :class:`File`, you can
-specify the minimum and maximum sophistication of these structures:
-
-    >>> f = h5py.File('name.hdf5', libver='earliest') # most compatible
-    >>> f = h5py.File('name.hdf5', libver='latest')   # most modern
-
-Here "latest" means that HDF5 will always use the newest version of these
-structures without particular concern for backwards compatibility.  The
-"earliest" option means that HDF5 will make a *best effort* to be backwards
-compatible.
-
-The default is "earliest".
-
-Specifying version bounds has changed from HDF5 version 1.10.2. There are two new
-compatibility levels: `v108` (for HDF5 1.8) and `v110` (for HDF5 1.10). This
-change enables, for example, something like this:
-
-    >>> f = h5py.File('name.hdf5', libver=('earliest', 'v108'))
-
-which enforces full backward compatibility up to HDF5 1.8. Using any HDF5
-feature that requires a newer format will raise an error.
-
-`latest` is now an alias to another bound label that represents the latest
-version. Because of this, the `File.libver` property will not use `latest` in
-its output for HDF5 1.10.2 or later.
+For the most part these relate to concepts that don't apply to HSDS, so are not included.
 
 .. _file_closing:
 
@@ -181,7 +78,7 @@ HDF5 calls 'weak' closing.
 
 .. code-block::
 
-    with h5py.File('f1.h5', 'r') as f1:
+    with h5py.File('/a_folder/f1.h5', 'r') as f1:
         ds = f1['dataset']
 
     # ERROR - can't access dataset, because f1 is closed:
@@ -197,162 +94,8 @@ HDF5 calls 'weak' closing.
 
     del ds  # Now f2.h5 will be closed
 
+..
 
-.. _file_userblock:
-
-User block
-----------
-
-HDF5 allows the user to insert arbitrary data at the beginning of the file,
-in a reserved space called the `user block`.  The length of the user block
-must be specified when the file is created.  It can be either zero
-(the default) or a power of two greater than or equal to 512.  You
-can specify the size of the user block when creating a new file, via the
-``userblock_size`` keyword to File; the userblock size of an open file can
-likewise be queried through the ``File.userblock_size`` property.
-
-Modifying the user block on an open file is not supported; this is a limitation
-of the HDF5 library.  However, once the file is closed you are free to read and
-write data at the start of the file, provided your modifications don't leave
-the user block region.
-
-
-.. _file_filenames:
-
-Filenames on different systems
-------------------------------
-
-Different operating systems (and different file systems) store filenames with
-different encodings. Additionally, in Python there are at least two different
-representations of filenames, as encoded ``bytes`` or as a Unicode string
-(``str`` on Python 3).
-
-h5py's high-level interfaces always return filenames as ``str``, e.g.
-:attr:`File.filename`. h5py accepts filenames as either ``str`` or ``bytes``.
-In most cases, using Unicode (``str``) paths is preferred, but there are some
-caveats.
-
-.. note::
-
-   HDF5 handles filenames as bytes (C ``char *``), and the h5py :doc:`lowlevel`
-   matches this.
-
-macOS (OSX)
-...........
-macOS is the simplest system to deal with, it only accepts UTF-8, so using
-Unicode paths will just work (and should be preferred).
-
-Linux (and non-macOS Unix)
-..........................
-Filenames on Unix-like systems are natively bytes. By convention, the locale
-encoding is used to convert to and from unicode; on most modern systems this
-will be UTF-8 by default (especially since Python 3.7, with :pep:`538`).
-
-Passing Unicode paths will mostly work, and Unicode paths from system
-functions like ``os.listdir()`` should always work. But if there are filenames
-that aren't in the expected encoding (e.g. on a network filesystem or a
-removable drive, or because something is misconfigured), you may want to handle
-them as bytes.
-
-Windows
-.......
-Windows systems natively handle filenames as Unicode, and with HDF5 1.10.6 and
-above filenames passed to h5py as bytes will be used as UTF-8 encoded text,
-regardless of system configuration.
-
-HDF5 1.10.5 and below could only use filenames with characters from the active
-code page, e.g. `Windows-1252 <https://en.wikipedia.org/wiki/Windows-1252>`_ on
-many systems configured for European languages. This limitation applies whether
-you use ``str`` or ``bytes`` with h5py.
-
-.. _file_cache:
-
-Chunk cache
------------
-
-:ref:`dataset_chunks` allows datasets to be stored on disk in separate pieces.
-When a part of any one of these pieces is needed, the entire chunk is read into
-memory before the requested part is copied to the user's buffer.  To the extent
-possible those chunks are cached in memory, so that if the user requests a
-different part of a chunk that has already been read, the data can be copied
-directly from memory rather than reading the file again.  The details of a
-given dataset's chunks are controlled when creating the dataset, but it is
-possible to adjust the behavior of the chunk *cache* when opening the file.
-
-The parameters controlling this behavior are prefixed by ``rdcc``, for *raw data
-chunk cache*. They apply to all datasets unless specifically changed for each one.
-
-* ``rdcc_nbytes`` sets the total size (measured in bytes) of the raw data chunk
-  cache for each dataset.  The default size is 1 MiB.
-  This should be set to the size of each chunk times the number of
-  chunks that are likely to be needed in cache.
-* ``rdcc_w0`` sets the policy for chunks to be
-  removed from the cache when more space is needed.  If the value is set to 0,
-  then the library will always evict the least recently used chunk in cache.  If
-  the value is set to 1, the library will always evict the least recently used
-  chunk which has been fully read or written, and if none have been fully read
-  or written, it will evict the least recently used chunk.  If the value is
-  between 0 and 1, the behavior will be a blend of the two.  Therefore, if the
-  application will access the same data more than once, the value should be set
-  closer to 0, and if the application does not, the value should be set closer
-  to 1.
-* ``rdcc_nslots`` is the number of chunk slots in
-  the cache for each dataset.  In order to allow the chunks to be looked up
-  quickly in cache, each chunk is assigned a unique hash value that is used to
-  look up the chunk.  The cache contains a simple array of pointers to chunks,
-  which is called a hash table.  A chunk's hash value is simply the index into
-  the hash table of the pointer to that chunk.  While the pointer at this
-  location might instead point to a different chunk or to nothing at all, no
-  other locations in the hash table can contain a pointer to the chunk in
-  question.  Therefore, the library only has to check this one location in the
-  hash table to tell if a chunk is in cache or not.  This also means that if two
-  or more chunks share the same hash value, then only one of those chunks can be
-  in the cache at the same time.  When a chunk is brought into cache and another
-  chunk with the same hash value is already in cache, the second chunk must be
-  evicted first.  Therefore it is very important to make sure that the size of
-  the hash table (which is determined by the ``rdcc_nslots`` parameter) is large
-  enough to minimize the number of hash value collisions.  Due to the hashing
-  strategy, this value should ideally be a prime number.  As a rule of thumb,
-  this value should be at least 10 times the number of chunks that can fit in
-  ``rdcc_nbytes`` bytes. For maximum performance, this value should be set
-  approximately 100 times that number of chunks. The default value is 521.
-
-Chunks and caching are described in greater detail in the `HDF5 documentation
-<https://support.hdfgroup.org/documentation/hdf5-docs/advanced_topics/chunking_in_hdf5.html>`_.
-
-.. _file_alignment:
-
-Data alignment
---------------
-
-When creating datasets within files, it may be advantageous to align the offset
-within the file itself. This can help optimize read and write times if the data
-become aligned with the underlying hardware, or may help with parallelism with
-MPI. Unfortunately, aligning small variables to large blocks can leave a lot of
-empty space in a file. To this effect, application developers are left with two
-options to tune the alignment of data within their file.  The two variables
-``alignment_threshold`` and ``alignment_interval``  in the :class:`File`
-constructor help control the threshold in bytes where the data alignment policy
-takes effect and the alignment in bytes within the file. The alignment is
-measured from the end of the user block.
-
-For more information, see the official HDF5 documentation `H5P_SET_ALIGNMENT
-<https://support.hdfgroup.org/documentation/hdf5/latest/group___f_a_p_l.html#gab99d5af749aeb3896fd9e3ceb273677a>`_.
-
-.. _file_meta_block_size:
-
-Meta block size
----------------
-
-Space for metadata is allocated in blocks within the HDF5 file. The argument
-``meta_block_size`` of the :class:`File` constructor sets the minimum size of
-these blocks.  Setting a large value can consolidate metadata into a small
-number of regions. Setting a small value can reduce the overall file size,
-especially in combination with the ``libver`` option. This controls how the
-overall data and metadata are laid out within the file.
-
-For more information, see the official HDF5 documentation `H5P_SET_META_BLOCK_SIZE
-<https://support.hdfgroup.org/documentation/hdf5/latest/group___f_a_p_l.html#ga8822e3dedc8e1414f20871a87d533cb1>`_.
 
 Reference
 ---------
@@ -360,7 +103,7 @@ Reference
 .. note::
 
     Unlike Python file objects, the attribute :attr:`File.name` gives the
-    HDF5 name of the root group, "``/``". To access the on-disk name, use
+    HDF5 name of the root group, "``/``". To access the domain  name, use
     :attr:`File.filename`.
 
 .. class:: File(name, mode='r', driver=None, libver=None, userblock_size=None, \
@@ -369,13 +112,13 @@ Reference
     fs_page_size=None, page_buf_size=None, min_meta_keep=0, min_raw_keep=0, \
     locking=None, alignment_threshold=1, alignment_interval=1, **kwds)
 
-    Open or create a new file.
+    Open or create a new HSDS domain.
 
     Note that in addition to the :class:`File`-specific methods and properties
     listed below, :class:`File` objects inherit the full interface of
     :class:`Group`.
 
-    :param name:    Name of file (`bytes` or `str`), or an instance of
+    :param name:    Name of domain (`str`), or an instance of
                     :class:`h5f.FileID` to bind to an existing
                     file identifier, or a file-like object
                     (see :ref:`file_fileobj`).

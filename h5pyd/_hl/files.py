@@ -198,7 +198,11 @@ class File(Group):
     @property
     def filename(self):
         """File name on disk"""
-        return self.id.http_conn.domain
+        if self.id.http_conn:
+            filename = self.id.http_conn.domain
+        else:
+            filename = None
+        return filename
 
     @property
     def driver(self):
@@ -207,7 +211,11 @@ class File(Group):
     @property
     def mode(self):
         """Python mode used to open file"""
-        return self.id.http_conn.mode
+        if self.id.http_conn:
+            mode = self.id.http_conn.mode
+        else:
+            mode = None
+        return mode
 
     @property
     def fid(self):
@@ -329,19 +337,23 @@ class File(Group):
         """
         groupid = None
         dn_ids = []
+        root_json = None
+        cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
+
+        if mode and mode not in ("r", "r+", "w", "w-", "x", "a"):
+            raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
+
+        if mode is None:
+            mode = "r"
+
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
-        no_endpoint_info = endpoint is None and username is None and password is None
-        if (mode is None and no_endpoint_info and isinstance(domain, GroupID)):
+        # no_endpoint_info = endpoint is None and username is None and password is None
+        if isinstance(domain, GroupID):
             groupid = domain
         else:
-            if mode and mode not in ("r", "r+", "w", "w-", "x", "a"):
-                raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
-
-            if mode is None:
-                mode = "r"
-
-            cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
+            if not isinstance(domain, str):
+                raise IOError(400, "expected a str or GroupID object for domain")
 
             # accept domain values in the form:
             #   http://server:port/home/user/myfile.h5
@@ -354,7 +366,7 @@ class File(Group):
             #
             #  For http prefixed values, extract the endpont and use the rest as domain path
             for protocol in ("http://", "https://", "hdf5://", "http+unix://"):
-                if domain and domain.startswith(protocol):
+                if isinstance(domain, str) and domain.startswith(protocol):
                     if protocol.startswith("http"):
                         domain = domain[len(protocol):]
                         # extract the endpoint
@@ -378,9 +390,8 @@ class File(Group):
             if domain[0] != "/":
                 raise IOError(400, "relative paths are not valid")
 
-            if endpoint is None:
-                if "hs_endpoint" in cfg:
-                    endpoint = cfg["hs_endpoint"]
+            if endpoint is None and "hs_endpoint" in cfg:
+                endpoint = cfg["hs_endpoint"]
 
             # remove the trailing slash on endpoint if it exists
             if endpoint and endpoint.endswith('/'):
@@ -420,8 +431,6 @@ class File(Group):
                 retries=retries,
                 timeout=timeout,
             )
-
-            root_json = None
 
             # try to do a GET from the domain
             req = "/"
@@ -499,19 +508,7 @@ class File(Group):
                 http_conn.close()
                 raise IOError(404, "Unexpected error")
 
-            if "dn_ids" in root_json:
-                dn_ids = root_json["dn_ids"]
-
             root_uuid = root_json["root"]
-
-            if "limits" in root_json:
-                self._limits = root_json["limits"]
-            else:
-                self._limits = None
-            if "version" in root_json:
-                self._version = root_json["version"]
-            else:
-                self._version = None
 
             if mode == "a":
                 # for append, verify we have 'update' permission on the domain
@@ -562,6 +559,21 @@ class File(Group):
         self._lastScan = None  # when summary stats where last updated by server
         self._dn_ids = dn_ids
         self._swmr_mode = swmr
+
+        if not root_json:
+            root_json = self.id.obj_json
+        if root_json:
+            if "dn_ids" in root_json:
+                dn_ids = root_json["dn_ids"]
+
+            if "limits" in root_json:
+                self._limits = root_json["limits"]
+            else:
+                self._limits = None
+            if "version" in root_json:
+                self._version = root_json["version"]
+            else:
+                self._version = None
 
         Group.__init__(self, self._id, track_order=track_order)
 

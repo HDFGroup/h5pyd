@@ -207,6 +207,33 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
+    def test_file_clone(self):
+        # verify you can create a File object based on an existing reference
+        filename = self.getFileName("file_clone")
+        print("filename:", filename)
+
+        f = h5py.File(filename, 'w')
+        self.assertEqual(f.filename, filename)
+        self.assertEqual(f.name, "/")
+        self.assertTrue(f.id.id is not None)
+        self.assertEqual(len(f.keys()), 0)
+        self.assertEqual(f.mode, 'r+')
+        self.assertTrue(h5py.is_hdf5(filename))
+
+        f.create_group("g1")
+        self.assertTrue("g1" in f)
+
+        # get a new file instance using a File object
+        g = h5py.File(f.id)
+        self.assertEqual(g.filename, f.filename)
+        self.assertEqual(g.id.id, f.id.id)
+        self.assertTrue("g1" in g)
+        #  print("f version:", f._version)
+        #  print("g version:", g._version)
+
+        f.close()
+        g.close()
+
     def test_open_notfound(self):
         # verify open of non-existent file throws exception
 
