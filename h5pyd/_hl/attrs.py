@@ -452,7 +452,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     def __iter__(self):
         """ Iterate over the names of attributes. """
         if self._objdb_attributes is not None:
-            if self._parent._track_order:
+            if self._parent.track_order:
                 attrs = sorted(self._objdb_attributes.items(), key=lambda x: x[1]['created'])
             else:
                 attrs = sorted(self._objdb_attributes.items())
@@ -469,7 +469,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             req = self._req_prefix
             # backup over the trailing slash in req
             req = req[:-1]
-            rsp = self._parent.GET(req, params={"CreateOrder": "1" if self._parent._track_order else "0"})
+            rsp = self._parent.GET(req, params={"CreateOrder": "1" if self._parent.track_order else "0"})
             attributes = rsp['attributes']
 
             attrlist = []
@@ -505,7 +505,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     def __reversed__(self):
         """ Iterate over the names of attributes in reverse order. """
         if self._objdb_attributes is not None:
-            if self._parent._track_order:
+            if self._parent.track_order:
                 attrs = sorted(self._objdb_attributes.items(), key=lambda x: x[1]['created'])
             else:
                 attrs = sorted(self._objdb_attributes.items())
@@ -522,7 +522,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             req = self._req_prefix
             # backup over the trailing slash in req
             req = req[:-1]
-            rsp = self._parent.GET(req, params={"CreateOrder": "1" if self._parent._track_order else "0"})
+            rsp = self._parent.GET(req, params={"CreateOrder": "1" if self._parent.track_order else "0"})
             attributes = rsp['attributes']
 
             attrlist = []

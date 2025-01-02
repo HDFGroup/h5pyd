@@ -31,6 +31,7 @@ from . import filters
 from . import selections as sel
 from .datatype import Datatype
 from .h5type import getTypeItem, createDataType, check_dtype, special_dtype, getItemSize
+from .. import config
 
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
 VERBOSE_REFRESH_TIME = 1.0  # 1 second
@@ -77,6 +78,7 @@ def make_new_dset(
     compression_opts=None,
     fillvalue=None,
     scaleoffset=None,
+    track_order=None,
     track_times=None,
     initializer=None,
     initializer_opts=None
@@ -88,6 +90,7 @@ def make_new_dset(
 
     # fill in fields for the body of the POST request as we got
     body = {}
+    cfg = config.get_config()
 
     # Convert data to a C-contiguous ndarray
     if data is not None and not isinstance(data, Empty):
@@ -249,17 +252,14 @@ def make_new_dset(
 
             dcpl["fillValue"] = fillvalue
 
+    if track_order or cfg.track_order:
+        dcpl["CreateOrder"] = 1
+
     if chunks and isinstance(chunks, dict):
         dcpl["layout"] = chunks
 
     body["creationProperties"] = dcpl
 
-    """
-    if track_times in (True, False):
-        dcpl.set_obj_track_times(track_times)
-    elif track_times is not None:
-        raise TypeError("track_times must be either True or False")
-    """
     if maxshape is not None and len(maxshape) > 0:
         if shape is not None:
             maxshape = tuple(m if m is not None else 0 for m in maxshape)
@@ -291,7 +291,7 @@ def make_new_dset(
 
     if data is not None:
         # init data
-        dset = Dataset(dset_id)
+        dset = Dataset(dset_id, track_order=(track_order or cfg.track_order))
         dset[...] = data
 
     return dset_id
@@ -763,12 +763,12 @@ class Dataset(HLObject):
         self._getVerboseInfo()
         return self._allocated_size
 
-    def __init__(self, bind, track_order=False):
+    def __init__(self, bind, track_order=None):
         """Create a new Dataset object by binding to a low-level DatasetID."""
 
         if not isinstance(bind, DatasetID):
             raise ValueError(f"{bind} is not a DatasetID")
-        HLObject.__init__(self, bind)
+        HLObject.__init__(self, bind, track_order=track_order)
 
         self._dcpl = self.id.dcpl_json
         self._filters = filters.get_filters(self._dcpl)
@@ -778,7 +778,14 @@ class Dataset(HLObject):
         # make a numpy dtype out of the type json
         self._dtype = createDataType(self.id.type_json)
         self._item_size = getItemSize(self.id.type_json)
-        self._track_order = track_order
+        if track_order is None:
+            if "CreateOrder" in self._dcpl:
+                if not self._dcpl["CreateOrder"] or self._dcpl["CreateOrder"] == "0":
+                    self._track_order = False
+                else:
+                    self._track_order = True
+        else:
+            self._track_order = track_order
 
         self._shape = self.get_shape()
 
