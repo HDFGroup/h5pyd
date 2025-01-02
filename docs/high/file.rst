@@ -43,7 +43,6 @@ Unsupported options
 The following options are used with h5py.File, but are not supported with h5pyd:
 
 * driver
-* libver
 * userblock_size
 * rdcc_nbytes
 * rdcc_w0
@@ -119,11 +118,41 @@ Reference
                     file identifier.
     :param mode:    Mode in which to open file; one of
                     ("w", "r", "r+", "a", "w-").  See :ref:`file_open`.
-    :param swmr:    If ``True`` open the file in single-writer-multiple-reader
+    :param endpoint: HSDS http endpoint.  If None, the endpoint given by HS_ENDPOINT environment
+                    variable will be used if set.  Otherwise, the endpoint given in the 
+                    .hscfg file will be used
+    :param username: HSDS username.  If None, the username given by the HS_USERNAME environment
+                     variable will be used if set.  Otherwise, the username given in the
+                     .hscfg file will be used
+    :param password: HSDS password.  If None, the password given by the HS_PASSWORD environment
+                    variable will be used if set.  Otherwise, the password given in the
+                    .hscfg file will be used
+    :param bucket: Name of bucket the domain is expected to be found in.  If None, the 
+                   default HSDS bucket name will be used
+    :param api_key: API key (e.g. a JSON Web Token) to use for authentication.  If provided,
+                    username and password parameters will be ignored
+    :param session: Keep http connection alive between requests (more efficient than 
+                    re-creating the connection on each request)
+    :param use_cache: Save domain state locally rather than fetching needed state from HSDS 
+                    as needed.  Set use_cache to False when opening a domain if you expect
+                    other clients to be modifying domain metadata (e.g. adding links or attributes).
+    :param swmr:    If ``True`` open the file in single-writer-multiple-reader.  Has the same 
+                    effect as setting use_cache to False.
                     mode. Only used when mode="r".
+    :param libver:  For compatibility with h5py - library version bounds.  Has no effect other
+                    than returning given value as a property.
+    :param owner:  For new domains, the owner username to be used for the domain.  Can only be
+                   set if username is an HSDS admin user.  If owner is None, username will be 
+                   assigned as owner.
+    :param linked_domain: For new domain, use the root object of the linked_domain.
+    :param logger:  Logger object ot be used for logging.
     :param track_order:  Track dataset/group/attribute creation order under
                     root group if ``True``.  Default is
                     ``h5.get_config().track_order``.
+    :param retries: Number of retries to use if an http request fails
+                    (e.g. on a 503 Service Unavailable response).
+    :param timeout: Number of seconds to wait on a http response before failing.
+
     
 
     .. method:: __bool__()
