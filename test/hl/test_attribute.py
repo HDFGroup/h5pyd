@@ -321,6 +321,7 @@ class TestTrackOrder(TestCase):
             self.assertEqual(list(grp1.attrs), list(self.titles))
             dset1 = f['dset1']
             self.assertEqual(list(dset1.attrs), list(self.titles))
+            dset2 = f['dset2']
             self.assertEqual(list(dset2.attrs), list(self.titles))
 
     def test_track_order_cfg(self):
