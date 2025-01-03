@@ -306,13 +306,23 @@ class TestTrackOrder(TestCase):
         filename = self.getFileName("test_test_track_order_attribute")
         print(f"filename: {filename}")
         with h5py.File(filename, 'w') as f:
-            g1 = f.create_group('test', track_order=True)
-            self.fill_attrs(g1)
-            self.assertEqual(list(g1.attrs), list(self.titles))
+            grp1 = f.create_group('grp1', track_order=True)
+            self.fill_attrs(grp1)
+            self.assertEqual(list(grp1.attrs), list(self.titles))
+            dset1 = f.create_dataset('dset1', data=[42,], track_order=True)
+            self.fill_attrs(dset1)
+            dset2 = f.create_dataset_like('dset2', dset1)
+            self.fill_attrs(dset2)
+            self.assertEqual(list(dset1.attrs), list(self.titles))
+            self.assertEqual(list(dset2.attrs), list(self.titles))
         # group should return track order
         with h5py.File(filename) as f:
-            g1 = f['test']
-            self.assertEqual(list(g1.attrs), list(self.titles))
+            grp1 = f['grp1']
+            self.assertEqual(list(grp1.attrs), list(self.titles))
+            dset1 = f['dset1']
+            self.assertEqual(list(dset1.attrs), list(self.titles))
+            dset2 = f['dset2']
+            self.assertEqual(list(dset2.attrs), list(self.titles))
 
     def test_track_order_cfg(self):
         filename = self.getFileName("test_test_track_order_attribute")
@@ -320,15 +330,19 @@ class TestTrackOrder(TestCase):
         cfg = h5py.get_config()
         with h5py.File(filename, 'w') as f:
             cfg.track_order = True
-            g1 = f.create_group('test')
+            grp1 = f.create_group('grp1')
+            dset1 = f.create_dataset('dset1', data=[42,])
             cfg.track_order = False  # reset
-
-            self.fill_attrs(g1)
-            self.assertEqual(list(g1.attrs), list(self.titles))
+            self.fill_attrs(grp1)
+            self.fill_attrs(dset1)
+            self.assertEqual(list(grp1.attrs), list(self.titles))
+            self.assertEqual(list(dset1.attrs), list(self.titles))
 
         with h5py.File(filename) as f:
-            g1 = f['test']
-            self.assertEqual(list(g1.attrs), list(self.titles))
+            grp1 = f['grp1']
+            self.assertEqual(list(grp1.attrs), list(self.titles))
+            dset1 = f['dset1']
+            self.assertEqual(list(dset1.attrs), list(self.titles))
 
     def test_no_track_order(self):
         filename = self.getFileName("test_test_no_track_order_attribute")

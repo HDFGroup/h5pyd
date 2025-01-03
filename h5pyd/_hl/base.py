@@ -948,6 +948,10 @@ class HLObject(CommonStateObject):
         """Last modified time as a datetime object"""
         return self.id._modified
 
+    @property
+    def track_order(self):
+        return self._track_order
+
     def verifyCert(self):
         # default to validate CERT for https requests, unless
         # the H5PYD_VERIFY_CERT environment variable is set and True
@@ -1072,7 +1076,7 @@ class HLObject(CommonStateObject):
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
 
-    def __init__(self, oid, file=None):
+    def __init__(self, oid, file=None, track_order=None):
         """ Setup this object, given its low-level identifier """
         self._id = oid
         self.log = self._id.http_conn.logging
@@ -1091,6 +1095,24 @@ class HLObject(CommonStateObject):
             self.log.addHandler(fh)
         else:
             pass
+
+        if track_order is None:
+            # set order based on group creation props
+            obj_json = self.id.obj_json
+            if "creationProperties" in obj_json:
+                cpl = obj_json["creationProperties"]
+            else:
+                cpl = {}
+            if "CreateOrder" in cpl:
+                createOrder = cpl["CreateOrder"]
+                if not createOrder or createOrder == "0":
+                    self._track_order = False
+                else:
+                    self._track_order = True
+            else:
+                self._track_order = False
+        else:
+            self._track_order = track_order
 
     def __hash__(self):
         return hash(self.id.id)

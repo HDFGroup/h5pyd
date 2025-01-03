@@ -82,13 +82,13 @@ class Table(Dataset):
     """
         Represents an HDF5 dataset
     """
-    def __init__(self, bind):
+    def __init__(self, bind, track_order=None):
         """ Create a new Table object by binding to a low-level DatasetID.
         """
 
         if not isinstance(bind, DatasetID):
             raise ValueError(f"{bind} is not a DatasetID")
-        Dataset.__init__(self, bind)
+        Dataset.__init__(self, bind, track_order=track_order)
 
         if len(self._dtype) < 1:
             raise ValueError("Table type must be compound")
