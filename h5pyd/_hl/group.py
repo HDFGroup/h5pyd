@@ -58,8 +58,8 @@ class Group(HLObject, MutableMappingHDF5):
 
         if not isinstance(bind, GroupID):
             raise ValueError(f"{bind} is not a GroupID")
-        HLObject.__init__(self, bind, **kwargs)
-
+        HLObject.__init__(self, bind, track_order=track_order, **kwargs)
+        """
         if track_order is None:
             # set order based on group creation props
             gcpl = self.id.gcpl_json
@@ -73,6 +73,7 @@ class Group(HLObject, MutableMappingHDF5):
                 self._track_order = False
         else:
             self._track_order = track_order
+        """
         self._req_prefix = "/groups/" + self.id.uuid
         self._link_db = {}  # cache for links
 
@@ -164,7 +165,7 @@ class Group(HLObject, MutableMappingHDF5):
             req = "/groups/" + parent_uuid + "/links/" + name
 
             try:
-                rsp_json = self.GET(req, params={"CreateOrder": "1" if self._track_order else "0"})
+                rsp_json = self.GET(req, params={"CreateOrder": "1" if self.track_order else "0"})
             except IOError:
                 raise KeyError("Unable to open object (Component not found)")
 
@@ -219,9 +220,9 @@ class Group(HLObject, MutableMappingHDF5):
 
         group_json = rsp
         groupId = GroupID(self, group_json)
-        sub_group = Group(groupId)
-        if track_order or cfg.track_order:
-            sub_group._track_order = True
+
+        sub_group = Group(groupId, track_order=(track_order or cfg.track_order))
+
         if parent_name:
             if parent_name[-1] == '/':
                 parent_name = parent_name + link
@@ -355,6 +356,8 @@ class Group(HLObject, MutableMappingHDF5):
             conjunction with the scale/offset filter.
         fillvalue
             (Scalar) Use this value for uninitialized parts of the dataset.
+        track_oder
+            (T/F) List attributes by creation_time if set
         track_times
             (T/F) Enable dataset creation timestamps.
         initializer
@@ -426,12 +429,17 @@ class Group(HLObject, MutableMappingHDF5):
                   'fillvalue'):
             kwupdate.setdefault(k, getattr(other, k))
         # TODO: more elegant way to pass these (dcpl to create_dataset?)
-        # TBD: track times and creation order not yet supported
-        """
-        dcpl = other.id.get_create_plist()
-        kwupdate.setdefault('track_times', dcpl.get_obj_track_times())
-        kwupdate.setdefault('track_order', dcpl.get_attr_creation_order() > 0)
-        """
+
+        dcpl_json = other.id.dcpl_json
+        track_order = None
+        if "CreateOrder" in dcpl_json:
+            createOrder = dcpl_json["CreateOrder"]
+            if not createOrder or createOrder == "0":
+                track_order = False
+            else:
+                track_order = True
+
+        kwupdate.setdefault('track_order', track_order)
 
         # Special case: the maxshape property always exists, but if we pass it
         # to create_dataset, the new dataset will automatically get chunked
@@ -566,9 +574,10 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 raise IOError(f"Unexpected uuid: {uuid}")
         objdb = self.id.http_conn.getObjDb()
-        if objdb and uuid in objdb:
+        if objdb and uuid in objdb and False:
             # we should be able to construct an object from objdb json
             obj_json = objdb[uuid]
+            print('fetch from db')
         else:
             # will need to get JSON from server
             req = f"/{collection_type}/{uuid}"
@@ -583,11 +592,11 @@ class Group(HLObject, MutableMappingHDF5):
         elif collection_type == 'datatypes':
             tgt = Datatype(TypeID(self, obj_json))
         elif collection_type == 'datasets':
-            # create a Table if the daset is one dimensional and compound
+            # create a Table if the dataset is one dimensional and compound
             shape_json = obj_json["shape"]
             dtype_json = obj_json["type"]
             if "dims" in shape_json and len(shape_json["dims"]) == 1 and dtype_json["class"] == 'H5T_COMPOUND':
-                tgt = Table(DatasetID(self, obj_json))
+                tgt = Table(DatasetID(self, obj_json), track_order=track_order)
             else:
                 tgt = Dataset(DatasetID(self, obj_json), track_order=track_order)
         else:
@@ -699,6 +708,10 @@ class Group(HLObject, MutableMappingHDF5):
         "getlink" and "getclass" are True:
             Return HardLink, SoftLink and ExternalLink classes.  Return
             "default" if nothing with that name exists.
+
+        "track_order" is (T/F):
+            List links and attributes by creation order if True, alphanumerically if False.
+            If None, the track_order used when creating the group will be used.
 
         "limit" is an integer:
             If "name" is None, this will return the first "limit" links in the group.
@@ -876,8 +889,8 @@ class Group(HLObject, MutableMappingHDF5):
             parent_uuid = link_json["id"]
             req = "/groups/" + parent_uuid
             params = {}
-            if self._track_order is not None:
-                params["CreateOrder"] = "1" if self._track_order else "0"
+            if self.track_order is not None:
+                params["CreateOrder"] = "1" if self.track_order else "0"
             group_json = self.GET(req, params=params)
             tgt = Group(GroupID(self, group_json))
             tgt[basename] = obj
@@ -977,8 +990,8 @@ class Group(HLObject, MutableMappingHDF5):
 
         req = "/groups/" + self.id.uuid
         params = {}
-        if self._track_order is not None:
-            params["CreateOrder"] = "1" if self._track_order else "0"
+        if self.track_order is not None:
+            params["CreateOrder"] = "1" if self.track_order else "0"
         rsp_json = self.GET(req, params=params)
         return rsp_json['linkCount']
 
@@ -989,8 +1002,8 @@ class Group(HLObject, MutableMappingHDF5):
         if links is None:
             req = "/groups/" + self.id.uuid + "/links"
             params = {}
-            if self._track_order is not None:
-                params["CreateOrder"] = "1" if self._track_order else "0"
+            if self.track_order is not None:
+                params["CreateOrder"] = "1" if self.track_order else "0"
             rsp_json = self.GET(req, params=params)
             links = rsp_json['links']
 
@@ -1003,7 +1016,7 @@ class Group(HLObject, MutableMappingHDF5):
             for x in links:
                 yield x['title']
         else:
-            if self._track_order:
+            if self.track_order:
                 links = sorted(links.items(), key=lambda x: x[1]['created'])
             else:
                 links = sorted(links.items())
@@ -1217,8 +1230,8 @@ class Group(HLObject, MutableMappingHDF5):
                     # request from server
                     req = "/groups/" + parent.id.uuid + "/links"
                     params = {}
-                    if self._track_order is not None:
-                        params["CreateOrder"] = "1" if self._track_order else "0"
+                    if self.track_order is not None:
+                        params["CreateOrder"] = "1" if self.track_order else "0"
                     rsp_json = self.GET(req, params=params)
                     links = rsp_json['links']
                 for link in links:
@@ -1270,7 +1283,7 @@ class Group(HLObject, MutableMappingHDF5):
 
         if links is None:
             req = "/groups/" + self.id.uuid + "/links"
-            rsp_json = self.GET(req, params={"CreateOrder": "1" if self._track_order else "0"})
+            rsp_json = self.GET(req, params={"CreateOrder": "1" if self.track_order else "0"})
             links = rsp_json['links']
 
             # reset the link cache
@@ -1282,7 +1295,7 @@ class Group(HLObject, MutableMappingHDF5):
             for x in reversed(links):
                 yield x['title']
         else:
-            if self._track_order:
+            if self.track_order:
                 links = sorted(links.items(), key=lambda x: x[1]['created'])
             else:
                 links = sorted(links.items())

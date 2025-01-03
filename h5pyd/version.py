@@ -16,7 +16,7 @@ from packaging.version import Version, parse
 import sys
 import numpy
 
-version = "0.20.0"
+version = "0.21.0"
 
 hdf5_version = "REST"
 
@@ -28,8 +28,8 @@ version_tuple = _exp._version + (
     else ("",)
 )
 
-api_version_tuple = (0, 20, 0)
-api_version = "0.20.0"
+api_version_tuple = (0, 21, 0)
+api_version = "0.21.0"
 
 __doc__ = f"""\
 This is h5pyd **{version}**

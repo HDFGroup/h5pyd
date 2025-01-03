@@ -667,6 +667,7 @@ class TestTrackOrder(TestCase):
         print(f"filename: {filename}")
         with h5py.File(filename, 'w') as f:
             g = f.create_group('order')
+            g._track_order = True
             # create subgroup and populate it with links
             g.create_group('subgroup')
             self.populate(g['subgroup'])
