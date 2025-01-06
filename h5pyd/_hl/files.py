@@ -294,8 +294,8 @@ class File(Group):
         See the h5py user guide for a detailed explanation of the options.
 
         domain
-            URI of the domain name to access. E.g.: /home/username/tall.h5.  Can also
-            use DNS style:  tall.username.home
+            URI of the domain name to access. E.g.: /home/username/tall.h5.  Alternatively a GroupID
+            (low-level group identifier object can be used)
         mode
             Access mode: 'r', 'r+', 'w', or 'a'
         endpoint
@@ -736,7 +736,7 @@ class File(Group):
             compressors = []
         return compressors
 
-    # override base implemention of ACL methods to use the domain rather than update root group
+    # override base implementation of ACL methods to use the domain rather than update root group
     def getACL(self, username):
         req = "/acls/" + username
         rsp_json = self.GET(req)

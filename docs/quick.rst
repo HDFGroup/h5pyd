@@ -6,10 +6,10 @@ Quick Start Guide
 Github Codespaces
 -----------------
 
-The quickest way to get started with h5pyd and HSDS is to use Github Codespaces.  You can launch A
-codespace the incudes h5pyd and HSDS by clicking here: <https://codespaces.new/hdfgroup/h5pyd>.
+The quickest way to get started with h5pyd and HSDS is to use Github Codespaces.  You can launch a
+codespace session that incudes h5pyd and HSDS by clicking here: <https://codespaces.new/hdfgroup/h5pyd>.
 Try out some of the included examples and Python notebooks to get familiar with the features
-offered by the package.
+offered by h5pyd and HSDS.
 
 Read on to run h5pyd on your laptop or desktop system...
 
