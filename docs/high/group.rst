@@ -1,4 +1,4 @@
-.. currentmodule:: h5py
+.. currentmodule:: h5pyd
 .. _group:
 
 
@@ -6,24 +6,30 @@ Groups
 ======
 
 
-Groups are the container mechanism by which HDF5 files are organized.  From
-a Python perspective, they operate somewhat like dictionaries.  In this case
+Groups are the container mechanism by which HSDS domains (ans well 
+as HDF5 files) are organized.  
+From a Python perspective, they operate somewhat like dictionaries.  In this case
 the "keys" are the names of group members, and the "values" are the members
 themselves (:class:`Group` and :class:`Dataset`) objects.
 
 Group objects also contain most of the machinery which makes HDF5 useful.
 The :ref:`File object <file>` does double duty as the HDF5 *root group*, and
-serves as your entry point into the file:
+serves as your entry point into the domain:
 
-    >>> f = h5py.File('foo.hdf5','w')
+    >>> f = h5py.File('/home/test_user1/test/foo.hdf5','w')
     >>> f.name
     '/'
     >>> list(f.keys())
     []
 
-Names of all objects in the file are all text strings (``str``).  These will be encoded with the HDF5-approved UTF-8
-encoding before being passed to the HDF5 C library.  Objects may also be
-retrieved using byte strings, which will be passed on to HDF5 as-is.
+Names of all objects in the domain are all text strings (``str``).  
+These will be encoded using UTF-8 for transmission in http requests and by
+HSDS when written to the storage medium.
+
+.. note::
+
+    Objects can be retrieved using byte strings, but these will decoded using 
+    UTF8 before sending the request to HSDS.
 
 
 .. _group_create:
@@ -49,6 +55,29 @@ Multiple intermediate groups can also be created implicitly::
     >>> grp3.name
     '/some/long'
 
+.. _group_anonymous:
+
+Anonymous groups
+----------------
+
+An anonymous group (a group that nothing links to)
+can be created by using ``None`` as the group name.
+The new group can either be set as a link target later,
+or kept as a "hidden" group of the domain.
+
+An anonymous group can be accessed using it's low-level id as
+in this example:
+
+    >>> anon_grp = f.create_group(None)
+    >>> grp = f.getObjByUuid(anon_grp.id.id)  # another reference to anon_grp
+    >>> f["g1"] = anon_grp  # link the grpup as "g1" of the root group
+
+.. note::
+
+    Unlike with HDF5, anonymous objects won't be released when the file is closed.
+    They will need to be explicitly deleted if they are desired to be
+    used temporarily.  
+
 
 .. _group_links:
 
@@ -63,24 +92,38 @@ they support the indexing syntax, and standard exceptions:
     >>> missing = subgrp["missing"]
     KeyError: "Name doesn't exist (Symbol table: Object not found)"
 
-Objects can be deleted from the file using the standard syntax::
-
-    >>> del subgroup["MyDataset"]
-
 .. note::
-    When using h5py from Python 3, the keys(), values() and items() methods
+    The keys(), values() and items() methods
     will return view-like objects instead of lists.  These objects support
     membership testing and iteration, but can't be sliced like lists.
 
-By default, objects inside group are iterated in alphanumeric order.
+By default, objects inside a group are iterated in alphanumeric order.
 However, if group is created with ``track_order=True``, the insertion
-order for the group is remembered (tracked) in HDF5 file, and group
+order for the group is remembered (tracked) in the domain, and group
 contents are iterated in that order.  The latter is consistent with
 Python 3.7+ dictionaries.
 
 The default ``track_order`` for all new groups can be specified
-globally with ``h5.get_config().track_order``.
+globally with ``h5pyd.get_config().track_order``.
 
+Links can be deleted from a group using the standard Python syntax::
+
+    >>> del subgroup["MyDataset"]
+
+.. note::
+
+    Unlike with h5py and HDF5, in h5pyd deleting the last link to an object will
+    not cause the target object to be deleted.  Instead the object needs to be
+    explicitly deleted using its UUID rather than the link name.  
+    See the example below.
+
+To delete the object a link refers to, pass the UUID identifier of the 
+object as the argument:
+
+    >>> g1 = f.create_group('g1')  # create a new object
+    >>> del f[g1.id.id]            # now delete the object
+    >>> 'g1' in f                  # link "g1" still exists
+    >>> del f['g1']                # delete the link
 
 .. _group_hardlinks:
 
@@ -117,11 +160,11 @@ Soft links
 
 Also like a UNIX filesystem, HDF5 groups can contain "soft" or symbolic links,
 which contain a text path instead of a pointer to the object itself.  You
-can easily create these in h5py by using ``h5py.SoftLink``::
+can easily create these in h5pyd by using ``h5pyd.SoftLink``::
 
-    >>> myfile = h5py.File('foo.hdf5','w')
+    >>> myfile = h5pyd.File('/home/test_user1/foo.hdf5','w')
     >>> group = myfile.create_group("somegroup")
-    >>> myfile["alias"] = h5py.SoftLink('/somegroup')
+    >>> myfile["alias"] = h5pyd.SoftLink('/somegroup')
 
 If the target is removed, they will "dangle":
 
@@ -140,43 +183,33 @@ specify the name of the file as well as the path to the desired object.  You
 can refer to objects in any file you wish.  Use similar syntax as for soft
 links:
 
-    >>> myfile = h5py.File('foo.hdf5','w')
-    >>> myfile['ext link'] = h5py.ExternalLink("otherfile.hdf5", "/path/to/resource")
+    >>> f = h5pyd.File('/home/test_user1/foo.hdf5','w')
+    >>> f['ext link'] = h5pyd.ExternalLink("/home/test_user1/otherfile.hdf5", "/path/to/resource")
 
-When the link is accessed, the file "otherfile.hdf5" is opened, and object at
+When the link is accessed, the domain "/home/test_user1/otherfile.hdf5" is opened, and object at
 "/path/to/resource" is returned.
 
-Since the object retrieved is in a different file, its ".file" and ".parent"
-properties will refer to objects in that file, *not* the file in which the
+Since the object retrieved is in a different domain, its ".file" and ".parent"
+properties will refer to objects in that domain, *not* the domain in which the
 link resides.
 
 .. note::
 
-    Currently, you can't access an external link if the file it points to is
-    already open.  This is related to how HDF5 manages file permissions
-    internally.
+    To specify an externlink to a domain in different bucket, pre-append the 
+    target bucket name to the external path.  E.g. ``otherbucket/home/test_user1/otherfile.hdf5``
 
-.. note::
-
-    The filename is stored in the file as bytes, normally UTF-8 encoded.
-    In most cases, this should work reliably, but problems are possible if a
-    file created on one platform is accessed on another. Older versions of HDF5
-    may have problems on Windows in particular. See :ref:`file_filenames` for
-    more details.
 
 Reference
 ---------
 
 .. class:: Group(identifier)
 
-    Generally Group objects are created by opening objects in the file, or
-    by the method :meth:`Group.create_group`.  Call the constructor with
-    a :class:`GroupID <low:h5py.h5g.GroupID>` instance to create a new Group
-    bound to an existing low-level identifier.
+    Generally Group objects are created by opening objects in the domain, or
+    by the method :meth:`Group.create_group`.   
 
     .. method:: __iter__()
 
-        Iterate over the names of objects directly attached to the group.
+        Iterate over the names of the links in the group.
         Use :meth:`Group.visit` or :meth:`Group.visititems` for recursive
         access to group members.
 
@@ -198,17 +231,7 @@ Reference
     .. method:: __bool__()
 
         Check that the group is accessible.
-        A group could be inaccessible for several reasons. For instance, the
-        group, or the file it belongs to, may have been closed elsewhere.
-
-        >>> f = h5py.open(filename)
-        >>> group = f["MyGroup"]
-        >>> f.close()
-        >>> if group:
-        ...     print("group is accessible")
-        ... else:
-        ...     print("group is inaccessible")
-        group is inaccessible
+        Will always return True for a valid group reference
 
     .. method:: keys()
 
@@ -289,8 +312,6 @@ Reference
        The second argument to the callback for ``visititems_links`` is an
        instance of one of the :ref:`link classes <group_link_classes>`.
 
-       .. versionadded:: 3.11
-
     .. method:: move(source, dest)
 
         Move an object or link in the file.  If `source` is a hard link, this
@@ -301,6 +322,10 @@ Reference
         :type source:   String
         :param dest:    New location for object or link.
         :type dest:   String
+
+        .. note::
+
+            This method is not yet supported, and will raise an error if invoked.
 
 
     .. method:: copy(source, dest, name=None, shallow=False, expand_soft=False, expand_external=False, expand_refs=False, without_attrs=False)
@@ -325,6 +350,11 @@ Reference
         :param expand_external: Expand external links into new objects.
         :param expand_refs: Copy objects which are pointed to by references.
         :param without_attrs:   Copy object(s) without copying HDF5 attributes.
+
+        .. note::
+
+            This method is not yet supported, and will raise an error if invoked.
+
 
 
     .. method:: create_group(name, track_order=None)
@@ -363,7 +393,7 @@ Reference
 
         :param data:    Initialize dataset to this (NumPy array).
 
-        :keyword chunks:    Chunk shape, or True to enable auto-chunking.
+        :keyword chunks:    Chunk shape, or True for auto-chunking.
 
         :keyword maxshape:  Dataset will be resizable up to this shape (Tuple).
                             Automatically enables chunking.  Use None for the
@@ -382,59 +412,18 @@ Reference
         :keyword fillvalue: This value will be used when reading
                             uninitialized parts of the dataset.
 
-        :keyword fill_time: Control when to write the fill value. One of the
-            following choices: `alloc`, write fill value before writing
-            application data values or when the dataset is created; `never`,
-            never write fill value; `ifset`, write fill value if it is defined.
-            Default to `ifset`, which is the default of HDF5 library. If the
-            whole dataset is going to be written by the application, setting
-            this to `never` can avoid unnecessary writing of fill value and
-            potentially improve performance.
-
-        :keyword track_times: Enable dataset creation timestamps (**T**/F).
 
         :keyword track_order: Track attribute creation order if
                         ``True``.  Default is
                         ``h5.get_config().track_order``.
 
-        :keyword external: Store the dataset in one or more external, non-HDF5
-            files. This should be an iterable (such as a list) of tuples of
-            ``(name, offset, size)`` to store data from ``offset`` to
-            ``offset + size`` in the named file. Each name must be a str,
-            bytes, or os.PathLike; each offset and size, an integer. The last
-            file in the sequence may have size ``h5py.h5f.UNLIMITED`` to let
-            it grow as needed. If only a name is given instead of an iterable
-            of tuples, it is equivalent to
-            ``[(name, 0, h5py.h5f.UNLIMITED)]``.
+   
+        :keyword initializer: Dataset initializer method - a method that will be
+                         invoked each time a dataset chunk is initialized.  methods
+                         currently available: arange, or None for no initializer
 
-        :keyword allow_unknown_filter: Do not check that the requested filter is
-            available for use (T/F). This should only be set if you will
-            write any data with ``write_direct_chunk``, compressing the
-            data before passing it to h5py.
+        :keyword initializer_args: List of arguments for dataset initializer args
 
-        :keyword rdcc_nbytes: Total size of the dataset's chunk cache in bytes.
-            The default size is 1024**2 (1 MiB).
-
-        :keyword rdcc_w0: The chunk preemption policy for this dataset. This
-            must be between 0 and 1 inclusive and indicates the weighting
-            according to which chunks which have been fully read or written are
-            penalized when determining which chunks to flush from cache. A value
-            of 0 means fully read or written chunks are treated no differently
-            than other chunks (the preemption is strictly LRU) while a value of
-            1 means fully read or written chunks are always preempted before
-            other chunks. If your application only reads or writes data once,
-            this can be safely set to 1. Otherwise, this should be set lower
-            depending on how often you re-read or re-write the same data. The
-            default value is 0.75.
-
-        :keyword rdcc_nslots: The number of chunk slots in the dataset's chunk
-            cache. Increasing this value reduces the number of cache collisions,
-            but slightly increases the memory used. Due to the hashing strategy,
-            this value should ideally be a prime number. As a rule of thumb,
-            this value should be at least 10 times the number of chunks that can
-            fit in rdcc_nbytes bytes. For maximum performance, this value should
-            be set approximately 100 times that number of chunks. The default
-            value is 521.
 
     .. method:: require_dataset(name, shape, dtype, exact=False, **kwds)
 
@@ -487,6 +476,11 @@ Reference
        :param fillvalue:
            The value to use where there is no data.
 
+        .. note: 
+
+            This is a place holder method until Virtual Datasets are supported.
+            Invoking the method will raise an error
+
     .. method:: build_virtual_dataset()
 
        Assemble a virtual dataset in this group.
@@ -506,6 +500,11 @@ Reference
        :param tuple maxshape: Maximum dimensions if the dataset can grow
            (optional). Use None for unlimited dimensions.
        :param fillvalue: The value used where no data is available.
+
+        .. note: 
+
+            This is a place holder method until Virtual Datasets are supported.
+            Invoking the method will raise an error
 
     .. attribute:: attrs
 
@@ -574,7 +573,7 @@ Link classes
 
     .. attribute:: filename
 
-        Name of the external file as a Unicode string
+        Path to a domain as a Unicode string
 
     .. attribute::  path
 

@@ -1,4 +1,4 @@
-.. currentmodule:: h5py
+.. currentmodule:: h5pyd
 .. _file:
 
 
@@ -44,7 +44,9 @@ The first argument is the path to the domain.  The path must be a string (i.e. P
 must be an absolute path (starting with '/' or 'hdf5://').  If you are unsure about what domains are present,
 you can use the ``hsls`` utility to list the contents of a folder.  E.g. ``$ hsls /home/test_user1/``.
 
-Note: Python "File-like" objects are not supported as the domain path.
+.. note::
+
+    Python "File-like" objects are not supported as the domain path.
 
 Domains live in buckets, and if a bucket name is not provided, the default bucket that has been 
 configured in the HSDS instance will be used.  To explicitly give a bucket name, use the bucket parameter:
@@ -65,11 +67,13 @@ Valid modes are:
 Domains are opened read-only by default. So the file mode parameter is 
 only required for one of the writable modes.
 
-Note: that unlike with h5py and the HDF5 library, there's no concept of file locking.  The
-same domain can be opened multiple times in the same or different thread, or even on a
-different machine.  Multiple clients can access the same domain for modification, but this won't
-result in the domain becoming corrupted (though nothing in HSDS guards against clients over-writing
-each others updates).
+.. note::
+
+    Unlike with h5py and the HDF5 library, there's no concept of file locking.  The
+    same domain can be opened multiple times in the same or different thread, or even on a
+    different machine.  Multiple clients can access the same domain for modification, but this won't
+    result in the domain becoming corrupted (though nothing in HSDS guards against clients over-writing
+    each others updates).
 
 Whatever the mode used, if the domain is not configured to authorize the desired action, a 
 ``403 - Forbidden`` error will be raised.  See the next sections on authentication and authorization.
@@ -144,9 +148,10 @@ authorizes the request and the user is a member of that group, the request will 
 group name: ``default`` that includes all users.  In any case, if no authorizing ACL is found, 
 a `403 - Forbidden`` error will be raised.
 
-When a new domain is created (e.g. by using h5pyd.File with the `w` mode), typically it will have one ACL that gives
-the owner of the domain (the authenticated user unless the 'owner' argument is given) full control.  Other users would not have
-permissions to even read the domain.  These permissions can be adjusted, or new ACLs added programmatically (using tbd),
+When a new domain is created (e.g. by using h5pyd.File with the `w` access mode), an ACL that gives
+the owner of the domain (the authenticated user making the request unless the 'owner' argument is given) full control.  
+Other users would not have permissions to even read the domain.  
+These permissions can be adjusted, or new ACLs added programmatically (using tbd),
 or using the ``hsacl`` tool (see: tbd).
 
 Folders (every domain lives in specific folder) also have ACLs.  To create a new domain, the authenticating user
@@ -216,7 +221,7 @@ Deleting Domains
 
 With h5py and the HDF5 library you would normally delete HDF5 files using your systems file browser, or the "rm"
 command.  Programmatically you could delete a HDF5 file using the standard Python Path.unlink method.
-Neither of these options are possible with HSDS domains, but the ``hsrm`` (see: tbd) command is included with
+None of these options are possible with HSDS domains, but the ``hsrm`` (see: tbd) command is included with
 h5pyd and works like the standard ``rm`` command with domain paths used instead of file paths.
 
 Programmatically, you can delete domains using the del method of the folder object (see: tbd).
@@ -229,11 +234,11 @@ Summary data
 Due to the way in which domains are stored, certain information about the domain would be unfeasible to 
 determine on demand.  For example to compute the total amount of storage used would require summing the size
 of each piece of object metadata and each dataset chunk, which for large domains could require fetching
-attributes for millions of objects.  So for these properties, the server runs asynchronous tasks to compile
-summary information about the domain.  
+attributes for millions of objects.  So for these properties, the server periodically runs asynchronous tasks 
+to compile summary information about the domain.  
 
-The impact of this is that some properties of the file object will only be reflect the
-state of the domain as of the last time HSDS ran this asynchronous task (typically a few seconds to a minute
+The impact of this is that some properties of the file object will only reflect the
+domain state as of the last time HSDS ran this asynchronous task (typically a few seconds to a minute
 after the last update to the domain).
 
 Properties for which this applies are:
@@ -260,10 +265,10 @@ for a recent update:
     while f.last_scan == time_stamp:
        time.sleep(0.1)  # wait for summary data to be updated
     # print affected summary properties
-    print("num_groups:", num_groups)
-    print("num_objects:", num_objects)
-    print("metadata_bytes:", metadata_bytes)
-    print("total_size:", total_size)
+    print("num_groups:", f.num_groups)
+    print("num_objects:", f.num_objects)
+    print("metadata_bytes:", f.metadata_bytes)
+    print("total_size:", f.total_size)
 
 ..
 

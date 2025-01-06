@@ -358,8 +358,6 @@ class Group(HLObject, MutableMappingHDF5):
             (Scalar) Use this value for uninitialized parts of the dataset.
         track_oder
             (T/F) List attributes by creation_time if set
-        track_times
-            (T/F) Enable dataset creation timestamps.
         initializer
             (String) chunk initializer function
         initializer_args
@@ -448,6 +446,11 @@ class Group(HLObject, MutableMappingHDF5):
             kwupdate.setdefault('maxshape', other.maxshape)
 
         return self.create_dataset(name, **kwupdate)
+    
+    def create_virtual_dataset(name, layout, fillvalue=None):
+        """ Create a virtual dataset """
+        # not currently supported
+        raise IOError("Not supported")
 
     def create_table(self, name, numrows=None, dtype=None, data=None, **kwds):
         """ Create a new Table - a one dimensional HDF5 Dataset with a compound type
@@ -1076,50 +1079,7 @@ class Group(HLObject, MutableMappingHDF5):
         ['MyGroup', 'MyCopy']
 
         """
-        pass
-        """
-        with phil:
-            if isinstance(source, HLObject):
-                source_path = '.'
-            else:
-                # Interpret source as a path relative to this group
-                source_path = source
-                source = self
-
-            if isinstance(dest, Group):
-                if name is not None:
-                    dest_path = name
-                else:
-                    # copy source into dest group: dest_name/source_name
-                    dest_path = pp.basename(h5i.get_name(source[source_path].id))
-
-            elif isinstance(dest, HLObject):
-                raise TypeError("Destination must be path or Group object")
-            else:
-                # Interpret destination as a path relative to this group
-                dest_path = dest
-                dest = self
-
-            flags = 0
-            if shallow:
-                flags |= h5o.COPY_SHALLOW_HIERARCHY_FLAG
-            if expand_soft:
-                flags |= h5o.COPY_EXPAND_SOFT_LINK_FLAG
-            if expand_external:
-                flags |= h5o.COPY_EXPAND_EXT_LINK_FLAG
-            if expand_refs:
-                flags |= h5o.COPY_EXPAND_REFERENCE_FLAG
-            if without_attrs:
-                flags |= h5o.COPY_WITHOUT_ATTR_FLAG
-            if flags:
-                copypl = h5p.create(h5p.OBJECT_COPY)
-                copypl.set_copy_object(flags)
-            else:
-                copypl = None
-
-            h5o.copy(source.id, self._e(source_path), dest.id, self._e(dest_path),
-                     copypl, base.dlcpl)
-        """
+        raise IOError("Not implemented")
 
     def move(self, source, dest):
         """ Move a link to a new location in the file.
@@ -1128,14 +1088,7 @@ class Group(HLObject, MutableMappingHDF5):
         "source" is a soft or external link, the link itself is moved, with its
         value unmodified.
         """
-        pass
-        """
-        with phil:
-            if source == dest:
-                return
-            self.id.links.move(self._e(source), self.id, self._e(dest),
-                               lapl=self._lapl, lcpl=self._lcpl)
-        """
+        raise IOError("Not supported")
 
     def visit(self, func):
         """ Recursively visit all names in this group and subgroups (HDF5 1.8).
@@ -1158,12 +1111,7 @@ class Group(HLObject, MutableMappingHDF5):
         >>> f.visit(list_of_names.append)
         """
         return self.visititems(func)
-        """
-        with phil:
-            def proxy(name):
-                return func(self._d(name))
-            return h5o.visit(self.id, proxy)
-        """
+       
 
     def visititems(self, func):
         """ Recursively visit names and objects in this group (HDF5 1.8).

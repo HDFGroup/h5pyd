@@ -1126,8 +1126,7 @@ class HLObject(CommonStateObject):
         return not self.__eq__(other)
 
     def __bool__(self):
-        with phil:
-            return bool(self.id)
+        return bool(self.id)
 
     def getACL(self, username):
         req = self._req_prefix + '/acls/' + username
