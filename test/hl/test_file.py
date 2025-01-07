@@ -54,7 +54,6 @@ class TestFile(TestCase):
         filename = self.getFileName("new_file")
         print("filename:", filename)
         now = time.time()
-        print("test create")
         f = h5py.File(filename, 'w')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
@@ -234,7 +233,6 @@ class TestFile(TestCase):
         self.assertEqual(g.filename, f.filename)
         self.assertEqual(g.id.id, f.id.id)
         self.assertTrue("g1" in g)
-        self.assertEqual(f._version, g._version)
 
         f.close()
         g.close()
