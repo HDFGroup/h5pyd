@@ -182,7 +182,7 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
-        # re-open using hdf5:// prefix
+        # re-open using hdf5:// prefix (only for h5pyd)
         if h5py.__name__ == "h5pyd":
             if filename[0] == '/':
                 filepath = "hdf5:/" + filename
@@ -266,10 +266,12 @@ class TestFile(TestCase):
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(f.keys()), 2)
 
+        if h5py.__name__ == "h5py":
+            return  # no ACLs in h5py
+        
         # no explicit ACLs yet
         file_acls = f.getACLs()
         self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl
-
         username = f.owner
 
         file_acl = f.getACL(username)

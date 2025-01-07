@@ -59,21 +59,6 @@ class Group(HLObject, MutableMappingHDF5):
         if not isinstance(bind, GroupID):
             raise ValueError(f"{bind} is not a GroupID")
         HLObject.__init__(self, bind, track_order=track_order, **kwargs)
-        """
-        if track_order is None:
-            # set order based on group creation props
-            gcpl = self.id.gcpl_json
-            if "CreateOrder" in gcpl:
-                createOrder = gcpl["CreateOrder"]
-                if not createOrder or createOrder == "0":
-                    self._track_order = False
-                else:
-                    self._track_order = True
-            else:
-                self._track_order = False
-        else:
-            self._track_order = track_order
-        """
         self._req_prefix = "/groups/" + self.id.uuid
         self._link_db = {}  # cache for links
 
@@ -356,7 +341,7 @@ class Group(HLObject, MutableMappingHDF5):
             conjunction with the scale/offset filter.
         fillvalue
             (Scalar) Use this value for uninitialized parts of the dataset.
-        track_oder
+        track_order
             (T/F) List attributes by creation_time if set
         initializer
             (String) chunk initializer function

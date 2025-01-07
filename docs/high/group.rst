@@ -123,7 +123,7 @@ object as the argument:
     >>> g1 = f.create_group('g1')  # create a new object
     >>> del f[g1.id.id]            # now delete the object
     >>> 'g1' in f                  # link "g1" still exists
-    >>> del f['g1']                # delete the link
+    >>> del f['g1']                # delete the link  
 
 .. _group_hardlinks:
 
@@ -187,7 +187,7 @@ External links
 ~~~~~~~~~~~~~~
 
 External links are "soft links plus", which allow you to
-specify the name of the file as well as the path to the desired object.  You
+specify the name of the domain as well as the path to the desired object.  You
 can refer to objects in any file you wish.  Use similar syntax as for soft
 links:
 
@@ -205,6 +205,56 @@ link resides.
 
     To specify an externlink to a domain in different bucket, pre-append the 
     target bucket name to the external path.  E.g. ``otherbucket/home/test_user1/otherfile.hdf5``
+
+.. _group_multilink:
+
+Multi-linking
+~~~~~~~~~~~~~
+
+Compared with accessing a disk file using HDF5, each request that is sent to HSDS will have higher
+latency.  For best performance, you'll want to reduce the number of requests being sent to the
+server as much as possible.  Multi-linking helps in this area by allowing multiple links to be 
+created, accessed, or deleted in one request.
+
+Consider the case where you'd like to add three soft links to create in the root group.
+The traditional way this would be done in h5py would be to add each link in turn:
+
+    >>> f = h5py.File('foo.hdf5', 'w')
+    >>> f['x'] = h5py.SoftLink('/g1.1/x')
+    >>> f['y'] = h5py.SoftLink('/g2.2/y')
+    >>> f['z'] = h5py.SoftLink('/g3.3/z')
+
+While these method works with h5pyd as well, it would be more efficient to 
+utilize multi-linking in this way:
+
+    >>> f = h5pyd.File('/home/test_user1/foo,h5', 'w')
+    >>> links = []
+    >>> links.append(h5py.SoftLink('/g1.1/x'))
+    >>> links.append(h5py.SoftLink('/g2.2/y'))
+    >>> links.append(h5py.SoftLink('/g3.3/z'))
+    >>> names = ['x', 'y', 'z']
+    >>> f[names] = links  # 3 links will be created in one request
+ 
+To create multiple links in one call, just use a list of link names
+as the key and a list of link objects (HardLink, SoftLik, or ExternalLink)
+as the value (where the number of names is equal to the number of links).  
+The result will be the same as if you created the links 
+one by one, but the operation will take less time.
+
+Multi-linking can be used to fetch links as well.
+If you need to fetch a specific set of link names 
+from a group, you can do this:
+
+    >>> names = ['ACH293', 'BUR389', 'CDJ982']
+    >>> f.get(names, getlink=True)
+    {'ACH293': <HardLink to "g-1faa5ed5-740572c1-e32f-0a8a33-16d09a">, 
+     'BUR389': <HardLink to "g-1faa5ed5-740572c1-1738-e4a329-74cd22">, 
+     'CDJ392': <HardLink to "g-1faa5ed5-740572c1-b20f-5926cc-2503fb">}
+
+Multiple links can also be deleted simultaneously.  For example,
+
+    >>> names = ['ACH293', 'BUR389', 'CDJ982']
+    >>> del f[names]
 
 
 Reference
@@ -263,7 +313,7 @@ Reference
 
         :return: a set-like object.
 
-    .. method:: get(name, default=None, getclass=False, getlink=False)
+    .. method:: get(name, default=None, getclass=False, getlink=False, track_order=None)
 
         Retrieve an item, or information about an item.  `name` and `default`
         work like the standard Python ``dict.get``.
@@ -277,6 +327,10 @@ Reference
                         :class:`SoftLink` or :class:`ExternalLink` instance.
                         If ``getclass`` is also True, returns the corresponding
                         Link class without instantiating it.
+        :param track_order: If True, return links by creation order.  If False,
+                        return link by alphanumeric order, if None, return links
+                        based on the track_order setting in effect when the 
+                        group was created.
 
     .. method:: visit(callable)
 
@@ -319,50 +373,6 @@ Reference
 
        The second argument to the callback for ``visititems_links`` is an
        instance of one of the :ref:`link classes <group_link_classes>`.
-
-    .. method:: move(source, dest)
-
-        Move an object or link in the file.  If `source` is a hard link, this
-        effectively renames the object.  If a soft or external link, the
-        link itself is moved.
-
-        :param source:  Name of object or link to move.
-        :type source:   String
-        :param dest:    New location for object or link.
-        :type dest:   String
-
-        .. note::
-
-            This method is not yet supported, and will raise an error if invoked.
-
-
-    .. method:: copy(source, dest, name=None, shallow=False, expand_soft=False, expand_external=False, expand_refs=False, without_attrs=False)
-
-        Copy an object or group.  The source can be a path, Group, Dataset, or
-        Datatype object.  The destination can be either a path or a Group
-        object.  The source and destination need not be in the same file.
-
-        If the source is a Group object, by default all objects within that
-        group will be copied recursively.
-
-        When the destination is a Group object, by default the target will be
-        created in that group with its current name (basename of obj.name). You
-        can override that by setting "name" to a string.
-
-        :param source:  What to copy.  May be a path in the file or a Group/Dataset object.
-        :param dest:    Where to copy it.  May be a path or Group object.
-        :param name:    If the destination is a Group object, use this for the
-                        name of the copied object (default is basename).
-        :param shallow: Only copy immediate members of a group.
-        :param expand_soft: Expand soft links into new objects.
-        :param expand_external: Expand external links into new objects.
-        :param expand_refs: Copy objects which are pointed to by references.
-        :param without_attrs:   Copy object(s) without copying HDF5 attributes.
-
-        .. note::
-
-            This method is not yet supported, and will raise an error if invoked.
-
 
 
     .. method:: create_group(name, track_order=None)
@@ -472,47 +482,32 @@ Reference
         shape and dtype, in which case the provided values take precedence over
         those from `other`.
 
-    .. method:: create_virtual_dataset(name, layout, fillvalue=None)
+    .. method:: create_table(name, numrows=None, dtype=None, data=None, **kwds)
 
-       Create a new virtual dataset in this group. See :doc:`/vds` for more
-       details.
+        Create a new table (one-dimensional dataset).  Options are explained in tbd .
 
-       :param str name:
-           Name of the dataset (absolute or relative).
-       :param VirtualLayout layout:
-           Defines what source data fills which parts of the virtual dataset.
-       :param fillvalue:
-           The value to use where there is no data.
+        :param name:    Name of table to create.  May be an absolute
+                        or relative path.  Provide None to create an anonymous
+                        dataset, to be linked into the file later.
 
-        .. note: 
+        :param numrows:  Number of initial rows
 
-            This is a place holder method until Virtual Datasets are supported.
-            Invoking the method will raise an error
+        :param dtype:   Data type for new table
 
-    .. method:: build_virtual_dataset()
+        :param data:    Initialize table to this (NumPy array).
 
-       Assemble a virtual dataset in this group.
+        :keyword chunks:    Chunk shape, or True for auto-chunking.
 
-       This is used as a context manager::
+        
 
-           with f.build_virtual_dataset('virt', (10, 1000), np.uint32) as layout:
-               layout[0] = h5py.VirtualSource('foo.h5', 'data', (1000,))
+    .. method:: getObjByUuid(obj_uuid)
 
-       Inside the context, you populate a :class:`VirtualLayout` object.
-       The file is only modified when you leave the context, and if there's
-       no error.
+        Returns the object in the domain with the given low-level identifier UUID.   
+        Raises an IOError ("401 - Not Found")
+        if no object with the given identifier exists.
 
-       :param str name: Name of the dataset (absolute or relative)
-       :param tuple shape: Shape of the dataset
-       :param dtype: A numpy dtype for data read from the virtual dataset
-       :param tuple maxshape: Maximum dimensions if the dataset can grow
-           (optional). Use None for unlimited dimensions.
-       :param fillvalue: The value used where no data is available.
-
-        .. note: 
-
-            This is a place holder method until Virtual Datasets are supported.
-            Invoking the method will raise an error
+       :param str obj_uuid:
+           Object identifier of the object to be returned.
 
     .. attribute:: attrs
 
@@ -528,11 +523,6 @@ Reference
         An HDF5 object reference pointing to this group.  See
         :ref:`refs_object`.
 
-    .. attribute:: regionref
-
-        A proxy object allowing you to interrogate region references.
-        See :ref:`refs_region`.
-
     .. attribute:: name
 
         String giving the full path to this group.
@@ -544,6 +534,10 @@ Reference
     .. attribute:: parent
 
         :class:`Group` instance containing this group.
+
+    .. attribute:: modified
+
+        datetime object giving the time object was last modified
 
 .. _group_link_classes:
 
