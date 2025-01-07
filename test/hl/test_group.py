@@ -192,22 +192,25 @@ class TestGroup(TestCase):
             self.assertTrue(name in f)
         self.assertTrue("/g1/g1.1" in f)
         g1_1 = f["/g1/g1.1"]
+        r = f["/"]
 
-        if is_hsds:
-            linkee_class = r.get('mysoftlink', getclass=True)
-            # TBD: investigate why h5py returned None here
-            self.assertEqual(linkee_class, h5py.Group)
-            link_class = r.get('mysoftlink', getclass=True, getlink=True)
-            self.assertEqual(link_class, h5py.SoftLink)
-            softlink = r.get('mysoftlink', getlink=True)
-            self.assertEqual(softlink.path, '/g1/g1.1')
+        linkee_class = r.get('mysoftlink', getclass=True)
+        self.assertEqual(linkee_class, h5py.Group)
+        link_class = r.get('mysoftlink', getclass=True, getlink=True)
+        self.assertEqual(link_class, h5py.SoftLink)
+        softlink = r.get('mysoftlink', getlink=True)
+        self.assertEqual(softlink.path, '/g1/g1.1')
         linked_obj = f["mysoftlink"]
         self.assertEqual(linked_obj.id, g1_1.id)
 
         if is_hsds:
             # for h5pyd we should be able to retrieve the anon group
+            anon_group = f.getObjByUuid(anon_group_id)
+            self.assertEqual(anon_group_id, anon_group.id.id)
+            # can also get anon group using groups/<uuid> key
             anon_group = f[f"groups/{anon_group_id}"]
             self.assertEqual(anon_group_id, anon_group.id.id)
+
         f.close()
 
     def test_nested_create(self):
@@ -234,9 +237,6 @@ class TestGroup(TestCase):
 
     def test_external_links(self):
         # create a file for use a link target
-        if config.get("use_h5py"):
-            # for some reason this test is failing in Travis
-            return
         linked_filename = self.getFileName("linked_file")
         abs_filepath = os.path.abspath(linked_filename)
         if config.get("use_h5py"):

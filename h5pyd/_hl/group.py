@@ -446,7 +446,7 @@ class Group(HLObject, MutableMappingHDF5):
             kwupdate.setdefault('maxshape', other.maxshape)
 
         return self.create_dataset(name, **kwupdate)
-    
+
     def create_virtual_dataset(name, layout, fillvalue=None):
         """ Create a virtual dataset """
         # not currently supported
@@ -1111,7 +1111,6 @@ class Group(HLObject, MutableMappingHDF5):
         >>> f.visit(list_of_names.append)
         """
         return self.visititems(func)
-       
 
     def visititems(self, func):
         """ Recursively visit names and objects in this group (HDF5 1.8).
@@ -1303,7 +1302,7 @@ class ExternalLink(object):
 
     """
         Represents an HDF5 external link.  Paths may be absolute or relative.
-        No checking is performed to ensure either the target or file exists.
+        No checking is performed to ensure either the target or the domain exists.
     """
 
     @property

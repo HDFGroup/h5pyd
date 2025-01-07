@@ -139,6 +139,14 @@ is to create an :ref:`HDF5 datasets <dataset>`::
     >>> out
     <HDF5 dataset "name": shape (), type "<i8">
 
+If the object is a Numpy datatype, the default is to create a committed datatype object.
+
+    >> dt = numpy.dtype("int32")
+    >> grp["name"] = dt
+    >> out = grp["name"]
+    >> out
+    <HDF5 named type "named_type" (dtype <i4)>
+
 When the object being stored is an existing Group or Dataset, a new link is
 made to the object::
 
@@ -513,7 +521,7 @@ Reference
     .. attribute:: id
 
         The groups's low-level identifier; an instance of
-        :class:`GroupID <low:h5py.h5g.GroupID>`.
+        :class:`GroupID <low:h5pyd.GroupID>`.
 
     .. attribute:: ref
 
@@ -565,10 +573,10 @@ Link classes
     Like :class:`SoftLink`, only they specify a filename in addition to a
     path.  See :ref:`group_extlinks`.
 
-    :param filename:    Name of the file to which the link points
+    :param filename:    Path to the domain to which the link points
     :type filename:     String
 
-    :param path:        Path to the object in the external file.
+    :param path:        Path to the object in the external domain.
     :type path:         String
 
     .. attribute:: filename

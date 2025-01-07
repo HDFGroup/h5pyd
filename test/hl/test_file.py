@@ -54,6 +54,7 @@ class TestFile(TestCase):
         filename = self.getFileName("new_file")
         print("filename:", filename)
         now = time.time()
+        print("test create")
         f = h5py.File(filename, 'w')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
@@ -128,13 +129,10 @@ class TestFile(TestCase):
         f = h5py.File(filename, "a")
         f.create_group("foo")
         del f["foo"]
+
         f.close()
 
         # re-open as read-only
-        if h5py.__name__ == "h5pyd":
-            wait_time = 90  # change to >90 to test async updates
-            print("waiting {wait_time:d} seconds for root scan sync".format(wait_time=wait_time))
-            time.sleep(wait_time)  # let async process update obj number
         f = h5py.File(filename, 'r')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
@@ -166,10 +164,18 @@ class TestFile(TestCase):
         if h5py.__name__ == "h5pyd":
             # check properties that are only available for h5pyd
             # Note: num_groups won't reflect current state since the
-            # data is being updated asynchronously
+            # data is being updated asynchronously, so wait for a scan update
+            logging.info("waiting on scan update")
+            ts = time.time()
+            while not f.last_scan:
+                time.sleep(0.1)
+                elapsed = time.time() - ts
+                if elapsed > 90:
+                    logging.error("scan not complete after 90 seconds")
+                    self.assertTrue(False)
+            logging.info(f"last_scan updated after {elapsed:6.2f} seconds")
             self.assertEqual(f.num_objects, 3)
             self.assertEqual(f.num_groups, 3)
-
             self.assertEqual(f.num_datasets, 0)
             self.assertEqual(f.num_datatypes, 0)
             self.assertTrue(f.allocated_bytes == 0)
