@@ -60,7 +60,64 @@ class Group(HLObject, MutableMappingHDF5):
             raise ValueError(f"{bind} is not a GroupID")
         HLObject.__init__(self, bind, track_order=track_order, **kwargs)
         self._req_prefix = "/groups/" + self.id.uuid
-        self._link_db = {}  # cache for links
+        self._link_db = None  # cache for links
+
+    def _refresh_link_cache(self, force=False):
+        if self._link_db is not None and not force and self.id.http_conn.mode == 'r':
+            # already initialized and we are in read-only mode, just return
+            return
+
+        objdb = self.id._http_conn.getObjDb()
+        group_id = self.id.uuid
+
+        if not force and objdb and group_id in objdb:
+            # _objdb is meta-data pulled from the domain on open.
+            # see if we can extract the link json from there
+            self.log.debug(f"found {group_id} in objdb")
+            group_json = objdb[group_id]
+            links = group_json["links"]
+            # mix in a "collection key for compatibility with server GET links request
+            for title in links:
+                link = links[title]
+                if 'class' not in link:
+                    self.log.error(f"expected to find class key in link {link}")
+                    continue
+                link['title'] = title
+                link_class = link['class']
+                if link_class == 'H5L_TYPE_HARD':
+                    if 'id' not in link:
+                        self.log.error(f"expected to find id key in hard link: {link}")
+                        continue
+                    link_id = link['id']
+                    if not link_id:
+                        self.log.error(f"null id for hard link: {link}")
+                        continue
+                    if link_id.startswith("g-"):
+                        link['collection'] = "groups"
+                    elif link_id.startswith("d-"):
+                        link['collection'] = "datasets"
+                    elif link_id.startswith("t-"):
+                        link["collection"] = "datatypes"
+                    else:
+                        self.log.error(f"unexpected id string for hard link: {link}")
+                else:
+                    pass  # no collection for non hardlink
+            link_db = links
+        else:
+            # make server request
+            self.log.debug(f"requesting links for {group_id}")
+            req = "/groups/" + group_id + "/links"
+            rsp_json = self.GET(req, use_cache=False)
+            links = rsp_json['links']
+            link_db = {}
+            for link in links:
+                title = link['title']
+                link_db[title] = link
+
+        self.log.debug(f"_refresh_link_cache - found {len(links)} for {group_id}")
+
+        # reset the link cache
+        self._link_db = link_db
 
     def _get_link_json(self, h5path):
         """ Return parent_uuid and json description of link for given path """
@@ -84,12 +141,17 @@ class Group(HLObject, MutableMappingHDF5):
                 # asking for the root, just return the root link
                 return parent_uuid, tgt_json
         else:
-            if in_group and h5path in self._link_db:
-                # link belonging to this group, see if it's in the cache
-                tgt_json = self._link_db[h5path]
-                parent_uuid = self.id.id
+            if in_group:
+                self._refresh_link_cache()
+                if h5path in self._link_db:
+                    # link belonging to this group, return cache itm
+                    tgt_json = self._link_db[h5path]
+                    parent_uuid = self.id.id
 
-                return parent_uuid, tgt_json
+                    return parent_uuid, tgt_json
+                else:
+                    self.log.info(f"{h5path} not found")
+                    raise KeyError("Unable to open object (Component not found)")
 
         path = h5path.split('/')
 
@@ -126,7 +188,7 @@ class Group(HLObject, MutableMappingHDF5):
                     group_uuid = tgt_json["id"]
 
             if tgt_json:
-                # mix in a "collection key for compatibilty wtth server GET links request
+                # mix in a "collection key for compatibility with server GET links request
                 if group_uuid and group_uuid.startswith("g-"):
                     tgt_json['collection'] = "groups"
                 elif group_uuid and group_uuid.startswith("d-"):
@@ -150,17 +212,13 @@ class Group(HLObject, MutableMappingHDF5):
             req = "/groups/" + parent_uuid + "/links/" + name
 
             try:
-                rsp_json = self.GET(req, params={"CreateOrder": "1" if self.track_order else "0"})
+                rsp_json = self.GET(req)
             except IOError:
                 raise KeyError("Unable to open object (Component not found)")
 
             if "link" not in rsp_json:
                 raise IOError("Unexpected Error")
             tgt_json = rsp_json['link']
-
-            if in_group:
-                # add to db to speed up future requests
-                self._link_db[name] = tgt_json
 
             if tgt_json['class'] == 'H5L_TYPE_HARD':
                 if tgt_json['collection'] == 'groups':
@@ -169,18 +227,6 @@ class Group(HLObject, MutableMappingHDF5):
                     parent_uuid = None
 
         return parent_uuid, tgt_json
-
-    def _get_objdb_links(self):
-        """ Return the links json from the objdb if present.
-        """
-        objdb = self.id.http_conn.getObjDb()
-        if not objdb:
-            return None
-        if self.id.id not in objdb:
-            self.log.warning(f"{self.id.id} not found in objdb")
-            return None
-        group_json = objdb[self.id.id]
-        return group_json["links"]
 
     def _make_group(self, parent_id=None, parent_name=None, link=None, track_order=None):
         """ helper function to make a group """
@@ -270,7 +316,7 @@ class Group(HLObject, MutableMappingHDF5):
                 parent_uuid = sub_group.id.id
 
             else:
-                # sub-group already exsits
+                # sub-group already exists
                 self.log.debug(f"create group - found subgroup: {link}")
                 if "link" not in rsp_json:
                     raise IOError("Unexpected Error")
@@ -499,6 +545,9 @@ class Group(HLObject, MutableMappingHDF5):
         shape or dtype don't match according to the above rules.
         """
 
+        if isinstance(name, bytes):
+            name = name.decode('utf-8')
+
         if name not in self:
             return self.create_dataset(name, *(shape, dtype), **kwds)
 
@@ -526,6 +575,9 @@ class Group(HLObject, MutableMappingHDF5):
         TypeError is raised if something with that name already exists that
         isn't a group.
         """
+        if isinstance(name, bytes):
+            # convert byte input to string
+            name = name.decode("utf-8")
 
         if name not in self:
             return self.create_group(name)
@@ -562,10 +614,9 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 raise IOError(f"Unexpected uuid: {uuid}")
         objdb = self.id.http_conn.getObjDb()
-        if objdb and uuid in objdb and False:
+        if objdb and uuid in objdb:
             # we should be able to construct an object from objdb json
             obj_json = objdb[uuid]
-            print('fetch from db')
         else:
             # will need to get JSON from server
             req = f"/{collection_type}/{uuid}"
@@ -722,6 +773,11 @@ class Group(HLObject, MutableMappingHDF5):
         >>> if cls == SoftLink:
         ...     print '"foo" is a soft link!'
         """
+        kwd_args = ("limit", "marker", "pattern", "follow_links")
+        for kwd in kwds:
+            if kwd not in kwd_args:
+                raise TypeError(f"group.get() unexpected keyword argument: {kwd}")
+
         if not (getclass or getlink):
             try:
                 return self.__getitem__(name, track_order=track_order)
@@ -767,8 +823,13 @@ class Group(HLObject, MutableMappingHDF5):
                     params["pattern"] = pattern
                 if follow_links:
                     params["follow_links"] = 1
+
                 if track_order is not None:
-                    params["CreateOrder"] = "1" if track_order else "0"
+                    if limit or marker or pattern or follow_links:
+                        # send server request, otherwise we'll just sort
+                        # client side (so things will work even if we have
+                        # the request in http cache)
+                        params["CreateOrder"] = "1" if track_order else "0"
 
                 if name:
                     body = {}
@@ -782,19 +843,37 @@ class Group(HLObject, MutableMappingHDF5):
 
                 if "links" in rsp:
                     # Process list of link objects so they may be accessed by name
-                    links = rsp['links']
-                    links_out = {}
+                    links_out = collections.OrderedDict()
+                    links = rsp["links"]
                     if all([isUUID(k) for k in links]):
                         # Multiple groups queried, links are returned under group ids
                         for group_id in links:
-                            group_links = {}
+                            group_links = collections.OrderedDict()
 
-                            for link in links[group_id]:
+                            link_list = links[group_id]
+                            if track_order is None:
+                                pass  # just use in the order we got from the server
+                            elif track_order:
+                                # sort by created key
+                                link_list.sort(key=lambda d: d['created'])
+                            else:
+                                # sort by title
+                                link_list.sort(key=lambda d: d['title'])
+
+                            for link in link_list:
                                 group_links[link["title"]] = self._objectify_link_Json(link)
 
                             links_out[group_id] = group_links
 
                     else:
+                        if track_order is None:
+                            pass  # just use in the order we got from the server
+                        elif track_order:
+                            # sort by created key
+                            links.sort(key=lambda d: d['created'])
+                        else:
+                            # sort by title
+                            links.sort(key=lambda d: d['title'])
                         for link in links:
                             links_out[link["title"]] = self._objectify_link_Json(link)
                 else:
@@ -933,8 +1012,9 @@ class Group(HLObject, MutableMappingHDF5):
                 arr = numpy.array(obj, dtype=dt)
             self.create_dataset(name, shape=arr.shape, dtype=arr.dtype, data=arr[...])
 
-            # ds = self.create_dataset(None, data=obj, dtype=base.guess_dtype(obj))
-            # h5o.link(ds.id, self.id, name, lcpl=lcpl)
+        if isinstance(name, str) and name.find('/') != -1:
+            # object in this group, update link db
+            self._refresh_link_cache()
 
     def __delitem__(self, name):
         """ Delete (unlink) an item from this group. """
@@ -964,66 +1044,61 @@ class Group(HLObject, MutableMappingHDF5):
 
         self.DELETE(req)
 
-        for n in name:
-            if n.find('/') == -1 and n in self._link_db:
-                # remove from link cache
-                del self._link_db[name]
+        self._refresh_link_cache()
 
     def __len__(self):
         """ Number of members attached to this group """
-        links_json = self._get_objdb_links()
-        # we can avoid a server request and just count the links in the obj json
-        if links_json:
-            return len(links_json)
+        self._refresh_link_cache()
+        num_links = len(self._link_db)
+        return num_links
 
-        req = "/groups/" + self.id.uuid
-        params = {}
-        if self.track_order is not None:
-            params["CreateOrder"] = "1" if self.track_order else "0"
-        rsp_json = self.GET(req, params=params)
-        return rsp_json['linkCount']
+    def _get_link_list(self, track_order=None):
+        if track_order is None:
+            track_order = self.track_order
+        self._refresh_link_cache()
+
+        # convert to a list of dicts
+        links = []
+        for title in self._link_db:
+            link = self._link_db[title]
+            links.append(link)
+
+        if track_order:
+            links.sort(key=lambda d: d['created'])
+        else:
+            links.sort(key=lambda d: d['title'])
+        return links
 
     def __iter__(self):
         """ Iterate over member names """
-        links = self._get_objdb_links()
+        links = self._get_link_list()
 
-        if links is None:
-            req = "/groups/" + self.id.uuid + "/links"
-            params = {}
-            if self.track_order is not None:
-                params["CreateOrder"] = "1" if self.track_order else "0"
-            rsp_json = self.GET(req, params=params)
-            links = rsp_json['links']
+        for link in links:
+            yield link['title']
 
-            # reset the link cache
-            self._link_db = {}
-            for link in links:
-                name = link["title"]
-                self._link_db[name] = link
+    def __reversed__(self):
+        """ Iterate over member names in reverse order """
+        self._refresh_link_cache()
+        links = self._get_link_list()
 
-            for x in links:
-                yield x['title']
-        else:
-            if self.track_order:
-                links = sorted(links.items(), key=lambda x: x[1]['created'])
-            else:
-                links = sorted(links.items())
-
-            ordered_links = {}
-            for link in links:
-                ordered_links[link[0]] = link[1]
-
-            for name in ordered_links:
-                yield name
+        for link in reversed(links):
+            yield link['title']
 
     def __contains__(self, name):
         """ Test if a member name exists """
         found = False
-        try:
-            self._get_link_json(name)
-            found = True
-        except KeyError:
-            pass  # not found
+
+        if name.find('/') == -1:
+            # a link in this group
+            self._refresh_link_cache()
+            if name in self._link_db:
+                found = True
+        else:
+            try:
+                self._get_link_json(name)
+                found = True
+            except KeyError:
+                pass  # not found
         return found
 
     def copy(self, source, dest, name=None,
@@ -1209,40 +1284,11 @@ class Group(HLObject, MutableMappingHDF5):
             r = f'<HDF5 group {namestr} ({len(self)} members)>'
         return r
 
-    def __reversed__(self):
-        """ Iterate over member names in reverse order """
-        links = self._get_objdb_links()
-
-        if links is None:
-            req = "/groups/" + self.id.uuid + "/links"
-            rsp_json = self.GET(req, params={"CreateOrder": "1" if self.track_order else "0"})
-            links = rsp_json['links']
-
-            # reset the link cache
-            self._link_db = {}
-            for link in links:
-                name = link["title"]
-                self._link_db[name] = link
-
-            for x in reversed(links):
-                yield x['title']
-        else:
-            if self.track_order:
-                links = sorted(links.items(), key=lambda x: x[1]['created'])
-            else:
-                links = sorted(links.items())
-
-            ordered_links = {}
-            for link in links:
-                ordered_links[link[0]] = link[1]
-
-            for name in reversed(ordered_links):
-                yield name
-
     def refresh(self):
         """Refresh the group metadata by reloading from the file.
         """
         self.id.refresh()
+        self._refresh_link_cache(force=True)
 
 
 class HardLink(object):

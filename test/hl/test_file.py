@@ -268,7 +268,7 @@ class TestFile(TestCase):
 
         if h5py.__name__ == "h5py":
             return  # no ACLs in h5py
-        
+
         # no explicit ACLs yet
         file_acls = f.getACLs()
         self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl

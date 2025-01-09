@@ -30,7 +30,6 @@ class TestGroup(TestCase):
         f = h5py.File(filename, 'w')
         self.assertTrue('/' in f)
         r = f['/']
-
         self.assertEqual(len(r), 0)
         self.assertTrue(isinstance(r, h5py.Group))
         self.assertTrue(r.name, '/')
@@ -175,7 +174,6 @@ class TestGroup(TestCase):
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":
             self.assertTrue(isinstance(g1.modified, datetime))
-        print("modified", type(g1.modified))
 
         # try creating an anon group
         anon_group = g1.create_group(None)
@@ -236,14 +234,14 @@ class TestGroup(TestCase):
     def test_external_links(self):
         # create a file for use a link target
         linked_filename = self.getFileName("linked_file")
-        
+
         f = h5py.File(linked_filename, 'w')
         abs_filepath = os.path.abspath(linked_filename)
         if h5py.__name__ == "h5pyd":
             rel_filepath = "linked_file.h5"
         else:
             rel_filepath = os.path.relpath(linked_filename)
-            
+
         g1 = f.create_group("g1")
         dset = g1.create_dataset('ds', (5, 7), dtype='f4')
         dset_id = dset.id.id
@@ -314,7 +312,7 @@ class TestGroup(TestCase):
             return  # multilink is for h5pyd only
         filename = self.getFileName("test_link_multi_removal")
         print(f"filename: {filename}")
-    
+
         f = h5py.File(filename, 'w')
         g1 = f.create_group("g1")
         g1_clone = f["g1"]
@@ -578,6 +576,12 @@ class TestTrackOrder(TestCase):
                 self.assertEqual(title, self.titles[i])
                 i += 1
 
+            # test with get and track_order=False
+            links = g.get(None, getlink=True, track_order=False)
+            ref = sorted(self.titles)
+            self.assertEqual(list(links), ref)
+            self.assertEqual(list(links), ref)
+
         # re-opening the file should retain the track_order setting
         with h5py.File(filename) as f:
             g = f['order']
@@ -631,12 +635,12 @@ class TestTrackOrder(TestCase):
             self.assertEqual(list(reversed(g)), list(reversed(ref)))
 
     def test_get_dataset_track_order(self):
-        
+
         filename = self.getFileName("test_get_dataset_track_order")
         print(f"filename: {filename}")
         if h5py.__name__ == "h5py":
             return  # h5py does not support track_order on group.get()
-        
+
         with h5py.File(filename, 'w') as f:
             g = f.create_group('order')
             dset = g.create_dataset('dset', (10,), dtype='i4')
@@ -658,7 +662,7 @@ class TestTrackOrder(TestCase):
         print(f"filename: {filename}")
         if h5py.__name__ == "h5py":
             return  # h5py does not support track_order on group.get()
-        
+
         with h5py.File(filename, 'w') as f:
             g = f.create_group('order')
             g._track_order = True
@@ -675,6 +679,7 @@ class TestTrackOrder(TestCase):
             g = f['order']
             subg2 = g.get('subgroup', track_order=False)
             self.assertEqual(list(subg2), sorted(self.titles))
+
 
 if __name__ == '__main__':
     loglevel = logging.ERROR

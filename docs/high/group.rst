@@ -106,6 +106,10 @@ Python 3.7+ dictionaries.
 The default ``track_order`` for all new groups can be specified
 globally with ``h5pyd.get_config().track_order``.
 
+If the group has already been created and you wish to fetch the links
+in a specific order, you can invoke the ``get`` method with the desired
+``track_order`` argument.
+
 Links can be deleted from a group using the standard Python syntax::
 
     >>> del subgroup["MyDataset"]
@@ -212,11 +216,11 @@ Multi-linking
 ~~~~~~~~~~~~~
 
 Compared with accessing a disk file using HDF5, each request that is sent to HSDS will have higher
-latency.  For best performance, you'll want to reduce the number of requests being sent to the
+latency.  Therefore for best performance, you'll want to reduce the number of requests being sent to the
 server as much as possible.  Multi-linking helps in this area by allowing multiple links to be 
 created, accessed, or deleted in one request.
 
-Consider the case where you'd like to add three soft links to create in the root group.
+Consider the case where you'd like to add three soft links to the root group.
 The traditional way this would be done in h5py would be to add each link in turn:
 
     >>> f = h5py.File('foo.hdf5', 'w')
@@ -224,7 +228,7 @@ The traditional way this would be done in h5py would be to add each link in turn
     >>> f['y'] = h5py.SoftLink('/g2.2/y')
     >>> f['z'] = h5py.SoftLink('/g3.3/z')
 
-While these method works with h5pyd as well, it would be more efficient to 
+While this method works with h5pyd as well, with h5pyd it would be more efficient to 
 utilize multi-linking in this way:
 
     >>> f = h5pyd.File('/home/test_user1/foo,h5', 'w')
