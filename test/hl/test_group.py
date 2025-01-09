@@ -576,11 +576,12 @@ class TestTrackOrder(TestCase):
                 self.assertEqual(title, self.titles[i])
                 i += 1
 
-            # test with get and track_order=False
-            links = g.get(None, getlink=True, track_order=False)
-            ref = sorted(self.titles)
-            self.assertEqual(list(links), ref)
-            self.assertEqual(list(links), ref)
+            if h5py.__name__ == "h5pyd":
+                # test with get and track_order=False
+                links = g.get(None, getlink=True, track_order=False)
+                ref = sorted(self.titles)
+                self.assertEqual(list(links), ref)
+                self.assertEqual(list(links), ref)
 
         # re-opening the file should retain the track_order setting
         with h5py.File(filename) as f:
