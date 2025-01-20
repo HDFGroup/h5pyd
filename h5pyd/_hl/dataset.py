@@ -14,7 +14,6 @@ from __future__ import absolute_import
 
 import posixpath as pp
 from copy import copy
-import sys
 import time
 import numpy
 import os
@@ -30,7 +29,7 @@ from .objectid import DatasetID
 from . import filters
 from . import selections as sel
 from .datatype import Datatype
-from .h5type import getTypeItem, createDataType, check_dtype, special_dtype, getItemSize
+from .h5type import getTypeItem, check_dtype, special_dtype, getItemSize
 from .. import config
 
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
@@ -67,6 +66,7 @@ def readtime_dtype(basetype, names):
 
 def make_new_dset(
     parent,
+    name=None,
     shape=None,
     dtype=None,
     data=None,
@@ -88,8 +88,9 @@ def make_new_dset(
     Only creates anonymous datasets.
     """
 
-    # fill in fields for the body of the POST request as we got
-    body = {}
+    if name and name.find('/') != -1:
+        raise ValueError("name cannot be a path")
+
     cfg = config.get_config()
 
     # Convert data to a C-contiguous ndarray
@@ -111,11 +112,6 @@ def make_new_dset(
             numpy.prod(shape, dtype=numpy.ulonglong) != numpy.prod(data.shape, dtype=numpy.ulonglong)
         ):
             raise ValueError("Shape tuple is incompatible with data")
-
-    if shape is None:
-        body["shape"] = "H5S_NULL"
-    else:
-        body["shape"] = shape
 
     if track_times is not None:
         if track_times not in (True, False):
@@ -183,7 +179,6 @@ def make_new_dset(
                 raise ValueError(errmsg)
         else:
             type_json = getTypeItem(dtype)
-    body["type"] = type_json
 
     layout = None
     if chunks is not None and isinstance(chunks, dict):
@@ -253,45 +248,40 @@ def make_new_dset(
             dcpl["fillValue"] = fillvalue
 
     if track_order or cfg.track_order:
-        dcpl["CreateOrder"] = 1
+        track_order = True
 
     if chunks and isinstance(chunks, dict):
         dcpl["layout"] = chunks
 
-    body["creationProperties"] = dcpl
+    maxdims = None
 
     if maxshape is not None and len(maxshape) > 0:
         if shape is not None:
-            maxshape = tuple(m if m is not None else 0 for m in maxshape)
-            body["maxdims"] = maxshape
+            maxdims = tuple(m if m is not None else 0 for m in maxshape)
         else:
             print("maxshape provided but no shape")
 
-    req = "/datasets"
-
-    rsp = parent.POST(req, body=body)
-
-    json_rep = {}
-    json_rep["id"] = rsp["id"]
-
-    req = "/datasets/" + rsp["id"]
-    rsp = parent.GET(req)
-
-    json_rep["shape"] = rsp["shape"]
-    json_rep["type"] = rsp["type"]
-    json_rep["lastModified"] = rsp["lastModified"]
-    if "creationProperties" in rsp:
-        json_rep["creationProperties"] = rsp["creationProperties"]
+    kwds = {"type_json": type_json, "cpl": dcpl}
+    if shape is None:
+        kwds["shape"] = "H5S_NULL"
     else:
-        json_rep["creationProperties"] = {}
-    if "layout" in rsp:
-        json_rep["layout"] = rsp["layout"]
+        kwds["shape"] = shape
+    if maxdims:
+        kwds["maxdims"] = maxdims
+    if track_order:
+        kwds["track_order"] = track_order
 
-    dset_id = DatasetID(parent, json_rep)
+    dset_id = parent.id.make_obj(name, **kwds)  # create the dataset
+
+    # for new datasets do a fetch to regularize the json values
+    if not dset_id.chunks:
+        # TBD - have HSDS return chunk shape on create, then
+        # we can avoid additional server request
+        dset_id.refresh()
 
     if data is not None:
         # init data
-        dset = Dataset(dset_id, track_order=(track_order or cfg.track_order))
+        dset = Dataset(dset_id)
         dset[...] = data
 
     return dset_id
@@ -544,38 +534,24 @@ class Dataset(HLObject):
     @property
     def ndim(self):
         """Numpy-style attribute giving the number of dimensions"""
-        if self._shape is None:
+        if self.shape is None:
             return 0
         else:
-            return len(self._shape)
+            return len(self.shape)
 
     @property
     def shape(self):
         """Numpy-style shape tuple giving dataset dimensions"""
         # just return the cached shape value
         # (although potentially it could have changed on server)
-        return self._shape
-
-    def get_shape(self, check_server=False):
-        # this version will optionally refetch the shape from the server
-        # (if the dataset is resiable)
         shape_json = self.id.shape_json
         if shape_json["class"] == "H5S_NULL":
             return None
         if shape_json["class"] == "H5S_SCALAR":
             return ()  # return empty
+        dims = tuple(shape_json['dims'])
 
-        if "maxdims" not in shape_json or not check_server:
-            # not resizable, just return dims
-            dims = shape_json["dims"]
-        else:
-            # resizable, retrieve current shape
-            req = "/datasets/" + self.id.uuid + "/shape"
-            rsp = self.GET(req)
-            shape_json = rsp["shape"]
-            dims = shape_json["dims"]
-        self._shape = tuple(dims)
-        return self._shape
+        return dims
 
     @shape.setter
     def shape(self, shape):
@@ -584,18 +560,18 @@ class Dataset(HLObject):
     @property
     def size(self):
         """Numpy-style attribute giving the total dataset size"""
-        if self._shape is None:
+        dims = self.shape
+        if dims is None:
             return None
-        return numpy.prod(self._shape, dtype=numpy.int64).item()
+        return numpy.prod(dims, dtype=numpy.int64).item()
 
     @property
     def nbytes(self):
         """Numpy-style attribute giving the raw dataset size as the number of bytes"""
         size = self.size
-        if (
-            size is None
-        ):  # if we are an empty 0-D array, then there are no bytes in the dataset
+        if (size is None):  # if we are an empty 0-D array, then there are no bytes in the dataset
             return 0
+        # TBD - this is not the actual size for vlen types
         return self.dtype.itemsize * size
 
     @property
@@ -727,7 +703,7 @@ class Dataset(HLObject):
     @property
     def fillvalue(self):
         """Fill value for this dataset (0 by default)"""
-        dcpl = self.id.dcpl_json
+        dcpl = self.id.cpl
         if "fillValue" in dcpl:
             fill_value = dcpl["fillValue"]
             if isinstance(fill_value, list):
@@ -749,7 +725,7 @@ class Dataset(HLObject):
     @property
     def _is_empty(self):
         """check if this is a null-space datset"""
-        return self._shape is None
+        return self.shape is None
 
     @property
     def num_chunks(self):
@@ -768,26 +744,15 @@ class Dataset(HLObject):
 
         if not isinstance(bind, DatasetID):
             raise ValueError(f"{bind} is not a DatasetID")
-        HLObject.__init__(self, bind, track_order=track_order)
+        super().__init__(bind, track_order=track_order)
 
-        self._dcpl = self.id.dcpl_json
-        self._filters = filters.get_filters(self._dcpl)
+        self._filters = filters.get_filters(self.id.cpl)
 
         self._local = None  # local()
 
         # make a numpy dtype out of the type json
-        self._dtype = createDataType(self.id.type_json)
+        self._dtype = self.id.get_type()
         self._item_size = getItemSize(self.id.type_json)
-        if track_order is None:
-            if "CreateOrder" in self._dcpl:
-                if not self._dcpl["CreateOrder"] or self._dcpl["CreateOrder"] == "0":
-                    self._track_order = False
-                else:
-                    self._track_order = True
-        else:
-            self._track_order = track_order
-
-        self._shape = self.get_shape()
 
         self._num_chunks = None  # aditional state we'll get when requested
         self._allocated_size = None  # as above
@@ -799,8 +764,7 @@ class Dataset(HLObject):
         now = time.time()
         if (self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME):
             # resynch the verbose data
-            req = "/datasets/" + self.id.uuid + "?verbose=1"
-            rsp_json = self.GET(req)
+            rsp_json = self.id.getVerboseInfo()
             if "num_chunks" in rsp_json:
                 self._num_chunks = rsp_json["num_chunks"]
             else:
@@ -839,18 +803,10 @@ class Dataset(HLObject):
             except TypeError:
                 raise TypeError("Argument must be a single int if axis is specified")
 
-            size = list(self._shape)
+            size = list(self.shape)
             size[axis] = newlen
 
-        size = tuple(size)
-
-        # send the request to the server
-        body = {"shape": size}
-        req = "/datasets/" + self.id.uuid + "/shape"
-        self.PUT(req, body=body)
-        # self.id.set_extent(size)
-        # h5f.flush(self.id)  # THG recommends
-        self._shape = size  # save the new shape
+        self.id.resize(size)
 
     def __len__(self):
         """The size of the first axis.  TypeError if scalar.
@@ -858,10 +814,6 @@ class Dataset(HLObject):
         Limited to 2**32 on 32-bit systems; Dataset.len() is preferred.
         """
         size = self.len()
-        if size > sys.maxsize:
-            raise OverflowError(
-                "Value too big for Python's __len__; use Dataset.len() instead."
-            )
         return size
 
     def len(self):
@@ -870,7 +822,8 @@ class Dataset(HLObject):
         Use of this method is preferred to len(dset), as Python's built-in
         len() cannot handle values greater then 2**32 on 32-bit systems.
         """
-        shape = self._shape
+
+        shape = self.shape
         if shape is None or len(shape) == 0:
             raise TypeError("Attempt to take len() of scalar dataset")
         return shape[0]
@@ -880,7 +833,7 @@ class Dataset(HLObject):
 
         BEWARE: Modifications to the yielded data are *NOT* written to file.
         """
-        shape = self._shape
+        shape = self.shape
         # to reduce round trips, grab BUFFER_SIZE items at a time
         # TBD: set buffersize based on size of each row
         BUFFER_SIZE = 1000
@@ -920,7 +873,7 @@ class Dataset(HLObject):
 
     def _getQueryParam(self, start, stop, step=None):
         param = ""
-        rank = len(self._shape)
+        rank = len(self.shape)
         if rank == 0:
             return None
         if step is None:
@@ -1019,31 +972,41 @@ class Dataset(HLObject):
                 return Empty(self.dtype)
             raise ValueError("Empty datasets cannot be sliced")
 
+        shape = self.shape
+        if shape is None:
+            rank = None
+        else:
+            rank = len(shape)
+
         # === Scalar dataspaces =================
 
-        if self._shape == ():
+        if shape == ():
             selection = sel.select(self, args)
             self.log.info(f"selection.mshape: {selection.mshape}")
 
-            # TBD - refactor the following with the code for the non-scalar case
-            req = "/datasets/" + self.id.uuid + "/value"
-            rsp = self.GET(req, format="binary")
+            req = f"/datasets/{self.id.uuid}/value"
 
-            if type(rsp) in (bytes, bytearray):
+            rsp = self.id.http_conn.GET(req, format="binary")
+            if rsp.status_code != 200:
+                msg = f"Error retrieving data: {rsp.status_code}"
+                self.log.warning(msg)
+                raise IOError(msg)
+
+            if rsp.is_binary:
                 # got binary response
                 self.log.info("got binary response for scalar selection")
                 # arr = numpy.frombuffer(rsp, dtype=new_dtype)
-                arr = bytesToArray(rsp, new_dtype, self._shape)
+                arr = bytesToArray(rsp.text, new_dtype, shape)
 
                 if not self.dtype.shape:
-                    self.log.debug(f"reshape arr to: {self._shape}")
-                    arr = numpy.reshape(arr, self._shape)
+                    self.log.debug(f"reshape arr to: {shape}")
+                    arr = numpy.reshape(arr, shape)
             else:
                 # got JSON response
                 # need some special conversion for compound types --
                 # each element must be a tuple, but the JSON decoder
                 # gives us a list instead.
-                data = rsp["value"]
+                data = rsp.json()["value"]
                 self.log.info("got json response for scalar selection")
                 if len(mtype) > 1 and type(data) in (list, tuple):
                     converted_data = []
@@ -1080,32 +1043,23 @@ class Dataset(HLObject):
         single_element = selection.mshape == ()
         mshape = (1,) if single_element else selection.mshape
 
-        rank = len(self._shape)
-
-        self.log.debug(f"dataset shape: {self._shape}")
+        self.log.debug(f"dataset shape: {shape}")
         self.log.debug(f"mshape: {mshape}")
 
         # Perfom the actual read
         rsp = None
-        req = "/datasets/" + self.id.uuid + "/value"
+        req = f"/datasets/{self.id.uuid}/value"
         params = {}
 
         if mtype.names != self.dtype.names:
             params["fields"] = ":".join(mtype.names)
-
-        if self.id._http_conn.mode == "r" and self.id._http_conn.cache_on:
-            # enables lambda to be used on server
-            self.log.debug("setting nonstrict parameter")
-            params["nonstrict"] = 1
-        else:
-            self.log.debug("not settng nonstrict")
 
         if isinstance(selection, sel.SimpleSelection):
             # Divy up large selections into pages, so no one request
             # to the server will take unduly long to process
             chunk_layout = self.id.chunks
             if chunk_layout is None:
-                chunk_layout = self._shape
+                chunk_layout = shape
             elif isinstance(chunk_layout, dict):
                 # CHUNK_REF layout
                 if "dims" not in chunk_layout:
@@ -1126,8 +1080,8 @@ class Dataset(HLObject):
             # determine the dimension for paging
             for i in range(rank):
                 stop = sel_start[i] + selection.count[i] * sel_step[i]
-                if stop > self._shape[i]:
-                    stop = self._shape[i]
+                if stop > shape[i]:
+                    stop = shape[i]
                 sel_stop.append(stop)
                 if scalar_selection[i]:
                     # scalar index so will hit just one chunk
@@ -1201,27 +1155,29 @@ class Dataset(HLObject):
                     self.log.info(f"page_mshape: {page_mshape}")
 
                     params["select"] = self._getQueryParam(page_start, page_stop, sel_step)
-                    try:
-                        rsp = self.GET(req, params=params, format="binary")
-                    except IOError as ioe:
-                        self.log.info(f"got IOError: {ioe.errno}")
-                        if ioe.errno == 413 and chunks_per_page > 1:
-                            # server rejected the request, reduce the page size
-                            chunks_per_page //= 2
-                            self.log.info(f"New chunks_per_page: {chunks_per_page}")
-                            break
-                        else:
-                            raise IOError(f"Error retrieving data: {ioe.errno}")
+
+                    rsp = self.id.http_conn.GET(req, params=params, format="binary")
+                    if rsp.status_code == 413 and chunks_per_page > 1:
+                        # server rejected the request, reduce the page size
+                        chunks_per_page //= 2
+                        msg = f"Got 413 response, set chunks_per_page to: {chunks_per_page}"
+                        self.log.info(msg)
+                        break
+                    elif rsp.status_code != 200:
+                        msg = f"Error retrieving data: {rsp.status_code}"
+                        self.log.warning(msg)
+                        raise IOError(msg)
+
                     if isinstance(rsp, str):
                         # hexencoded response?
                         # this is returned by API Gateway for lamba responses
                         rsp = bytes.fromhex(rsp)
                         # from here treat it like a byte responses
-                    if type(rsp) in (bytes, bytearray):
+                    if rsp.is_binary:
                         # got binary response
                         # TBD - check expected number of bytes
-                        self.log.info(f"binary response, {len(rsp)} bytes")
-                        arr1d = bytesToArray(rsp, mtype, page_mshape)
+                        self.log.info(f"binary response, {len(rsp.text)} bytes")
+                        arr1d = bytesToArray(rsp.text, mtype, page_mshape)
                         page_arr = numpy.reshape(arr1d, page_mshape)
                     else:
                         # got JSON response
@@ -1229,8 +1185,9 @@ class Dataset(HLObject):
                         # each element must be a tuple, but the JSON decoder
                         # gives us a list instead.
                         self.log.info("json response")
+                        rsp_json = rsp.json()
 
-                        data = rsp["value"]
+                        data = rsp_json["value"]
                         self.log.debug(data)
 
                         page_arr = jsonToArray(page_mshape, mtype, data)
@@ -1279,20 +1236,25 @@ class Dataset(HLObject):
                 # use a post method to avoid long query strings
                 self.log.info("using post select")
                 try:
-                    rsp = self.POST(req, body=params, format="binary")
+                    rsp = self.id.http_conn.POST(req, body=params, format="binary")
                 except IOError as ioe:
                     self.log.info(f"got IOError: {ioe.errno}")
                     raise IOError(f"Error retrieving data: {ioe.errno}")
             else:
                 try:
-                    rsp = self.GET(req, params=params, format="binary")
+                    rsp = self.id.http_conn.GET(req, params=params, format="binary")
                 except IOError as ioe:
                     self.log.info(f"got IOError: {ioe.errno}")
-                    raise IOError(f"Error retrieving data: {ioe.errno}")
-            if type(rsp) in (bytes, bytearray):
+                    raise IOError(ioe.errno, "Error retrieving data")
+
+            if rsp.status_code != 200:
+                self.log.info(f"got http error: {rsp.status_code}")
+                raise IOError(rsp.status_code, "Error retrieving data")
+
+            if rsp.is_binary:
                 # got binary response
-                self.log.info(f"binary response, {len(rsp)} bytes")
-                arr = bytesToArray(rsp, mtype, mshape)
+                self.log.info(f"binary response, {len(rsp.text)} bytes")
+                arr = bytesToArray(rsp.text, mtype, mshape)
             else:
                 # got JSON response
                 # need some special conversion for compound types --
@@ -1300,7 +1262,7 @@ class Dataset(HLObject):
                 # gives us a list instead.
                 self.log.info("json response")
 
-                data = rsp["value"]
+                data = rsp.json()["value"]
                 # self.log.debug(data)
 
                 arr = jsonToArray(mshape, mtype, data)
@@ -1310,7 +1272,6 @@ class Dataset(HLObject):
             body = {}
 
             points = selection.points.tolist()
-            rank = len(self._shape)
             # verify the points are in range and strictly monotonic (for the 1d case)
             last_point = -1
 
@@ -1328,7 +1289,7 @@ class Dataset(HLObject):
                         if len(point) != rank:
                             raise ValueError("invalid point argument")
                         for i in range(rank):
-                            if point[i] < 0 or point[i] >= self._shape[i]:
+                            if point[i] < 0 or point[i] >= shape[i]:
                                 raise IndexError("point out of range")
                         if rank == 1:
                             if point[0] <= last_point:
@@ -1336,7 +1297,7 @@ class Dataset(HLObject):
                             last_point = point[0]
 
                     elif rank == 1 and isinstance(point, int):
-                        if point < 0 or point > self._shape[0]:
+                        if point < 0 or point > shape[0]:
                             raise IndexError("point out of range")
                         if point <= last_point:
                             raise TypeError("index points must be strictly increasing")
@@ -1349,16 +1310,19 @@ class Dataset(HLObject):
             body = arr_points.tobytes()
             self.log.info(f"point select binary request, num bytes: {len(body)}")
 
-            rsp = self.POST(req, format=format, body=body)
-            if type(rsp) in (bytes, bytearray):
-                elements_received = len(rsp) // mtype.itemsize
+            rsp = self.id.http_conn.POST(req, format=format, body=body)
+            if rsp.status_code != 200:
+                self.log.info(f"got http post error: {rsp.status_code}")
+                raise IOError(rsp.status_code, "Error on POST request")
+            if rsp.is_binary:
+                elements_received = len(rsp.text) // mtype.itemsize
                 elements_expected = selection.mshape[0]
                 if elements_received != elements_expected:
                     msg = f"Expected {elements_expected} elements, but got {elements_received}"
                     self.log.warning(msg)
                     raise IOError(msg)
 
-                arr = numpy.frombuffer(rsp, dtype=mtype)
+                arr = numpy.frombuffer(rsp.text, dtype=mtype)
             else:
                 data = rsp["value"]
                 if len(data) != selection.mshape[0]:
@@ -1404,7 +1368,7 @@ class Dataset(HLObject):
             self.log.debug("val not ndarray")
             pass  # not a numpy object, just leave dtype as None
 
-        if self._shape is None:
+        if self.shape is None:
             # null space dataset
             if isinstance(val, Empty):
                 return  # nothing to do
@@ -1592,7 +1556,7 @@ class Dataset(HLObject):
         if len(names) > 0:
             params["fields"] = ":".join(names)
 
-        self.PUT(req, body=body, format=format, params=params)
+        self.id.http_conn.PUT(req, body=body, format=format, params=params)
 
     def read_direct(self, dest, source_sel=None, dest_sel=None):
         """Read data directly from HDF5 into an existing NumPy array.
@@ -1681,10 +1645,6 @@ class Dataset(HLObject):
                 f"but memory allocation cannot be avoided on read"
             )
 
-        # Special case for (0,)*-shape datasets
-        if self._shape is None or numpy.prod(self._shape) == 0:
-            return numpy.empty(self._shape, dtype=self.dtype if dtype is None else dtype)
-
         data = self[:]
         if dtype is not None:
             return data.astype(dtype, copy=False)
@@ -1702,14 +1662,13 @@ class Dataset(HLObject):
                     namestr = f'"{name}"'
                 else:
                     namestr = "/"
-            r = f'<HDF5 dataset {namestr}: shape {self._shape}, type "{self.dtype.str}">'
+            r = f'<HDF5 dataset {namestr}: shape {self.shape}, type "{self.dtype.str}">'
         return r
 
     def refresh(self):
         """Refresh the dataset metadata by reloading from the file.
         """
         self.id.refresh()
-        self._shape = self.get_shape()
         self._num_chunks = None  # aditional state we'll get when requested
         self._allocated_size = None  # as above
         self._verboseUpdated = None  # when the verbose data was fetched

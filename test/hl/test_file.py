@@ -264,7 +264,8 @@ class TestFile(TestCase):
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
-        self.assertEqual(len(f.keys()), 2)
+        print("f.keys:", list(f.keys()))
+        self.assertEqual(len(list(f.keys())), 2)
 
         if h5py.__name__ == "h5py":
             return  # no ACLs in h5py

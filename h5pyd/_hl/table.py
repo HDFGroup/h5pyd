@@ -85,15 +85,14 @@ class Table(Dataset):
     def __init__(self, bind, track_order=None):
         """ Create a new Table object by binding to a low-level DatasetID.
         """
-
         if not isinstance(bind, DatasetID):
             raise ValueError(f"{bind} is not a DatasetID")
-        Dataset.__init__(self, bind, track_order=track_order)
+        super().__init__(bind, track_order=track_order)
 
-        if len(self._dtype) < 1:
+        if len(self.dtype) < 1:
             raise ValueError("Table type must be compound")
 
-        if len(self._shape) > 1:
+        if len(self.shape) > 1:
             raise ValueError("Table must be one-dimensional")
 
     @property
@@ -107,13 +106,14 @@ class Table(Dataset):
 
     @property
     def nrows(self):
-        return self._shape[0]
+        shape_json = self.id.shape_json
+        return shape_json['dims'][0]
 
     def read(self, start=None, stop=None, step=None, field=None, out=None):
         if start is None:
             start = 0
         if stop is None:
-            stop = self._shape[0]
+            stop = self.nrows
         if step is None:
             step = 1
         arr = self[start:stop:step]
@@ -164,10 +164,10 @@ class Table(Dataset):
             if not start:
                 start = 0
             if not stop:
-                stop = self._shape[0]
+                stop = self.nrows
         else:
             start = 0
-            stop = self._shape[0]
+            stop = self.nrows
 
         selection_arg = slice(start, stop)
         selection = sel.select(self, selection_arg)
@@ -280,10 +280,10 @@ class Table(Dataset):
             if not start:
                 start = 0
             if not stop:
-                stop = self._shape[0]
+                stop = self.nrows
         else:
             start = 0
-            stop = self._shape[0]
+            stop = self.nrows
 
         selection_arg = slice(start, stop)
         selection = sel.select(self, selection_arg)
@@ -391,7 +391,7 @@ class Table(Dataset):
 
         numrows = val.shape[0]
 
-        req = "/datasets/" + self.id.uuid + "/value"
+        req = f"/datasets/{self.id.uuid}/value"
 
         params = {}
         body = {}
@@ -413,8 +413,9 @@ class Table(Dataset):
             body['value'] = val
             body['append'] = numrows
 
-        self.PUT(req, body=body, format=format, params=params)
+        rsp = self.id.http_conn.PUT(req, body=body, format=format, params=params)
+        if rsp.status_code != 200:
+            raise IOError(rsp.status_code, "table append failed")
 
         # if we get here, the request was successful, adjust the shape
-        total_rows = self._shape[0] + numrows
-        self._shape = (total_rows,)
+        # TBD...

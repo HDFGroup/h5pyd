@@ -95,6 +95,7 @@ class TestTable(TestCase):
         table.append(data)
 
         self.assertEqual(table.nrows, len(data))
+        self.assertEqual(table.shape, (len(data),))
 
         for indx in range(len(data)):
             row = table[indx]
