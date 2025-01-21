@@ -254,9 +254,8 @@ class TestGroup(TestCase):
         f.close()
 
     def test_closed_group(self):
-        def get_group_ref(filename):
-            tmp_filename = self.getFileName("tmp_file")
-
+        def get_group_ref():
+            tmp_filename = self.getFileName("test_closed_group")
             with h5py.File(tmp_filename, 'w') as f:
                 g1 = f.create_group("g1")
                 self.assertTrue(isinstance(g1, h5py.Group))
@@ -264,9 +263,7 @@ class TestGroup(TestCase):
 
             return g1
 
-        filename = self.getFileName("test_closed_group")
-
-        grp = get_group_ref(filename)
+        grp = get_group_ref()
         self.assertFalse(grp)
 
     def test_external_links(self):
