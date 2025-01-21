@@ -260,14 +260,13 @@ class TestGroup(TestCase):
             with h5py.File(tmp_filename, 'w') as f:
                 g1 = f.create_group("g1")
                 self.assertTrue(isinstance(g1, h5py.Group))
+                self.assertTrue(g1)
 
             return g1
 
         filename = self.getFileName("test_closed_group")
-        print("filename:", filename)
 
         grp = get_group_ref(filename)
-        print(grp)
         self.assertFalse(grp)
 
     def test_external_links(self):
