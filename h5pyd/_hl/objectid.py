@@ -14,7 +14,7 @@ from __future__ import absolute_import
 from datetime import datetime
 import pytz
 import time
-# import weakref
+import weakref
 from .h5type import createDataType
 
 
@@ -99,12 +99,12 @@ class ObjectID:
     @property
     def domain(self):
         """ domain for this obj """
-        return self._http_conn.domain
+        return self.http_conn.domain
 
     @property
     def obj_json(self):
         """json representation of the object"""
-        objdb = self._http_conn.objdb
+        objdb = self.http_conn.objdb
         obj_json = objdb[self.uuid]
         return obj_json
 
@@ -127,8 +127,20 @@ class ObjectID:
 
     @property
     def http_conn(self):
-        """ http connector """
-        return self._http_conn
+        # access weak ref
+        if isinstance(self._http_conn, weakref.ReferenceType):
+            conn = self._http_conn()
+            if conn is None:
+                raise RuntimeError("http connection has been garbage collected")
+        else:
+            return self._http_conn
+        return conn
+
+    @property
+    def objdb(self):
+        # get ref to ObjDB instance
+        http_conn = self.http_conn
+        return http_conn.objdb
 
     @property
     def collection_type(self):
@@ -169,11 +181,11 @@ class ObjectID:
         """ Return id obj for given uuid """
         obj_class = get_class_for_uuid(obj_uuid)
         if obj_class is GroupID:
-            obj = GroupID(obj_uuid, http_conn=self._http_conn)
+            obj = GroupID(obj_uuid, http_conn=self.http_conn)
         elif obj_class is TypeID:
-            obj = TypeID(obj_uuid, http_conn=self._http_conn)
+            obj = TypeID(obj_uuid, http_conn=self.http_conn)
         elif obj_class is DatasetID:
-            obj = DatasetID(obj_uuid, http_conn=self._http_conn)
+            obj = DatasetID(obj_uuid, http_conn=self.http_conn)
         else:
             raise TypeError(f"Unexpected type: {obj_uuid}")
 
@@ -188,8 +200,7 @@ class ObjectID:
 
     def set_attr(self, name, attr):
         """ Create the given attribute """
-        objdb = self._http_conn.objdb
-        objdb.set_attr(self._uuid, name, attr)
+        self.objdb.set_attr(self._uuid, name, attr)
 
     def get_attr(self, name):
         """ Return the given attribute """
@@ -202,8 +213,7 @@ class ObjectID:
 
     def del_attr(self, name):
         """ Delete the named attribute """
-        objdb = self._http_conn.objdb
-        objdb.del_attr(self._uuid, name)
+        self.objdb.del_attr(self._uuid, name)
 
     def has_attr(self, name):
         """ Test if an attribute name exists """
@@ -247,17 +257,15 @@ class ObjectID:
         """
         self._uuid = get_UUID(obj_uuid)
 
-        if http_conn is not None:
+        if http_conn:
             # use a weakref here so we don't keep a potentially large
             # objdb in memory accidentally
-            self._http_conn = http_conn  # weakref.ref(http_conn)
+            self._http_conn = weakref.ref(http_conn)
         else:
             raise IOError("Expected parent to have http connector")
 
-        objdb = http_conn.objdb
-
-        if self._uuid not in objdb:
-            objdb.fetch(self._uuid)  # will throw IOError if not found
+        if self._uuid not in self.objdb:
+            self.objdb.fetch(self._uuid)  # will throw IOError if not found
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -270,8 +278,7 @@ class ObjectID:
 
     def refresh(self):
         """ get the latest obj_json data from server """
-        objdb = self._http_conn.objdb
-        objdb.fetch(self.uuid)
+        self.objdb.fetch(self.uuid)
 
     def close(self):
         """Remove handles to id.
@@ -281,7 +288,8 @@ class ObjectID:
         self._http_conn = None
 
     def __bool__(self):
-        return bool(self.uuid)
+        """ Return true if the weak ref to http_conn is still valid """
+        return bool(self._http_conn())
 
     def __del__(self):
         """ cleanup """
@@ -289,7 +297,7 @@ class ObjectID:
 
     def __repr__(self):
         class_name = self.__class__.__name__
-        if self._uuid:
+        if self._uuid and self._http_conn():
             r = f"<{class_name}({self._uuid})>"
         else:
             r = f"<Closed {class_name}>"
@@ -385,7 +393,7 @@ class DatasetID(ObjectID):
     def getVerboseInfo(self):
         req = f"/datasets/{self._uuid}"
         params = {'verbose': 1}
-        rsp = self._http_conn.GET(req, params=params)
+        rsp = self.http_conn.GET(req, params=params)
         if rsp.status_code != 200:
             raise RuntimeError(f"get status: {rsp.status_code} for {req}")
         rsp_json = rsp.json()
@@ -394,7 +402,7 @@ class DatasetID(ObjectID):
     def resize(self, dims):
         """ update the shape of the dataset """
         # send the request to the server
-        objdb = self._http_conn.objdb
+        objdb = self.http_conn.objdb
         objdb.resize(self._uuid, dims)
 
 
@@ -421,7 +429,7 @@ class GroupID(ObjectID):
             links = obj_json['links']
             if title in links:
                 raise IOError("Unable to create object (name already exists)")
-        objdb = self._http_conn.objdb
+        objdb = self.http_conn.objdb
         kwds = {}
 
         if shape is not None:
@@ -451,7 +459,7 @@ class GroupID(ObjectID):
         links = self.links
         if not replace and title in links:
             raise IOError("Unable to create link (name already exists)")
-        objdb = self._http_conn.objdb
+        objdb = self.http_conn.objdb
 
         objdb.set_link(self.uuid, title, link_json, replace=replace)
 
@@ -461,7 +469,7 @@ class GroupID(ObjectID):
         if title not in links:
             # not found
             raise KeyError(f"link '{title}' not found")
-        objdb = self._http_conn.objdb
+        objdb = self.http_conn.objdb
         objdb.del_link(self.uuid, title)
 
     @property
@@ -498,3 +506,23 @@ class GroupID(ObjectID):
             return True
         else:
             return False
+
+
+class FileID(GroupID):
+
+    def __init__(self, root_uuid, http_conn=None):
+        super().__init__(root_uuid, http_conn=http_conn)
+        self._file_conn = http_conn  # keep a strong ref here
+
+    def __bool__(self):
+        if self._file_conn:
+            return True
+        else:
+            return False
+
+    def close(self):
+        """Remove handles to id.
+        """
+
+        self._file_conn = None
+        super().close()

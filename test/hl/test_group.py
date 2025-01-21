@@ -55,11 +55,9 @@ class TestGroup(TestCase):
         self.assertEqual(g1.name, "/g1")
 
         g1_file = g1.file
-        print("g1_file.name:", g1_file.filename)
-        self.assertEqual(g1.file.filename, filename)
+        self.assertEqual(g1_file.filename, filename)
 
         r.create_group("g1/g1.1")
-        print(g1_file.filename)
         g1_1 = r["g1/g1.1"]
         self.assertEqual(g1_1.name, "/g1/g1.1")
         self.assertEqual(len(r), 1)
@@ -142,12 +140,11 @@ class TestGroup(TestCase):
         self.assertEqual(g1_class, h5py.Group)
         linkee_class = r.get('mysoftlink', getclass=True)
         self.assertEqual(linkee_class, h5py.Group)
-        print(f"test {r}.get, getclass and getlink are true")
         link_class = r.get('mysoftlink', getclass=True, getlink=True)
         self.assertEqual(link_class, h5py.SoftLink)
         softlink = r.get('mysoftlink', getlink=True)
         self.assertEqual(softlink.path, '/g1/g1.1')
-        """
+
         linkee_class = r.get('myexternallink', getclass=True)
         link_class = r.get('myexternallink', getclass=True, getlink=True)
         self.assertEqual(link_class, h5py.ExternalLink)
@@ -155,22 +152,17 @@ class TestGroup(TestCase):
         self.assertEqual(external_link.path, 'somepath')
         external_link_filename = external_link.filename
         self.assertTrue(external_link_filename.find('link_target') > -1)
-        """
 
         links = r.items()
         got_external_link = False
-        print("looping through links")
         for link in links:
-            print("link:", link[0])
             title = link[0]
             obj = link[1]
             if title == 'myexternallink':
-                print("title is myexternallink")
                 self.assertTrue(obj is not None)
                 self.assertEqual(len(obj), 0)
                 self.assertTrue(obj.file.filename != filename)
                 got_external_link = True
-                print("got_external_link")
 
         self.assertTrue(got_external_link)
 
@@ -254,16 +246,19 @@ class TestGroup(TestCase):
         f.close()
 
     def test_closed_group(self):
-        def get_group_ref():
+        def get_group_ref(f):
             tmp_filename = self.getFileName("test_closed_group")
-            with h5py.File(tmp_filename, 'w') as f:
-                g1 = f.create_group("g1")
+            with h5py.File(tmp_filename, 'w') as g:
+                g1 = g.create_group("g1")
                 self.assertTrue(isinstance(g1, h5py.Group))
                 self.assertTrue(g1)
+                return g1
 
-            return g1
-
-        grp = get_group_ref()
+        filename = self.getFileName("tmp_file")
+        f = h5py.File(filename, 'w')
+        grp = get_group_ref(f)
+        # grp should be closed
+        self.assertFalse(grp is None)
         self.assertFalse(grp)
 
     def test_external_links(self):

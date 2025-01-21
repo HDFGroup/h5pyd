@@ -17,7 +17,7 @@ import os
 import pathlib
 import time
 
-from .objectid import GroupID
+from .objectid import FileID
 from .group import Group
 from .httpconn import HttpConn
 from .. import config
@@ -335,7 +335,8 @@ class File(Group):
         timeout
             Timeout value in seconds
         """
-        groupid = None
+
+        fileid = None
         dn_ids = []
         root_json = None
         cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
@@ -349,8 +350,8 @@ class File(Group):
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
         # no_endpoint_info = endpoint is None and username is None and password is None
-        if isinstance(domain, GroupID):
-            groupid = domain
+        if isinstance(domain, FileID):
+            fileid = domain
         else:
             if not isinstance(domain, str):
                 raise IOError(400, "expected a str or GroupID object for domain")
@@ -538,10 +539,10 @@ class File(Group):
             else:
                 objdb.reload()
 
-            groupid = GroupID(root_uuid, http_conn=http_conn)
+            fileid = FileID(root_uuid, http_conn=http_conn)
         # end else
 
-        self._id = groupid
+        self._id = fileid
         self._verboseInfo = None  # additional state we'll get when requested
         self._verboseUpdated = None  # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
@@ -575,7 +576,7 @@ class File(Group):
         else:
             self._version = None
 
-        Group.__init__(self, self._id, track_order=track_order)
+        super().__init__(self._id, track_order=track_order)
 
     def _getVerboseInfo(self):
         now = time.time()
@@ -792,6 +793,10 @@ class File(Group):
 
     def flush(self):
         """Tells the service to complete any pending updates to permanent storage"""
+        if self.mode == 'r':
+            # read-only, no need to flush
+            return
+
         self.log.debug("flush")
         self.log.info("sending PUT flush request")
         req = "/"
@@ -818,18 +823,8 @@ class File(Group):
         # this will close the socket of the http_conn singleton
 
         self.log.debug(f"close, mode: {self.mode}")
-        if flush is None:
-            # set flush to true if this is a direct connect and file
-            # is writable
-            if self.mode == "r+" and self._id._http_conn._hsds:
-                flush = True
-            else:
-                flush = False
-        # do a PUT flush if this file is writable and the server is HSDS and flush is set
-        if flush:
-            self.flush()
-        if self._id._http_conn:
-            self._id._http_conn.close()
+        self.flush()
+
         self._id.close()
 
     def __enter__(self):

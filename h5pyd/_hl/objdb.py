@@ -13,7 +13,7 @@
 from __future__ import absolute_import
 
 import time
-# import weakref
+import weakref
 from .. import config
 
 
@@ -33,11 +33,19 @@ def get_collection(uuid):
 class ObjDB():
     """ Domain level object map """
     def __init__(self, http_conn, use_cache=True):
-        self._http_conn = http_conn  # weakref.ref(http_conn)
+        self._http_conn = weakref.ref(http_conn)
         self._objdb = {}
         self._loadtime = {}
         self._use_cache = use_cache
         self.log = http_conn.logging
+
+    @property
+    def http_conn(self):
+        # access weark ref
+        conn = self._http_conn()
+        if conn is None:
+            raise RuntimeError("http connection has been garbage collected")
+        return conn
 
     def fetch(self, obj_uuid):
         """ get obj_json for given obj_uuid from the server """
@@ -61,7 +69,7 @@ class ObjDB():
         if collection_type == "groups":
             # get links as well
             params["include_links"] = 1
-        rsp = self._http_conn.GET(req, params=params)
+        rsp = self.http_conn.GET(req, params=params)
         if rsp.status_code in (404, 410):
             self.log.warning(f"obj: {obj_uuid} not found")
             return None
@@ -126,11 +134,11 @@ class ObjDB():
 
     def reload(self):
         """ re-initialize objdb """
-        self.log.info(f"objdb.reload {self._http_conn.domain}")
+        self.log.info(f"objdb.reload {self.http_conn.domain}")
         self._objdb = {}
         self._loadtime = {}
         obj_uuids = set()
-        obj_uuids.add(self._http_conn.root_uuid)
+        obj_uuids.add(self.http_conn.root_uuid)
         while obj_uuids:
             obj_uuid = obj_uuids.pop()
             obj_json = self.fetch(obj_uuid)
@@ -223,7 +231,7 @@ class ObjDB():
                     self.log.warning(f"id: {obj_id} has null h5path for link: {link_name}")
                     raise KeyError(h5path)
                 if slink_path.startswith('/'):
-                    slink_id = self._http_conn.root_uuid
+                    slink_id = self.http_conn.root_uuid
                 else:
                     slink_id = obj_id
                 # recursive call
@@ -267,7 +275,7 @@ class ObjDB():
             self.del_link(group_uuid, title)
         # make a http put
         req = f"/groups/{group_uuid}/links/{title}"
-        self._http_conn.PUT(req, body=link_json)  # create the link
+        self.http_conn.PUT(req, body=link_json)  # create the link
         link_json['created'] = time.time()
         links[title] = link_json
 
@@ -279,7 +287,7 @@ class ObjDB():
         # tbd - validate link_json?
         if title in links:
             req = f"/groups/{group_uuid}/links/{title}"
-            rsp = self._http_conn.DELETE(req)
+            rsp = self.http_conn.DELETE(req)
             if rsp.status_code != 200:
                 raise IOError(rsp.status_code, f"failed to delete link: {title}")
             # ok - so delete our cached copy
@@ -332,7 +340,7 @@ class ObjDB():
             body['creationProperties'] = cpl
 
         # self.log.debug(f"create group with body: {body}")
-        rsp = self._http_conn.POST(req, body=body)
+        rsp = self.http_conn.POST(req, body=body)
         self.log.info(f"got status code: {rsp.status_code} for POST req: {req}")
 
         if rsp.status_code not in (200, 201):
@@ -365,7 +373,7 @@ class ObjDB():
 
         collection = get_collection(obj_uuid)
         req = f"/{collection}/{obj_uuid}/attributes/{name}"
-        rsp = self._http_conn.PUT(req, body=attr_json, params=params)
+        rsp = self.http_conn.PUT(req, body=attr_json, params=params)
 
         if rsp.status_code not in (200, 201):
             self.log.error(f"got {rsp.status_code} for put req: {req}")
@@ -384,7 +392,7 @@ class ObjDB():
 
         collection = get_collection(obj_uuid)
         req = f"/{collection}/{obj_uuid}/attributes/{name}"
-        rsp = self._http_conn.DELETE(req)
+        rsp = self.http_conn.DELETE(req)
 
         if rsp.status_code != 200:
             self.log.error(f"got {rsp.status_code} for delete req: {req}")
@@ -397,7 +405,7 @@ class ObjDB():
         # send the request to the server
         body = {"shape": dims}
         req = f"/datasets/{dset_uuid}/shape"
-        rsp = self._http_conn.PUT(req, body=body)
+        rsp = self.http_conn.PUT(req, body=body)
         if rsp.status_code not in (200, 201):
             msg = "unable to resize dataset shape, error"
             raise IOError(rsp.status_code, msg)

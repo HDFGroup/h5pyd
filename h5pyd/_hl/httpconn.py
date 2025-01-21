@@ -280,6 +280,7 @@ class HttpConn:
         self._api_key = api_key
         self._s = None  # Sessions
         self._server_info = None
+        self._external_refs = []
 
         self._logger = logger
         if logger is None:
@@ -777,6 +778,12 @@ class HttpConn:
             else:
                 s = self._s
         return s
+
+    def add_external_ref(self, fid):
+        # this is used by the group class to keep references to external links open
+        if fid.__class__.__name__ != "FileID":
+            raise TypeError("add_external_ref, expected FileID type")
+        self._external_refs.append(fid)
 
     def close(self):
         if self._s:

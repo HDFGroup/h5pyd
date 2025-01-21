@@ -109,7 +109,12 @@ class Group(HLObject, MutableMappingHDF5):
                     except IOError:
                         # unable to find external link
                         raise KeyError(f"Unable to open domain: {external_domain}")
-                    return f[external_path]
+                    # save reference to the fileid object so the returned object
+                    # doesn't get closed on return
+                    self.id.http_conn.add_external_ref(f.id)
+                    obj = f[external_path]
+                    obj.id._http_conn = f.id._http_conn
+                    return obj
                 else:
                     raise IOError(f"Unexpected link_class: {link_class}")
             elif create:

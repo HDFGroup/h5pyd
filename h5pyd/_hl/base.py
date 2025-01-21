@@ -21,7 +21,7 @@ import logging.handlers
 from collections.abc import (
     Mapping, MutableMapping, KeysView, ValuesView, ItemsView
 )
-from .objectid import GroupID, ObjectID
+from .objectid import FileID, ObjectID
 from .h5type import Reference, check_dtype, special_dtype
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
@@ -796,9 +796,9 @@ class HLObject(CommonStateObject):
         from .files import File
         http_conn = self._id.http_conn
         root_uuid = http_conn.root_uuid
-        groupid = GroupID(root_uuid, http_conn=http_conn)
+        fileid = FileID(root_uuid, http_conn=http_conn)
 
-        return File(groupid)
+        return File(fileid)
 
     @property
     def name(self):
