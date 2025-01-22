@@ -211,6 +211,14 @@ class ObjectID:
 
         return attr
 
+    def get_attr_value(self, name):
+        """ Return attribute value or None if not found """
+        if self.has_attr(name):
+            attr_json = self.get_attr(name)
+            return attr_json["value"]
+        else:
+            return None
+
     def del_attr(self, name):
         """ Delete the named attribute """
         self.objdb.del_attr(self._uuid, name)

@@ -13,7 +13,6 @@
 from __future__ import absolute_import
 
 import os.path as op
-import json
 import time
 import logging
 from .httpconn import HttpConn
@@ -224,10 +223,10 @@ class Folder:
             if rsp.status_code < 500:
                 self.log.warning(f"folder put status_code: {rsp.status_code}")
             else:
-                self.log.error("status_code: {}".format(rsp.status_code))
+                self.log.error(f"status_code: {rsp.status_code}")
             raise IOError(rsp.status_code, rsp.reason)
-        domain_json = json.loads(rsp.text)
-        self.log.info("domain_json: {}".format(domain_json))
+        domain_json = rsp.json()
+        self.log.info(f"domain_json: {domain_json}")
         if "class" in domain_json:
             if domain_json["class"] != "folder":
                 self.log.warning("Not a folder domain")
@@ -258,7 +257,7 @@ class Folder:
         rsp = self._http_conn.GET(req)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
-        rsp_json = json.loads(rsp.text)
+        rsp_json = rsp.json()
         acl_json = rsp_json["acl"]
         return acl_json
 
@@ -269,7 +268,7 @@ class Folder:
         rsp = self._http_conn.GET(req)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
-        rsp_json = json.loads(rsp.text)
+        rsp_json = rsp.json()
         acls_json = rsp_json["acls"]
         return acls_json
 
@@ -315,7 +314,7 @@ class Folder:
         rsp = self._http_conn.GET(req, params=params)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
-        rsp_json = json.loads(rsp.text)
+        rsp_json = rsp.json()
         if "domains" not in rsp_json:
             raise IOError(500, "Unexpected Error")
         domains = rsp_json["domains"]
