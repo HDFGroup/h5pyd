@@ -64,6 +64,21 @@ def get_UUID(name):
     return obj_uuid
 
 
+def get_collection(uuid):
+    """ Return the collection type for the given obj uuid """
+
+    obj_uuid = get_UUID(uuid)
+
+    if obj_uuid.startswith("g-"):
+        return "groups"
+    elif obj_uuid.startswith("t-"):
+        return "datatypes"
+    elif obj_uuid.startswith("d-"):
+        return "datasets"
+    else:
+        raise TypeError(f"unexpected uuid: {uuid}")
+
+
 def get_class_for_uuid(uuid):
     """ Return class based on uuid """
     if not uuid:

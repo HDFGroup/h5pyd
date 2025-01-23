@@ -110,6 +110,7 @@ class TestAttribute(TestCase):
         refdt = h5py.special_dtype(ref=h5py.Reference)  # create ref dtype
         g1.attrs.create('f1', g11_ref, dtype=refdt)     # create attribute with ref to g1.1
         ref = g1.attrs['f1']  # read back the attribute
+        print(f"ref: {ref} type: {type(ref)}")
 
         refobj = f[ref]  # get the ref'd object
         self.assertTrue('name' in refobj.attrs)  # should see the tag attribute

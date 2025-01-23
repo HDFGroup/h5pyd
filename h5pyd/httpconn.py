@@ -26,8 +26,7 @@ import logging
 
 from . import openid
 from .objdb import ObjDB
-from .. import config
-from . import requests_lambda
+from . import config
 
 
 def eprint(*args, **kwargs):
@@ -249,7 +248,6 @@ class HttpResponse:
 class HttpConn:
     """
     Some utility methods based on equivalents in base class.
-    TBD: Should refactor these to a common base class
     """
 
     def __init__(
@@ -276,7 +274,6 @@ class HttpConn:
         self._retries = retries
         self._timeout = timeout
         self._hsds = None
-        self._lambda = None
         self._api_key = api_key
         self._s = None  # Sessions
         self._server_info = None
@@ -300,12 +297,6 @@ class HttpConn:
         if not endpoint:
             msg = "no endpoint set"
             raise ValueError(msg)
-
-        lambda_prefix = requests_lambda.LAMBDA_REQ_PREFIX
-
-        if endpoint.startswith(lambda_prefix):
-            # save lambda function name
-            self._lambda = endpoint[len(lambda_prefix):]
 
         elif endpoint.startswith("local"):
             # create a local hsds server
@@ -548,10 +539,7 @@ class HttpConn:
                 self._hsds.run()
 
             s = self.session
-            if self._lambda:
-                stream = False
-            else:
-                stream = True
+            stream = True  # tbd  - config for no streaming?
 
             rsp = s.get(
                 self._endpoint + req,
@@ -745,15 +733,12 @@ class HttpConn:
         retries = self._retries
         backoff_factor = 1
         status_forcelist = (500, 502, 503, 504)
-        lambda_prefix = requests_lambda.LAMBDA_REQ_PREFIX
 
         if self._use_session:
             if self._s is None:
                 if self._endpoint.startswith("http+unix://"):
                     self.log.debug(f"create unixsocket session: {self._endpoint}")
                     s = requests_unixsocket.Session()
-                elif self._endpoint.startswith(lambda_prefix):
-                    s = requests_lambda.Session()
                 else:
                     # regular request session
                     s = requests.Session()

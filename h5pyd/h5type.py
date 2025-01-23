@@ -58,9 +58,9 @@ class Reference():
         Represents an HDF5 object reference
     """
     @property
-    def id(self):
+    def uuid(self):
         """ Low-level identifier appropriate for this object """
-        return self._id
+        return self._uuid
 
     @property
     def objref(self):
@@ -70,20 +70,34 @@ class Reference():
     def __init__(self, bind):
         """ Create a new reference by binding to a group/dataset/committed type
         """
-        self._id = bind._id
-        self._objref = weakref.ref(bind)
+        if bind:
+            self._uuid = bind.id.uuid
+            self._objref = weakref.ref(bind)
+        else:
+            self._uuid = ""
+            self._objref = None
 
     def __repr__(self):
-        if not isinstance(self._id.id, str):
+        # TBD: for h5py compatiblity, this should return "<HDF5 object reference>", but
+        # we are using some hacks to pass refs as strings, so need this for now
+        if not isinstance(self._uuid, str):
             raise TypeError("Expected string id")
-        item = None
+        if not self._uuid:
+            item = ""
+        elif self._uuid.startswith("g-"):
+            item = f"groups/{self._uuid}"
+        elif self._uuid.startswith("t-"):
+            item = f"datatypes/{self._uuid}"
+        elif self._uuid.startswith("d-"):
+            item = f"datasets/{self._uuid}"
+        else:
+            raise ValueError("unexpected uuid: {self._uuid}")
 
-        collection_type = self._id.collection_type
-        item = f"{collection_type}/{self._id.id}"
         return item
 
     def tolist(self):
         return [self.__repr__(),]
+
 
 
 class RegionReference():

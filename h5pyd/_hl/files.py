@@ -17,9 +17,9 @@ import os
 import pathlib
 import time
 
-from .objectid import FileID
+from ..objectid import FileID
 from .group import Group
-from .httpconn import HttpConn
+from ..httpconn import HttpConn
 from .. import config
 
 VERBOSE_REFRESH_TIME = 1.0  # 1 second

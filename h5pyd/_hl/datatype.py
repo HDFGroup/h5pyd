@@ -17,8 +17,8 @@ import posixpath as pp
 # from ..h5t import TypeID
 from .base import HLObject
 
-from .objectid import TypeID
-from .h5type import createDataType
+from ..objectid import TypeID
+from ..h5type import createDataType
 
 
 class Datatype(HLObject):

@@ -21,8 +21,8 @@ import logging.handlers
 from collections.abc import (
     Mapping, MutableMapping, KeysView, ValuesView, ItemsView
 )
-from .objectid import FileID, ObjectID
-from .h5type import Reference, check_dtype, special_dtype
+from ..objectid import FileID, ObjectID
+from ..h5type import Reference, check_dtype, special_dtype
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
 numpy_float_types = (np.float16, np.float32, np.float64)
@@ -41,28 +41,6 @@ class FakeLock():
 
     def __exit__(self, a, b, c):
         pass
-
-
-_phil = FakeLock()
-
-# Python alias for access from other modules
-phil = _phil
-
-
-def with_phil(func):
-    """ Locking decorator """
-    """
-    For h5yp source code compatiblity - jlr
-    """
-
-    import functools
-
-    def wrapper(*args, **kwds):
-        with _phil:
-            return func(*args, **kwds)
-
-    functools.update_wrapper(wrapper, func, ('__name__', '__doc__'))
-    return wrapper
 
 
 def find_item_type(data):
@@ -591,7 +569,6 @@ class LinkCreationPropertyList(object):
     """
         Represents a LinkCreationPropertyList
     """
-    @with_phil
     def __init__(self, char_encoding=None):
         if char_encoding:
             if char_encoding not in ("CSET_ASCII", "CSET_UTF8"):
@@ -600,7 +577,6 @@ class LinkCreationPropertyList(object):
         else:
             self._char_encoding = "CSET_ASCII"
 
-    @with_phil
     def __repr__(self):
         return "<HDF5 LinkCreationPropertyList>"
 
@@ -614,7 +590,6 @@ class LinkAccessPropertyList(object):
         Represents a LinkAccessPropertyList
     """
 
-    @with_phil
     def __repr__(self):
         return "<HDF5 LinkAccessPropertyList>"
 
@@ -921,16 +896,14 @@ class ValuesViewHDF5(ValuesView):
     """
 
     def __contains__(self, value):
-        with phil:
-            for key in self._mapping:
-                if value == self._mapping.get(key):
-                    return True
-            return False
+        for key in self._mapping:
+            if value == self._mapping.get(key):
+                return True
+        return False
 
     def __iter__(self):
-        with phil:
-            for key in self._mapping:
-                yield self._mapping.get(key)
+        for key in self._mapping:
+            yield self._mapping.get(key)
 
 
 class ItemsViewHDF5(ItemsView):
@@ -940,16 +913,14 @@ class ItemsViewHDF5(ItemsView):
     """
 
     def __contains__(self, item):
-        with phil:
-            key, val = item
-            if key in self._mapping:
-                return val == self._mapping.get(key)
-            return False
+        key, val = item
+        if key in self._mapping:
+            return val == self._mapping.get(key)
+        return False
 
     def __iter__(self):
-        with phil:
-            for key in self._mapping:
-                yield (key, self._mapping.get(key))
+        for key in self._mapping:
+            yield (key, self._mapping.get(key))
 
 
 class MappingHDF5(Mapping):

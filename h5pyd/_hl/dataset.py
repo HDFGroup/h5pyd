@@ -23,13 +23,13 @@ from concurrent.futures import as_completed
 
 from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes
 from .base import Empty, guess_dtype
-from .h5type import Reference, RegionReference
+from ..h5type import Reference, RegionReference
 from .base import _decode
-from .objectid import DatasetID
+from ..objectid import DatasetID
 from . import filters
 from . import selections as sel
 from .datatype import Datatype
-from .h5type import getTypeItem, check_dtype, special_dtype, getItemSize
+from ..h5type import getTypeItem, check_dtype, special_dtype, getItemSize
 from .. import config
 
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
@@ -1267,6 +1267,7 @@ class Dataset(HLObject):
 
                 arr = jsonToArray(mshape, mtype, data)
                 self.log.debug(f"jsontoArray returned: {arr}")
+
         elif isinstance(selection, sel.PointSelection):
             format = "binary"  # default binary
             body = {}

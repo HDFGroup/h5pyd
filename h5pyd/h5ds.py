@@ -11,6 +11,7 @@
 ##############################################################################
 from ._hl.objectid import DatasetID
 
+
 def attach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
     """ Attach Dimension Scale dscale to Dimension idx of Dataset dset. """
 
@@ -19,20 +20,20 @@ def attach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
         raise ValueError("dimension must be non-negative")
     if idx >= rank:
         raise ValueError("invalid dimension")
-    
+
     if not is_scale(dscale):
         raise TypeError("f{dscale} is not a dimension scale")
-       
+
     if is_scale(dset):
         raise TypeError("cannot attach a dimension scale to a dimension scale")
-      
+
     # Create a DIMENSION_LIST attribute if needed
-   
+
     orig_dimlist = dset.getAttrValue('DIMENSION_LIST')
     if orig_dimlist:
         # delete and replace later
         dset.del_attr('DIMENSION_LIST')
-           
+
         value = [list() for _ in range(rank)]
 
     dimlist = {
@@ -105,6 +106,7 @@ def attach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
         # Update the REFERENCE_LIST attribute of the dimension scale
         dscale.set_attr('REFERENCE_LIST', new_reflist)
 
+
 def detach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
     """ Detach Dimension Scale dscale from the Dimension idx of Dataset dset. """
 
@@ -113,7 +115,7 @@ def detach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
         raise ValueError("dimension must be non-negative")
     if idx >= rank:
         raise ValueError("invalid dimension")
-    
+
     if not dset.has_attr('DIMENSION_LIST'):
         raise IOError("no DIMENSION_LIST attr in {dset}")
     dimlist = dset.get_attr('DIMENSION_LIST')
@@ -157,6 +159,7 @@ def detach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
             if old_reflist:
                 dscale.del_attr('REFERENCE_LIST')
 
+
 def get_label(dset: DatasetID, idx: int) -> str:
     """ Read the label for Dimension idx of Dataset dset into buffer label. """
 
@@ -165,7 +168,7 @@ def get_label(dset: DatasetID, idx: int) -> str:
         raise ValueError("dimension must be non-negative")
     if idx >= rank:
         raise ValueError("invalid dimension")
-    
+
     label_values = dset.get_attr('DIMENSION_LABELS')
 
     if not label_values:
@@ -177,6 +180,7 @@ def get_label(dset: DatasetID, idx: int) -> str:
 
     return label_values[idx]
 
+
 def get_num_scales(dset: DatasetID, dim: int) -> int:
     """ Determines how many Dimension Scales are attached to Dimension dim of Dataset dset. """
 
@@ -185,7 +189,7 @@ def get_num_scales(dset: DatasetID, dim: int) -> int:
         raise ValueError("dimension must be non-negative")
     if dim >= rank:
         raise ValueError("invalid dimension")
-    
+
     dimlist_values = dset.get_attr_value('DIMENSION_LIST')
     if not dimlist_values:
         return 0
@@ -198,8 +202,9 @@ def get_num_scales(dset: DatasetID, dim: int) -> int:
 
 def get_scale_name(dscale: DatasetID) -> str:
     """ Retrieves name of Dimension Scale dscale. """
-    
+
     return dscale.get_attr_value("NAME")
+
 
 def is_attached(dset: DatasetID, dscale: DatasetID, idx: int) -> bool:
     """ Report if Dimension Scale dscale is currently attached to Dimension idx of Dataset dset. """
@@ -209,7 +214,7 @@ def is_attached(dset: DatasetID, dscale: DatasetID, idx: int) -> bool:
         raise ValueError("dimension must be non-negative")
     if idx >= rank:
         raise ValueError("invalid dimension")
-    
+
     if not is_scale(dscale) or is_scale(dset):
         return False
     if not dset.has_attr("DIMENSION_LIST"):
@@ -221,6 +226,7 @@ def is_attached(dset: DatasetID, dscale: DatasetID, idx: int) -> bool:
                 reflist["value"] and f"datasets/{dscale._uuid}" in dimlist["value"][idx])
     except (KeyError, IndexError):
         return False
+
 
 def is_scale(dset: DatasetID) -> bool:
     """ Determines whether dset is a dimension scale. """
@@ -262,8 +268,9 @@ def is_scale(dset: DatasetID) -> bool:
         return False
     if type_json.get('strPad') != 'H5T_STR_NULLTERM':
         return False
-    
+
     return True
+
 
 def set_label(dset: DatasetID, idx: int, label: str):
     """ Set label for the Dimension idx of Dataset dset to the value label. """
@@ -273,7 +280,7 @@ def set_label(dset: DatasetID, idx: int, label: str):
         raise ValueError("dimension must be non-negative")
     if idx >= rank:
         raise ValueError("invalid dimension")
-    
+
     label_name = 'DIMENSION_LABELS'
     if dset.has_attr(label_name):
         labels = dset.get_attr(label_name)
@@ -294,9 +301,10 @@ def set_label(dset: DatasetID, idx: int, label: str):
         labels['value'][idx] = label
     dset.set_attr(label_name, labels)
 
+
 def set_scale(dset: DatasetID, dimname: str):
     """ Convert dataset dset to a dimension scale, with optional name dimname. """
-    
+
     # CLASS attribute with the value 'DIMENSION_SCALE'
     class_attr = {
         'creationProperties': {
@@ -336,8 +344,8 @@ def set_scale(dset: DatasetID, dimname: str):
         dset.del_attr('CLASS')
 
 
-def iterate(dset: DatasetID, dim: int, callable: any, startidx: int=0) -> any:
-    """ Iterate a callable (function, method or callable object) over the members of a group. 
+def iterate(dset: DatasetID, dim: int, callable: any, startidx: int = 0) -> any:
+    """ Iterate a callable (function, method or callable object) over the members of a group.
      Your callable should have the signature:
 
     func(STRING name) => Result
@@ -349,18 +357,17 @@ def iterate(dset: DatasetID, dim: int, callable: any, startidx: int=0) -> any:
         raise ValueError("dimension must be non-negative")
     if dim >= rank:
         raise ValueError("invalid dimension")
-    
+
     dimlist = dset.get_attr_value('DIMENSION_LIST')
     if not dimlist:
         return 0
-    
+
     if startidx >= len(dimlist):
         # dimension scale len request out of range
         return 0
-    
+
     idx = startidx
     while idx < len(dimlist):
         dscale_uuid = dimlist[idx]
         callable(DatasetID(dscale_uuid))
         idx += 1
-

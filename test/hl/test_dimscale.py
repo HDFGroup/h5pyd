@@ -28,7 +28,7 @@ class TestDimensionScale(TestCase):
     def test_everything(self):
         """Everything related to dimension scales"""
         filename = self.getFileName('test_dimscale')
-        f = h5py.File(filename, 'w') 
+        f = h5py.File(filename, 'w')
 
         dset = f.create_dataset('temperatures', (10, 10, 10), dtype='f')
         f.create_dataset('scale_x', data=np.arange(10) * 10e3)

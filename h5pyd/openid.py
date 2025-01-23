@@ -29,7 +29,7 @@ except ModuleNotFoundError:
     # eprint("Unable to import google auth packages")
 
 
-from .. import config as hsconfig
+from . import config as hsconfig
 
 
 class OpenIDHandler(ABC):

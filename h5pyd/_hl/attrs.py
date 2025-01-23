@@ -25,7 +25,8 @@ import json
 from . import base
 from .base import jsonToArray, Empty
 from .datatype import Datatype
-from .h5type import getTypeItem, createDataType, special_dtype, Reference
+from ..objectid import get_class_for_uuid, GroupID, TypeID, DatasetID
+from ..h5type import getTypeItem, createDataType, special_dtype, Reference
 
 
 class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
@@ -264,6 +265,9 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             attr['shape'] = shape
             if value.dtype.kind != 'c':
                 attr['value'] = self._bytesArrayToList(value)
+            elif isinstance(value, Reference):
+                # special case reference types
+                attr['value'] = value.tolist()
             else:
                 # Special case: complex numbers
                 special_dt = createDataType(type_json)

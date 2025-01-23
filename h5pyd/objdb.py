@@ -14,20 +14,8 @@ from __future__ import absolute_import
 
 import time
 import weakref
-from .. import config
-
-
-def get_collection(uuid):
-    """ Return the collection type for the given obj uuid """
-
-    if uuid.startswith("g-"):
-        return "groups"
-    elif uuid.startswith("t-"):
-        return "datatypes"
-    elif uuid.startswith("d-"):
-        return "datasets"
-    else:
-        raise TypeError(f"unexpected uuid: {uuid}")
+from . import config
+from .objectid import get_collection
 
 
 class ObjDB():
@@ -108,8 +96,14 @@ class ObjDB():
 
     def __delitem__(self, obj_uuid):
         if obj_uuid not in self._objdb:
-            self.log.warning(f"id: {obj_uuid} not found for deletion in objDB")
-            raise KeyError(obj_uuid)
+            print(f"{obj_uuid} not in objdb, fetching")
+            obj_json = self.fetch(obj_uuid)
+            if not obj_json:
+                self.log.warning(f"id: {obj_uuid} not found for deletion in objDB")
+                raise KeyError(obj_uuid)
+        collection = get_collection(obj_uuid)
+        req = f"/{collection}/{obj_uuid}"
+        self._http_conn.DELETE(req)
         del self._objdb[obj_uuid]
         del self._loadtime[obj_uuid]
 
@@ -280,6 +274,8 @@ class ObjDB():
         links[title] = link_json
 
     def del_link(self, group_uuid, title):
+        """ Delete the given link """
+
         if title.find('/') != -1:
             raise KeyError("objdb.del_link - link title can not be nested")
         obj_json = self.__getitem__(group_uuid)
@@ -361,6 +357,18 @@ class ObjDB():
             self.set_link(parent_uuid, title, link_json)
 
         return obj_uuid
+
+    def del_obj(self, obj_uuid):
+        """ Delete the given object """
+        collection = get_collection(obj_uuid)
+        req = f"/{collection}/{obj_uuid}"
+
+        rsp = self.http_conn.DELETE(req)
+        if rsp.status_code != 200:
+            raise IOError(rsp.status_code, f"failed to delete object: {obj_uuid}")
+        # ok - so delete our cached copy
+        if obj_uuid in self._objdb:
+            del self._objdb[obj_uuid]
 
     def set_attr(self, obj_uuid, name, attr_json):
         """ create update attribute  """

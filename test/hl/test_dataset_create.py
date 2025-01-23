@@ -556,6 +556,11 @@ class TestCreateDataset(TestCase):
         validate_dset(dset)
 
         dset_id = dset.id.id
+        if config.get("use_h5py"):
+            self.assertTrue(isinstance(dset_id, int))
+        else:
+            self.assertTrue(isinstance(dset_id, str))
+
         if not config.get("use_h5py"):
             # Check dataset's last modified time
             self.assertTrue(isinstance(dset.modified, datetime))
@@ -572,20 +577,22 @@ class TestCreateDataset(TestCase):
         self.assertEqual(num_links, 0)
         if not config.get("use_h5py"):
             # can get a reference to the dataset using the dataset id
-            uuid_ref = f"datasets/{dset_id}"
-            dset = f[uuid_ref]
+
+            dset_ref = f.id.get(dset_id)
+            print("dset_ref:", dset_ref)
+            dset = f[dset_ref]
             validate_dset(dset)
             self.assertEqual(dset.id.id, dset_id)
 
-            # explictly delete dataset
-            del f[uuid_ref]
+            # explicitly delete dataset
+            del f[dset_ref]
 
             # should not be returned now
             try:
-                dset = f[uuid_ref]
+                dset = f[dset_ref]
                 print(f"didn't expect to get: {dset}")
-                self.asertTrue(False)
-            except IOError:
+                self.assertTrue(False)
+            except KeyError:
                 pass  # expected
         f.close()
 

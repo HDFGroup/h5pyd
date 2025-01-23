@@ -51,6 +51,8 @@ class TestObjRef(TestCase):
         # get ref to g1/g1.1 from g2
         g11ref = g2[g11_ref]
 
+        self.assertTrue(isinstance(g11ref, h5py.Group))
+
         # create subgroup /g1/g1.1/foo
         g11ref.create_group("foo")
         self.assertEqual(len(g11), 1)
@@ -63,6 +65,7 @@ class TestObjRef(TestCase):
         d1_ref = d1.ref
         dt = h5py.special_dtype(ref=h5py.Reference)
         self.assertTrue(dt.metadata['ref'] is h5py.Reference)
+
         ref = h5py.check_dtype(ref=dt)
         self.assertEqual(ref, h5py.Reference)
 
@@ -75,16 +78,19 @@ class TestObjRef(TestCase):
         dset[1] = d1_ref
 
         a_ref = dset[0]
-        obj = f[a_ref]
-        if not config.get("use_h5py"):
-            self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
-        self.assertEqual(obj.name, "/g1/g1.1")
-
         b_ref = dset[1]
-        obj = f[b_ref]
-        if not config.get("use_h5py"):
-            self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
-        self.assertEqual(obj.name, "/g2/d1")
+        a_obj = f[a_ref]
+        b_obj = f[b_ref]
+        if config.get("use_h5py"):
+            self.assertEqual(a_obj.name, "/g1/g1.1")
+            self.assertEqual(b_obj.name, "/g2/d1")
+        else:
+            # in h5pyd, paths aren't assigned when an object is
+            # fetched by reference
+            self.assertEqual(a_obj.name, None)
+            self.assertEqual(a_obj.id, g11.id)  # ref to g1.1
+            self.assertEqual(b_obj.name, None)
+            self.assertEqual(b_obj.id, d1.id)  # ref to /g2/d1
 
         # try the same thing using attributes
         ref_values = [g11_ref, d1_ref]
@@ -101,14 +107,17 @@ class TestObjRef(TestCase):
         self.assertEqual(ref, h5py.Reference)
         a0_ref = attr[0]
         obj = f[a0_ref]
-        if not config.get("use_h5py"):
+        if config.get("use_h5py"):
+            self.assertEqual(obj.name, "/g1/g1.1")
+        else:
             self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
-        self.assertEqual(obj.name, "/g1/g1.1")
+
         a1_ref = attr[1]
         obj = f[a1_ref]
-        if not config.get("use_h5py"):
+        if config.get("use_h5py"):
+            self.assertEqual(obj.name, "/g2/d1")
+        else:
             self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
-        self.assertEqual(obj.name, "/g2/d1")
         f.close()
 
         # try opening in read-mode
@@ -122,15 +131,17 @@ class TestObjRef(TestCase):
         self.assertEqual(ref, h5py.Reference)
         a0_ref = attr[0]
         obj = f[a0_ref]
-        if not config.get("use_h5py"):
+        if config.get("use_h5py"):
+            self.assertEqual(obj.name, "/g1/g1.1")
+        else:
             self.assertEqual(obj.id.id, g11.id.id)  # ref to g1.1
 
-        self.assertEqual(obj.name, "/g1/g1.1")
         a1_ref = attr[1]
         obj = f[a1_ref]
-        if not config.get("use_h5py"):
+        if config.get("use_h5py"):
+            self.assertEqual(obj.name, "/g2/d1")
+        else:
             self.assertEqual(obj.id.id, d1.id.id)  # ref to d1
-        self.assertEqual(obj.name, "/g2/d1")
 
     def test_delete(self):
         filename = self.getFileName("objref_delete_test")

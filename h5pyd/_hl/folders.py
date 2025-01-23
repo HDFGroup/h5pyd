@@ -15,7 +15,7 @@ from __future__ import absolute_import
 import os.path as op
 import time
 import logging
-from .httpconn import HttpConn
+from ..httpconn import HttpConn
 from .. import config
 
 

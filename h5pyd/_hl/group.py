@@ -17,13 +17,13 @@ import numpy
 import collections
 
 from .base import HLObject, MutableMappingHDF5, guess_dtype
-from .objectid import TypeID, GroupID, DatasetID, isUUID
-from .h5type import special_dtype
+from ..objectid import ObjectID, TypeID, GroupID, DatasetID, isUUID
+from ..h5type import special_dtype
 from . import dataset
 from .dataset import Dataset
 from .table import Table
 from .datatype import Datatype
-from . import h5type
+from .. import h5type
 
 
 def _h5parent(path):
@@ -261,7 +261,15 @@ class Group(HLObject, MutableMappingHDF5):
             dset = Dataset(dset_id)
 
         if base_name:
-            dset._name = f"{self._name}/{base_name}"
+            if parent_grp.name:
+                if parent_grp.name[-1] == '/':
+                    dset._name = parent_grp.name + base_name
+                else:
+                    dset._name = f"{parent_grp.name}/{base_name}"
+            else:
+                dset._name = None
+        else:
+            dset._name = None
 
         return dset
 
@@ -416,25 +424,40 @@ class Group(HLObject, MutableMappingHDF5):
             name = name.decode('utf-8')
         self.log.debug(f"group.__getitem__({name}, track_order={track_order})")
 
-        tgt_uuid = None
+        obj_id = None
         if isinstance(name, h5type.Reference):
             tgt = name.objref()  # weak reference to ref object
             if tgt is not None:
                 return tgt  # ref'd object has not been deleted
             else:
-                tgt_uuid = name.id.id
+                tgt_uuid = name.uuid
+                obj_id = self.id.get(tgt_uuid)
+        elif isinstance(name, ObjectID):
+            obj_id = name
         elif isUUID(name):
-            tgt_uuid = name
+            # TBD: elements from dataset reference types are being returned as strings
+            # so interpret anything that looks like a UUID as ref pointer.
+            # Once bytesToArray is fixed to do the right thing, we can omit this check
+            obj_id = self.id.get(name)
         elif name == "/":
             # return root group
-            tgt_uuid = self.id.http_conn.root_uuid
+            root_uuid = self.id.http_conn.root_uuid
+            obj_id = self.id.get(root_uuid)
         else:
             pass  # will do a path lookup
 
-        if tgt_uuid:
-            obj_id = self.id.get(tgt_uuid)
+        if obj_id:
+            # verify the object exists
+            objdb = self.id.http_conn.objdb
+            if obj_id.id not in objdb:
+                try:
+                    objdb.fetch(obj_id.id)  # will raise exception if
+                except IOError:
+                    raise KeyError(f"Object {obj_id} does not exist")
             if isinstance(obj_id, GroupID):
                 tgt = Group(obj_id)
+                if name == "/":
+                    tgt._name = "/"
             elif isinstance(obj_id, DatasetID):
                 if obj_id.rank == 1 and obj_id.type_class == 'H5T_COMPOUND':
                     tgt = Table(obj_id)
@@ -633,12 +656,9 @@ class Group(HLObject, MutableMappingHDF5):
         """ Delete (unlink) an item from this group. """
         objdb = self.id.http_conn.objdb
 
-        if isUUID(name):
-            obj_id = op.basename(name)
-            if obj_id in objdb:
-                del objdb[obj_id]
-            else:
-                self.log.warning(f"expected to find obj_id: {obj_id} for delete")
+        if isinstance(name, ObjectID):
+            # delete the object, not the link
+            objdb.del_obj(name.id)
         else:
             parent_path = _h5parent(name)
             basename = _h5base(name)
