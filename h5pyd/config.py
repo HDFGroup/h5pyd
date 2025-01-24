@@ -88,6 +88,10 @@ class Config:
             else:
                 return None
         return Config._cfg[name]
+    
+    def get(self, name):
+        """ alias for __getitem__ """
+        return self.__getitem__(name)
 
     def __setitem__(self, name, obj):
         """ set config item """
