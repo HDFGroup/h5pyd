@@ -13,6 +13,7 @@
 from __future__ import absolute_import
 from . import base
 from .dataset import Dataset
+from .. objectid import DatasetID
 from .. import h5ds
 
 
@@ -29,9 +30,9 @@ class DimensionProxy(base.CommonStateObject):
         h5ds.set_label(self._id, self._dimension, val)
 
     def __init__(self, dset, dimension):
-        if not isinstance(dset, Dataset):
+        if not isinstance(dset, DatasetID):
             raise TypeError(f"expected Dataset, but got: {type(dset)}")
-        self._id = dset.id
+        self._id = dset
         self._dimension = int(dimension)
 
     def __hash__(self):
@@ -52,26 +53,29 @@ class DimensionProxy(base.CommonStateObject):
             item can be an int in which case scale at that index will be returned
             or item can be a str in which casee the scale ith that name will be returned """
 
-        if isinstance(item, int):
-            scales = []
-            h5ds.iterate(self._id, self._dimension, scales.append, 0)
-            return Dataset(scales[item])
-        else:
-            def f(dsid):
-                """ Iterate over scales to find a matching name """
-                if h5ds.get_scale_name(dsid) == self._e(item):
-                    return dsid
+        scales = []
+        h5ds.iterate(self._id, self._dimension, scales.append, 0)
 
-            res = h5ds.iterate(self._id, self._dimension, f, 0)
-            if res is None:
-                raise KeyError(item)
-            return Dataset(res)
+        if isinstance(item, int):
+            if item < 0 or item >= len(scales):
+                raise IndexError(f"{item} is out of range")
+            return Dataset(scales[item])
+
+        else:
+            for dsid in scales:
+                if h5ds.get_scale_name(dsid) == item:
+                    return Dataset(dsid)
+            raise KeyError(item)
 
     def attach_scale(self, dscale):
         ''' Attach a scale to this dimension.
 
         Provide the Dataset of the scale you would like to attach.
         '''
+        if not isinstance(dscale, Dataset):
+            raise TypeError(f"attach_scale expected Dataset but got: {type(dscale)}")
+        if not h5ds.is_scale(dscale.id):
+            h5ds.set_scale(dscale.id)
         h5ds.attach_scale(self._id, dscale.id, self._dimension)
 
     def detach_scale(self, dscale):
@@ -79,6 +83,9 @@ class DimensionProxy(base.CommonStateObject):
 
         Provide the Dataset of the scale you would like to remove.
         '''
+        if not isinstance(dscale, Dataset):
+            raise TypeError(f"detach_scale expected Dataset but got: {type(dscale)}")
+
         h5ds.detach_scale(self._id, dscale.id, self._dimension)
 
     def items(self):
@@ -95,7 +102,7 @@ class DimensionProxy(base.CommonStateObject):
         scales = []
         for scale_id in scale_ids:
             scale_name = h5ds.get_scale_name(scale_id)
-            scales.append(scale_name, Dataset(scale_id))
+            scales.append((scale_name, Dataset(scale_id)))
         return scales
 
     def keys(self):
@@ -123,6 +130,9 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
     def __init__(self, parent):
         ''' Private constructor.
         '''
+        if not isinstance(parent, Dataset):
+            raise TypeError(f"attach_scale expected Dataset but got: {type(parent)}")
+
         self._id = parent.id
 
     def __getitem__(self, index):
@@ -151,5 +161,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
 
         Provide the dataset and a name for the scale.
         '''
+        if not isinstance(dset, Dataset):
+            raise TypeError(f"create_scale expected Dataset but got: {type(dset)}")
 
         dset.make_scale(name)

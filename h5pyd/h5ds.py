@@ -11,6 +11,10 @@
 ##############################################################################
 from ._hl.objectid import DatasetID
 
+DIMENSION_LIST = "DIMENSION_LIST"
+REFERENCE_LIST = "REFERENCE_LIST"
+DIMENSION_LABELS = "DIMENSION_LABELS"
+
 
 def attach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
     """ Attach Dimension Scale dscale to Dimension idx of Dataset dset. """
@@ -25,15 +29,15 @@ def attach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
         raise TypeError("f{dscale} is not a dimension scale")
 
     if is_scale(dset):
-        raise TypeError("cannot attach a dimension scale to a dimension scale")
+        raise RuntimeError("cannot attach a dimension scale to a dimension scale")
 
     # Create a DIMENSION_LIST attribute if needed
 
-    orig_dimlist = dset.getAttrValue('DIMENSION_LIST')
-    if orig_dimlist:
+    if dset.has_attr(DIMENSION_LIST):
         # delete and replace later
-        dset.del_attr('DIMENSION_LIST')
-
+        value = dset.get_attr_value(DIMENSION_LIST)
+        dset.del_attr(DIMENSION_LIST)
+    else:
         value = [list() for _ in range(rank)]
 
     dimlist = {
@@ -57,10 +61,10 @@ def attach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
     # Update the DIMENSION_LIST attribute with the object reference to the
     # dimension scale
     dimlist['value'][idx].append('datasets/' + dscale.uuid)
-    dset.set_attr('DIMENSION_list', dimlist)
+    dset.set_attr(DIMENSION_LIST, dimlist)
 
-    if dscale.has_attr('REFERENCE_LIST'):
-        old_reflist = dscale.get_attr('REFERENCE_LIST')
+    if dscale.has_attr(REFERENCE_LIST):
+        old_reflist = dscale.get_attr(REFERENCE_LIST)
     else:
         old_reflist = {
             'creationProperties': {
@@ -104,7 +108,7 @@ def attach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
         new_reflist["shape"]["dims"] = [len(reflist_value), ]
 
         # Update the REFERENCE_LIST attribute of the dimension scale
-        dscale.set_attr('REFERENCE_LIST', new_reflist)
+        dscale.set_attr(REFERENCE_LIST, new_reflist)
 
 
 def detach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
@@ -116,10 +120,10 @@ def detach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
     if idx >= rank:
         raise ValueError("invalid dimension")
 
-    if not dset.has_attr('DIMENSION_LIST'):
+    if not dset.has_attr(DIMENSION_LIST):
         raise IOError("no DIMENSION_LIST attr in {dset}")
-    dimlist = dset.get_attr('DIMENSION_LIST')
-    dset.del_attr('DIMENSION_LIST')
+    dimlist = dset.get_attr(DIMENSION_LIST)
+    dset.del_attr(DIMENSION_LIST)
 
     try:
         # TBD: use ref class
@@ -128,12 +132,12 @@ def detach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
     except Exception as e:
         # Restore the attribute's old value then raise the same
         # exception
-        dset.set_attr('DIMENSION_LIST', dimlist)
+        dset.set_attr(DIMENSION_LIST, dimlist)
         raise e
-    dset.set_attr('DIMENSION_LIST', dimlist)
+    dset.set_attr(DIMENSION_LIST, dimlist)
 
-    if dscale.has_attr('REFERENCE_LIST'):
-        old_reflist = dscale.get_attr('REFERENCE_LIST')
+    if dscale.has_attr(REFERENCE_LIST):
+        old_reflist = dscale.get_attr(REFERENCE_LIST)
     else:
         old_reflist = {}
 
@@ -150,14 +154,14 @@ def detach_scale(dset: DatasetID, dscale: DatasetID, idx: int):
         if len(new_refs) > 0:
             new_reflist["value"] = new_refs
             new_reflist["shape"] = [len(new_refs), ]
-            if dscale.has_attr('REFERENCE_LIST'):
-                dscale.del_attr('REFERENCE_LIST')
-            dscale.set_attr('REFERENCE_LIST', new_reflist)
+            if dscale.has_attr(REFERENCE_LIST):
+                dscale.del_attr(REFERENCE_LIST)
+            dscale.set_attr(REFERENCE_LIST, new_reflist)
         else:
             # Remove REFERENCE_LIST attribute if this dimension scale is
             # not attached to any dataset
             if old_reflist:
-                dscale.del_attr('REFERENCE_LIST')
+                dscale.del_attr(REFERENCE_LIST)
 
 
 def get_label(dset: DatasetID, idx: int) -> str:
@@ -169,7 +173,10 @@ def get_label(dset: DatasetID, idx: int) -> str:
     if idx >= rank:
         raise ValueError("invalid dimension")
 
-    label_values = dset.get_attr('DIMENSION_LABELS')
+    if not dset.has_attr(DIMENSION_LABELS):
+        return ''
+
+    label_values = dset.get_attr_value(DIMENSION_LABELS)
 
     if not label_values:
         return ''
@@ -189,8 +196,7 @@ def get_num_scales(dset: DatasetID, dim: int) -> int:
         raise ValueError("dimension must be non-negative")
     if dim >= rank:
         raise ValueError("invalid dimension")
-
-    dimlist_values = dset.get_attr_value('DIMENSION_LIST')
+    dimlist_values = dset.get_attr_value(DIMENSION_LIST)
     if not dimlist_values:
         return 0
 
@@ -217,10 +223,12 @@ def is_attached(dset: DatasetID, dscale: DatasetID, idx: int) -> bool:
 
     if not is_scale(dscale) or is_scale(dset):
         return False
-    if not dset.has_attr("DIMENSION_LIST"):
+    if not dset.has_attr(DIMENSION_LIST):
         return False
-    dimlist = dset.get_attr("DIMENSION_LIST")
-    reflist = dscale.get_attr("REFERENCE_LIST")
+    dimlist = dset.get_attr(DIMENSION_LIST)
+    if not dscale.has_attr(REFERENCE_LIST):
+        return False
+    reflist = dscale.get_attr(REFERENCE_LIST)
     try:
         return ([f"datasets/{dset._uuid}", idx] in
                 reflist["value"] and f"datasets/{dscale._uuid}" in dimlist["value"][idx])
@@ -246,6 +254,8 @@ def is_scale(dset: DatasetID) -> bool:
     #     },
     #     'value': 'DIMENSION_SCALE'
     # }
+    if not dset.has_attr("CLASS"):
+        return False
     class_json = dset.get_attr("CLASS")
     if class_json["value"] != "DIMENSION_SCALE":
         return False
@@ -281,7 +291,7 @@ def set_label(dset: DatasetID, idx: int, label: str):
     if idx >= rank:
         raise ValueError("invalid dimension")
 
-    label_name = 'DIMENSION_LABELS'
+    label_name = DIMENSION_LABELS
     if dset.has_attr(label_name):
         labels = dset.get_attr(label_name)
     else:
@@ -298,11 +308,11 @@ def set_label(dset: DatasetID, idx: int, label: str):
             },
             'value': ['' for n in range(rank)]
         }
-        labels['value'][idx] = label
+    labels['value'][idx] = label
     dset.set_attr(label_name, labels)
 
 
-def set_scale(dset: DatasetID, dimname: str):
+def set_scale(dset: DatasetID, dimname: str = ""):
     """ Convert dataset dset to a dimension scale, with optional name dimname. """
 
     # CLASS attribute with the value 'DIMENSION_SCALE'
@@ -361,13 +371,18 @@ def iterate(dset: DatasetID, dim: int, callable: any, startidx: int = 0) -> any:
     dimlist = dset.get_attr_value('DIMENSION_LIST')
     if not dimlist:
         return 0
+    if len(dimlist) != rank:
+        raise ValueError(f"expected {rank} elements in dimlist, but got: {len(dimlist)}")
 
-    if startidx >= len(dimlist):
+    scale_list = dimlist[dim]
+
+    if startidx >= len(scale_list):
         # dimension scale len request out of range
         return 0
 
     idx = startidx
-    while idx < len(dimlist):
-        dscale_uuid = dimlist[idx]
-        callable(DatasetID(dscale_uuid))
+    while idx < len(scale_list):
+        dscale_uuid = scale_list[idx]
+        dscale_id = dset.get(dscale_uuid)
+        callable(dscale_id)
         idx += 1

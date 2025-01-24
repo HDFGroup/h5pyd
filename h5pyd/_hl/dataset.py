@@ -30,6 +30,7 @@ from . import filters
 from . import selections as sel
 from .datatype import Datatype
 from ..h5type import getTypeItem, check_dtype, special_dtype, getItemSize
+from .. import h5ds
 from .. import config
 
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
@@ -1689,7 +1690,15 @@ class Dataset(HLObject):
 
         You can optionally pass a name to associate with this scale.
         """
-        self.dims.create_scale(self, name=name)
+        h5ds.set_scale(self._id, name)
+
+    @property
+    def is_scale(self):
+        """Return ``True`` if this dataset is also a dimension scale.
+
+        Return ``False`` otherwise.
+        """
+        return h5ds.is_scale(self._id)
 
     """
       Convert a list to a tuple, recursively.

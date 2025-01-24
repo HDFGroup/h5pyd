@@ -301,12 +301,12 @@ class ObjectID:
 
     def refresh(self):
         """ get the latest obj_json data from server """
-        self.objdb.fetch(self.uuid)
+        self.objdb.fetch(self._uuid)
 
     def close(self):
         """Remove handles to id.
         """
-        self._old_uuid = self.uuid  # for debugging
+        self._old_uuid = self._uuid  # for debugging
         self._uuid = 0
         self._http_conn = None
 
@@ -428,6 +428,25 @@ class DatasetID(ObjectID):
         objdb = self.http_conn.objdb
         objdb.resize(self._uuid, dims)
 
+    def shape_refresh(self):
+        """ Get the current shape """
+        if self.is_extensible():
+            self.objdb.shape_refresh(self._uuid)
+
+    def is_extensible(self):
+        """ Return True if the dataset is extensible """
+        shape_json = self.shape_json
+        if "maxdims" not in shape_json:
+            return False
+        extensible = False
+        maxdims = shape_json['maxdims']
+        for i in range(len(maxdims)):
+            # fi any dim is 0 or None, then extensible
+            extent = maxdims[i]
+            if extent == 0 or extent is None:
+                extensible = True
+        return extensible
+
 
 class GroupID(ObjectID):
 
@@ -514,7 +533,6 @@ class GroupID(ObjectID):
             item['title'] = title
             item['created'] = link_json['created']
             link_list.append(item)
-
         if track_order:
             link_list.sort(key=lambda d: d['created'])
         else:

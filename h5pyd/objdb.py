@@ -96,7 +96,6 @@ class ObjDB():
 
     def __delitem__(self, obj_uuid):
         if obj_uuid not in self._objdb:
-            print(f"{obj_uuid} not in objdb, fetching")
             obj_json = self.fetch(obj_uuid)
             if not obj_json:
                 self.log.warning(f"id: {obj_uuid} not found for deletion in objDB")
@@ -408,6 +407,24 @@ class ObjDB():
         # remove from the objdb
         del attrs[name]
 
+    def shape_refresh(self, dset_uuid):
+        """ Get the latest dataset shape """
+        if dset_uuid not in self._objdb:
+            # just need to do a fetch...
+            self.fetch(dset_uuid)
+        else:
+            obj_json = self._objdb[dset_uuid]
+            req = f"/datasets/{dset_uuid}/shape"
+            rsp = self.http_conn.GET(req)
+            if rsp.status_code != 200:
+                msg = "unable to get dataset shape"
+                raise IOError(rsp.status_code, msg)
+            rsp_json = rsp.json()
+            if "shape" not in rsp_json:
+                raise RuntimeError(f"Unexpected response for {req}")
+            shape_json = rsp_json['shape']
+            obj_json['shape'] = shape_json
+
     def resize(self, dset_uuid, dims):
         """ update the shape of the dataset """
         # send the request to the server
@@ -419,4 +436,4 @@ class ObjDB():
             raise IOError(rsp.status_code, msg)
         # TBD Have HSDS return updated shape in response to avoid
         # this GET request
-        self.fetch(dset_uuid)
+        self.shape_refresh(dset_uuid)

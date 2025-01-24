@@ -827,7 +827,7 @@ class Group(HLObject, MutableMappingHDF5):
                     # caller indicates to end iteration
                     break
             visited[parent.id.uuid] = True
-            if parent.id.__class__ is GroupID:
+            if isinstance(parent.id, GroupID):
                 # get group links
                 for title in parent.id.get_link_titles():
                     link = parent.id.get_link(title)

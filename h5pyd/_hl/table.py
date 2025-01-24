@@ -201,18 +201,21 @@ class Table(Dataset):
                 params["select"] = sel_param
             try:
                 self.log.debug(f"params: {params}")
-                rsp = self.GET(req, params=params)
-                if isinstance(rsp, bytes):
+                rsp = self.id.http_conn.GET(req, params=params)
+                if rsp.status_code != 200:
+                    raise IOError(rsp.status_code, "table read request failed")
+                if rsp.is_binary:
                     # binary response
-                    arr = bytesToArray(rsp, rsp_type, None)
+                    arr = bytesToArray(rsp.text, rsp_type, None)
                     count = len(arr)
                     self.log.info(f"got {count} rows binary data")
                 else:
-                    values = rsp["value"]
+                    rsp_json = rsp.json()
+                    values = rsp_json["value"]
                     count = len(values)
-                    if "index" in rsp:
+                    if "index" in rsp_json:
                         # older server version that returns index as a seperate key
-                        indices = rsp["index"]
+                        indices = rsp_json["index"]
                         if len(indices) != count:
                             raise ValueError(f"expected {count} indicies, but got: {len(indices)}")
                     else:
@@ -298,15 +301,18 @@ class Table(Dataset):
 
         req = "/datasets/" + self.id.uuid + "/value"
 
-        rsp = self.PUT(req, body=value, format="json", params=params)
+        rsp = self.id.http_conn.PUT(req, body=value, format="json", params=params)
+        if rsp.status_code != 200:
+            raise IOError(rsp.status_code, "table update request failed")
+        rsp_json = rsp.json()
         indices = None
         arr = None
-        if "index" in rsp:
-            indices = rsp["index"]
-        elif "value" in rsp:
+        if "index" in rsp_json:
+            indices = rsp_json["index"]
+        elif "value" in rsp_json:
             # new-style return type - index is first element in each row
             indices = []
-            for row in rsp["value"]:
+            for row in rsp_json["value"]:
                 indices.append(row[0])
         else:
             raise ValueError("unexpected response from PUT query")
@@ -418,4 +424,4 @@ class Table(Dataset):
             raise IOError(rsp.status_code, "table append failed")
 
         # if we get here, the request was successful, adjust the shape
-        # TBD...
+        self.id.shape_refresh()

@@ -823,9 +823,9 @@ class File(Group):
         # this will close the socket of the http_conn singleton
 
         self.log.debug(f"close, mode: {self.mode}")
-        self.flush()
-
-        self._id.close()
+        if self.id:
+            self.flush()
+            self._id.close()
 
     def __enter__(self):
         return self

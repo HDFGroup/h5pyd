@@ -18,7 +18,6 @@ import logging
 
 if config.get("use_h5py"):
     import h5py
-    print("using h5py")
 else:
     import h5pyd as h5py
 
@@ -44,15 +43,16 @@ class TestDimensionScale(TestCase):
             self.assertIsInstance(d, h5py._hl.dims.DimensionProxy)
 
         # Create and name dimension scales
-        dset.dims.create_scale(f['scale_x'], 'Simulation X (North) axis')
+        f['scale_x'].make_scale('Simulation X (North) axis')
+
         self.assertTrue(h5py.h5ds.is_scale(f['scale_x'].id))
-        dset.dims.create_scale(f['scale_y'], 'Simulation Y (East) axis')
+        f['scale_y'].make_scale('Simulation Y (East) axis')
         self.assertTrue(h5py.h5ds.is_scale(f['scale_y'].id))
-        dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
+        f['scale_z'].make_scale('Simulation Z (Vertical) axis')
         self.assertTrue(h5py.h5ds.is_scale(f['scale_z'].id))
 
         # Try re-creating the last dimscale
-        dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
+        f['scale_z'].make_scale('Simulation Z (Vertical) axis')
         self.assertTrue(h5py.h5ds.is_scale(f['scale_z'].id))
 
         # Attach a non-dimension scale (and in the process make it a dimension
@@ -116,9 +116,16 @@ class TestDimensionScale(TestCase):
             self.assertIsInstance(s[0], str)
             self.assertEqual(s[0], 'Simulation Z (Vertical) axis')
 
+        for s in dset.dims[0].items():
+            self.assertIsInstance(s, tuple)
+            self.assertIsInstance(s[1], h5py.Dataset)
+            self.assertIsInstance(s[0], str)
+        title = 'Simulation X (North) axis'
+        self.assertTrue(title in dset.dims[0])
+
         self.assertIsInstance(dset.dims[0][0], h5py.Dataset)
-        self.assertIsInstance(dset.dims[0]['Simulation X (North) axis'],
-                              h5py.Dataset)
+
+        self.assertIsInstance(dset.dims[0]['Simulation X (North) axis'], h5py.Dataset)
 
         with self.assertRaises(IndexError):
             dset.dims[0][10]
@@ -127,21 +134,17 @@ class TestDimensionScale(TestCase):
             dset.dims[0]['foobar']
 
         # Test dimension scale names
-        # TBD: why does this raise Unicode error for h5pyd?
-        if config.get("use_h5py"):
-            dset.dims.create_scale(f['scale_name'], '√')
-        else:
-            with self.assertRaises(UnicodeError):
-                dset.dims.create_scale(f['scale_name'], '√')
+        f['scale_name'].make_scale('√')
 
         with self.assertRaises((AttributeError, TypeError)):
-            dset.dims.create_scale(f['scale_name'], 67)
+            f['scale_name'].make_scale(67)
 
         f.close()
 
         # try opening file in read mode
         f = h5py.File(filename, 'r')
         dset = f['/temperatures']
+
         self.assertTrue(len(dset.dims), 3)
         labels = ('x', 'y', 'z')
         for i in range(3):
@@ -152,7 +155,11 @@ class TestDimensionScale(TestCase):
             else:
                 self.assertEqual(len(dimscale), 1)
                 scale = dimscale[0]
-                self.assertTrue(scale.name.endswith(labels[i]))
+                if config.get('use_h5py'):
+                    self.assertTrue(scale.name.endswith(labels[i]))
+                else:
+                    # in h5pyd, dimscales are anonymous
+                    self.assertTrue(scale.name is None)
                 self.assertEqual(scale.shape, (10,))
         for s in dset.dims[2].items():
             self.assertIsInstance(s, tuple)

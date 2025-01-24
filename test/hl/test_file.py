@@ -264,7 +264,6 @@ class TestFile(TestCase):
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
-        print("f.keys:", list(f.keys()))
         self.assertEqual(len(list(f.keys())), 2)
 
         if h5py.__name__ == "h5py":
