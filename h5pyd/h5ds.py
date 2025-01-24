@@ -9,7 +9,7 @@
 # distribution tree.  If you do not have access to this file, you may        #
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
-from ._hl.objectid import DatasetID
+from .objectid import DatasetID
 
 DIMENSION_LIST = "DIMENSION_LIST"
 REFERENCE_LIST = "REFERENCE_LIST"
