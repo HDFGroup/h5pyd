@@ -2,7 +2,7 @@
 # Copyright by The HDF Group.                                                #
 # All rights reserved.                                                       #
 #                                                                            #
-# This file is part of HSDS (HDF5 REST Server) Service, Libraries and      #
+# This file is part of HSDS (HDF5 REST Server) Service, Libraries and        #
 # Utilities.  The full HDF5 REST Server copyright notice, including          #
 # terms governing use, modification, and redistribution, is contained in     #
 # the file COPYING, which can be found at the root of the source code        #
@@ -25,10 +25,8 @@ import json
 import logging
 
 from . import openid
-from .. import config
-from . import requests_lambda
-
-MAX_CACHE_ITEM_SIZE = 10000  # max size of an item to put in the cache
+from .objdb import ObjDB
+from . import config
 
 
 def eprint(*args, **kwargs):
@@ -40,30 +38,19 @@ DEFAULT_TIMEOUT = (
     1000,
 )  # #20  # 180  # seconds - allow time for hsds service to bounce
 
-
-class CacheResponse(object):
-    """Wrap a json response in a Requests.Response looking class.
-    Note: we don't want to keep a proper requests obj in the cache since it
-    would contain refernces to other objects
-    """
-
-    def __init__(self, rsp):
-        # just save off what we need
-        self._text = rsp.text
-        self._status_code = rsp.status_code
-        self._headers = rsp.headers
-
-    @property
-    def text(self):
-        return self._text
-
-    @property
-    def status_code(self):
-        return self._status_code
-
-    @property
-    def headers(self):
-        return self._headers
+"""
+def verifyCert(self):
+    # default to validate CERT for https requests, unless
+    # the H5PYD_VERIFY_CERT environment variable is set and True
+    #
+    # TBD: set default to True once the signing authority of data.hdfgroup.org is
+    # recognized
+    if "H5PYD_VERIFY_CERT" in os.environ:
+        verify_cert = os.environ["H5PYD_VERIFY_CERT"].upper()
+        if verify_cert.startswith('F'):
+            return False
+    return True
+"""
 
 
 def getAzureApiKey():
@@ -146,10 +133,121 @@ def getKeycloakApiKey():
     return api_key
 
 
+class HttpResponse:
+    """ wrapper for http request responses """
+    def __init__(self, rsp, logger=None):
+        self._rsp = rsp
+        self._logger = logger
+        if logger is None:
+            self.log = logging
+        else:
+            self.log = logging.getLogger(logger)
+        self._text = None
+
+    @property
+    def status_code(self):
+        """ return response status code """
+        return self._rsp.status_code
+
+    @property
+    def reason(self):
+        """ return response reason """
+        return self._rsp.reason
+
+    @property
+    def content_type(self):
+        """ return content type """
+        rsp = self._rsp
+        if 'Content-Type' in rsp.headers:
+            content_type = rsp.headers['Content-Type']
+        else:
+            content_type = ""
+        return content_type
+
+    @property
+    def content_length(self):
+        """ Return length of response if available """
+        if 'Content-Length' in self._rsp.headers:
+            content_length = self._rsp.headers['Content-Length']
+        else:
+            content_length = None
+        return content_length
+
+    @property
+    def is_binary(self):
+        """ return True if the response indicates binary data """
+
+        if self.content_type == "application/octet-stream":
+            return True
+        else:
+            return False
+
+    @property
+    def is_json(self):
+        """ return true if response indicates json """
+
+        if self.content_type.startswith("application/json"):
+            return True
+        else:
+            return False
+
+    @property
+    def text(self):
+        """ getresponse content as bytes """
+
+        if not self._text:
+            rsp = self._rsp
+            if not self.is_binary:
+                # hex encoded response?
+                # this is returned by API Gateway for lambda responses
+                self._text = bytes.fromhex(rsp.text)
+            else:
+                if self.content_length:
+                    self.log.debug(f"got binary response, {self.content_length} bytes")
+                else:
+                    self.log.debug("got binary response, content_length unknown")
+
+                HTTP_CHUNK_SIZE = 4096
+                http_chunks = []
+                downloaded_bytes = 0
+                for http_chunk in rsp.iter_content(chunk_size=HTTP_CHUNK_SIZE):
+                    if http_chunk:  # filter out keep alive chunks
+                        self.log.debug(f"got http_chunk - {len(http_chunk)} bytes")
+                        downloaded_bytes += len(http_chunk)
+                        http_chunks.append(http_chunk)
+                if len(http_chunks) == 0:
+                    raise IOError("no data returned")
+                if len(http_chunks) == 1:
+                    # can return first and only chunk as response
+                    self._text = http_chunks[0]
+                else:
+                    msg = f"retrieved {len(http_chunks)} http_chunks "
+                    msg += f" {downloaded_bytes} total bytes"
+                    self.log.info(msg)
+                    self._text = bytearray(downloaded_bytes)
+                    index = 0
+                    for http_chunk in http_chunks:
+                        self._text[index:(index + len(http_chunk))] = http_chunk
+                        index += len(http_chunk)
+
+        return self._text
+
+    def json(self):
+        """ Return json from response"""
+
+        rsp = self._rsp
+
+        if not self.is_json:
+            raise IOError("response is not json")
+
+        rsp_json = json.loads(rsp.text)
+        self.log.debug(f"rsp_json - {len(rsp.text)} bytes")
+        return rsp_json
+
+
 class HttpConn:
     """
     Some utility methods based on equivalents in base class.
-    TBD: Should refactor these to a common base class
     """
 
     def __init__(
@@ -166,6 +264,7 @@ class HttpConn:
         logger=None,
         retries=3,
         timeout=DEFAULT_TIMEOUT,
+        objdb=None,
         **kwds,
     ):
         self._domain = domain_name
@@ -175,16 +274,11 @@ class HttpConn:
         self._retries = retries
         self._timeout = timeout
         self._hsds = None
-        self._lambda = None
         self._api_key = api_key
         self._s = None  # Sessions
         self._server_info = None
-        if use_cache:
-            self._cache = {}
-            self._objdb = {}
-        else:
-            self._cache = None
-            self._objdb = None
+        self._external_refs = []
+
         self._logger = logger
         if logger is None:
             self.log = logging
@@ -203,12 +297,6 @@ class HttpConn:
         if not endpoint:
             msg = "no endpoint set"
             raise ValueError(msg)
-
-        lambda_prefix = requests_lambda.LAMBDA_REQ_PREFIX
-
-        if endpoint.startswith(lambda_prefix):
-            # save lambda function name
-            self._lambda = endpoint[len(lambda_prefix):]
 
         elif endpoint.startswith("local"):
             # create a local hsds server
@@ -315,6 +403,8 @@ class HttpConn:
             else:
                 self.log.error(f"Unknown openid provider: {provider}")
 
+        self._objdb = ObjDB(self, use_cache=use_cache)
+
     def __del__(self):
         if self._hsds:
             self.log.debug("hsds stop")
@@ -329,6 +419,11 @@ class HttpConn:
 
         if headers is None:
             headers = {}
+
+        # This should be the default - but explicitly set anyway
+        if "Accept-Encoding" not in headers:
+            headers['Accept-Encoding'] = "deflate, gzip"
+
         elif "Authorization" in headers:
             return headers  # already have auth key
         if username is None:
@@ -403,10 +498,11 @@ class HttpConn:
                 return False
         return True
 
-    def getObjDb(self):
+    @property
+    def objdb(self):
         return self._objdb
 
-    def GET(self, req, format="json", params=None, headers=None, use_cache=True):
+    def GET(self, req, format="json", params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         # check that domain is defined (except for some specific requests)
@@ -431,21 +527,6 @@ class HttpConn:
         if format == "binary":
             headers["accept"] = "application/octet-stream"
 
-        # list of parameters which should disable cache usage
-
-        check_cache = self._cache is not None and use_cache and format == "json"
-        check_cache = check_cache and params["domain"] == self._domain
-        check_cache = check_cache and "select" not in params and "query" not in params
-        check_cache = check_cache and "follow_links" not in params and "pattern" not in params
-        check_cache = check_cache and "Limit" not in params and "Marker" not in params
-
-        if check_cache:
-            self.log.debug("httpcon - checking cache")
-            if req in self._cache:
-                self.log.debug("httpcon - returning cache result")
-                rsp = self._cache[req]
-                return rsp
-
         self.log.info(f"GET: {self._endpoint + req} [{params['domain']}] timeout: {self._timeout}")
 
         for k in params:
@@ -458,10 +539,7 @@ class HttpConn:
                 self._hsds.run()
 
             s = self.session
-            if self._lambda:
-                stream = False
-            else:
-                stream = True
+            stream = True  # tbd  - config for no streaming?
 
             rsp = s.get(
                 self._endpoint + req,
@@ -481,68 +559,14 @@ class HttpConn:
             self.log.error(f"got {type(e)} exception: {e}")
             raise IOError("Unexpected exception")
 
-        content_type = None
-        if rsp.status_code == 200 and self._cache is not None:
-            rsp_headers = rsp.headers
-            content_length = 0
-            if "Content-Length" in rsp_headers:
-                try:
-                    content_length = int(rsp_headers["Content-Length"])
-                except ValueError:
-                    content_length = MAX_CACHE_ITEM_SIZE + 1
-            self.log.debug(f"content_length: {content_length}")
-
-            if "Content-Type" in rsp_headers:
-                content_type = rsp_headers["Content-Type"]
-            self.log.debug(f"content_type: {content_type}")
-
-            add_to_cache = content_type and content_type.startswith("application/json")
-            add_to_cache = add_to_cache and content_length < MAX_CACHE_ITEM_SIZE and not req.endswith("/value")
-            add_to_cache = add_to_cache and "follow_links" not in params and "pattern" not in params
-            add_to_cache = add_to_cache and "Limit" not in params and "Marker" not in params
-
-            if add_to_cache:
-                # add to our _cache
-                cache_rsp = CacheResponse(rsp)
-                self.log.debug(f"adding {req} to cache")
-                self._cache[req] = cache_rsp
-
-            if rsp.status_code == 200 and req == "/":
-                self.log.info(f"got domain json: {len(rsp.text)} bytes")
-                self._domain_json = json.loads(rsp.text)
-
-        # when calling AWS Lambda thru API Gatway, the status_code
-        # indicates the Lambda request was successful, but not necessarily
-        # the requested HSDS action was.
-        # Check here and raise IOError is needed.
-
-        json_success = (rsp.status_code == 200) and content_type and content_type.startswith("application/json")
-
-        if json_success:
-            body = json.loads(rsp.text)
-            if "statusCode" in body:
-                status_code = body["statusCode"]
-                if status_code == 400:
-                    raise IOError("Invalid request")
-                if status_code == 403:
-                    raise IOError("Unauthorize")
-                if status_code == 404:
-                    raise IOError("Not found")
-                if status_code == 410:
-                    raise IOError("Conflict")
-                if status_code == 500:
-                    raise IOError("Unexpected error")
-
-        return rsp
+        return HttpResponse(rsp)
 
     def PUT(self, req, body=None, format="json", params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
-        if self._cache is not None:
-            # update invalidate everything in cache
-            self._cache = {}
+
         if params:
             self.log.info(f"PUT params: {params}")
         else:
@@ -595,17 +619,13 @@ class HttpConn:
             self.log.info("clearing domain_json cache")
             self._domain_json = None
         self.log.info(f"PUT returning: {rsp}")
-        return rsp
+        return HttpResponse(rsp)
 
     def POST(self, req, body=None, format="json", params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
-        if self._cache is not None:
-            # invalidate cache for updates
-            # TBD: handle special case for point selection since that doesn't modify anything
-            self._cache = {}
 
         if params is None:
             params = {}
@@ -661,13 +681,12 @@ class HttpConn:
         if rsp.status_code not in (200, 201):
             self.log.error(f"POST error: {rsp.status_code}")
 
-        return rsp
+        return HttpResponse(rsp)
 
     def DELETE(self, req, params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
-        if self._cache is not None:
-            self._cache = {}
+
         if req not in ("/domains", "/") and self._domain is None:
             raise IOError("no domain defined")
         if params is None:
@@ -702,10 +721,10 @@ class HttpConn:
             raise IOError("Connection Error")
 
         if rsp.status_code == 200 and req == "/":
-            self.log.info("clearning domain_json cache")
+            self.log.info("clearing domain_json cache")
             self._domain_json = None
 
-        return rsp
+        return HttpResponse(rsp)
 
     @property
     def session(self):
@@ -714,15 +733,12 @@ class HttpConn:
         retries = self._retries
         backoff_factor = 1
         status_forcelist = (500, 502, 503, 504)
-        lambda_prefix = requests_lambda.LAMBDA_REQ_PREFIX
 
         if self._use_session:
             if self._s is None:
                 if self._endpoint.startswith("http+unix://"):
                     self.log.debug(f"create unixsocket session: {self._endpoint}")
                     s = requests_unixsocket.Session()
-                elif self._endpoint.startswith(lambda_prefix):
-                    s = requests_lambda.Session()
                 else:
                     # regular request session
                     s = requests.Session()
@@ -747,6 +763,12 @@ class HttpConn:
             else:
                 s = self._s
         return s
+
+    def add_external_ref(self, fid):
+        # this is used by the group class to keep references to external links open
+        if fid.__class__.__name__ != "FileID":
+            raise TypeError("add_external_ref, expected FileID type")
+        self._external_refs.append(fid)
 
     def close(self):
         if self._s:
@@ -777,20 +799,13 @@ class HttpConn:
         return self._mode
 
     @property
-    def cache_on(self):
-        if self._cache is None:
-            return False
-        else:
-            return True
-
-    @property
     def domain_json(self):
         if self._domain_json is None:
             rsp = self.GET("/")
             if rsp.status_code != 200:
                 raise IOError(rsp.reason)
             # assume JSON
-            self._domain_json = json.loads(rsp.text)
+            self._domain_json = rsp.json()
         return self._domain_json
 
     @property

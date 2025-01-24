@@ -14,10 +14,10 @@ from __future__ import absolute_import
 
 from . import version
 from ._hl.base import Empty
-from ._hl.h5type import special_dtype, Reference, RegionReference
-from ._hl.h5type import vlen_dtype, string_dtype, enum_dtype
-from ._hl.h5type import check_vlen_dtype, check_string_dtype, check_enum_dtype
-from ._hl.h5type import check_opaque_dtype, check_ref_dtype, check_dtype
+from .h5type import special_dtype, Reference, RegionReference
+from .h5type import vlen_dtype, string_dtype, enum_dtype
+from .h5type import check_vlen_dtype, check_string_dtype, check_enum_dtype
+from .h5type import check_opaque_dtype, check_ref_dtype, check_dtype
 from ._hl.files import File, H5Image, is_hdf5
 from ._hl.folders import Folder
 from ._hl.group import Group, SoftLink, ExternalLink, UserDefinedLink, HardLink
@@ -25,7 +25,7 @@ from ._hl.dataset import Dataset, MultiManager
 from ._hl.table import Table
 from ._hl.datatype import Datatype
 from ._hl.attrs import AttributeManager
-from ._hl.serverinfo import getServerInfo
+from .serverinfo import getServerInfo
 from . import h5ds
 
 

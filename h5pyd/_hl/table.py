@@ -15,11 +15,11 @@ import numpy
 from .base import _decode
 from .base import bytesToArray
 from .dataset import Dataset
-from .objectid import DatasetID
+from ..objectid import DatasetID
 from . import selections as sel
-from .h5type import Reference
-from .h5type import check_dtype
-from .h5type import getQueryDtype
+from ..h5type import Reference
+from ..h5type import check_dtype
+from ..h5type import getQueryDtype
 
 
 class Cursor():
@@ -85,15 +85,14 @@ class Table(Dataset):
     def __init__(self, bind, track_order=None):
         """ Create a new Table object by binding to a low-level DatasetID.
         """
-
         if not isinstance(bind, DatasetID):
             raise ValueError(f"{bind} is not a DatasetID")
-        Dataset.__init__(self, bind, track_order=track_order)
+        super().__init__(bind, track_order=track_order)
 
-        if len(self._dtype) < 1:
+        if len(self.dtype) < 1:
             raise ValueError("Table type must be compound")
 
-        if len(self._shape) > 1:
+        if len(self.shape) > 1:
             raise ValueError("Table must be one-dimensional")
 
     @property
@@ -107,13 +106,14 @@ class Table(Dataset):
 
     @property
     def nrows(self):
-        return self._shape[0]
+        shape_json = self.id.shape_json
+        return shape_json['dims'][0]
 
     def read(self, start=None, stop=None, step=None, field=None, out=None):
         if start is None:
             start = 0
         if stop is None:
-            stop = self._shape[0]
+            stop = self.nrows
         if step is None:
             step = 1
         arr = self[start:stop:step]
@@ -164,10 +164,10 @@ class Table(Dataset):
             if not start:
                 start = 0
             if not stop:
-                stop = self._shape[0]
+                stop = self.nrows
         else:
             start = 0
-            stop = self._shape[0]
+            stop = self.nrows
 
         selection_arg = slice(start, stop)
         selection = sel.select(self, selection_arg)
@@ -201,18 +201,21 @@ class Table(Dataset):
                 params["select"] = sel_param
             try:
                 self.log.debug(f"params: {params}")
-                rsp = self.GET(req, params=params)
-                if isinstance(rsp, bytes):
+                rsp = self.id.http_conn.GET(req, params=params)
+                if rsp.status_code != 200:
+                    raise IOError(rsp.status_code, "table read request failed")
+                if rsp.is_binary:
                     # binary response
-                    arr = bytesToArray(rsp, rsp_type, None)
+                    arr = bytesToArray(rsp.text, rsp_type, None)
                     count = len(arr)
                     self.log.info(f"got {count} rows binary data")
                 else:
-                    values = rsp["value"]
+                    rsp_json = rsp.json()
+                    values = rsp_json["value"]
                     count = len(values)
-                    if "index" in rsp:
+                    if "index" in rsp_json:
                         # older server version that returns index as a seperate key
-                        indices = rsp["index"]
+                        indices = rsp_json["index"]
                         if len(indices) != count:
                             raise ValueError(f"expected {count} indicies, but got: {len(indices)}")
                     else:
@@ -280,10 +283,10 @@ class Table(Dataset):
             if not start:
                 start = 0
             if not stop:
-                stop = self._shape[0]
+                stop = self.nrows
         else:
             start = 0
-            stop = self._shape[0]
+            stop = self.nrows
 
         selection_arg = slice(start, stop)
         selection = sel.select(self, selection_arg)
@@ -298,15 +301,18 @@ class Table(Dataset):
 
         req = "/datasets/" + self.id.uuid + "/value"
 
-        rsp = self.PUT(req, body=value, format="json", params=params)
+        rsp = self.id.http_conn.PUT(req, body=value, format="json", params=params)
+        if rsp.status_code != 200:
+            raise IOError(rsp.status_code, "table update request failed")
+        rsp_json = rsp.json()
         indices = None
         arr = None
-        if "index" in rsp:
-            indices = rsp["index"]
-        elif "value" in rsp:
+        if "index" in rsp_json:
+            indices = rsp_json["index"]
+        elif "value" in rsp_json:
             # new-style return type - index is first element in each row
             indices = []
-            for row in rsp["value"]:
+            for row in rsp_json["value"]:
                 indices.append(row[0])
         else:
             raise ValueError("unexpected response from PUT query")
@@ -391,7 +397,7 @@ class Table(Dataset):
 
         numrows = val.shape[0]
 
-        req = "/datasets/" + self.id.uuid + "/value"
+        req = f"/datasets/{self.id.uuid}/value"
 
         params = {}
         body = {}
@@ -413,8 +419,9 @@ class Table(Dataset):
             body['value'] = val
             body['append'] = numrows
 
-        self.PUT(req, body=body, format=format, params=params)
+        rsp = self.id.http_conn.PUT(req, body=body, format=format, params=params)
+        if rsp.status_code != 200:
+            raise IOError(rsp.status_code, "table append failed")
 
         # if we get here, the request was successful, adjust the shape
-        total_rows = self._shape[0] + numrows
-        self._shape = (total_rows,)
+        self.id.shape_refresh()

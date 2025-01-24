@@ -162,7 +162,7 @@ def get_chunk_layout(dset):
         msg = "get_chunk_layout called on hdf5 dataset"
         logging.error(msg)
         raise IOError(msg)
-    dset_json = dset.id.dcpl_json
+    dset_json = dset.id.cpl
     if "layout" not in dset_json:
         msg = f"expect to find layout key in dset_json: {dset_json}"
         logging.error(msg)

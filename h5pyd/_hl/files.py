@@ -14,13 +14,12 @@ from __future__ import absolute_import
 
 import io
 import os
-import json
 import pathlib
 import time
 
-from .objectid import GroupID
+from ..objectid import FileID
 from .group import Group
-from .httpconn import HttpConn
+from ..httpconn import HttpConn
 from .. import config
 
 VERBOSE_REFRESH_TIME = 1.0  # 1 second
@@ -187,18 +186,18 @@ class File(Group):
     @property
     def attrs(self):
         """Attributes attached to this object"""
-        # hdf5 complains that a file identifier is an invalid location for an
-        # attribute. Instead of self, pass the root group to AttributeManager:
         from . import attrs
 
-        # parent_obj = {"id": self.id.uuid}
-        # return attrs.AttributeManager(self['/'])
-        return attrs.AttributeManager(self)
+        return attrs.AttributeManager(self.id)
 
     @property
     def filename(self):
         """File name on disk"""
-        return self.id.http_conn.domain
+        if self.id.http_conn:
+            filename = self.id.http_conn.domain
+        else:
+            filename = None
+        return filename
 
     @property
     def driver(self):
@@ -207,7 +206,11 @@ class File(Group):
     @property
     def mode(self):
         """Python mode used to open file"""
-        return self.id.http_conn.mode
+        if self.id.http_conn:
+            mode = self.id.http_conn.mode
+        else:
+            mode = None
+        return mode
 
     @property
     def fid(self):
@@ -246,6 +249,11 @@ class File(Group):
     def swmr_mode(self):
         """ Controls use of cached metadata """
         return self._swmr_mode
+
+    @property
+    def objdb(self):
+        """ Return ref to object database """
+        return self._id.http_conn.objdb
 
     @swmr_mode.setter
     def swmr_mode(self, value):
@@ -286,8 +294,8 @@ class File(Group):
         See the h5py user guide for a detailed explanation of the options.
 
         domain
-            URI of the domain name to access. E.g.: /home/username/tall.h5.  Can also
-            use DNS style:  tall.username.home
+            URI of the domain name to access. E.g.: /home/username/tall.h5.  Alternatively a GroupID
+            (low-level group identifier object can be used)
         mode
             Access mode: 'r', 'r+', 'w', or 'a'
         endpoint
@@ -327,21 +335,26 @@ class File(Group):
         timeout
             Timeout value in seconds
         """
-        groupid = None
+
+        fileid = None
         dn_ids = []
+        root_json = None
+        cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
+
+        if mode and mode not in ("r", "r+", "w", "w-", "x", "a"):
+            raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
+
+        if mode is None:
+            mode = "r"
+
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
-        no_endpoint_info = endpoint is None and username is None and password is None
-        if (mode is None and no_endpoint_info and isinstance(domain, GroupID)):
-            groupid = domain
+        # no_endpoint_info = endpoint is None and username is None and password is None
+        if isinstance(domain, FileID):
+            fileid = domain
         else:
-            if mode and mode not in ("r", "r+", "w", "w-", "x", "a"):
-                raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
-
-            if mode is None:
-                mode = "r"
-
-            cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
+            if not isinstance(domain, str):
+                raise IOError(400, "expected a str or GroupID object for domain")
 
             # accept domain values in the form:
             #   http://server:port/home/user/myfile.h5
@@ -354,7 +367,7 @@ class File(Group):
             #
             #  For http prefixed values, extract the endpont and use the rest as domain path
             for protocol in ("http://", "https://", "hdf5://", "http+unix://"):
-                if domain and domain.startswith(protocol):
+                if isinstance(domain, str) and domain.startswith(protocol):
                     if protocol.startswith("http"):
                         domain = domain[len(protocol):]
                         # extract the endpoint
@@ -378,9 +391,8 @@ class File(Group):
             if domain[0] != "/":
                 raise IOError(400, "relative paths are not valid")
 
-            if endpoint is None:
-                if "hs_endpoint" in cfg:
-                    endpoint = cfg["hs_endpoint"]
+            if endpoint is None and "hs_endpoint" in cfg:
+                endpoint = cfg["hs_endpoint"]
 
             # remove the trailing slash on endpoint if it exists
             if endpoint and endpoint.endswith('/'):
@@ -421,8 +433,6 @@ class File(Group):
                 timeout=timeout,
             )
 
-            root_json = None
-
             # try to do a GET from the domain
             req = "/"
             params = {"getdnids": 1}  # return dn ids if available
@@ -455,7 +465,7 @@ class File(Group):
                     connect_try += 1
 
             if rsp.status_code == 200:
-                root_json = json.loads(rsp.text)
+                root_json = rsp.json()
             if rsp.status_code != 200 and mode in ("r", "r+"):
                 # file must exist
                 http_conn.close()
@@ -494,24 +504,12 @@ class File(Group):
                     http_conn.close()
                     raise IOError(rsp.status_code, rsp.reason)
 
-                root_json = json.loads(rsp.text)
+                root_json = rsp.json()
             if "root" not in root_json:
                 http_conn.close()
                 raise IOError(404, "Unexpected error")
 
-            if "dn_ids" in root_json:
-                dn_ids = root_json["dn_ids"]
-
             root_uuid = root_json["root"]
-
-            if "limits" in root_json:
-                self._limits = root_json["limits"]
-            else:
-                self._limits = None
-            if "version" in root_json:
-                self._version = root_json["version"]
-            else:
-                self._version = None
 
             if mode == "a":
                 # for append, verify we have 'update' permission on the domain
@@ -522,8 +520,8 @@ class File(Group):
                     req = "/acls/" + name
                     rsp = http_conn.GET(req)
                     if rsp.status_code == 200:
-                        rspJson = json.loads(rsp.text)
-                        domain_acl = rspJson["acl"]
+                        rsp_json = rsp.json()
+                        domain_acl = rsp_json["acl"]
                         if not domain_acl["update"]:
                             http_conn.close()
                             raise IOError(403, "Forbidden")
@@ -533,44 +531,63 @@ class File(Group):
             if mode in ("w", "w-", "x", "a"):
                 http_conn._mode = "r+"
 
-            group_json = None
-            # do we already have the group_json?
-            if "domain_objs" in root_json and mode == "r":
-                objdb = root_json["domain_objs"]
-                http_conn._objdb = objdb
-                if root_uuid in objdb:
-                    group_json = objdb[root_uuid]
+            objdb = http_conn.objdb
 
-            if not group_json:
-                # get the group json for the root group
-                req = "/groups/" + root_uuid
+            if "domain_objs" in root_json:
+                domain_objs = root_json["domain_objs"]
+                objdb.load(domain_objs)
+            else:
+                objdb.reload()
 
-                rsp = http_conn.GET(req)
-
-                if rsp.status_code != 200:
-                    http_conn.close()
-                    raise IOError(rsp.status_code, "Unexpected Error")
-                group_json = json.loads(rsp.text)
-
-            groupid = GroupID(None, group_json, http_conn=http_conn)
+            fileid = FileID(root_uuid, http_conn=http_conn)
         # end else
 
-        self._name = "/"
-        self._id = groupid
+        self._id = fileid
         self._verboseInfo = None  # additional state we'll get when requested
         self._verboseUpdated = None  # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
         self._dn_ids = dn_ids
         self._swmr_mode = swmr
 
-        Group.__init__(self, self._id, track_order=track_order)
+        if not root_json:
+            # fetch the root_json
+            req = "/"
+            params = {"getdnids": 1}  # return dn ids if available
+
+            if use_cache and mode == "r":
+                params["getobjs"] = "T"
+                params["include_attrs"] = "T"
+            if bucket:
+                params["bucket"] = bucket
+            rsp = self.id.http_conn.GET(req, params=params)
+            if rsp.status_code != 200:
+                raise IOError(rsp.status_code, rsp.reason)
+            root_json = rsp.json()
+
+        if "dn_ids" in root_json:
+            dn_ids = root_json["dn_ids"]
+
+        if "limits" in root_json:
+            self._limits = root_json["limits"]
+        else:
+            self._limits = None
+        if "version" in root_json:
+            self._version = root_json["version"]
+        else:
+            self._version = None
+
+        super().__init__(self._id, track_order=track_order)
 
     def _getVerboseInfo(self):
         now = time.time()
         if (self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME):
             # resynch the verbose data
             req = "/?verbose=1"
-            rsp_json = self.GET(req, use_cache=False, params={"CreateOrder": "1" if self._track_order else "0"})
+            rsp = self.id.http_conn.GET(req)
+            if rsp.status_code != 200:
+                self.log.error(f"got status code: {rsp.status_code} for get verbose")
+                raise IOError("unexpected error")
+            rsp_json = rsp.json()
 
             self.log.debug("get verbose info")
             props = {}
@@ -712,16 +729,22 @@ class File(Group):
             compressors = []
         return compressors
 
-    # override base implemention of ACL methods to use the domain rather than update root group
+    # override base implementation of ACL methods to use the domain rather than update root group
     def getACL(self, username):
         req = "/acls/" + username
-        rsp_json = self.GET(req)
+        rsp = self.id.http_conn.GET(req)
+        if rsp.status_code != 200:
+            raise IOError(rsp.status_code, "Unable to get ACL")
+        rsp_json = rsp.json()
         acl_json = rsp_json["acl"]
         return acl_json
 
     def getACLs(self):
         req = "/acls"
-        rsp_json = self.GET(req)
+        rsp = self.id.http_conn.GET(req)
+        if rsp.status_code != 200:
+            raise IOError(rsp.status_code, "Unable to get ACL")
+        rsp_json = rsp.json()
         acls_json = rsp_json["acls"]
         return acls_json
 
@@ -735,7 +758,9 @@ class File(Group):
             perm[k] = acl[k]
 
         req = "/acls/" + acl["userName"]
-        self.PUT(req, body=perm)
+        rsp = self.id.http_conn.PUT(req, body=perm)
+        if rsp.status_code not in (200, 201):
+            raise IOError(rsp.status_code, "Failed to create ACL")
 
     def run_scan(self):
         MAX_WAIT = 10
@@ -768,13 +793,21 @@ class File(Group):
 
     def flush(self):
         """Tells the service to complete any pending updates to permanent storage"""
+        if self.mode == 'r':
+            # read-only, no need to flush
+            return
+
         self.log.debug("flush")
         self.log.info("sending PUT flush request")
         req = "/"
         body = {"flush": 1, "getdnids": 1}
-        rsp = self.PUT(req, body=body)
-        if "dn_ids" in rsp:
-            dn_ids = rsp["dn_ids"]
+        rsp = self.id.http_conn.PUT(req, body=body)
+        self.log.debug(f"got status code: {rsp.status_code} from flush")
+        if rsp.status_code != 200:
+            raise RuntimeError(f"got status code: {rsp.status_code} on flush")
+        rsp_json = rsp.json()
+        if "dn_ids" in rsp_json:
+            dn_ids = rsp_json["dn_ids"]
             orig_ids = set(self._dn_ids)
             current_ids = set(dn_ids)
             self._dn_ids = current_ids
@@ -790,19 +823,9 @@ class File(Group):
         # this will close the socket of the http_conn singleton
 
         self.log.debug(f"close, mode: {self.mode}")
-        if flush is None:
-            # set flush to true if this is a direct connect and file
-            # is writable
-            if self.mode == "r+" and self._id._http_conn._hsds:
-                flush = True
-            else:
-                flush = False
-        # do a PUT flush if this file is writable and the server is HSDS and flush is set
-        if flush:
+        if self.id:
             self.flush()
-        if self._id._http_conn:
-            self._id._http_conn.close()
-        self._id.close()
+            self._id.close()
 
     def __enter__(self):
         return self

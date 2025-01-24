@@ -104,7 +104,7 @@ def select(obj, args):
                 int(a)
             except Exception:
                 use_fancy = True
-        if use_fancy:
+        if use_fancy and hasattr(obj, "shape"):
             sel = FancySelection(obj.shape)
             sel[args]
             return sel
@@ -144,7 +144,7 @@ class Selection(object):
     """
 
     def __init__(self, shape, *args, **kwds):
-        """ Create a selection.  Shape may be None if spaceid is given. """
+        """ Create a selection.   """
 
         shape = tuple(shape)
         self._shape = shape

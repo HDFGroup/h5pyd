@@ -128,13 +128,10 @@ class TestFile(TestCase):
         f = h5py.File(filename, "a")
         f.create_group("foo")
         del f["foo"]
+
         f.close()
 
         # re-open as read-only
-        if h5py.__name__ == "h5pyd":
-            wait_time = 90  # change to >90 to test async updates
-            print("waiting {wait_time:d} seconds for root scan sync".format(wait_time=wait_time))
-            time.sleep(wait_time)  # let async process update obj number
         f = h5py.File(filename, 'r')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
@@ -166,10 +163,18 @@ class TestFile(TestCase):
         if h5py.__name__ == "h5pyd":
             # check properties that are only available for h5pyd
             # Note: num_groups won't reflect current state since the
-            # data is being updated asynchronously
+            # data is being updated asynchronously, so wait for a scan update
+            logging.info("waiting on scan update")
+            ts = time.time()
+            while not f.last_scan:
+                time.sleep(0.1)
+                elapsed = time.time() - ts
+                if elapsed > 90:
+                    logging.error("scan not complete after 90 seconds")
+                    self.assertTrue(False)
+            logging.info(f"last_scan updated after {elapsed:6.2f} seconds")
             self.assertEqual(f.num_objects, 3)
             self.assertEqual(f.num_groups, 3)
-
             self.assertEqual(f.num_datasets, 0)
             self.assertEqual(f.num_datatypes, 0)
             self.assertTrue(f.allocated_bytes == 0)
@@ -177,7 +182,7 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
-        # re-open using hdf5:// prefix
+        # re-open using hdf5:// prefix (only for h5pyd)
         if h5py.__name__ == "h5pyd":
             if filename[0] == '/':
                 filepath = "hdf5:/" + filename
@@ -207,6 +212,31 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
+    def test_file_clone(self):
+        # verify you can create a File object based on an existing reference
+        filename = self.getFileName("file_clone")
+        print("filename:", filename)
+
+        f = h5py.File(filename, 'w')
+        self.assertEqual(f.filename, filename)
+        self.assertEqual(f.name, "/")
+        self.assertTrue(f.id.id is not None)
+        self.assertEqual(len(f.keys()), 0)
+        self.assertEqual(f.mode, 'r+')
+        self.assertTrue(h5py.is_hdf5(filename))
+
+        f.create_group("g1")
+        self.assertTrue("g1" in f)
+
+        # get a new file instance using a File object
+        g = h5py.File(f.id)
+        self.assertEqual(g.filename, f.filename)
+        self.assertEqual(g.id.id, f.id.id)
+        self.assertTrue("g1" in g)
+
+        f.close()
+        g.close()
+
     def test_open_notfound(self):
         # verify open of non-existent file throws exception
 
@@ -234,12 +264,14 @@ class TestFile(TestCase):
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
-        self.assertEqual(len(f.keys()), 2)
+        self.assertEqual(len(list(f.keys())), 2)
+
+        if h5py.__name__ == "h5py":
+            return  # no ACLs in h5py
 
         # no explicit ACLs yet
         file_acls = f.getACLs()
         self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl
-
         username = f.owner
 
         file_acl = f.getACL(username)

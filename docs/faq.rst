@@ -80,6 +80,7 @@ family                              Multi-file driver
 mpio                                Parallel HDF5 file access
 =================================== =========================================== ============================
 
+.. _h5py_pytable_cmp:
 
 What's the difference between h5py and PyTables?
 ------------------------------------------------
@@ -202,15 +203,20 @@ To build from a Git checkout:
 
 Clone the project::
 
-    $ git clone https://github.com/HDFGroup/h5pyd.git
-    $ cd h5pyd
+    $ git clone https://github.com/h5py/h5py.git
+    $ cd h5py
 
-Build and install the project::
+(Optional) Choose which branch to build from (e.g. a stable branch)::
 
-    $ pip install .
+    $ git checkout 2.1
+
+Build the project. If given, /path/to/hdf5 should point to a directory
+containing a compiled, shared-library build of HDF5 (containing things like "include" and "lib")::
+
+    $ python setup.py build [--hdf5=/path/to/hdf5]
 
 (Optional) Run the unit tests::
 
-    $ python testall.py
+    $ python setup.py test
 
-Report any failing tests by filing a bug report at GitHub.
+Report any failing tests to the mailing list (h5py at googlegroups), or by filing a bug report at GitHub.

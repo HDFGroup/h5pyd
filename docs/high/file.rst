@@ -1,352 +1,304 @@
-.. currentmodule:: h5py
+.. currentmodule:: h5pyd
 .. _file:
 
 
 File Objects
 ============
 
-File objects serve as your entry point into the world of HDF5.  In addition
+File objects serve as your entry point into the world of HDF5.  While an h5py file object
+corresponds to a POSIX file, in h5pyd a file object represents a HSDS ``domain`` .
+Like HDF5 files, an HSDS domain is a hierarchical collection of groups and datasets.  
+Unlike an HDF5 file though, the storage for a domain is managed by HSDS and clients may
+not have direct access to the storage medium (e.g. an S3 bucket in which the user does not
+have authorization to access directly).
+
+For the most part you work with file objects in h5pyd in the same manner as you would with h5py.
+The primary difference being that while you provide a file path in the h5py file constructor, you
+use a domain path in h5pyd (see "Opening & Creating domains" below).
+
+In addition
 to the File-specific capabilities listed here, every File instance is
-also an :ref:`HDF5 group <group>` representing the `root group` of the file.
+also an :ref:`HDF5 group <group>` representing the `root group` of the domain.
+
 
 .. _file_open:
 
-Opening & creating files
-------------------------
+Opening & creating domains
+--------------------------
 
-HDF5 files work generally like standard Python file objects.  They support
+File objects in h5pyd work generally like standard Python file objects.  They support
 standard modes like r/w/a, and should be closed when they are no longer in
 use.  However, there is obviously no concept of "text" vs "binary" mode.
 
-    >>> f = h5py.File('myfile.hdf5','r')
+Domains are identified by a sequence of folder names and finally the domain name 
+all delimitated by ``/`` characters.
+While the result looks like a standard POSIX path,
+the path is only relevant to the particular HSDS instance you are connecting to.
+You may prefer to use the  optional ``hdf5://`` prefix as a reminder that the path
+is not actually referencing a POSIX file.
 
-The file name may be a byte string or unicode string. Valid modes are:
+    >>> f = h5pyd.File('/home/test_user1/mydomain.h5', 'r')
+    >>> f = h5pyd.File('hdf5:://home/test_user1/mydomain.h5', 'r')  # equivalent
+
+The first argument is the path to the domain.  The path must be a string (i.e. Python 3 unicode string) and
+must be an absolute path (starting with '/' or 'hdf5://').  If you are unsure about what domains are present,
+you can use the ``hsls`` utility to list the contents of a folder.  E.g. ``$ hsls /home/test_user1/``.
+
+.. note::
+
+    Python "File-like" objects are not supported as the domain path.
+
+Domains live in buckets, and if a bucket name is not provided, the default bucket that has been 
+configured in the HSDS instance will be used.  To explicitly give a bucket name, use the bucket parameter:
+
+   >>> f = h5py.File('/home/test_user1/mydomain.h5','r', bucket='mybucket')
+
+The second argument is the domain access mode.
+Valid modes are:
 
     ========  ================================================
-     r        Readonly, file must exist (default)
-     r+       Read/write, file must exist
-     w        Create file, truncate if exists
-     w- or x  Create file, fail if exists
+     r        Readonly, domain must exist (default)
+     r+       Read/write, domain must exist
+     w        Create domain, delete existing domain if found
+     w- or x  Create domain, fail if exists
      a        Read/write if exists, create otherwise
     ========  ================================================
 
-.. versionchanged:: 3.0
-   Files are now opened read-only by default. Earlier versions of h5py would
-   pick different modes depending on the presence and permissions of the file.
-
-.. _file_driver:
-
-File drivers
-------------
-
-HDF5 ships with a variety of different low-level drivers, which map the logical
-HDF5 address space to different storage mechanisms.  You can specify which
-driver you want to use when the file is opened::
-
-    >>> f = h5py.File('myfile.hdf5', driver=<driver name>, <driver_kwds>)
-
-For example, the HDF5 "core" driver can be used to create a purely in-memory
-HDF5 file, optionally written out to disk when it is closed.  Here's a list
-of supported drivers and their options:
-
-    None
-        **Strongly recommended.** Use the standard HDF5 driver appropriate
-        for the current platform. On UNIX, this is the H5FD_SEC2 driver;
-        on Windows, it is H5FD_WINDOWS.
-
-    'sec2'
-        Unbuffered, optimized I/O using standard POSIX functions.
-
-    'stdio'
-        Buffered I/O using functions from stdio.h.
-
-    'core'
-        Store and manipulate the data in memory, and optionally write it
-        back out when the file is closed. Using this with an existing file
-        and a reading mode will read the entire file into memory. Keywords:
-
-        backing_store:
-          If True (default), save changes to the real file at the specified
-          path on :meth:`~.File.close` or :meth:`~.File.flush`.
-          If False, any changes are discarded when the file is closed.
-
-        block_size:
-          Increment (in bytes) by which memory is extended. Default is 64k.
-
-    'family'
-        Store the file on disk as a series of fixed-length chunks.  Useful
-        if the file system doesn't allow large files.  Note: the filename
-        you provide *must* contain a printf-style integer format code
-        (e.g. %d"), which will be replaced by the file sequence number.
-        Keywords:
-
-        memb_size:  Maximum file size (default is 2**31-1).
-
-    'fileobj'
-        Store the data in a Python file-like object; see below.
-        This is the default if a file-like object is passed to :class:`File`.
-
-    'split'
-        Splits the meta data and raw data into separate files. Keywords:
-
-        meta_ext:
-          Metadata filename extension. Default is '-m.h5'.
-
-        raw_ext:
-          Raw data filename extension. Default is '-r.h5'.
-
-    'ros3'
-        Allows read only access to HDF5 files on S3. Keywords:
-
-        aws_region:
-          Name of the AWS "region" where the S3 bucket with the file is, e.g. ``b"us-east-1"``. Default is ``b''``.
-
-        secret_id:
-          "Access ID" for the resource. Default is ``b''``.
-
-        secret_key:
-          "Secret Access Key" associated with the ID and resource. Default is ``b''``.
-
-        The argument values must be ``bytes`` objects.
-
-
-.. _file_fileobj:
-
-Python file-like objects
-------------------------
-
-.. versionadded:: 2.9
-
-The first argument to :class:`File` may be a Python file-like object, such as
-an :class:`io.BytesIO` or :class:`tempfile.TemporaryFile` instance.
-This is a convenient way to create temporary HDF5 files, e.g. for testing or to
-send over the network.
-
-The file-like object must be open for binary I/O, and must have these methods:
-``read()`` (or ``readinto()``), ``write()``, ``seek()``, ``tell()``,
-``truncate()`` and ``flush()``.
-
-
-    >>> tf = tempfile.TemporaryFile()
-    >>> f = h5py.File(tf, 'w')
-
-Accessing the :class:`File` instance after the underlying file object has been
-closed will result in undefined behaviour.
-
-When using an in-memory object such as :class:`io.BytesIO`, the data written
-will take up space in memory. If you want to write large amounts of data,
-a better option may be to store temporary data on disk using the functions in
-:mod:`tempfile`.
-
-.. literalinclude:: ../../examples/bytesio.py
-
-.. warning::
-
-   When using a Python file-like object for an HDF5 file, make sure to close
-   the HDF5 file before closing the file object it's wrapping. If there is an
-   error while trying to close the HDF5 file, segfaults may occur.
+Domains are opened read-only by default. So the file mode parameter is 
+only required for one of the writable modes.
 
 .. note::
 
-   Using a Python file-like object for HDF5 is internally more complex,
-   as the HDF5 C code calls back into Python to access it. It inevitably
-   has more ways to go wrong, and the failures may be less clear when it does.
-   For some common use cases, you can easily avoid it:
+    Unlike with h5py and the HDF5 library, there's no concept of file locking.  The
+    same domain can be opened multiple times in the same or different thread, or even on a
+    different machine.  Multiple clients can access the same domain for modification, but this won't
+    result in the domain becoming corrupted (though nothing in HSDS guards against clients over-writing
+    each others updates).
 
-   - To create a file in memory and never write it to disk, use the ``'core'``
-     driver with ``mode='w', backing_store=False`` (see :ref:`file_driver`).
-   - To use a temporary file securely, make a temporary directory and
-     :ref:`open a file path <file_open>` inside it.
+Whatever the mode used, if the domain is not configured to authorize the desired action, a 
+``403 - Forbidden`` error will be raised.  See the next sections on authentication and authorization.
 
-.. _file_version:
+In addition to instantiating a file object with a domain path, you can pass the low level id of an 
+existing file object.  The two file objects will share the root group, but methods (e.g. flush)
+can be invoked independently.  
 
-Version bounding
-----------------
+    >>> f = h5pyd.File('/home/test_user1/mydomain.h5', 'w')  # create a new domain
+    >>> g = h5pyd.File(f.id, "r")  # this handle can only be used for reading
+    >>> f.close()  # close f, g is still open
+    >>> g.filename  # returns '/home/test_user1/mydomain.h5'
 
-HDF5 has been evolving for many years now.  By default, the library will write
-objects in the most compatible fashion possible, so that older versions will
-still be able to read files generated by modern programs.  However, there can be
-feature or performance advantages if you are willing to forgo a certain level of
-backwards compatibility.  By using the "libver" option to :class:`File`, you can
-specify the minimum and maximum sophistication of these structures:
+.. _file_authentication:
 
-    >>> f = h5py.File('name.hdf5', libver='earliest') # most compatible
-    >>> f = h5py.File('name.hdf5', libver='latest')   # most modern
+Authentication
+--------------
 
-Here "latest" means that HDF5 will always use the newest version of these
-structures without particular concern for backwards compatibility.  The
-"earliest" option means that HDF5 will make a *best effort* to be backwards
-compatible.
-
-The default is "earliest".
-
-Specifying version bounds has changed from HDF5 version 1.10.2. There are two new
-compatibility levels: `v108` (for HDF5 1.8) and `v110` (for HDF5 1.10). This
-change enables, for example, something like this:
-
-    >>> f = h5py.File('name.hdf5', libver=('earliest', 'v108'))
-
-which enforces full backward compatibility up to HDF5 1.8. Using any HDF5
-feature that requires a newer format will raise an error.
-
-`latest` is now an alias to another bound label that represents the latest
-version. Because of this, the `File.libver` property will not use `latest` in
-its output for HDF5 1.10.2 or later.
-
-.. _file_closing:
-
-Closing files
--------------
-
-If you call :meth:`File.close`, or leave a ``with h5py.File(...)`` block,
-the file will be closed and any objects (such as groups or datasets) you have
-from that file will become unusable. This is equivalent to what HDF5 calls
-'strong' closing.
-
-If a file object goes out of scope in your Python code, the file will only
-be closed when there are no remaining objects belonging to it. This is what
-HDF5 calls 'weak' closing.
+In most cases HSDS will reject requests that don't provide some form of authentication.  
+The HSDS username and password can be supplied by using the ``username`` and ``password``
+arguments.  In addition the desired HSDS endpoint can be specified using ``endpoint``.
+For example:
 
 .. code-block::
 
-    with h5py.File('f1.h5', 'r') as f1:
-        ds = f1['dataset']
+    path = "hdf5://home/test_user1/mydomain.h5"
+    username = "test_user1"
+    password = "12345"
+    endpoint = "http://hsds.hdf.test"
+    f = h5pyd.File(path, 'r', username=username, password=password, endpoint=endpoint)
 
-    # ERROR - can't access dataset, because f1 is closed:
-    ds[0]
+..
 
-    def get_dataset():
-        f2 = h5py.File('f2.h5', 'r')
-        return f2['dataset']
-    ds = get_dataset()
+The username, password, and endpoint provided will be stored with the File object and used to
+authenticate any requests sent to HSDS for operations on this domain.  If the username
+and password given are invalid, a ``401 - Unauthorized`` error will be raised. 
 
-    # OK - f2 is out of scope, but the dataset reference keeps it open:
-    ds[0]
+Of course it's not best practice to hardcode usernames and passwords, so alternatively the environment variables
+``HS_USERNAME``, ``HS_PASSWORD``, and ``HS_ENDPOINT`` can be used to store the user credentials and endpoint.  If 
+username, password, and endpoint arguments are not provided, the respective environment variables will be used
+if set.
 
-    del ds  # Now f2.h5 will be closed
+If neither named parameters or environment variables are supplied, this information will be read from
+the file ``.hscfg`` in the users home directory.  The ``.hscfg`` can be created using the ``hsconfigure`` 
+utility (see: tbd).
 
+Finally, if no credentials are found using any of these methods, anonymous requests (http requests that don't include 
+an authentication header) will be used.
+Depending on the permission settings of the domain and whether the HSDS instance has been configured to allow
+anonymous requests, this will allow read-only actions on the domain.
 
-.. _file_userblock:
+.. _file_authorization:
 
-User block
-----------
+Authorization
+-------------
 
-HDF5 allows the user to insert arbitrary data at the beginning of the file,
-in a reserved space called the `user block`.  The length of the user block
-must be specified when the file is created.  It can be either zero
-(the default) or a power of two greater than or equal to 512.  You
-can specify the size of the user block when creating a new file, via the
-``userblock_size`` keyword to File; the userblock size of an open file can
-likewise be queried through the ``File.userblock_size`` property.
+HSDS uses the concept of ``Access Control Lists (ACLs)`` to determine what actions a given user can perform on a domain.
+A domain can have one or more ACLs associated with it.   Each ACL consist of the following fields:
 
-Modifying the user block on an open file is not supported; this is a limitation
-of the HDF5 library.  However, once the file is closed you are free to read and
-write data at the start of the file, provided your modifications don't leave
-the user block region.
+* user (string) - user or group name (a group is a set of users)
+* create (T/F) - permission to create new objects (domains, groups, datasets, etc.)
+* read (T/F) - permission to read data and metadata (e.g. list links in a group)
+* update (T/F) - permission to modify metadata or dataset data
+* delete (T/F) - permission to delete objects (including the domain itself)
+* readACL (T/F) - permission to view permissions (i.e. read the list of ACLs for a domain)
+* updateACL (T/F) - permission to add, delete, or modify ACLs
 
+When HSDS receives a request, it will determine what type of action is requiring (read, update, delete, etc.), and
+then review the ACLs for the domain to determine if the action is authorized.  If there is an ACL for the particular 
+user making the request, then the relevant flag for that ACL will be used.  Otherwise, if there is a group ACL which
+authorizes the request and the user is a member of that group, the request will be authorized.  There is a special
+group name: ``default`` that includes all users.  In any case, if no authorizing ACL is found, 
+a `403 - Forbidden`` error will be raised.
 
-.. _file_filenames:
+When a new domain is created (e.g. by using h5pyd.File with the `w` access mode), an ACL that gives
+the owner of the domain (the authenticated user making the request unless the 'owner' argument is given) full control.  
+Other users would not have permissions to even read the domain.  
+These permissions can be adjusted, or new ACLs added programmatically (using tbd),
+or using the ``hsacl`` tool (see: tbd).
 
-Filenames on different systems
-------------------------------
+Folders (every domain lives in specific folder) also have ACLs.  To create a new domain, the authenticating user
+needs to have create permissions for the domain's folder.
 
-Different operating systems (and different file systems) store filenames with
-different encodings. Additionally, in Python there are at least two different
-representations of filenames, as encoded ``bytes`` or as a Unicode string
-(``str`` on Python 3).
+Finally, there are special users that can be configured in HSDS known as ``admin`` users.  Admin users can perform any
+action regardless of the ACLs.  With great power comes great responsibility, so it's best practice to only use 
+admin credentials when there's no alternative (e.g. you accidentally removed permissions for a domain you own).
 
-h5py's high-level interfaces always return filenames as ``str``, e.g.
-:attr:`File.filename`. h5py accepts filenames as either ``str`` or ``bytes``.
-In most cases, using Unicode (``str``) paths is preferred, but there are some
-caveats.
-
-.. note::
-
-   HDF5 handles filenames as bytes (C ``char *``), and the h5py :doc:`lowlevel`
-   matches this.
-
-macOS (OSX)
-...........
-macOS is the simplest system to deal with, it only accepts UTF-8, so using
-Unicode paths will just work (and should be preferred).
-
-Linux (and non-macOS Unix)
-..........................
-Filenames on Unix-like systems are natively bytes. By convention, the locale
-encoding is used to convert to and from unicode; on most modern systems this
-will be UTF-8 by default (especially since Python 3.7, with :pep:`538`).
-
-Passing Unicode paths will mostly work, and Unicode paths from system
-functions like ``os.listdir()`` should always work. But if there are filenames
-that aren't in the expected encoding (e.g. on a network filesystem or a
-removable drive, or because something is misconfigured), you may want to handle
-them as bytes.
-
-Windows
-.......
-Windows systems natively handle filenames as Unicode, and with HDF5 1.10.6 and
-above filenames passed to h5py as bytes will be used as UTF-8 encoded text,
-regardless of system configuration.
-
-HDF5 1.10.5 and below could only use filenames with characters from the active
-code page, e.g. `Windows-1252 <https://en.wikipedia.org/wiki/Windows-1252>`_ on
-many systems configured for European languages. This limitation applies whether
-you use ``str`` or ``bytes`` with h5py.
 
 .. _file_cache:
 
-Chunk cache
------------
+Caching
+-------
 
-:ref:`dataset_chunks` allows datasets to be stored on disk in separate pieces.
-When a part of any one of these pieces is needed, the entire chunk is read into
-memory before the requested part is copied to the user's buffer.  To the extent
-possible those chunks are cached in memory, so that if the user requests a
-different part of a chunk that has already been read, the data can be copied
-directly from memory rather than reading the file again.  The details of a
-given dataset's chunks are controlled when creating the dataset, but it is
-possible to adjust the behavior of the chunk *cache* when opening the file.
+When a domain is open for reading, h5pyd will by default, cache certain metadata from  the domain 
+(e.g. links in a group), so that it doesn't 
+have to repeatedly request information from the HSDS instance associated with the domain.   This is good for performance
+(requests to HSDS generally have higher latency than reading from a file), but in cases where the domain is being actively modified, 
+it may not be what you want.  For example, suppose a sensor of some sort was setup so that readings from the previous time 
+period was appended to a dataset every second.  By default, h5pyd won't know to check that the dataset shape has
+been modified, so a program written to plot real-time readings wouldn't see any updates.
+To avoid this, setting ``use_swmr`` to True will instruct h5pyd to not cache any data, so 
+any operation will fetch the current data from HSDS.  See: (tbd) for more details.  
 
-The parameters controlling this behavior are prefixed by ``rdcc``, for *raw data
-chunk cache*.
+.. _file_flush:
 
-* ``rdcc_nbytes`` sets the total size (measured in bytes) of the raw data chunk
-  cache for each dataset.  The default size is 1 MB.
-  This should be set to the size of each chunk times the number of
-  chunks that are likely to be needed in cache.
-* ``rdcc_w0`` sets the policy for chunks to be
-  removed from the cache when more space is needed.  If the value is set to 0,
-  then the library will always evict the least recently used chunk in cache.  If
-  the value is set to 1, the library will always evict the least recently used
-  chunk which has been fully read or written, and if none have been fully read
-  or written, it will evict the least recently used chunk.  If the value is
-  between 0 and 1, the behavior will be a blend of the two.  Therefore, if the
-  application will access the same data more than once, the value should be set
-  closer to 0, and if the application does not, the value should be set closer
-  to 1.
-* ``rdcc_nslots`` is the number of chunk slots in
-  the cache for each dataset.  In order to allow the chunks to be looked up
-  quickly in cache, each chunk is assigned a unique hash value that is used to
-  look up the chunk.  The cache contains a simple array of pointers to chunks,
-  which is called a hash table.  A chunk's hash value is simply the index into
-  the hash table of the pointer to that chunk.  While the pointer at this
-  location might instead point to a different chunk or to nothing at all, no
-  other locations in the hash table can contain a pointer to the chunk in
-  question.  Therefore, the library only has to check this one location in the
-  hash table to tell if a chunk is in cache or not.  This also means that if two
-  or more chunks share the same hash value, then only one of those chunks can be
-  in the cache at the same time.  When a chunk is brought into cache and another
-  chunk with the same hash value is already in cache, the second chunk must be
-  evicted first.  Therefore it is very important to make sure that the size of
-  the hash table (which is determined by the ``rdcc_nslots`` parameter) is large
-  enough to minimize the number of hash value collisions.  Due to the hashing
-  strategy, this value should ideally be a prime number.  As a rule of thumb,
-  this value should be at least 10 times the number of chunks that can fit in
-  ``rdcc_nbytes`` bytes. For maximum performance, this value should be set
-  approximately 100 times that number of chunks. The default value is 521.
+Flushing
+--------
 
-Chunks and caching are described in greater detail in the `HDF5 documentation
-<https://portal.hdfgroup.org/display/HDF5/Chunking+in+HDF5>`_.
+For performance reasons, HSDS will not immediately write updates to a domain while processing 
+the request that made the update.
+Rather, the modifications will live in a server-side memory cache of "dirty" objects.  
+These objects will get written to storage periodically (every one second by default).  
+This is very similar in concept to how writes to a POSIX file don't immediately
+get written to disk, but will be managed by the file controller.  
+With h5pyd, if HSDS unfortunately crashed just after processing a series of 
+PUT or POST requests, these changes would not get published to the storage device and as a result be lost.
+
+If you need to make absolutely certain that recent updates have been persisted, use the flush method.  This call
+won't return until HSDS has verified that all pending updates have been written to permanent storage.
+
+
+.. _file_closing:
+
+Closing domains
+---------------
+
+Objects in HSDS are stateless - i.e. at the level of the REST interface, the server doesn't
+utilize any session information in responding to requests.  So an "open" vs. "closed"
+domain is a concept that only applies at the client level.  The h5pyd file object
+does use the close method to do some internal housekeeping however.  For example, closing
+the http connection with the HSDS.  So invoking close on h5pyd file object is good best practice,
+but not a critical as with h5py.
+
+The close method will be invoked automatically when you leave the ``with h5py.File(...)`` block.
+
+The close method does have an optional parameter not found in h5yd: ``flush``.
+See See :ref:`file_flush` .
+
+
+.. _file_delete:
+
+
+Deleting Domains
+----------------
+
+With h5py and the HDF5 library you would normally delete HDF5 files using your systems file browser, or the "rm"
+command.  Programmatically you could delete a HDF5 file using the standard Python Path.unlink method.
+None of these options are possible with HSDS domains, but the ``hsrm`` (see: tbd) command is included with
+h5pyd and works like the standard ``rm`` command with domain paths used instead of file paths.
+
+Programmatically, you can delete domains using the del method of the folder object (see: tbd).
+
+.. _file_summary:
+
+Summary data
+------------
+
+Due to the way in which domains are stored, certain information about the domain would be unfeasible to 
+determine on demand.  For example to compute the total amount of storage used would require summing the size
+of each piece of object metadata and each dataset chunk, which for large domains could require fetching
+attributes for millions of objects.  So for these properties, the server periodically runs asynchronous tasks 
+to compile summary information about the domain.  
+
+The impact of this is that some properties of the file object will only reflect the
+domain state as of the last time HSDS ran this asynchronous task (typically a few seconds to a minute
+after the last update to the domain).
+
+Properties for which this applies are:
+
+* num_objects
+* num_datatypes
+* num_groups
+* num_datasets
+* num_linked_chunks
+* total_size
+* metadata_bytes
+* linked_bytes
+* allocated_bytes
+* md5_sum
+
+The last_scan property returns the timestamp at which the scan was run.  You can use this property to determine when
+HSDS has updated the summary data for a domain.  The following illustrates how to get summary data 
+for a recent update:
+
+.. code-block::
+
+    time_stamp = f.last_scan  # get the last scan time
+    f.create_group("g1")  # create a new group
+    while f.last_scan == time_stamp:
+       time.sleep(0.1)  # wait for summary data to be updated
+    # print affected summary properties
+    print("num_groups:", f.num_groups)
+    print("num_objects:", f.num_objects)
+    print("metadata_bytes:", f.metadata_bytes)
+    print("total_size:", f.total_size)
+
+..
+
+
+.. _file_unsupported:
+
+Unsupported options
+-------------------
+
+The following options are used with h5py.File, but are not supported with h5pyd:
+
+* driver
+* userblock_size
+* rdcc_nbytes
+* rdcc_w0
+* rdcc_nslots
+* fs_strategy
+* fs_persist
+* fs_page_size
+* fs_threshold
+* page_buf_size
+* min_meta_keep
+* min_raw_keep
+* locking
+* alignment_threshold
+* alignment_interval
+* meta_block_size
+
+For the most part these relate to concepts that don't apply to HSDS, so are not included.
+
 
 
 Reference
@@ -355,100 +307,198 @@ Reference
 .. note::
 
     Unlike Python file objects, the attribute :attr:`File.name` gives the
-    HDF5 name of the root group, "``/``". To access the on-disk name, use
+    HDF5 name of the root group, "``/``". To access the domain  name, use
     :attr:`File.filename`.
 
-.. class:: File(name, mode=None, driver=None, libver=None, \
-    userblock_size=None, swmr=False, rdcc_nslots=None, rdcc_nbytes=None, \
-    rdcc_w0=None, track_order=None, fs_strategy=None, fs_persist=False, \
-    fs_threshold=1, **kwds)
+.. class:: File(name, mode='r',  swmr=False,  track_order=None)
 
-    Open or create a new file.
+    Open or create a new HSDS domain.
 
-    Note that in addition to the File-specific methods and properties listed
-    below, File objects inherit the full interface of :class:`Group`.
+    Note that in addition to the :class:`File`-specific methods and properties
+    listed below, :class:`File` objects inherit the full interface of
+    :class:`Group`.
 
-    :param name:    Name of file (`bytes` or `str`), or an instance of
-                    :class:`h5f.FileID` to bind to an existing
-                    file identifier, or a file-like object
-                    (see :ref:`file_fileobj`).
-    :param mode:    Mode in which to open file; one of
+    :param name:    Name of domain (`str`), or an instance of
+                    :class:`Group.id` to bind to an existing
+                    domain identifier.
+    :param mode:    Mode in which to open the domain; one of
                     ("w", "r", "r+", "a", "w-").  See :ref:`file_open`.
-    :param driver:  File driver to use; see :ref:`file_driver`.
-    :param libver:  Compatibility bounds; see :ref:`file_version`.
-    :param userblock_size:  Size (in bytes) of the user block.  If nonzero,
-                    must be a power of 2 and at least 512.  See
-                    :ref:`file_userblock`.
-    :param swmr:    If ``True`` open the file in single-writer-multiple-reader
+    :param endpoint: HSDS http endpoint.  If None, the endpoint given by HS_ENDPOINT environment
+                    variable will be used if set.  Otherwise, the endpoint given in the 
+                    .hscfg file will be used
+    :param username: HSDS username.  If None, the username given by the HS_USERNAME environment
+                     variable will be used if set.  Otherwise, the username given in the
+                     .hscfg file will be used
+    :param password: HSDS password.  If None, the password given by the HS_PASSWORD environment
+                    variable will be used if set.  Otherwise, the password given in the
+                    .hscfg file will be used
+    :param bucket: Name of bucket the domain is expected to be found in.  If None, the 
+                   default HSDS bucket name will be used
+    :param api_key: API key (e.g. a JSON Web Token) to use for authentication.  If provided,
+                    username and password parameters will be ignored
+    :param session: Keep http connection alive between requests (more efficient than 
+                    re-creating the connection on each request)
+    :param use_cache: Save domain state locally rather than fetching needed state from HSDS 
+                    as needed.  Set use_cache to False when opening a domain if you expect
+                    other clients to be modifying domain metadata (e.g. adding links or attributes).
+    :param swmr:    If ``True`` open the domain in single-writer-multiple-reader.  Has the same 
+                    effect as setting use_cache to False.
                     mode. Only used when mode="r".
-    :param rdcc_nbytes:  Total size of the raw data chunk cache in bytes. The
-                    default size is :math:`1024^2` (1 MiB) per dataset.
-    :param rdcc_w0: Chunk preemption policy for all datasets.  Default value is
-                    0.75.
-    :param rdcc_nslots:  Number of chunk slots in the raw data chunk cache for
-                    this file.  Default value is 521.
+    :param libver:  For compatibility with h5py - library version bounds.  Has no effect other
+                    than returning given value as a property.
+    :param owner:  For new domains, the owner username to be used for the domain.  Can only be
+                   set if username is an HSDS admin user.  If owner is None, username will be 
+                   assigned as owner.
+    :param linked_domain: For new domain, use the root object of the linked_domain.
+    :param logger:  Logger object to be used for logging.
     :param track_order:  Track dataset/group/attribute creation order under
                     root group if ``True``.  Default is
                     ``h5.get_config().track_order``.
-    :param fs_strategy: The file space handling strategy to be used.
-            Only allowed when creating a new file. One of "fsm", "page",
-            "aggregate", "none", or None (to use the HDF5 default).
-    :param fs_persist: A boolean to indicate whether free space should be
-            persistent or not. Only allowed when creating a new file. The
-            default is False.
-    :param fs_threshold: The smallest free-space section size that the free
-            space manager will track. Only allowed when creating a new file.
-            The default is 1.
-    :param kwds:    Driver-specific keywords; see :ref:`file_driver`.
+    :param retries: Number of retries to use if an http request fails
+                    (e.g. on a 503 Service Unavailable response).
+    :param timeout: Number of seconds to wait on a http response before failing.
+
+    
 
     .. method:: __bool__()
 
-        Check that the file descriptor is valid and the file open:
+        Check that the file descriptor is valid and the domain is open:
 
-            >>> f = h5py.File(filename)
+            >>> f = h5pyd.File(domainpath)
             >>> f.close()
             >>> if f:
-            ...     print("file is open")
+            ...     print("domain is open")
             ... else:
-            ...     print("file is closed")
-            file is closed
+            ...     print("domain is closed")
+            domain is closed
 
-    .. method:: close()
+    .. method:: close(flush=False)
 
-        Close this file.  All open objects will become invalid.
+        Close this domain.  All open objects will become invalid.  If flush is True, will 
+        invoke a flush operation before closing the domain.
 
     .. method:: flush()
 
-        Request that the HDF5 library flush its buffers to disk.
+        Request that HSDS persist any recent updates to permanent storage
+
+    .. method:: getACLs()
+
+        Return a list of ACLs associated with the domain.  See: tbd
+
+    .. method:: getACL(username)
+
+        Returns the ACL for the given user or group name.  Raises a ``401 - Not Found`` error
+        if no ACL with that name exists
+
+    .. method:: run_scan()
+
+        Force a re-compilation of summary data (see tbd).  Requires write intent on the domain
 
     .. attribute:: id
 
-        Low-level identifier (an instance of :class:`FileID <low:h5py.h5f.FileID>`).
+        Low-level identifier (an instance of :class:`GroupID`).
 
     .. attribute:: filename
 
-        Name of this file on disk, as a Unicode string.
+        Path to the domain, as a Unicode string.
 
     .. attribute:: mode
 
-        String indicating if the file is open readonly ("r") or read-write
+        String indicating if the domain is open readonly ("r") or read-write
         ("r+").  Will always be one of these two values, regardless of the
-        mode used to open the file.
+        mode used to open the domain.
 
     .. attribute:: swmr_mode
 
-       True if the file access is using :doc:`/swmr`. Use :attr:`mode` to
+       True if the domain access is using :doc:`/swmr`. Use :attr:`mode` to
        distinguish SWMR read from write.
-
-    .. attribute:: driver
-
-        String giving the driver used to open the file.  Refer to
-        :ref:`file_driver` for a list of drivers.
 
     .. attribute:: libver
 
-        2-tuple with library version settings.  See :ref:`file_version`.
+        Compatibility place holder for HDF5 library version. 
+
+    .. attribute:: driver
+
+        Compatibility place holder for HDF5 file driver.  Returns: ``rest_driver``. 
+    
+    .. attribute:: serverver
+
+        HSDS version string
 
     .. attribute:: userblock_size
 
-        Size of user block (in bytes).  Generally 0.  See :ref:`file_userblock`.
+        Compatibility place holder.  Always returns 0.
+
+    .. attribute:: created
+
+        Time (in seconds since epoch) that the domain was created.
+
+    .. attribute:: modified
+
+        Time (in seconds since epoch) the the domain was last modified
+
+    .. attribute:: owner
+
+        Name of user who created the domain
+
+    .. attribute:: num_objects
+
+        Number of objects (groups, datases, named datatypes) that are in the domain
+
+    .. attribute:: num_datatypes
+
+        Number of named datatypes in the domain
+
+    .. attribute:: num_datasets
+
+        Number of datasets in the domain
+    
+    .. attribute:: num_groups
+
+        Number of groups in the domain
+
+    .. attribute:: num_chunks
+
+        Number of chunks (sum of number of chunks for each dataset) in the domain
+
+    .. attribute:: num_linked_chunks
+
+        Number of linked chunks (chunks that reference HDF5 file chunks) in the domain
+
+    .. attribute:: allocated_bytes
+
+        Number of bytes that have been allocated (i.e. the sum of the size of each chunk that has
+        been created) for the domain
+
+    .. attribute:: metadata_bytes
+
+        Number of bytes that been used for metadata (object properties, links, attributes, etc.) in
+        the domain
+
+    .. attribute:: linked_bytes
+
+        Number of bytes contained in chunks that links to HDF5 file chunks
+
+    .. attribute:: total_size
+
+        Total amount of storage used for metadata, chunk data, and linked chunks in the domain
+
+    .. attribute:: md5_sum
+
+        MD5 checksum for domain - a 32 character hexadecimal string.  Will change whenever any metadata
+        or dataset data is modified
+
+    .. attribute:: last_scan
+
+        Time (in seconds since epoch) that the last domain scan was performed
+
+    .. attribute:: limits
+
+        Server defined limits.  Currently returns a dictionary with the keys
+        ``min_chunk_size``, ``max_chunk_size``, and ``max_request_size``.
+
+    .. attribute:: compressors
+
+        Compression filters supported by HSDS.  See: tbd
+    
+

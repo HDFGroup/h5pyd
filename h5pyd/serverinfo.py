@@ -14,7 +14,7 @@ from __future__ import absolute_import
 
 import time
 from .httpconn import HttpConn
-from .. import config
+from . import config
 
 
 def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **kwds):

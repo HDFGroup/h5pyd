@@ -47,6 +47,11 @@ You may also initialize the dataset to an existing NumPy array by providing the 
     >>> arr = np.arange(100)
     >>> dset = f.create_dataset("init", data=arr)
 
+Assigning an array into a group works like specifying ``data`` and no other
+parameters::
+
+    >>> f["init"] = arr
+
 Keywords ``shape`` and ``dtype`` may be specified along with ``data``; if so,
 they will override ``data.shape`` and ``data.dtype``.  It's required that
 (1) the total number of points in ``shape`` match the total number of points
@@ -58,7 +63,7 @@ the requested ``dtype``.
 Reading & writing data
 ----------------------
 
-HDF5 datasets re-use the NumPy slicing syntax to read and write to the file.
+HDF5 datasets reuse the NumPy slicing syntax to read and write to the file.
 Slice specifications are translated directly to HDF5 "hyperslab"
 selections, and are a fast and efficient way to access data in the file. The
 following slicing arguments are recognized:
@@ -209,6 +214,10 @@ axes using ``None``::
 
     >>> dset = f.create_dataset("unlimited", (10, 10), maxshape=(None, 10))
 
+For a 1D dataset, ``maxshape`` can be an integer instead of a tuple. But to make an
+unlimited 1D dataset, ``maxshape`` must be a tuple ``(None,)``. Passing ``None`` gives
+the default behaviour, where the initial size is also the maximum.
+
 .. note:: Resizing an array with existing data works differently than in NumPy; if
     any axis shrinks, the data in the missing region is discarded.  Data does
     not "rearrange" itself as it does when resizing a NumPy array.
@@ -267,10 +276,10 @@ The ``compression_opts`` parameter will then be passed to this filter.
      A Python package of several popular filters, including Blosc, LZ4 and ZFP,
      for convenient use with h5py
 
-   `HDF5 Filter Plugins <https://portal.hdfgroup.org/display/support/HDF5+Filter+Plugins>`_
+   `HDF5 Filter Plugins <https://github.com/HDFGroup/hdf5_plugins/releases>`_
      A collection of filters as a single download from The HDF Group
 
-   `Registered filter plugins <https://portal.hdfgroup.org/display/support/Filters>`_
+   `Registered filter plugins <https://github.com/HDFGroup/hdf5_plugins/blob/master/docs/RegisteredFilterPlugins.md>`_
      The index of publicly announced filter plugins
 
 .. note:: The underlying implementation of the compression filter will have the
@@ -340,7 +349,7 @@ A MultiBlockSlice can be used in place of a slice to select a number of (count)
 blocks of multiple elements separated by a stride, rather than a set of single
 elements separated by a step.
 
-For an explanation of how this slicing works, see the `HDF5 documentation <https://support.hdfgroup.org/HDF5/Tutor/selectsimple.html>`_.
+For an explanation of how this slicing works, see the `HDF5 documentation <https://support.hdfgroup.org/documentation/hdf5/latest/_l_b_dset_sub_r_w.html>`_.
 
 For example::
 
@@ -436,47 +445,6 @@ The dtype of the dataset can be accessed via ``<dset>.dtype`` as per normal.
 As empty datasets cannot be sliced, some methods of datasets such as
 ``read_direct`` will raise a ``TypeError`` exception if used on a empty dataset.
 
-Reading and Writing to Multiple Datasets
-------------------------------------------------------------
-The MultiManager interface enables reading and writing to multiple datasets
-in parallel. A MultiManager requires a list of datasets to operate on, and then accepts
-slice arguments for reading and writing like a typical Dataset.
-
-Reading datasets through a MultiManager returns a list where each entry is an array containing
-the values read from the corresponding data.
-
-    >>> mm = MultiManager(datasets=[dset1, dset2, dset3])
-    >>> data = mm[...]  # read all elements from each dataset
-    >>> data[0]  # data read from dset1
-    [0, 1, 2, 3]
-    >>> data[1]  # data read from dset2
-    [0, 2, 3, 4]
-
-Writing to datasets through a MultiManager requires a list where each entry is an array containing
-the values to be written to each dataset.
-
-    >>> mm[0] = [[1], [2], [3]]  # write a different element to index 0 in each dataset
-    >>> data = mm[...]
-    >>> data[0]
-    [1, 1, 2, 3]
-    >>> data[1]
-    [2, 2, 3, 4]
-
-Multiple selections can be provided to read or write to a different region on each dataset in the MultiManager.
-
-    >>> selections = [np.s_[0:2], np.s_[1:4], np.s_[2:4]]
-    >>> data = mm[selections]
-    >>> data[0]
-    [1, 1]
-    >>> data[1]
-    [2, 3, 4]
-    >>> mm[selections] == [[0, 1], [4, 5, 6], [7, 8]]
-    >>> data = mm[...]
-    >>> data[0]
-    [0, 1, 2, 3]
-    >>> data[1]
-    [2, 4, 5, 6]
-
 Reference
 ---------
 
@@ -505,7 +473,7 @@ Reference
         >>> dset = f["MyDS"]
         >>> f.close()
         >>> if dset:
-        ...     print("datset accessible")
+        ...     print("dataset accessible")
         ... else:
         ...     print("dataset inaccessible")
         dataset inaccessible
@@ -544,12 +512,8 @@ Reference
             >>> out.dtype
             dtype('int16')
 
-        .. versionchanged:: 3.0
-           Allowed reading through the wrapper object. In earlier versions,
-           :meth:`astype` had to be used as a context manager:
-
-               >>> with dset.astype('int16'):
-               ...     out = dset[:]
+        .. versionchanged:: 3.9
+           :meth:`astype` can no longer be used as a context manager.
 
     .. method:: asstr(encoding=None, errors='strict')
 
@@ -702,6 +666,11 @@ Reference
     .. attribute:: dims
 
         Access to :ref:`dimension_scales`.
+
+    .. attribute:: is_scale
+
+        Return ``True`` if the dataset is also a :ref:`dimension scale <dimension_scales>`,
+        ``False`` otherwise.
 
     .. attribute:: attrs
 

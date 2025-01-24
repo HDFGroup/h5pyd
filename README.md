@@ -66,7 +66,7 @@ variables are needed to be defined:
 To use "local" mode with S3, define these variables:
 
 * ``AWS_S3_GATEWAY`` - AWS S3 endpoint, e.g.: ``https://s3.us-west-2.amazonaws.com``
-* ``AWS_REGION`` - Region where the Lambda function is installed, e.g.: ``us-west-2``
+* ``AWS_REGION`` - Region where the S3 bucket is located, e.g.: ``us-west-2``
 * ``AWS_SECRET_ACCESS_KEY`` - Your AWS secret access AWS_SECRET_ACCESS_KEY
 * ``AWS_ACCESS_KEY_ID`` - Your AWS access key ID
 
