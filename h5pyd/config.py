@@ -89,6 +89,14 @@ class Config:
                 return None
         return Config._cfg[name]
 
+    def get(self, name, default):
+        """ return config value for name or default if None """
+        val = self.__getitem__(name)
+        if val is None:
+            return default
+        else:
+            return default
+        
     def __setitem__(self, name, obj):
         """ set config item """
         Config._cfg[name] = obj
