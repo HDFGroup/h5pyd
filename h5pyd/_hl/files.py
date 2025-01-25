@@ -791,20 +791,24 @@ class File(Group):
 
         return
 
-    def flush(self):
+    def flush(self, checkpoint=False):
         """Tells the service to complete any pending updates to permanent storage"""
         if self.mode == 'r':
             # read-only, no need to flush
             return
 
         self.log.debug("flush")
+        # TBD: send any pending write requests
+        if not checkpoint:
+            return
+            
         self.log.info("sending PUT flush request")
         req = "/"
         body = {"flush": 1, "getdnids": 1}
         rsp = self.id.http_conn.PUT(req, body=body)
         self.log.debug(f"got status code: {rsp.status_code} from flush")
         if rsp.status_code != 200:
-            raise RuntimeError(f"got status code: {rsp.status_code} on flush")
+                raise RuntimeError(f"got status code: {rsp.status_code} on flush")
         rsp_json = rsp.json()
         if "dn_ids" in rsp_json:
             dn_ids = rsp_json["dn_ids"]
@@ -818,7 +822,7 @@ class File(Group):
                 raise IOError(500, "Unexpected Error")
         self.log.info("PUT flush complete")
 
-    def close(self, flush=None):
+    def close(self):
         """Clears reference to remote resource."""
         # this will close the socket of the http_conn singleton
 
