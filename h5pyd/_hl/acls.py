@@ -96,20 +96,16 @@ class ACLManager():
     """
         Allows dictionary-style access to an Domain or Folder's ACLs.
 
-        These are created exclusively by the library and are available as
-        a Python attribute at <object>.attrs
+        Like Group objects, acls provide a minimal dictionary-
+        style interface, key'd by username.  Each acl consist of a set
+        of permissions flags for 'create', 'read', 'update', 'delete',
+        'readACL', and 'updateACL'.
 
-        Like Group objects, attributes provide a minimal dictionary-
-        style interface.  Anything which can be reasonably converted to a
-        Numpy array or Numpy scalar can be stored.
+        To modify an existing ACL, fetch it, set the desired permission
+        flags and then set the acl.
 
-        Attributes are automatically created on assignment with the
-        syntax <obj>.attrs[name] = value, with the HDF5 type automatically
-        deduced from the value.  Existing attributes are overwritten.
-
-        To modify an existing attribute while preserving its type, use the
-        method modify().  To specify an attribute of a particular type and
-        shape, use create().
+        To create a new ACL, get an ACL instance with acls.create_ACL method,
+        modify as desired, then set the acl using the desired username.
     """
 
     def __init__(self, parent):
@@ -146,32 +142,14 @@ class ACLManager():
                     acl[k] = False
             self._acls[user_name] = acl
 
-    def readonly_acl(self):
-        """ return a ACL with just read set to true """
-        acl = {
-            'updateACL': False,
-            'delete': False,
-            'create': False,
-            'read': True,
-            'update': False,
-            'readACL': False,
-        }
-        return ACL(acl)
-
-    def fullperm_acl():
-        """ return a ACL with all flags set to True """
-        acl = {
-            'updateACL': True,
-            'delete': True,
-            'create': True,
-            'read': True,
-            'update': True,
-            'readACL': True,
-        }
-        return ACL(acl)
+    def create_acl(self, c=False, r=False, u=False, d=False, e=False, p=False):
+        """ return an ACL with the given flag settings"""
+        perm = {"create": c, "read": r, "update": u, "delete": d, "readACL": e, "updateACL": p}
+        acl = ACL(perm)
+        return acl
 
     def __getitem__(self, name):
-        """ Read the value of an attribute.
+        """ Get the ACL for the given username.
         """
         if isinstance(name, bytes):
             name = name.decode("utf-8")
@@ -185,11 +163,7 @@ class ACLManager():
         return ACL(self._acls[name])
 
     def __setitem__(self, name, acl):
-        """ Set a new attribute, overwriting any existing attribute.
-
-        The type and shape of the attribute are determined from the data.  To
-        use a specific type or shape, or to preserve the type of an attribute,
-        use the methods create() and modify().
+        """ Set an ACL, overwriting any existing ACL.
         """
 
         if not isinstance(acl, ACL):
@@ -211,14 +185,8 @@ class ACLManager():
             raise IOError(rsp.status_code, "PUT ACL failed")
         self.refresh()
 
-    def create_ACL(self, c=False, r=False, u=False, d=False, e=False, p=False):
-        perm = {"create": c, "read": r, "update": u, "delete": d, "readACL": e, "updateACL": p}
-        acl = ACL(perm)
-        self.refresh()
-        return acl
-
     def __delitem__(self, name):
-        """ Delete an attribute (which must already exist). """
+        """ Delete an ACL (which must already exist). """
         if isinstance(name, bytes):
             name = name.decode("utf-8")
 
@@ -240,13 +208,13 @@ class ACLManager():
         self.refresh()
 
     def __len__(self):
-        """ Number of attributes attached to the object. """
+        """ Number of ACLs attached to the domain or folder. """
         if self._acls is None:
             self.refresh()
         return len(self._acls)
 
     def __contains__(self, name):
-        """ Determine if an attribute exists, by name. """
+        """ Determine if an ACL exists, by name. """
         if isinstance(name, bytes):
             name = name.decode("utf-8")
 
@@ -274,7 +242,7 @@ class ACLManager():
             yield name
 
     def __reversed__(self):
-        """ Iterate over the names of attributes in reverse order. """
+        """ Iterate over the names of ACLs in reverse order. """
         names = self._get_acl_names()
         for name in reversed(names):
             yield name
