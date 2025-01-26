@@ -39,30 +39,6 @@ def abort(msg):
 
 
 #
-# get given ACL, return None if not found
-#
-def getACL(f, username="default"):
-    try:
-        acl = f.getACL(username)
-    except IOError as ioe:
-        if ioe.errno == 403:
-            print("No permission to read ACL for this domain")
-            sys.exit(1)
-        elif ioe.errno == 401:
-            print("username/password needs to be provided")
-            sys.exit(1)
-        elif ioe.errno == 404 or not ioe.errno:
-            return None
-        else:
-            eprint(f"unexpected error: {ioe}")
-            sys.exit(1)
-    if acl and "domain" in acl:
-        # remove the domain key
-        del acl["domain"]
-    return acl
-
-
-#
 # Usage
 #
 def usage():
@@ -195,16 +171,22 @@ def main():
         else:
             abort(f"Unexpected error: {ioe}")
 
+    #
+    # get the acls
+    #
+    try:
+        acls = f.acls
+    except IOError as ioe:
+        if ioe.errno == 403:
+            username = cfg["hs_username"]
+            abort(f"User: {username} does not have permission to read ACL for this domain")
+        elif ioe.errno == 401:
+            abort("username/password needs to be provided")
+        else:
+            abort(f"Unexpected error: {ioe}")
+
     # update/add ACL if permission flags have been set
     if perm:
-        default_acl = {'updateACL': False,
-                       'delete': False,
-                       'create': False,
-                       'read': False,
-                       'update': False,
-                       'readACL': False,
-                       'userName': 'default'
-                       }
         # note: list.copy not supported in py2.7, copy by hand for now
         # update_names = usernames.copy()
         update_names = []
@@ -216,65 +198,58 @@ def main():
 
         for username in update_names:
             # get user's ACL if it exist
-            acl = getACL(f, username=username)
-            if acl is None:
-                acl = default_acl.copy()
-            acl["userName"] = username
-            logging.info(f"updating acl to: {acl}")
+            if username not in acls:
+                acl = acls.readonly_acl()
+                acl.read = False
+            else:
+                acl = acls[username]
+            logging.info(f"updating acl for user: {username}")
             # mix in any permission changes
             for k in perm:
-                acl[k] = perm[k]
+                if k == "create":
+                    acl.create = perm[k]
+                elif k == "read":
+                    acl.read = perm[k]
+                elif k == "update":
+                    acl.update = perm[k]
+                elif k == "delete":
+                    acl.delete = perm[k]
+                elif k == "readACL":
+                    acl.readACL = perm[k]
+                elif k == "updateACL":
+                    acl.updateACL = perm[k]
+                else:
+                    raise IOError(f"Unexpected permission: {k}")
             try:
-                f.putACL(acl)
+                logging.info(f"setting {username} acl to: {acl}")
+                acls[username] = acl
             except IOError as ioe:
                 if ioe.errno in (401, 403):
                     abort("access is not authorized")
                 else:
-                    abort("Unexpected error:", ioe)
-    #
-    # read the acls
-    #
+                    abort(f"Unexpected error: {ioe}")
+
     if len(usernames) == 0:
         # no usernames, dump all ACLs
-        try:
-            acls = f.getACLs()
-        except IOError as ioe:
-            if ioe.errno == 403:
-                username = cfg["hs_username"]
-                abort(f"User: {username} does not have permission to read ACL for this domain")
-            elif ioe.errno == 401:
-                abort("username/password needs to be provided")
-            else:
-                abort(f"Unexpected error: {ioe}")
         print("%015s   %08s  %08s  %08s  %08s  %08s  %08s " % fields)
         print("-" * 80)
-        for acl in acls:
-            vals = (acl["userName"], acl["create"], acl["read"],
-                    acl["update"], acl["delete"], acl["readACL"], acl["updateACL"])
+        for name in acls:
+            acl = acls[name]
+            vals = (name, acl.create, acl.read,
+                    acl.update, acl.delete, acl.readACL, acl.updateACL)
             print("%015s   %08s  %08s  %08s  %08s  %08s  %08s " % vals)
     else:
         header_printed = False  # don't print header until we have at least one ACL
         for username in usernames:
-            try:
-                acl = f.getACL(username)
-                if not header_printed:
-                    print("%015s   %08s  %08s  %08s  %08s  %08s  %08s " % fields)
-                    print("-" * 80)
-                    header_printed = True
-                vals = (acl["userName"], acl["create"], acl["read"],
-                        acl["update"], acl["delete"], acl["readACL"], acl["updateACL"])
-                print("%015s   %08s  %08s  %08s  %08s  %08s  %08s " % vals)
-            except IOError as ioe:
-                if ioe.errno == 403:
-                    this_user = cfg["hs_username"]
-                    abort(f"User {this_user} does not have permission to read ACL for this domain")
-                elif ioe.errno == 401:
-                    abort("username/password needs to be provided")
-                elif ioe.errno == 404:
-                    abort(f"{username} not found")
-                else:
-                    abort(f"Unexpected error: {ioe}")
-
+            if username not in acls:
+                abort(f"{username} not found")
+            if not header_printed:
+                print("%015s   %08s  %08s  %08s  %08s  %08s  %08s " % fields)
+                print("-" * 80)
+                header_printed = True
+            vals = (username, acl.create, acl.read, acl.update, acl.delete,
+                    acl.readACL, acl.updateACL)
+            print("%015s   %08s  %08s  %08s  %08s  %08s  %08s " % vals)
     f.close()
 
 

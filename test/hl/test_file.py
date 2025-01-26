@@ -19,7 +19,6 @@ else:
     import h5pyd as h5py
 
 from common import ut, TestCase
-from copy import copy
 import time
 import logging
 
@@ -266,86 +265,96 @@ class TestFile(TestCase):
         self.assertTrue(f.id.id is not None)
         self.assertEqual(len(list(f.keys())), 2)
 
-        if h5py.__name__ == "h5py":
-            return  # no ACLs in h5py
-
         # no explicit ACLs yet
-        file_acls = f.getACLs()
-        self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl
+        self.assertTrue(len(f.acls) >= 1)  # Should have at least the test_user1 acl
         username = f.owner
 
-        file_acl = f.getACL(username)
+        file_acl = f.acls[username]
+        self.assertEqual(str(file_acl), "<ACL(crudep)>")
         # default owner ACL should grant full permissions
-        acl_keys = ("create", "read", "update", "delete", "readACL", "updateACL")
-        # self.assertEqual(file_acl["userName"], "default")
-        for k in acl_keys:
-            self.assertEqual(file_acl[k], True)
+        self.assertTrue(file_acl.create)
+        self.assertTrue(file_acl.read)
+        self.assertTrue(file_acl.update)
+        self.assertTrue(file_acl.delete)
+        self.assertTrue(file_acl.readACL)
+        self.assertTrue(file_acl.updateACL)
 
-        try:
-            default_acl = f.getACL("default")
-        except IOError as ioe:
-            if ioe.errno == 404:
-                pass  # expected
+        self.assertFalse("default" in f.acls)
 
         # create  public-read ACL
-        default_acl = {}
-        for key in acl_keys:
-            if key == "read":
-                default_acl[key] = True
-            else:
-                default_acl[key] = False
-        default_acl["userName"] = "default"
-        f.putACL(default_acl)
-        f.close()
+        default_acl = file_acl.copy()
+        default_acl.create = False
+        default_acl.update = False
+        default_acl.delete = False
+        default_acl.readACL = False
+        default_acl.updateACL = False
 
-        # ooen with test_user2 should succeed for read mode
+        self.assertEqual(str(default_acl), "<ACL(-r----)>")
+
+        f.acls["default"] = default_acl
+
+        f.close()
+        user2_name = self.test_user2['name']
+        user2_password = self.test_user2['password']
+
+        # open with test_user2 should succeed for read mode
         try:
-            f = h5py.File(filename, 'r', username=self.test_user2["name"], password=self.test_user2["password"])
-            f.close()
+            f = h5py.File(filename, 'r', username=user2_name, password=user2_password)
         except IOError:
             self.assertTrue(False)
 
+        # user2 does not have read ACL permission
+        try:
+            len(f.acls)
+            self.assertTrue(False)
+        except IOError as ioe:
+            if ioe.errno == 403:
+                pass  # expected
+            else:
+                self.assertTrue(False)
+
+        f.close()
+
         # test_user2 has read access, but opening in write mode should fail
         try:
-            f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
+            f = h5py.File(filename, 'w', username=user2_name, password=user2_password)
             self.assertFalse(True)  # expect exception for hsds
         except IOError as ioe:
             self.assertEqual(ioe.errno, 403)  # user is not authorized
 
         # append mode w/ test_user2
         try:
-            f = h5py.File(filename, 'a', username=self.test_user2["name"], password=self.test_user2["password"])
+            f = h5py.File(filename, 'a', username=user2_name, password=user2_password)
             self.assertFalse(True)  # expected exception
         except IOError as ioe:
             self.assertEqual(ioe.errno, 403)  # Forbidden
 
-        f = h5py.File(filename, 'a')  # open for append with original username
-        # add an acl for test_user2 that has only read/update access
-        user2_acl = copy(default_acl)
-        user2_acl["userName"] = self.test_user2["name"]
-        user2_acl["read"] = True  # allow read access
-        user2_acl["update"] = True
-        user2_acl["readACL"] = True
-        f.putACL(user2_acl)
+        # updating an acl as user2 should not be allowed
+        user2_acl = default_acl.copy()
+        user2_acl.update = True  # flip update and readACL to True
+        user2_acl.readACL = True
 
+        f = h5py.File(filename, 'a')  # open for append with original username
+        f.acls[user2_name] = user2_acl  # add an acl for test_user2
         f.close()
 
-        # ooen with test_user2 should succeed for read mode
+        # open with test_user2 should succeed for append mode
         try:
-            f = h5py.File(filename, 'r', username=self.test_user2["name"], password=self.test_user2["password"])
+            f = h5py.File(filename, 'a', username=user2_name, password=user2_password)
         except IOError:
             self.assertTrue(False)
+        f.close()
 
         # test_user2  opening in write mode should still fail
         try:
-            f = h5py.File(filename, 'w', username=self.test_user2["name"], password=self.test_user2["password"])
+            f = h5py.File(filename, 'w', username=user2_name, password=user2_password)
             self.assertFalse(True)  # expected exception
         except IOError as ioe:
             self.assertEqual(ioe.errno, 403)  # user is not authorized
 
         # append mode w/ test_user2
         try:
-            f = h5py.File(filename, 'a', username=self.test_user2["name"], password=self.test_user2["password"])
+            f = h5py.File(filename, 'a', username=user2_name, password=user2_password)
         except IOError:
             self.assertTrue(False)  # shouldn't get here
 

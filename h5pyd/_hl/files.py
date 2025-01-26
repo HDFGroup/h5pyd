@@ -191,6 +191,12 @@ class File(Group):
         return attrs.AttributeManager(self.id)
 
     @property
+    def acls(self):
+        """ ACLs attached to this object """
+        from . import acls
+        return acls.ACLManager(self)
+
+    @property
     def filename(self):
         """File name on disk"""
         if self.id.http_conn:
@@ -511,23 +517,6 @@ class File(Group):
 
             root_uuid = root_json["root"]
 
-            if mode == "a":
-                # for append, verify we have 'update' permission on the domain
-                # try first with getting the acl for the current user, then as default
-                for name in (username, "default"):
-                    if not username:
-                        continue
-                    req = "/acls/" + name
-                    rsp = http_conn.GET(req)
-                    if rsp.status_code == 200:
-                        rsp_json = rsp.json()
-                        domain_acl = rsp_json["acl"]
-                        if not domain_acl["update"]:
-                            http_conn.close()
-                            raise IOError(403, "Forbidden")
-                        else:
-                            break  # don't check with "default" user in this case
-
             if mode in ("w", "w-", "x", "a"):
                 http_conn._mode = "r+"
 
@@ -577,6 +566,30 @@ class File(Group):
             self._version = None
 
         super().__init__(self._id, track_order=track_order)
+
+        if mode == 'a':
+            # check that we have update permissions
+            try:
+                acls = self.acls
+            except IOError as ioe:
+                if ioe.errno == 403:
+                    # no permission to read acl, trust update is ok
+                    acls = None
+                else:
+                    # some other error
+                    raise
+            if acls:
+                for name in (username, "default"):
+                    if not username:
+                        continue
+                    if username not in acls:
+                        continue
+                    acl = acls[username]
+                    if acl.update:
+                        break  # ok to update
+                    else:
+                        self.close()
+                        raise IOError(403, "Forbidden")
 
     def _getVerboseInfo(self):
         now = time.time()
@@ -729,39 +742,6 @@ class File(Group):
             compressors = []
         return compressors
 
-    # override base implementation of ACL methods to use the domain rather than update root group
-    def getACL(self, username):
-        req = "/acls/" + username
-        rsp = self.id.http_conn.GET(req)
-        if rsp.status_code != 200:
-            raise IOError(rsp.status_code, "Unable to get ACL")
-        rsp_json = rsp.json()
-        acl_json = rsp_json["acl"]
-        return acl_json
-
-    def getACLs(self):
-        req = "/acls"
-        rsp = self.id.http_conn.GET(req)
-        if rsp.status_code != 200:
-            raise IOError(rsp.status_code, "Unable to get ACL")
-        rsp_json = rsp.json()
-        acls_json = rsp_json["acls"]
-        return acls_json
-
-    def putACL(self, acl):
-        if "userName" not in acl:
-            raise IOError(404, "ACL has no 'userName' key")
-        perm = {}
-        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
-            if k not in acl:
-                raise IOError(404, "Missing ACL field: {}".format(k))
-            perm[k] = acl[k]
-
-        req = "/acls/" + acl["userName"]
-        rsp = self.id.http_conn.PUT(req, body=perm)
-        if rsp.status_code not in (200, 201):
-            raise IOError(rsp.status_code, "Failed to create ACL")
-
     def run_scan(self):
         MAX_WAIT = 10
         self._getVerboseInfo()
@@ -801,14 +781,14 @@ class File(Group):
         # TBD: send any pending write requests
         if not checkpoint:
             return
-            
+
         self.log.info("sending PUT flush request")
         req = "/"
         body = {"flush": 1, "getdnids": 1}
         rsp = self.id.http_conn.PUT(req, body=body)
         self.log.debug(f"got status code: {rsp.status_code} from flush")
         if rsp.status_code != 200:
-                raise RuntimeError(f"got status code: {rsp.status_code} on flush")
+            raise RuntimeError(f"got status code: {rsp.status_code} on flush")
         rsp_json = rsp.json()
         if "dn_ids" in rsp_json:
             dn_ids = rsp_json["dn_ids"]

@@ -718,51 +718,6 @@ class _RegionProxy(object):
         pass
 
 
-class ACL(object):
-
-    @property
-    def username(self):
-        return self._username
-
-    @property
-    def create(self):
-        return self._create
-
-    @property
-    def delete(self):
-        return self._delete
-
-    @property
-    def read(self):
-        return self._read
-
-    @property
-    def update(self):
-        return self._update
-
-    @property
-    def readACL(self):
-        return self._readACL
-
-    @property
-    def updateACL(self):
-        return self._updateACL
-
-    """
-        Proxy object which handles ACLs (access control list)
-
-    """
-
-    def __init__(self):
-        self._username = None
-        self._create = True
-        self._delete = True
-        self._read = True
-        self._update = True
-        self._readACL = True
-        self._updateACL = True
-
-
 class HLObject(CommonStateObject):
 
     @property

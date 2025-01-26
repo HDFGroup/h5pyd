@@ -250,45 +250,11 @@ class Folder:
         else:
             self._owner = None
 
-    def getACL(self, username):
-        if self._http_conn is None:
-            raise IOError(400, "folder is not open")
-        req = "/acls/" + username
-        rsp = self._http_conn.GET(req)
-        if rsp.status_code != 200:
-            raise IOError(rsp.reason)
-        rsp_json = rsp.json()
-        acl_json = rsp_json["acl"]
-        return acl_json
-
-    def getACLs(self):
-        if self._http_conn is None:
-            raise IOError(400, "folder is not open")
-        req = "/acls"
-        rsp = self._http_conn.GET(req)
-        if rsp.status_code != 200:
-            raise IOError(rsp.status_code, rsp.reason)
-        rsp_json = rsp.json()
-        acls_json = rsp_json["acls"]
-        return acls_json
-
-    def putACL(self, acl):
-        if self._http_conn is None:
-            raise IOError(400, "folder is not open")
-        if self._http_conn.mode == "r":
-            raise IOError(400, "folder is open as read-onnly")
-        if "userName" not in acl:
-            raise IOError(404, "ACL has no 'userName' key")
-        perm = {}
-        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
-            if k not in acl:
-                raise IOError(404, "Missing ACL field: {}".format(k))
-            perm[k] = acl[k]
-
-        req = "/acls/" + acl["userName"]
-        rsp = self._http_conn.PUT(req, body=perm)
-        if rsp.status_code != 201:
-            raise IOError(rsp.status_code, rsp.reason)
+    @property
+    def acls(self):
+        """ ACLs attached to this object """
+        from . import acls
+        return acls.ACLManager(self)
 
     def _getSubdomains(self):
         if self._http_conn is None:

@@ -55,13 +55,14 @@ class TestFolders(TestCase):
         self.assertEqual(dir_parent[:-1], op.dirname(folder_name[:-1]))
 
         # get ACL for dir
-        dir_acl = d.getACL(self.test_user1["name"])
-        self.assertEqual(len(dir_acl.keys()), 7)
-        for k in dir_acl.keys():
-            self.assertTrue(dir_acl[k])
-
-        dir_acls = d.getACLs()
-        self.assertTrue(isinstance(dir_acls, list))
+        user1_name = self.test_user1['name']
+        dir_acl = d.acls[user1_name]
+        self.assertTrue(dir_acl.create)
+        self.assertTrue(dir_acl.read)
+        self.assertTrue(dir_acl.update)
+        self.assertTrue(dir_acl.delete)
+        self.assertTrue(dir_acl.readACL)
+        self.assertTrue(dir_acl.updateACL)
 
         count = len(d)
         self.assertTrue(count > 1)
@@ -106,18 +107,6 @@ class TestFolders(TestCase):
 
         dir_parent = d.parent
         self.assertEqual(dir_parent[:-1], op.dirname(folder_name[:-1]))
-
-        # get ACL for dir
-        dir_acl = d.getACL(self.test_user1["name"])
-        self.assertEqual(len(dir_acl.keys()), 7)
-        for k in dir_acl.keys():
-            self.assertTrue(dir_acl[k])
-
-        dir_acls = d.getACLs()
-        self.assertTrue(isinstance(dir_acls, list))
-
-        count = len(d)
-        self.assertTrue(count > 1)
 
         test_domain_found = False
 

@@ -96,7 +96,7 @@ class Config:
             return default
         else:
             return default
-        
+
     def __setitem__(self, name, obj):
         """ set config item """
         Config._cfg[name] = obj
