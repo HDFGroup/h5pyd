@@ -18,13 +18,25 @@ from . import config
 from .objectid import get_collection
 
 
+class PendingItem():
+    def __init__(self, obj_uuid, action, name, data):
+        self._uuid = obj_uuid
+        self._action = action
+        self._name = name
+        self._data = data
+        self._load_time = time.time()
+
+
 class ObjDB():
     """ Domain level object map """
-    def __init__(self, http_conn, use_cache=True):
+    def __init__(self, http_conn, expire_time=0.0, max_objects=None):
         self._http_conn = weakref.ref(http_conn)
         self._objdb = {}
-        self._loadtime = {}
-        self._use_cache = use_cache
+        self._load_times = {}
+        self._pending = []
+        self._missing_uuids = set()
+        self._expire_time = expire_time
+        self._max_objects = max_objects
         self.log = http_conn.logging
 
     @property
@@ -35,10 +47,30 @@ class ObjDB():
             raise RuntimeError("http connection has been garbage collected")
         return conn
 
+    def _is_expired(self, obj_uuid):
+        """ Get expired state of the uuid.  Return:
+            None - if the item is not loaded
+            True - if the item is loaded but expired
+            False - if the item is loaded but not expired
+        """
+        if obj_uuid not in self._load_times:
+            return None
+        if self._expire_time > 0.0:
+            age = time.time() - self._load_times[obj_uuid]
+
+            return age > self._expire_time
+        else:
+            return False
+
     def fetch(self, obj_uuid):
         """ get obj_json for given obj_uuid from the server """
 
         self.log.debug(f"ObjDB.fetch({obj_uuid})")
+
+        if obj_uuid in self._missing_uuids:
+            msg = f"returning None for fetch since object {obj_uuid} is in missing_uuids set"
+            self.log.warning(msg)
+            return None
 
         if obj_uuid.startswith("g-"):
             collection_type = "groups"
@@ -60,18 +92,20 @@ class ObjDB():
         rsp = self.http_conn.GET(req, params=params)
         if rsp.status_code in (404, 410):
             self.log.warning(f"obj: {obj_uuid} not found")
+            self._missing_uuids.add(obj_uuid)
             return None
         elif rsp.status_code != 200:
             raise IOError(f"Unexpected error on request {req}: {rsp.status_code}")
         obj_json = rsp.json()
-        self.__set_item__(obj_uuid, obj_json)
         return obj_json
 
-    def __set_item__(self, obj_uuid, obj_json):
+    def __setitem__(self, obj_uuid, obj_json):
         """ set the obj_json in the db with obj_uuid as the key """
-
+        if self._max_objects is not None:
+            if len(self._objdb) >= self._max_objects:
+                # over limit, skip set
+                return
         discard_keys = ('root', 'id', 'attributeCount', 'linkCount', 'hrefs', 'domain', 'bucket')
-        # tbd: should bucket be supported?  Not being returned in GET request
         for k in discard_keys:
             if k in obj_json:
                 del obj_json[k]
@@ -83,18 +117,33 @@ class ObjDB():
 
         # assign or replace current object
         self._objdb[obj_uuid] = obj_json
-        self._loadtime[obj_uuid] = time.time()
-
-        return obj_json
+        self._load_times[obj_uuid] = time.time()
 
     def __getitem__(self, obj_uuid):
-        if obj_uuid not in self._objdb:
+        """ get item from objdb, fetching from server if necessary """
+
+        if self._is_expired(obj_uuid) in (None, True):
+            # fetch latest json
+            obj_json = self.fetch(obj_uuid)
+            if obj_json is not None:
+                self.__setitem__(obj_uuid, obj_json)
+        else:
+            obj_json = self._objdb[obj_uuid]
+
+        if obj_json is None:
             self.log.warning(f"id: {obj_uuid} not found in objDB")
             raise KeyError(obj_uuid)
-        obj_json = self._objdb[obj_uuid]
         return obj_json
 
+    def free(self, obj_uuid):
+        """ free from objdb """
+        if obj_uuid in self._objdb:
+            del self._objdb[obj_uuid]
+        if obj_uuid in self._load_times:
+            del self._load_times[obj_uuid]
+
     def __delitem__(self, obj_uuid):
+        """ delete object frm server and free from objdb"""
         if obj_uuid not in self._objdb:
             obj_json = self.fetch(obj_uuid)
             if not obj_json:
@@ -102,9 +151,8 @@ class ObjDB():
                 raise KeyError(obj_uuid)
         collection = get_collection(obj_uuid)
         req = f"/{collection}/{obj_uuid}"
-        self._http_conn.DELETE(req)
-        del self._objdb[obj_uuid]
-        del self._loadtime[obj_uuid]
+        self.http_conn.DELETE(req)
+        self.free(obj_uuid)
 
     def __len__(self):
         return len(self._objdb)
@@ -123,19 +171,22 @@ class ObjDB():
         """ load content from hsds summary json """
         for obj_uuid in domain_objs:
             obj_json = domain_objs[obj_uuid]
-            self.__set_item__(obj_uuid, obj_json)
+            self.__setitem__(obj_uuid, obj_json)
 
-    def reload(self):
+    def reload(self, load_all=False):
         """ re-initialize objdb """
         self.log.info(f"objdb.reload {self.http_conn.domain}")
         self._objdb = {}
         self._loadtime = {}
         obj_uuids = set()
         obj_uuids.add(self.http_conn.root_uuid)
+        if not load_all:
+            return
+
         while obj_uuids:
             obj_uuid = obj_uuids.pop()
             obj_json = self.fetch(obj_uuid)
-            self.__set_item__(obj_uuid, obj_json)
+            self.__setitem__(obj_uuid, obj_json)
 
             if "links" in obj_json:
                 # add ids for any hard-links to our search if
@@ -167,12 +218,13 @@ class ObjDB():
         if not parent_uuid.startswith("g-"):
             self.log.error("get_bypath - expected parent_uuid to be a group id")
             raise TypeError()
-        if parent_uuid not in self._objdb:
+
+        obj_json = self.__getitem__(parent_uuid)
+        if obj_json is None:
             self.log.warning("get_bypath - parent_uuid not found")
             raise KeyError("parent_uuid: {parent_uuid} not found")
 
         obj_id = parent_uuid
-        obj_json = self._objdb[obj_id]
         searched_ids = set(obj_id)
 
         link_names = h5path.split('/')
@@ -207,38 +259,17 @@ class ObjDB():
                 if obj_id in searched_ids:
                     self.log.warning(f"circular reference using path: {h5path}")
                     raise KeyError(h5path)
-                if obj_id not in self._objdb:
-                    # TBD - fetch from the server in case this object has not
-                    # been loaded yet?
+                obj_json = self.__getitem__(obj_id)
+                if not obj_json:
                     self.log.warning(f"id: {obj_id} not found")
                     obj_json = None
                 else:
                     searched_ids.add(obj_id)
                     obj_json = self._objdb[obj_id]
             elif link_class == 'H5L_TYPE_SOFT':
-                if not follow:
-                    continue
-                # soft link
-                slink_path = link_tgt['h5path']
-                if not slink_path:
-                    self.log.warning(f"id: {obj_id} has null h5path for link: {link_name}")
-                    raise KeyError(h5path)
-                if slink_path.startswith('/'):
-                    slink_id = self.http_conn.root_uuid
-                else:
-                    slink_id = obj_id
-                # recursive call
-                try:
-                    obj_json = self.get_bypath(slink_id, slink_path)
-                except KeyError:
-                    self.log.warning(f"Unable to find object in softpath: {slink_path}")
-                    continue
-                obj_id = obj_json['id']
+                self.log.warning("objdb.get_bypath can't follow soft links")
             elif link_class == 'H5L_TYPE_EXTERNAL':
-                if not follow:
-                    continue
-                # tbd
-                self.log.error("external link not supported")
+                self.log.warning("objdb.get_bypath can't follow external links")
             else:
                 self.log.error(f"link type: {link_class} not supported")
 
@@ -305,7 +336,7 @@ class ObjDB():
             if title.find('/') != -1:
                 raise KeyError("link title can not be nested")
             if parent_uuid not in self._objdb:
-                raise KeyError(f"parent_uuid: {parent_uuid} not found")
+                self.log.warning(f"make_obj: {parent_uuid} not in objdb")
 
             link_json["name"] = title
 
@@ -346,7 +377,7 @@ class ObjDB():
         if cpl:
             obj_json['creationProperties'] = cpl
         obj_uuid = obj_json['id']
-        self.__set_item__(obj_uuid, obj_json)  # update group db
+        self.__setitem__(obj_uuid, obj_json)  # update group db
         if link_json:
             # tweak link_json to look like a link entry on objdb
             link_json['class'] = 'H5L_TYPE_HARD'

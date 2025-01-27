@@ -285,6 +285,8 @@ class File(Group):
         api_key=None,
         use_session=True,
         use_cache=True,
+        cache_limit=0,
+        cache_expire_time=0,
         swmr=False,
         libver=None,
         logger=None,
@@ -317,8 +319,14 @@ class File(Group):
         use_session
             maintain http connect between calls
         use_cache
-            save attribute and links values rather than retreiving from server each time they are accessed.
+            save attribute and links values rather than retrieving from server each time they are accessed.
             Set to False if the storage content is expected to change due to another application
+        cache_limit
+            If use_cache is True, the max number of metadata objects to hold in cache.
+            If cache_limit is 0, the number is unlimited
+        cache_expire_time
+            Amount of time in seconds to hold object in metadata cache before refreshing.
+            If 0, items will be held in cache indefinitely
         swmr
             For compatibility with h5py - has the effect of overriding use_cache so that metadata
             will always be synchronized with the server
@@ -421,8 +429,13 @@ class File(Group):
                 elif "hs_bucket" in cfg:
                     bucket = cfg["hs_bucket"]
 
-            if swmr:
-                use_cache = False  # disable metadata caching in swmr mode
+            if use_cache:
+                if cache_limit > 0:
+                    max_objects = cache_limit
+                else:
+                    max_objects = None
+            else:
+                max_objects = 0
 
             http_conn = HttpConn(
                 domain,
@@ -433,7 +446,8 @@ class File(Group):
                 mode=mode,
                 api_key=api_key,
                 use_session=use_session,
-                use_cache=use_cache,
+                expire_time=cache_expire_time,
+                max_objects=max_objects,
                 logger=logger,
                 retries=retries,
                 timeout=timeout,
@@ -442,10 +456,12 @@ class File(Group):
             # try to do a GET from the domain
             req = "/"
             params = {"getdnids": 1}  # return dn ids if available
-
-            if use_cache and mode == "r":
-                params["getobjs"] = "T"
-                params["include_attrs"] = "T"
+            if max_objects is None or max_objects > 0:
+                # get object meta objects
+                # TBD: have hsds support a max limit of objects to return
+                params["getobjs"] = 1
+            params["include_attrs"] = 1
+            params["include_links"] = 1
             if bucket:
                 params["bucket"] = bucket
 
@@ -525,8 +541,6 @@ class File(Group):
             if "domain_objs" in root_json:
                 domain_objs = root_json["domain_objs"]
                 objdb.load(domain_objs)
-            else:
-                objdb.reload()
 
             fileid = FileID(root_uuid, http_conn=http_conn)
         # end else

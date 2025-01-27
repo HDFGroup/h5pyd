@@ -117,10 +117,26 @@ class ObjectID:
         return self.http_conn.domain
 
     @property
+    def http_conn(self):
+        # access weak ref
+        if isinstance(self._http_conn, weakref.ReferenceType):
+            conn = self._http_conn()
+            if conn is None:
+                raise RuntimeError("http connection has been garbage collected")
+        else:
+            return self._http_conn
+        return conn
+
+    @property
+    def objdb(self):
+        # get ref to ObjDB instance
+        http_conn = self.http_conn
+        return http_conn.objdb
+
+    @property
     def obj_json(self):
         """json representation of the object"""
-        objdb = self.http_conn.objdb
-        obj_json = objdb[self.uuid]
+        obj_json = self.objdb[self.uuid]
         return obj_json
 
     @property
@@ -139,23 +155,6 @@ class ObjectID:
             dt = datetime.fromtimestamp(time.time())
 
         return dt
-
-    @property
-    def http_conn(self):
-        # access weak ref
-        if isinstance(self._http_conn, weakref.ReferenceType):
-            conn = self._http_conn()
-            if conn is None:
-                raise RuntimeError("http connection has been garbage collected")
-        else:
-            return self._http_conn
-        return conn
-
-    @property
-    def objdb(self):
-        # get ref to ObjDB instance
-        http_conn = self.http_conn
-        return http_conn.objdb
 
     @property
     def collection_type(self):
@@ -205,6 +204,19 @@ class ObjectID:
             raise TypeError(f"Unexpected type: {obj_uuid}")
 
         return obj
+
+    def get_root(self):
+        """ Return root id """
+        root_uuid = self.http_conn.root_uuid
+        return GroupID(root_uuid, http_conn=self.http_conn)
+
+    @property
+    def is_root(self):
+        """ Return True if this is the root group id """
+        if self._uuid == self.http_conn.root_uuid:
+            return True
+        else:
+            return False
 
     @property
     def attrs(self):
@@ -275,9 +287,8 @@ class ObjectID:
         return names
 
     def __init__(self, obj_uuid, http_conn=None):
+        """Create a new objectId """
 
-        """Create a new objectId.
-        """
         self._uuid = get_UUID(obj_uuid)
 
         if http_conn:
@@ -287,8 +298,10 @@ class ObjectID:
         else:
             raise IOError("Expected parent to have http connector")
 
-        if self._uuid not in self.objdb:
-            self.objdb.fetch(self._uuid)  # will throw IOError if not found
+        obj_json = self.objdb[self._uuid]  # we're raise KeyError if not found
+        if not obj_json:
+            # should be not None if KeyError wasn't thrown
+            raise RuntimeError("Unexpected error")
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -301,11 +314,16 @@ class ObjectID:
 
     def refresh(self):
         """ get the latest obj_json data from server """
+        self.objdb.free(self._uuid)
         self.objdb.fetch(self._uuid)
 
+    def delete_object(self):
+        """ delete the given object on the server """
+
+        del self.objdb[self._uuid]
+
     def close(self):
-        """Remove handles to id.
-        """
+        """Remove handles to id """
         self._old_uuid = self._uuid  # for debugging
         self._uuid = 0
         self._http_conn = None
@@ -425,8 +443,7 @@ class DatasetID(ObjectID):
     def resize(self, dims):
         """ update the shape of the dataset """
         # send the request to the server
-        objdb = self.http_conn.objdb
-        objdb.resize(self._uuid, dims)
+        self.objdb.resize(self._uuid, dims)
 
     def shape_refresh(self):
         """ Get the current shape """
@@ -471,7 +488,6 @@ class GroupID(ObjectID):
             links = obj_json['links']
             if title in links:
                 raise IOError("Unable to create object (name already exists)")
-        objdb = self.http_conn.objdb
         kwds = {}
 
         if shape is not None:
@@ -484,7 +500,7 @@ class GroupID(ObjectID):
             kwds['track_order'] = track_order
         if maxdims:
             kwds['maxdims'] = maxdims
-        obj_uuid = objdb.make_obj(self._uuid, title, **kwds)
+        obj_uuid = self.objdb.make_obj(self._uuid, title, **kwds)
         obj_id = self.get(obj_uuid)
         return obj_id
 
@@ -501,9 +517,8 @@ class GroupID(ObjectID):
         links = self.links
         if not replace and title in links:
             raise IOError("Unable to create link (name already exists)")
-        objdb = self.http_conn.objdb
 
-        objdb.set_link(self.uuid, title, link_json, replace=replace)
+        self.objdb.set_link(self.uuid, title, link_json, replace=replace)
 
     def del_link(self, title):
         """ delete the given link """
@@ -511,8 +526,7 @@ class GroupID(ObjectID):
         if title not in links:
             # not found
             raise KeyError(f"link '{title}' not found")
-        objdb = self.http_conn.objdb
-        objdb.del_link(self.uuid, title)
+        self.objdb.del_link(self.uuid, title)
 
     @property
     def link_count(self):
@@ -521,6 +535,7 @@ class GroupID(ObjectID):
         return len(links)
 
     def get_link_titles(self, track_order=None):
+
         links = self.links
         if track_order is None:
             track_order = self.track_order

@@ -260,7 +260,8 @@ class HttpConn:
         api_key=None,
         mode="a",
         use_session=True,
-        use_cache=True,
+        expire_time=1.0,
+        max_objects=None,
         logger=None,
         retries=3,
         timeout=DEFAULT_TIMEOUT,
@@ -285,7 +286,7 @@ class HttpConn:
         else:
             self.log = logging.getLogger(logger)
         msg = f"HttpConn.init(domain: {domain_name} use_session: {use_session} "
-        msg += f"use_cache: {use_cache} retries: {retries}"
+        msg += f"expire_time: {expire_time:6.2f} sec retries: {retries}"
         self.log.debug(msg)
 
         if self._timeout != DEFAULT_TIMEOUT:
@@ -403,7 +404,7 @@ class HttpConn:
             else:
                 self.log.error(f"Unknown openid provider: {provider}")
 
-        self._objdb = ObjDB(self, use_cache=use_cache)
+        self._objdb = ObjDB(self, expire_time=expire_time, max_objects=max_objects)
 
     def __del__(self):
         if self._hsds:

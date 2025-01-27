@@ -62,14 +62,12 @@ class Group(HLObject, MutableMappingHDF5):
 
         if h5path == "/":
             # return root group
-            root_uuid = self.id.http_conn.root_uuid
-            root_id = self.id.get(root_uuid)  # create a GroupID object
+            root_id = self.id.get_root()  # create a GroupID object
             root_grp = Group(root_id, track_order=track_order)
             return root_grp
         elif h5path[0] == '/':
             # absolute path - start with root
-            root_uuid = self.id.http_conn.root_uuid
-            parent_id = self.id.get(root_uuid)
+            parent_id = self.id.get_root()
             parent_name = "/"
         else:
             # relative path - start with this object
@@ -441,19 +439,11 @@ class Group(HLObject, MutableMappingHDF5):
             obj_id = self.id.get(name)
         elif name == "/":
             # return root group
-            root_uuid = self.id.http_conn.root_uuid
-            obj_id = self.id.get(root_uuid)
+            obj_id = self.id.get_root()
         else:
             pass  # will do a path lookup
 
         if obj_id:
-            # verify the object exists
-            objdb = self.id.http_conn.objdb
-            if obj_id.id not in objdb:
-                try:
-                    objdb.fetch(obj_id.id)  # will raise exception if
-                except IOError:
-                    raise KeyError(f"Object {obj_id} does not exist")
             if isinstance(obj_id, GroupID):
                 tgt = Group(obj_id)
                 if name == "/":
@@ -466,7 +456,7 @@ class Group(HLObject, MutableMappingHDF5):
             elif isinstance(obj_id, TypeID):
                 tgt = Datatype(obj_id)
             else:
-                raise IOError("Unexpected Error - ObjectID type: " + obj_id.__class__.__name__)
+                raise IOError(f"Unexpected Error - ObjectID type: {obj_id.__class__.__name__}")
             return tgt
 
         # get item by h5path
@@ -654,11 +644,12 @@ class Group(HLObject, MutableMappingHDF5):
 
     def __delitem__(self, name):
         """ Delete (unlink) an item from this group. """
-        objdb = self.id.http_conn.objdb
 
         if isinstance(name, ObjectID):
             # delete the object, not the link
-            objdb.del_obj(name.id)
+            if name.is_root:
+                IOError("The root group can not be deleted")
+            name.delete_object()
         else:
             parent_path = _h5parent(name)
             basename = _h5base(name)

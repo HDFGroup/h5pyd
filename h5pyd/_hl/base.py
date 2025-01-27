@@ -794,7 +794,7 @@ class HLObject(CommonStateObject):
             raise TypeError(f"unexpected type for HLObject.__init__: {type(oid)}")
         self._id = oid
         self.log = self._id.http_conn.logging
-        if self.id.uuid == self.id.http_conn.root_uuid:
+        if self.id.is_root:
             # set the name as the root group
             self._name = "/"
         else:
