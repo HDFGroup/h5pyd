@@ -17,6 +17,7 @@ import weakref
 from . import config
 from .objectid import get_collection
 
+MAX_PENDING_ITEMS = 500  # TBD: make this a config?
 
 class ObjDB():
     """ Domain level object map """
@@ -28,6 +29,7 @@ class ObjDB():
             self._pending = {}
         else:
             self._pending = None
+        self._pending_count = 0
         self._missing_uuids = set()
         self._expire_time = expire_time
         self._max_age = max_age
@@ -62,7 +64,7 @@ class ObjDB():
             return False
 
     def _flush_pending(self):
-        #  self._pending[obj_uuid] = {"links": {}, "attrs": {}}
+        """ commit any pending updates"""
         if not self._pending:
             self.log.debug("flush_pending - no pending objects")
             return
@@ -110,6 +112,8 @@ class ObjDB():
                 # clear items from pending queue
                 for obj_id in obj_ids:
                     self._pending[obj_id]['links'] = {}
+
+        self._pending_count = 0
 
     def flush(self):
         """ commit all pending items """
@@ -366,6 +370,9 @@ class ObjDB():
         if self._max_age > 0.0:
             pending_links = self._get_pending(group_uuid)["links"]
             pending_links[title] = link_json
+            self._pending_count += 1
+            if self._pending_count > MAX_PENDING_ITEMS:
+                self._flush_pending()
         else:
             # do a PUT immediately
             # make a http put
@@ -497,6 +504,9 @@ class ObjDB():
         if self._max_age > 0.0:
             pending_links = self._get_pending(obj_uuid)["attrs"]
             pending_links[name] = attr_json
+            self._pending_count += 1
+            if self._pending_count > MAX_PENDING_ITEMS:
+                self._flush_pending()
         else:
             # do a PUT immediately
 
