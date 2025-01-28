@@ -262,6 +262,7 @@ class HttpConn:
         use_session=True,
         expire_time=1.0,
         max_objects=None,
+        max_age=1.0,
         logger=None,
         retries=3,
         timeout=DEFAULT_TIMEOUT,
@@ -404,7 +405,8 @@ class HttpConn:
             else:
                 self.log.error(f"Unknown openid provider: {provider}")
 
-        self._objdb = ObjDB(self, expire_time=expire_time, max_objects=max_objects)
+        kwds = {"expire_time": expire_time, "max_objects": max_objects, "max_age": max_age}
+        self._objdb = ObjDB(self, **kwds)
 
     def __del__(self):
         if self._hsds:

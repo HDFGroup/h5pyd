@@ -166,6 +166,7 @@ class TestFile(TestCase):
             logging.info("waiting on scan update")
             ts = time.time()
             while not f.last_scan:
+                print("waiting on summary data to be compiled...")
                 time.sleep(0.1)
                 elapsed = time.time() - ts
                 if elapsed > 90:
@@ -412,7 +413,7 @@ class TestTrackOrder(TestCase):
         filename = self.getFileName("test_track_order_file")
         print(f"filename: {filename}")
         # write file using creation order
-        with h5py.File(filename, 'w', track_order=True) as f:
+        with h5py.File(filename, 'w', track_order=True, max_age=0.0) as f:
             self.populate(f)
             self.assertEqual(list(f), list(self.titles))
             self.assertEqual(list(f.attrs), list(self.titles))
@@ -428,7 +429,7 @@ class TestTrackOrder(TestCase):
         # write file using creation order
         cfg = h5py.get_config()
         cfg.track_order = True
-        with h5py.File(filename, 'w') as f:
+        with h5py.File(filename, 'w', max_age=0.0) as f:
             self.populate(f)
             self.assertEqual(list(f), list(self.titles))
             self.assertEqual(list(f.attrs), list(self.titles))

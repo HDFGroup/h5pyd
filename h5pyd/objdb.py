@@ -18,30 +18,29 @@ from . import config
 from .objectid import get_collection
 
 
-class PendingItem():
-    def __init__(self, obj_uuid, action, name, data):
-        self._uuid = obj_uuid
-        self._action = action
-        self._name = name
-        self._data = data
-        self._load_time = time.time()
-
-
 class ObjDB():
     """ Domain level object map """
-    def __init__(self, http_conn, expire_time=0.0, max_objects=None):
+    def __init__(self, http_conn, expire_time=0.0, max_age=0.0, max_objects=None):
         self._http_conn = weakref.ref(http_conn)
         self._objdb = {}
         self._load_times = {}
-        self._pending = []
+        if max_age > 0.0:
+            self._pending = {}
+        else:
+            self._pending = None
         self._missing_uuids = set()
         self._expire_time = expire_time
+        self._max_age = max_age
         self._max_objects = max_objects
         self.log = http_conn.logging
+        if http_conn.mode == 'r':
+            self._read_only = True
+        else:
+            self._read_only = False
 
     @property
     def http_conn(self):
-        # access weark ref
+        # access weak ref
         conn = self._http_conn()
         if conn is None:
             raise RuntimeError("http connection has been garbage collected")
@@ -61,6 +60,60 @@ class ObjDB():
             return age > self._expire_time
         else:
             return False
+
+    def _flush_pending(self):
+        #  self._pending[obj_uuid] = {"links": {}, "attrs": {}}
+        if not self._pending:
+            self.log.debug("flush_pending - no pending objects")
+            return
+
+        # flush attributes
+        obj_ids = {}
+        for obj_uuid in self._pending:
+            pending_attrs = self._pending[obj_uuid]['attrs']
+            if pending_attrs:
+                if obj_uuid not in obj_ids:
+                    obj_ids[obj_uuid] = {}
+                obj_id = obj_ids[obj_uuid]
+                obj_id["attributes"] = pending_attrs
+
+        if obj_ids:
+            body = {"obj_ids": obj_ids}
+            root_uuid = self.http_conn.root_uuid
+            req = f"/groups/{root_uuid}/attributes"
+            rsp = self.http_conn.PUT(req, body=body)
+            if rsp.status_code not in (200, 201):
+                raise IOError(rsp.status_code, "Failed to update attributes")
+            else:
+                # clear items from pending queue
+                for obj_id in obj_ids:
+                    self._pending[obj_id]['attrs'] = {}
+
+        # flush links
+        obj_ids = {}
+        for obj_uuid in self._pending:
+            pending_links = self._pending[obj_uuid]['links']
+            if pending_links:
+                if obj_uuid not in obj_ids:
+                    obj_ids[obj_uuid] = {}
+                obj_id = obj_ids[obj_uuid]
+                obj_id["links"] = pending_links
+
+        if obj_ids:
+            body = {"grp_ids": obj_ids}
+            root_uuid = self.http_conn.root_uuid
+            req = f"/groups/{root_uuid}/links"
+            rsp = self.http_conn.PUT(req, body=body)
+            if rsp.status_code not in (200, 201):
+                raise IOError(rsp.status_code, "Failed to update links")
+            else:
+                # clear items from pending queue
+                for obj_id in obj_ids:
+                    self._pending[obj_id]['links'] = {}
+
+    def flush(self):
+        """ commit all pending items """
+        self._flush_pending()
 
     def fetch(self, obj_uuid):
         """ get obj_json for given obj_uuid from the server """
@@ -144,6 +197,9 @@ class ObjDB():
 
     def __delitem__(self, obj_uuid):
         """ delete object frm server and free from objdb"""
+        if self._read_only:
+            raise IOError("no write intent on domain")
+
         if obj_uuid not in self._objdb:
             obj_json = self.fetch(obj_uuid)
             if not obj_json:
@@ -286,21 +342,35 @@ class ObjDB():
             self.log.info(f"get_bypath link at {h5path} found target: {obj_id}")
             return obj_json
 
+    def _get_pending(self, obj_uuid):
+        """ get pending items """
+        if obj_uuid not in self._pending:
+            self._pending[obj_uuid] = {"links": {}, "attrs": {}}
+        return self._pending[obj_uuid]
+
     def set_link(self, group_uuid, title, link_json, replace=False):
         """ create/update the given link """
         if not group_uuid.startswith("g-"):
             raise TypeError("objdb.set_link - expected a group identifier")
         if title.find('/') != -1:
             raise KeyError("objdb.setlink - link title can not be nested")
+        if self._read_only:
+            raise IOError("no write intent on domain")
         obj_json = self.__getitem__(group_uuid)
         links = obj_json["links"]
+        link_json['created'] = time.time()
+
         if title in links and replace:
             # TBD: hsds update to for link replacement?
             self.del_link(group_uuid, title)
-        # make a http put
-        req = f"/groups/{group_uuid}/links/{title}"
-        self.http_conn.PUT(req, body=link_json)  # create the link
-        link_json['created'] = time.time()
+        if self._max_age > 0.0:
+            pending_links = self._get_pending(group_uuid)["links"]
+            pending_links[title] = link_json
+        else:
+            # do a PUT immediately
+            # make a http put
+            req = f"/groups/{group_uuid}/links/{title}"
+            self.http_conn.PUT(req, body=link_json)  # create the link
         links[title] = link_json
 
     def del_link(self, group_uuid, title):
@@ -308,10 +378,22 @@ class ObjDB():
 
         if title.find('/') != -1:
             raise KeyError("objdb.del_link - link title can not be nested")
+        if self._read_only:
+            raise IOError("no write intent on domain")
         obj_json = self.__getitem__(group_uuid)
         links = obj_json["links"]
         # tbd - validate link_json?
+        if self._max_age > 0.0:
+            pending_links = self._get_pending(group_uuid)["links"]
+            if title in pending_links:
+                del pending_links[title]
+
         if title in links:
+            pending_links = self._get_pending(group_uuid)["links"]
+            if title in pending_links:
+                del pending_links[title]
+
+            # TBD - support deferred delete
             req = f"/groups/{group_uuid}/links/{title}"
             rsp = self.http_conn.DELETE(req)
             if rsp.status_code != 200:
@@ -327,6 +409,8 @@ class ObjDB():
           If type_json and shape_json - create a dataset
           If type_json and not shape_json - create a datatype
         """
+        if self._read_only:
+            raise IOError("no write intent on domain")
         cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
 
         if track_order is None:
@@ -390,6 +474,8 @@ class ObjDB():
 
     def del_obj(self, obj_uuid):
         """ Delete the given object """
+        if self._read_only:
+            raise IOError("no write intent on domain")
         collection = get_collection(obj_uuid)
         req = f"/{collection}/{obj_uuid}"
 
@@ -402,32 +488,47 @@ class ObjDB():
 
     def set_attr(self, obj_uuid, name, attr_json):
         """ create update attribute  """
+        if self._read_only:
+            raise IOError("no write intent on domain")
         obj_json = self.__getitem__(obj_uuid)
         attrs = obj_json["attributes"]
-        params = {}
-        if name in attrs:
-            self.log.debug(f"replacing attr {name} of {obj_uuid}")
-            params['replace'] = 1
-
-        collection = get_collection(obj_uuid)
-        req = f"/{collection}/{obj_uuid}/attributes/{name}"
-        rsp = self.http_conn.PUT(req, body=attr_json, params=params)
-
-        if rsp.status_code not in (200, 201):
-            self.log.error(f"got {rsp.status_code} for put req: {req}")
-            raise RuntimeError(f"Unexpected error on put request {req}: {rsp.status_code}")
-        self.log.info(f"got {rsp.status_code} for req: {req}")
         attr_json['created'] = time.time()
+
+        if self._max_age > 0.0:
+            pending_links = self._get_pending(obj_uuid)["attrs"]
+            pending_links[name] = attr_json
+        else:
+            # do a PUT immediately
+
+            params = {}
+            if name in attrs:
+                self.log.debug(f"replacing attr {name} of {obj_uuid}")
+                params['replace'] = 1
+            collection = get_collection(obj_uuid)
+            req = f"/{collection}/{obj_uuid}/attributes/{name}"
+            rsp = self.http_conn.PUT(req, body=attr_json, params=params)
+
+            if rsp.status_code not in (200, 201):
+                self.log.error(f"got {rsp.status_code} for put req: {req}")
+                raise RuntimeError(f"Unexpected error on put request {req}: {rsp.status_code}")
+            self.log.info(f"got {rsp.status_code} for req: {req}")
         attrs[name] = attr_json
 
     def del_attr(self, obj_uuid, name):
         """ delete the given attribute """
+        if self._read_only:
+            raise IOError("no write intent on domain")
         obj_json = self.__getitem__(obj_uuid)
         attrs = obj_json["attributes"]
         if name not in attrs:
             self.log.warning(f"attr {name} of {obj_uuid} not found for delete")
             raise KeyError("Unable to delete attribute (can't locate attribute)")
+        if self._max_age > 0.0:
+            pending_attrs = self._get_pending(obj_uuid)["attrs"]
+            if name in pending_attrs:
+                del pending_attrs[name]
 
+        # tbd - support deferred deletion
         collection = get_collection(obj_uuid)
         req = f"/{collection}/{obj_uuid}/attributes/{name}"
         rsp = self.http_conn.DELETE(req)
@@ -458,6 +559,8 @@ class ObjDB():
 
     def resize(self, dset_uuid, dims):
         """ update the shape of the dataset """
+        if self._read_only:
+            raise IOError("no write intent on domain")
         # send the request to the server
         body = {"shape": dims}
         req = f"/datasets/{dset_uuid}/shape"

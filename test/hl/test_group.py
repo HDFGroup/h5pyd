@@ -357,7 +357,7 @@ class TestTrackOrder(TestCase):
     def test_track_order(self):
         filename = self.getFileName("test_track_order_group")
         print(f"filename: {filename}")
-        with h5py.File(filename, 'w') as f:
+        with h5py.File(filename, 'w', max_age=0.0) as f:
             g = f.create_group('order', track_order=True)  # creation order
             self.populate(g)
 
@@ -388,7 +388,7 @@ class TestTrackOrder(TestCase):
         filename = self.getFileName("test_track_order_cfg_group")
         print(f"filename: {filename}")
         cfg = h5py.get_config()
-        with h5py.File(filename, 'w') as f:
+        with h5py.File(filename, 'w', max_age=0.0) as f:
             cfg.track_order = True  # creation order
             g = f.create_group('order')
             cfg.track_order = False  # reset
@@ -432,7 +432,7 @@ class TestTrackOrder(TestCase):
         if h5py.__name__ == "h5py":
             return  # h5py does not support track_order on group.get()
 
-        with h5py.File(filename, 'w') as f:
+        with h5py.File(filename, 'w', max_age=0.0) as f:
             g = f.create_group('order')
             dset = g.create_dataset('dset', (10,), dtype='i4')
             dset2 = g.create_dataset('dset2', (10,), dtype='i4')
@@ -454,7 +454,7 @@ class TestTrackOrder(TestCase):
         if h5py.__name__ == "h5py":
             return  # h5py does not support track_order on group.get()
 
-        with h5py.File(filename, 'w') as f:
+        with h5py.File(filename, 'w', max_age=0.0) as f:
             g = f.create_group('order')
             g._track_order = True
             # create subgroup and populate it with links

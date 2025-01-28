@@ -576,9 +576,17 @@ class FileID(GroupID):
         else:
             return False
 
+    def flush(self):
+        """ commit any pending write requests """
+        if not self._http_conn:
+            pass  # connection closed
+        else:
+            self.objdb.flush()
+
     def close(self):
         """Remove handles to id.
         """
 
+        self.flush()
         self._file_conn = None
         super().close()

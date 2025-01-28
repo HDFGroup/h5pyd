@@ -287,6 +287,7 @@ class File(Group):
         use_cache=True,
         cache_limit=0,
         cache_expire_time=0,
+        max_age=1.0,
         swmr=False,
         libver=None,
         logger=None,
@@ -327,6 +328,9 @@ class File(Group):
         cache_expire_time
             Amount of time in seconds to hold object in metadata cache before refreshing.
             If 0, items will be held in cache indefinitely
+        max_time
+            Amount of of time in seconds to hold a dirty object in the metadata cache before writing.
+            If 0, items will be written immediately
         swmr
             For compatibility with h5py - has the effect of overriding use_cache so that metadata
             will always be synchronized with the server
@@ -448,6 +452,7 @@ class File(Group):
                 use_session=use_session,
                 expire_time=cache_expire_time,
                 max_objects=max_objects,
+                max_age=max_age,
                 logger=logger,
                 retries=retries,
                 timeout=timeout,
@@ -792,7 +797,9 @@ class File(Group):
             return
 
         self.log.debug("flush")
-        # TBD: send any pending write requests
+        # send any pending write requests
+        self.id.flush()
+
         if not checkpoint:
             return
 
