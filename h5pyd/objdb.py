@@ -19,6 +19,7 @@ from .objectid import get_collection
 
 MAX_PENDING_ITEMS = 500  # TBD: make this a config?
 
+
 class ObjDB():
     """ Domain level object map """
     def __init__(self, http_conn, expire_time=0.0, max_age=0.0, max_objects=None):
