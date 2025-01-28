@@ -136,7 +136,11 @@ class TestTrackOrder(TestCase):
         print(f"filename: {filename}")
         # use max_age as 0 because pending writes messes up the tracking order
         # TBD: find work-around for this
-        with h5py.File(filename, 'w', max_age=0.0) as f:
+        if config.get('use_h5py'):
+            kwds = {}
+        else:
+            kwds = {"max_age": 0.0}
+        with h5py.File(filename, 'w', **kwds) as f:
             grp1 = f.create_group('grp1', track_order=True)
             self.fill_attrs(grp1)
             self.assertEqual(list(grp1.attrs), list(self.titles))
@@ -159,7 +163,11 @@ class TestTrackOrder(TestCase):
         filename = self.getFileName("test_test_track_order_attribute")
         print(f"filename: {filename}")
         cfg = h5py.get_config()
-        with h5py.File(filename, 'w', max_age=0.0) as f:
+        if config.get('use_h5py'):
+            kwds = {}
+        else:
+            kwds = {"max_age": 0.0}
+        with h5py.File(filename, 'w', **kwds) as f:
             cfg.track_order = True
             grp1 = f.create_group('grp1')
             dset1 = f.create_dataset('dset1', data=[42,])
@@ -178,7 +186,11 @@ class TestTrackOrder(TestCase):
     def test_no_track_order(self):
         filename = self.getFileName("test_test_no_track_order_attribute")
         print(f"filename: {filename}")
-        f = h5py.File(filename, 'w', max_age=0.0)
+        if config.get('use_h5py'):
+            kwds = {}
+        else:
+            kwds = {"max_age": 0.0}
+        f = h5py.File(filename, 'w', **kwds)
         g1 = f.create_group('test')  # name alphanumeric
         self.fill_attrs(g1)
         self.assertEqual(list(g1.attrs), sorted(list(self.titles)))
@@ -186,7 +198,11 @@ class TestTrackOrder(TestCase):
     def test_track_order_overwrite_delete(self):
         filename = self.getFileName("test_test_track_order_overwrite_delete")
         print(f"filename: {filename}")
-        f = h5py.File(filename, 'w', max_age=0.0)
+        if config.get('use_h5py'):
+            kwds = {}
+        else:
+            kwds = {"max_age": 0.0}
+        f = h5py.File(filename, 'w', **kwds)
 
         g1 = f.create_group("g1", track_order=True)  # creation order
         self.fill_attrs(g1)
@@ -207,7 +223,11 @@ class TestTrackOrder(TestCase):
         """
         filename = self.getFileName("test_test_track_order_not_inherited")
         print(f"filename: {filename}")
-        f = h5py.File(filename, 'w', track_order=True, max_age=0.0)
+        if config.get('use_h5py'):
+            kwds = {}
+        else:
+            kwds = {"max_age": 0.0}
+        f = h5py.File(filename, 'w', track_order=True, **kwds)
         g1 = f.create_group('test')
         self.fill_attrs(g1)
 

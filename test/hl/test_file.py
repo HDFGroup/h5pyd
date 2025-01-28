@@ -413,7 +413,11 @@ class TestTrackOrder(TestCase):
         filename = self.getFileName("test_track_order_file")
         print(f"filename: {filename}")
         # write file using creation order
-        with h5py.File(filename, 'w', track_order=True, max_age=0.0) as f:
+        if config.get('use_h5py'):
+            kwds = {}
+        else:
+            kwds = {"max_age": 0.0}
+        with h5py.File(filename, 'w', track_order=True, **kwds) as f:
             self.populate(f)
             self.assertEqual(list(f), list(self.titles))
             self.assertEqual(list(f.attrs), list(self.titles))
@@ -429,7 +433,11 @@ class TestTrackOrder(TestCase):
         # write file using creation order
         cfg = h5py.get_config()
         cfg.track_order = True
-        with h5py.File(filename, 'w', max_age=0.0) as f:
+        if config.get('use_h5py'):
+            kwds = {}
+        else:
+            kwds = {"max_age": 0.0}
+        with h5py.File(filename, 'w', **kwds) as f:
             self.populate(f)
             self.assertEqual(list(f), list(self.titles))
             self.assertEqual(list(f.attrs), list(self.titles))
