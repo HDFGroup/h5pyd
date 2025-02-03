@@ -1,4 +1,4 @@
-.. currentmodule:: h5py
+.. currentmodule:: h5pyd
 .. _dataset:
 
 
@@ -10,7 +10,7 @@ data elements, with an immutable datatype and (hyper)rectangular shape.
 Unlike NumPy arrays, they support a variety of transparent storage features
 such as compression, error-detection, and chunked I/O.
 
-They are represented in h5py by a thin proxy class which supports familiar
+They are represented in h5pyd by a thin proxy class which supports familiar
 NumPy operations like slicing, along with a variety of descriptive attributes:
 
   - **shape** attribute
@@ -19,10 +19,10 @@ NumPy operations like slicing, along with a variety of descriptive attributes:
   - **dtype** attribute
   - **nbytes** attribute
 
-h5py supports most NumPy dtypes, and uses the same character codes (e.g.
+h5pyd supports most NumPy dtypes, and uses the same character codes (e.g.
 ``'f'``, ``'i8'``) and dtype machinery as
 `Numpy <https://docs.scipy.org/doc/numpy/reference/arrays.dtypes.html>`_.
-See :ref:`faq` for the list of dtypes h5py supports.
+See :ref:`faq` for the list of dtypes h5pyd supports.
 
 
 .. _dataset_create:
@@ -86,16 +86,13 @@ Here are a few examples (output omitted).
     >>> dset[...,6]
     >>> dset[()]
 
-There's more documentation on what parts of numpy's :ref:`fancy indexing <dataset_fancy>` are available in h5py.
+There's more documentation on what parts of numpy's :ref:`fancy indexing <dataset_fancy>` are available in h5pyd.
 
 For compound data, it is advised to separate field names from the
 numeric slices::
 
     >>> dset.fields("FieldA")[:10]   # Read a single field
     >>> dset[:10]["FieldA"]          # Read all fields, select in NumPy
-
-It is also possible to mix indexing and field names (``dset[:10, "FieldA"]``),
-but this might be removed in a future version of h5py.
 
 To retrieve the contents of a `scalar` dataset, you can use the same
 syntax as in NumPy:  ``result = dset[()]``.  In other words, index into
@@ -105,13 +102,12 @@ For simple slicing, broadcasting is supported:
 
     >>> dset[0,:,:] = np.arange(10)  # Broadcasts to (10,10)
 
-Broadcasting is implemented using repeated hyperslab selections, and is
-safe to use with very large target selections.  It is supported for the above
-"simple" (integer, slice and ellipsis) slicing only.
+Broadcasting is implemented on HSDS and using it can reduce the 
+amount of data that needs to be transferred to the server.
+It is supported for the above "simple" (integer, slice and ellipsis) slicing only.
 
 .. warning::
-   Currently h5py does not support nested compound types, see :issue:`1197` for
-   more information.
+   Currently h5pyd does not support nested compound types 
 
 Multiple indexing
 ~~~~~~~~~~~~~~~~~
@@ -120,7 +116,7 @@ Indexing a dataset once loads a numpy array into memory.
 If you try to index it twice to write data, you may be surprised that nothing
 seems to have happened:
 
-   >>> f = h5py.File('my_hdf5_file.h5', 'w')
+   >>> f = h5pyd.File('/my_hdf5_file.h5', 'w')
    >>> dset = f.create_dataset("test", (2, 2))
    >>> dset[0][1] = 3.0  # No effect!
    >>> print(dset[0][1])
@@ -151,24 +147,22 @@ axis, and iterating over a dataset iterates over the first axis.  However,
 modifications to the yielded data are not recorded in the file.  Resizing a
 dataset while iterating has undefined results.
 
-On 32-bit platforms, ``len(dataset)`` will fail if the first axis is bigger
-than 2**32. It's recommended to use :meth:`Dataset.len` for large datasets.
-
 .. _dataset_chunks:
 
 Chunked storage
 ---------------
 
-An HDF5 dataset created with the default settings will be `contiguous`; in
-other words, laid out on disk in traditional C order.  Datasets may also be
-created using HDF5's `chunked` storage layout.  This means the dataset is
-divided up into regularly-sized pieces which are stored haphazardly on disk,
-and indexed using a B-tree.
+In HSDS the default storage layout for HDF5 datasets is `chunked`; in
+other words, the dataset is divided up into regularly-sized pieces which are 
+each stored separately in the storage system (i.e. a file when POSIX storage is used
+or as a object for AWS S3 or Azure Blob Storage).  
 
 Chunked storage makes it possible to resize datasets, and because the data
-is stored in fixed-size chunks, to use compression filters.
+is stored in fixed-size chunks, to use compression filters.  Also in HSDS,
+having a dataset divided into smaller chunks enables parallelization for dataset
+read and write operations.
 
-To enable chunked storage, set the keyword ``chunks`` to a tuple indicating
+To set the chunked storage layout, set the keyword ``chunks`` to a tuple indicating
 the chunk shape::
 
     >>> dset = f.create_dataset("chunked", (1000, 1000), chunks=(100, 100))
@@ -178,17 +172,14 @@ the data in ``dset[0:100,0:100]`` will be stored together in the file, as will
 the data points in range ``dset[400:500, 100:200]``.
 
 Chunking has performance implications.  It's recommended to keep the total
-size of your chunks between 10 KiB and 1 MiB, larger for larger datasets.
-Also keep in mind that when any element in a chunk is accessed, the entire
-chunk is read from disk.
+size of your chunks between 1 MiB and 8 MiB.
 
-Since picking a chunk shape can be confusing, you can have h5py guess a chunk
+Since picking a chunk shape can be confusing, you can have h5pyd guess a chunk
 shape for you::
 
     >>> dset = f.create_dataset("autochunk", (1000, 1000), chunks=True)
-
-Auto-chunking is also enabled when using compression or ``maxshape``, etc.,
-if a chunk shape is not manually specified.
+    >>> dset.chunks
+    (313, 32)
 
 The iter_chunks method returns an iterator that can be used to perform chunk by chunk
 reads or writes::
@@ -229,8 +220,8 @@ Filter pipeline
 ---------------
 
 Chunked data may be transformed by the HDF5 `filter pipeline`.  The most
-common use is applying transparent compression.  Data is compressed on the
-way to disk, and automatically decompressed when read.  Once the dataset
+common use is applying transparent compression.  Data is compressed by HSDS 
+before writing to storage, and automatically decompressed when read.  Once the dataset
 is created with a particular compression filter applied, data may be read
 and written as normal with no special steps required.
 
@@ -247,47 +238,30 @@ Lossless compression filters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 GZIP filter (``"gzip"``)
-    Available with every installation of HDF5, so it's best where portability is
+    Available with HSDS and every installation of HDF5, so it's best where portability is
     required.  Good compression, moderate speed.  ``compression_opts`` sets the
     compression level and may be an integer from 0 to 9, default is 4.
 
+'blosclz', 'lz4', 'lz4hc', 'gzip', 'zstd',
 
-LZF filter (``"lzf"``)
-    Available with every installation of h5py (C source code also available).
-    Low to moderate compression, very fast.  No options.
+BLOSCLZ filter (``"blosclz"``)
+    TBD
 
+LZ4 filter (``"lz4"``)
+    TBD
 
-SZIP filter (``"szip"``)
-    Patent-encumbered filter used in the NASA community.  Not available with all
-    installations of HDF5 due to legal reasons.  Consult the HDF5 docs for filter
-    options.
+LZ4HC filter (``"lz4hc"``)
+    TBD
 
-Custom compression filters
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In addition to the compression filters listed above, compression filters can be
-dynamically loaded by the underlying HDF5 library. This is done by passing a
-filter number to :meth:`Group.create_dataset` as the ``compression`` parameter.
-The ``compression_opts`` parameter will then be passed to this filter.
-
-.. seealso::
-
-   `hdf5plugin <https://pypi.org/project/hdf5plugin/>`_
-     A Python package of several popular filters, including Blosc, LZ4 and ZFP,
-     for convenient use with h5py
-
-   `HDF5 Filter Plugins <https://github.com/HDFGroup/hdf5_plugins/releases>`_
-     A collection of filters as a single download from The HDF Group
-
-   `Registered filter plugins <https://github.com/HDFGroup/hdf5_plugins/blob/master/docs/RegisteredFilterPlugins.md>`_
-     The index of publicly announced filter plugins
-
-.. note:: The underlying implementation of the compression filter will have the
-    ``H5Z_FLAG_OPTIONAL`` flag set. This indicates that if the compression
-    filter doesn't compress a block while writing, no error will be thrown. The
-    filter will then be skipped when subsequently reading the block.
+ZSTD filter (``"zste"``)
+    TBD
 
 
+.. note::
+
+    Since compression is done server-side, custom compression filters as used
+    with the HDF5 library are not supported. 
+ 
 .. _dataset_scaleoffset:
 
 Scale-Offset filter
@@ -306,25 +280,23 @@ HDF5 automatically compute the number of bits required for lossless compression
 of the chunk.  For floating-point data, indicates the number of digits after
 the decimal point to retain.
 
-.. warning::
-    Currently the scale-offset filter does not preserve special float values
-    (i.e. NaN, inf), see
-    https://forum.hdfgroup.org/t/scale-offset-filter-and-special-float-values-nan-infinity/3379
-    for more information and follow-up.
+.. note::
 
+    In the current HSDS release, the Scale-offset filter is not supported.  It
+    can be specified with dataset_create in h5pyd, but will have no effect on
+    how data actually gets stored on the server.
 
+ 
 .. _dataset_shuffle:
 
 Shuffle filter
 ~~~~~~~~~~~~~~
 
-Block-oriented compressors like GZIP or LZF work better when presented with
+Block-oriented compressors like GZIP or BLOSCZL work better when presented with
 runs of similar values.  Enabling the shuffle filter rearranges the bytes in
-the chunk and may improve compression ratio.  No significant speed penalty,
-lossless.
+the chunk and may improve compression ratio.   
 
 Enable by setting :meth:`Group.create_dataset` keyword ``shuffle`` to True.
-
 
 .. _dataset_fletcher32:
 
@@ -336,6 +308,12 @@ corrupted chunks will fail with an error.  No significant speed penalty.
 Obviously shouldn't be used with lossy compression filters.
 
 Enable by setting :meth:`Group.create_dataset` keyword ``fletcher32`` to True.
+
+.. note::
+
+    In the current HSDS release, the Fletche32 filter is not supported.  It
+    can be specified with dataset_create in h5pyd, but will have no effect on
+    how data actually gets accessed on the server.
 
 .. _dataset_multi_block:
 
@@ -362,6 +340,10 @@ They can be used in multi-dimensional slices alongside any slicing object,
 including other MultiBlockSlices. For a more complete example of this,
 see the multiblockslice_interleave.py example script.
 
+.. note::
+
+    Multi-Block selection is not currently supported.
+
 .. _dataset_fancy:
 
 Fancy indexing
@@ -383,11 +365,24 @@ dataset with shape (10, 10)::
     >>> result.shape
     (5, 3)
 
-The following restrictions exist:
+.. note::
 
-* Selection coordinates must be given in increasing order
-* Duplicate selections are ignored
-* Very long lists (> 1000 elements) may produce poor performance
+    With h5py and the HDF5 library, performance using Fancy indexing can
+    be sub-optimal for selections using a large number of coordinates.  This is generally not
+    an issue with h5pyd and HSDS.   Typically you should see much better performance
+    using Fancy Indexing compared with iteration through a list of coordinates.
+
+You can also use fancy-indexing on multiple axes:
+
+    >>> dse.shape
+    (10, 10, 10)
+    >>> result = dset[[2,6,8], :, [3,5,9]]
+    >>> result.shape
+    (3,10)
+
+.. note::
+
+    Fancy-indexing on multiple axes is not supported with h5py and the HDF5 library.
 
 NumPy boolean "mask" arrays can also be used to specify a selection.  The
 result of this operation is a 1-D array with elements arranged in the
@@ -400,10 +395,6 @@ list of points to select, so be careful when using it with large masks::
     >>> result.shape
     (49,)
 
-.. versionchanged:: 2.10
-   Selecting using an empty list is now allowed.
-   This returns an array with length 0 in the relevant dimension.
-
 .. _dataset_empty:
 
 Creating and Reading Empty (or Null) datasets and attributes
@@ -412,26 +403,26 @@ Creating and Reading Empty (or Null) datasets and attributes
 HDF5 has the concept of Empty or Null datasets and attributes. These are not
 the same as an array with a shape of (), or a scalar dataspace in HDF5 terms.
 Instead, it is a dataset with an associated type, no data, and no shape. In
-h5py, we represent this as either a dataset with shape ``None``, or an
-instance of ``h5py.Empty``. Empty datasets and attributes cannot be sliced.
+h5pyd, we represent this as either a dataset with shape ``None``, or an
+instance of ``h5pyd.Empty``. Empty datasets and attributes cannot be sliced.
 
-To create an empty attribute, use ``h5py.Empty`` as per :ref:`attributes`::
+To create an empty attribute, use ``h5pyd.Empty`` as per :ref:`attributes`::
 
-    >>> obj.attrs["EmptyAttr"] = h5py.Empty("f")
+    >>> obj.attrs["EmptyAttr"] = h5pyd.Empty("f")
 
-Similarly, reading an empty attribute returns ``h5py.Empty``::
+Similarly, reading an empty attribute returns ``h5pyd.Empty``::
 
     >>> obj.attrs["EmptyAttr"]
-    h5py.Empty(dtype="f")
+    h5pyd.Empty(dtype="f")
 
 Empty datasets can be created either by defining a ``dtype`` but no
 ``shape`` in ``create_dataset``::
 
     >>> grp.create_dataset("EmptyDataset", dtype="f")
 
-or by ``data`` to an instance of ``h5py.Empty``::
+or by ``data`` to an instance of ``h5pyd.Empty``::
 
-    >>> grp.create_dataset("EmptyDataset", data=h5py.Empty("f"))
+    >>> grp.create_dataset("EmptyDataset", data=h5pyd.Empty("f"))
 
 An empty dataset has shape defined as ``None``, which is the best way of
 determining whether a dataset is empty or not. An empty dataset can be "read" in
@@ -439,7 +430,7 @@ a similar way to scalar datasets, i.e. if ``empty_dataset`` is an empty
 dataset::
 
     >>> empty_dataset[()]
-    h5py.Empty(dtype="f")
+    h5pyd.Empty(dtype="f")
 
 The dtype of the dataset can be accessed via ``<dset>.dtype`` as per normal.
 As empty datasets cannot be sliced, some methods of datasets such as
@@ -453,7 +444,7 @@ Reference
     Dataset objects are typically created via :meth:`Group.create_dataset`,
     or by retrieving existing datasets from a file.  Call this constructor to
     create a new Dataset bound to an existing
-    :class:`DatasetID <low:h5py.h5d.DatasetID>` identifier.
+    :class:`DatasetID <low:h5pyd.DatasetID>` identifier.
 
     .. method:: __getitem__(args)
 
@@ -469,7 +460,7 @@ Reference
         A dataset could be inaccessible for several reasons. For instance, the
         dataset, or the file it belongs to, may have been closed elsewhere.
 
-        >>> f = h5py.open(filename)
+        >>> f = h5pyd.open(domain_path)
         >>> dset = f["MyDS"]
         >>> f.close()
         >>> if dset:
@@ -478,13 +469,18 @@ Reference
         ...     print("dataset inaccessible")
         dataset inaccessible
 
+    
+    .. method:: flush()
+
+        Force any pending persist updates to to be sent to the server.
+
     .. method:: read_direct(array, source_sel=None, dest_sel=None)
 
         Read from an HDF5 dataset directly into a NumPy array, which can
         avoid making an intermediate copy as happens with slicing. The
         destination array must be C-contiguous and writable, and must have
         a datatype to which the source data may be cast.  Data type conversion
-        will be carried out on the fly by HDF5.
+        will be carried out on the fly.
 
         `source_sel` and `dest_sel` indicate the range of points in the
         dataset and destination array respectively.  Use the output of
@@ -505,15 +501,14 @@ Reference
     .. method:: astype(dtype)
 
         Return a wrapper allowing you to read data as a particular
-        type.  Conversion is handled by HDF5 directly, on the fly::
+        type::
 
             >>> dset = f.create_dataset("bigint", (1000,), dtype='int64')
             >>> out = dset.astype('int16')[:]
             >>> out.dtype
             dtype('int16')
 
-        .. versionchanged:: 3.9
-           :meth:`astype` can no longer be used as a context manager.
+        TBD: this example is not working
 
     .. method:: asstr(encoding=None, errors='strict')
 
@@ -525,8 +520,6 @@ Reference
        encoding and errors work like ``bytes.decode()``, but the default
        encoding is defined by the datatype - ASCII or UTF-8.
        This is not guaranteed to be correct.
-
-       .. versionadded:: 3.0
 
     .. method:: fields(names)
 
@@ -555,8 +548,6 @@ Reference
 
        A ValueError will be raised if the selection region is invalid.
 
-       .. versionadded:: 3.0
-
     .. method:: resize(size, axis=None)
 
         Change the shape of a dataset.  `size` may be a tuple giving the new
@@ -579,14 +570,6 @@ Reference
 
        You can optionally pass a name to associate with this scale.
 
-    .. method:: virtual_sources
-
-       If this dataset is a :doc:`virtual dataset </vds>`, return a list of
-       named tuples: ``(vspace, file_name, dset_name, src_space)``,
-       describing which parts of the dataset map to which source datasets.
-       The two 'space' members are low-level
-       :class:`SpaceID <low:h5py.h5s.SpaceID>` objects.
-
     .. attribute:: shape
 
         NumPy-style shape tuple giving dataset dimensions.
@@ -606,8 +589,6 @@ Reference
         as datasets may be compressed when written or only partly filled with data.
         This value also does not include the array overhead, as it only describes the size of the data itself.
         Thus the real amount of RAM occupied by this dataset may be slightly greater.
-
-        .. versionadded:: 3.0
 
     .. attribute:: ndim
 
@@ -655,13 +636,13 @@ Reference
 
     .. attribute:: external
 
-       If this dataset is stored in one or more external files, this is a list
-       of 3-tuples, like the ``external=`` parameter to
-       :meth:`Group.create_dataset`. Otherwise, it is ``None``.
+       This is used by h5py to indicate if the dataset is stored in one or more external files.
+       With h5pyd this always returns ``None``.  
 
     .. attribute:: is_virtual
 
        True if this dataset is a :doc:`virtual dataset </vds>`, otherwise False.
+       Always returns False in h5pyd.
 
     .. attribute:: dims
 
@@ -688,8 +669,9 @@ Reference
 
     .. attribute:: regionref
 
-        Proxy object for creating HDF5 region references.  See
-        :ref:`refs_region`.
+        Proxy object for creating HDF5 region references.  Not
+        yet supported in h5pyd.  
+        See :ref:`refs_region`.
 
     .. attribute:: name
 
@@ -702,3 +684,21 @@ Reference
     .. attribute:: parent
 
         :class:`Group` instance containing this dataset.
+
+    .. attribute:: num_chunks
+
+        Returns the number of allocated chunks used by this dataset.
+        Non-synchronous, value may not reflect the current state of
+        the dataset.
+
+Multi-Manager
+-------------
+
+Accessing a large number of selections in a dataset, or selections from a 
+large number of datasets can be slow to access selection by selection.
+For better performance in this case, you can use the Multi-Manager class.
+This class enables multiple selections to be read or written in parallel for
+better performance.
+
+TBD
+        

@@ -9,12 +9,12 @@ dimension scale is simply another HDF5 dataset. In principle, the length of the
 multidimensional array along the dimension of interest should be equal to the
 length of the dimension scale, but HDF5 does not enforce this property.
 
-The HDF5 library provides the H5DS API for working with dimension scales. H5py
-provides low-level bindings to this API in :mod:`h5py.h5ds`. These low-level
-bindings are in turn used to provide a high-level interface through the
+The HDF5 library provides the H5DS API for working with dimension scales. H5pyd
+provides an equivalent low-level API in :mod:`h5py.h5ds`. These low-level
+methods are in turn used to provide a high-level interface through the
 ``Dataset.dims`` property. Suppose we have the following data file::
 
-    f = File('foo.h5', 'w')
+    f = File('/foo.h5', 'w')
     f['data'] = np.ones((4, 3, 2), 'f')
 
 HDF5 allows the dimensions of ``data`` to be labeled, for example::
@@ -94,7 +94,8 @@ returned. There is no guarantee that the name of the dimension scale is unique.
 
 
 Nested dimension scales are not permitted: if a dataset has a dimension scale
-attached to it, converting the dataset to a dimension scale will fail, since the
+attached to it, converting the dataset to a dimension scale will fail, since that
+would create nested dimension scales.
 `HDF5 specification doesn't allow this <https://support.hdfgroup.org/documentation/hdf5/latest/group___h5_d_s.html#ga508a06962e9fc11dff32ed356e0a71fa>`_. ::
 
    >>> f['data'].make_scale()

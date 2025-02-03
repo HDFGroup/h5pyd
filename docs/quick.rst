@@ -70,8 +70,12 @@ Core concepts
 -------------
 
 While the HDF5 library works with files on a POSIX filesystem (typically a local disk or network mount), 
-with h5pyd all access to data storage is mediated by HSDS.  For example, HSDS may be configured to use 
-AWS storage that you don't have permissions to view directly. 
+with h5pyd all access to data storage is mediated by HSDS.  In general, you may not have direct access to
+the storage HSDS uses to store data.  For example, HSDS may be configured to use 
+an AWS storage bucket that you don't have permissions to view directly. On the other hand, HSDS and h5pyd
+provide APIs and tools for managing your data effectively.  So, while with h5py on a Linux system you 
+would delete an HDF5 file using ``rm myfile.h5``, with the h5pyd CLI tools you would run:
+``hsrm /home/myfolder/myfile.h5``.
 
 To make keeping track of everything  easier, HSDS manages storage using three levels of organization:
 
@@ -82,12 +86,16 @@ To make keeping track of everything  easier, HSDS manages storage using three le
 Buckets are the top-level of storage used by HSDS and will correspond to AWS S3 Buckets, Azure Blob Containers, or POSIX directories.
 Buckets can not be created using the h5pyd package (these need to be setup by the HSDS administrator), 
 but the h5pyd File and Folder object have an optional bucket parameter to specify which
-bucket to access.  Typically HSDS will be setup with a default bucket that will be used if no bucket name is given explicitly. 
+bucket to access.  Typically HSDS will be setup with a default bucket that will be used if no bucket name is given explicitly.
+To access a domain or folder that is not on the default bucket, you can use the ``--bucket`` option with the h5pyd CLI
+tools, or the bucket parameter with the h5pyd.File and h5pyd.Folder constructors. 
 
-Folders can be created using h5pyd (or the hstouch CLI tool).  To use hstouch to create a folder, run hstouch followed by
-the path to the desired folder.  E.g. ``hstouch /home/$USER/myfolder/``.  In h5oyd, there no 'current folder' concept,
-so the path must always start with ``/`` (or if desired, ``hdf5://`` to distinguish from a POSIX path).  Also, to create
-folder, the path must end in a slash.  To view the contents of a folder, use the ``hsls`` tool.  E.g.:
+Folders can be created programmatically using h5pyd Folder class or with the hstouch CLI tool.  
+To use hstouch to create a folder, run hstouch followed by
+the path to the desired folder.  E.g. ``hstouch /home/$USER/myfolder/``.  
+In h5pyd, there no 'current directory' concept, so the path must always start with ``/`` 
+(or if desired, ``hdf5://`` to distinguish from a POSIX path).  
+Also,  the path must end in a slash.  To view the contents of a folder, use the ``hsls`` tool.  E.g.:
 ``hsls /home/$USER/myfolder/``. 
 
 Folder can contain sub-folders, but also domains (equivalent to an HDF5 file).  As with HDF5 files, 
@@ -98,24 +106,25 @@ when using h5pyd (as with h5py) is:
 
     **Groups work like dictionaries, and datasets work like NumPy arrays**
 
-Domains can be created programmatically, or using the CLI tools.  E.g. ``hstouch /home/$USER/myfolder/mytestfile.h5``.
+As with folders, domains can be created programmatically, or using the CLI tools.  E.g. you can create a domain mytestfile.h5 using
+ ``hstouch /home/$USER/myfolder/mytestfile.h5``.
 To convert an HDF5 file to an HSDS domain, you can use the hscp command: ``hscp mytestfile.h5 /home/$USER/myfolder/``.
 
 A quick note on domain permissions:  When you create a new domain, it will only be accessible using your 
 credentials.  You can enable who else can access the domain using the hsacl tool.  For example, to enable 
 other users to read a domain (but not modify it) use: ``hsacl /home/$USER/myfolder/mytest.h5 +r default``.  
-For details of using hsacl, see: tbd.
+For more details on how ACLs work, see: tbd.
 
 To programmatically access a domain for reading for reading, use the h5pyd.File object::
 
     >>> import h5pyd as h5py
     >>> f = h5py.File('/home/test_user1/mytestfile.h5', 'r')  # replace test_user1 with your user name
 
-The :ref:`File object <file>` is your starting point. If you are familiar with h5py, the rest of this section will be 
+The :ref:`File object <file>` is your starting point for accessing all the objects that are in the domain. 
+If you are familiar with h5py, the rest of this section will be 
 exactly the same as to what you'd expect opening an HDF5 file.  In you are not familiar with h5py, keep reading, but
 keep in mind that this will apply to both h5py and h5pyd.
    
-
 What is stored in the domain? Remember :py:class:`h5pyd.File` 
 acts like a Python dictionary, thus we can check the keys,
 
@@ -147,6 +156,10 @@ from a dataset in the file::
     array([ 0, 10, 20, 30, 40, 50, 60, 70, 80, 90])
 
 For more, see :ref:`file` and :ref:`dataset`.
+
+There is also a specialized class for working with tabular data: Tables.  Tables extends the 
+Dataset class with some properties and methods specific to this type of data.  For more information
+see: tbd.
 
 Creating a domain programmatically
 ++++++++++++++++++++++++++++++++++

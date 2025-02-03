@@ -740,6 +740,16 @@ class Dataset(HLObject):
         self._getVerboseInfo()
         return self._allocated_size
 
+    @property
+    def external(self):
+        """ h5py compability method """
+        return False
+
+    @property
+    def is_virtual(self):
+        """ h5py compatibility method """
+        return False
+
     def __init__(self, bind, track_order=None):
         """Create a new Dataset object by binding to a low-level DatasetID."""
 

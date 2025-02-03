@@ -6,7 +6,7 @@ File Objects
 ============
 
 File objects serve as your entry point into the world of HDF5.  While an h5py file object
-corresponds to a POSIX file, in h5pyd a file object represents a HSDS ``domain`` .
+corresponds to a POSIX file, in h5pyd a file object represents an HSDS ``domain``.
 Like HDF5 files, an HSDS domain is a hierarchical collection of groups and datasets.  
 Unlike an HDF5 file though, the storage for a domain is managed by HSDS and clients may
 not have direct access to the storage medium (e.g. an S3 bucket in which the user does not
@@ -94,7 +94,7 @@ Authentication
 
 In most cases HSDS will reject requests that don't provide some form of authentication.  
 The HSDS username and password can be supplied by using the ``username`` and ``password``
-arguments.  In addition the desired HSDS endpoint can be specified using ``endpoint``.
+arguments.  In addition the desired HSDS endpoint can be specified using the ``endpoint`` argument.
 For example:
 
 .. code-block::
@@ -111,10 +111,10 @@ The username, password, and endpoint provided will be stored with the File objec
 authenticate any requests sent to HSDS for operations on this domain.  If the username
 and password given are invalid, a ``401 - Unauthorized`` error will be raised. 
 
-Of course it's not best practice to hardcode usernames and passwords, so alternatively the environment variables
-``HS_USERNAME``, ``HS_PASSWORD``, and ``HS_ENDPOINT`` can be used to store the user credentials and endpoint.  If 
-username, password, and endpoint arguments are not provided, the respective environment variables will be used
-if set.
+Of course it's not best practice to hardcode usernames and passwords in the code, so alternatively 
+the environment variables ``HS_USERNAME``, ``HS_PASSWORD``, and ``HS_ENDPOINT`` can be used to store 
+the user credentials and endpoint.  If username, password, and endpoint arguments are not provided, 
+the respective environment variables will be used if set.
 
 If neither named parameters or environment variables are supplied, this information will be read from
 the file ``.hscfg`` in the users home directory.  The ``.hscfg`` can be created using the ``hsconfigure`` 
@@ -167,32 +167,30 @@ admin credentials when there's no alternative (e.g. you accidentally removed per
 Caching
 -------
 
-When a domain is open for reading, h5pyd will by default, cache certain metadata from  the domain 
-(e.g. links in a group), so that it doesn't 
-have to repeatedly request information from the HSDS instance associated with the domain.   This is good for performance
-(requests to HSDS generally have higher latency than reading from a file), but in cases where the domain is being actively modified, 
-it may not be what you want.  For example, suppose a sensor of some sort was setup so that readings from the previous time 
+When data for a domain is fetched from HSDS, by default h5pyd will cache metadata 
+(e.g. links in a group), so that the client doesn't have to repeatedly request the same information from HSDS.   
+This is good for performance (requests to HSDS generally have higher latency than reading from a file), 
+but in cases where the domain is being actively modified, it may not be what you want.  
+For example, suppose a sensor of some sort was setup so that readings from the previous time 
 period was appended to a dataset every second.  By default, h5pyd won't know to check that the dataset shape has
 been modified, so a program written to plot real-time readings wouldn't see any updates.
-To avoid this, setting ``use_swmr`` to True will instruct h5pyd to not cache any data, so 
-any operation will fetch the current data from HSDS.  See: (tbd) for more details.  
+To avoid this, setting ``use_swmr`` to ``True`` will instruct h5pyd to not cache any data, so 
+any operation will fetch the current data from HSDS.  See: (tbd) for more details.
+
+Another approach would be to use the ``refresh`` method on any object that you suspect may be modified
+externally.  This will cause h5pyd to delete any cached metadata and request the current state from HSDS.
 
 .. _file_flush:
 
 Flushing
 --------
 
-For performance reasons, HSDS will not immediately write updates to a domain while processing 
-the request that made the update.
-Rather, the modifications will live in a server-side memory cache of "dirty" objects.  
-These objects will get written to storage periodically (every one second by default).  
+For performance reasons, some updates to the domain may be held in a memory cache before being sent to HSDS.
+Pending updates will get sent to the service periodically or at the latest when the file is closed. 
 This is very similar in concept to how writes to a POSIX file don't immediately
-get written to disk, but will be managed by the file controller.  
-With h5pyd, if HSDS unfortunately crashed just after processing a series of 
-PUT or POST requests, these changes would not get published to the storage device and as a result be lost.
-
-If you need to make absolutely certain that recent updates have been persisted, use the flush method.  This call
-won't return until HSDS has verified that all pending updates have been written to permanent storage.
+get written to disk, but will be managed by the file controller. 
+This normally has no impact on the application behavior, but if you wish to have changes immediately sent to the service,
+you can use :meth:`~.File.flush`.  This will force any pending changes to be sent to the service.
 
 
 .. _file_closing:
@@ -200,17 +198,40 @@ won't return until HSDS has verified that all pending updates have been written 
 Closing domains
 ---------------
 
-Objects in HSDS are stateless - i.e. at the level of the REST interface, the server doesn't
-utilize any session information in responding to requests.  So an "open" vs. "closed"
-domain is a concept that only applies at the client level.  The h5pyd file object
-does use the close method to do some internal housekeeping however.  For example, closing
-the http connection with the HSDS.  So invoking close on h5pyd file object is good best practice,
-but not a critical as with h5py.
 
-The close method will be invoked automatically when you leave the ``with h5py.File(...)`` block.
+If you call :meth:`File.close`, or leave a ``with h5py.File(...)`` block,
+the file instance will be closed and any objects (such as groups or datasets) you have
+from that file will become unusable. This is equivalent to what HDF5 calls
+'strong' closing.
 
-The close method does have an optional parameter not found in h5yd: ``flush``.
-See See :ref:`file_flush` .
+If a file object goes out of scope in your Python code, the file will only
+be closed when there are no remaining objects belonging to it. This is what
+HDF5 calls 'weak' closing.
+
+.. code-block::
+
+    with h5pdy.File('/data/f1.h5', 'r') as f1:
+        ds = f1['dataset']
+
+    # ERROR - can't access dataset, because f1 is closed:
+    ds[0]
+
+    def get_dataset():
+        f2 = h5pyd.File('/data/f2.h5', 'r')
+        return f2['dataset']
+    ds = get_dataset()
+
+    # OK - f2 is out of scope, but the dataset reference keeps it open:
+    ds[0]
+
+    del ds  # Now f2.h5 will be closed
+
+Closing the domain will commit any pending changes to HSDS (see the "Flushing" section above),
+as well as release any local resources associated with the domain (e.g. cached data).  So
+it's best practice to have the domain closed explicitly with :meth:`File.close`, or by leaving
+ a ``with h5py.File(...)`` block
+rather than relying on the File reference to go out of scope.
+
 
 
 .. _file_delete:
@@ -223,6 +244,8 @@ With h5py and the HDF5 library you would normally delete HDF5 files using your s
 command.  Programmatically you could delete a HDF5 file using the standard Python Path.unlink method.
 None of these options are possible with HSDS domains, but the ``hsrm`` (see: tbd) command is included with
 h5pyd and works like the standard ``rm`` command with domain paths used instead of file paths.
+
+Example: ``$ hsrm hdf5://home/test_user1/mydomain.h5``
 
 Programmatically, you can delete domains using the del method of the folder object (see: tbd).
 
@@ -379,7 +402,7 @@ Reference
 
     .. method:: flush()
 
-        Request that HSDS persist any recent updates to permanent storage
+        Force any pending persist updates to to be sent to the server.
 
     .. method:: getACLs()
 

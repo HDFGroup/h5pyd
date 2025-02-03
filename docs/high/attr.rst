@@ -32,14 +32,8 @@ specified globally with ``h5.get_config().track_order``.
 Large attributes
 ----------------
 
-HDF5 allows attributes to be larger than 64 KiB, but these need to be stored in
-a different way. As of March 2024, the way HDF5 documentation suggests you
-configure this does not work. Instead, enable order tracking when creating the
-object you want to attach attributes to::
-
-    grp = f.create_group('g', track_order=True)
-    grp.attrs['large'] = np.arange(1_000_000, dtype=np.uint32)
-
+These is no strict limit on the size of attributes, but it is recommended to use them
+only for data sizes less than 64 KiB.
 
 Reference
 ---------

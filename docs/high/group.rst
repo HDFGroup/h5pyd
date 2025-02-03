@@ -6,7 +6,7 @@ Groups
 ======
 
 
-Groups are the container mechanism by which HSDS domains (ans well 
+Groups are the container mechanism by which HSDS domains (as well 
 as HDF5 files) are organized.  
 From a Python perspective, they operate somewhat like dictionaries.  In this case
 the "keys" are the names of group members, and the "values" are the members
@@ -69,7 +69,7 @@ An anonymous group can be accessed using it's low-level id as
 in this example:
 
     >>> anon_grp = f.create_group(None)
-    >>> grp = f.getObjByUuid(anon_grp.id.id)  # another reference to anon_grp
+    >>> grp = f[anon_grp.id]  # another reference to anon_grp
     >>> f["g1"] = anon_grp  # link the grpup as "g1" of the root group
 
 .. note::
@@ -96,6 +96,7 @@ they support the indexing syntax, and standard exceptions:
     The keys(), values() and items() methods
     will return view-like objects instead of lists.  These objects support
     membership testing and iteration, but can't be sliced like lists.
+
 
 By default, objects inside a group are iterated in alphanumeric order.
 However, if group is created with ``track_order=True``, the insertion
@@ -125,7 +126,7 @@ To delete the object a link refers to, pass the UUID identifier of the
 object as the argument:
 
     >>> g1 = f.create_group('g1')  # create a new object
-    >>> del f[g1.id.id]            # now delete the object
+    >>> del f[g1.id]            # now delete the object
     >>> 'g1' in f                  # link "g1" still exists
     >>> del f['g1']                # delete the link  
 
@@ -212,54 +213,6 @@ link resides.
 
 .. _group_multilink:
 
-Multi-linking
-~~~~~~~~~~~~~
-
-Compared with accessing a disk file using HDF5, each request that is sent to HSDS will have higher
-latency.  Therefore for best performance, you'll want to reduce the number of requests being sent to the
-server as much as possible.  Multi-linking helps in this area by allowing multiple links to be 
-created, accessed, or deleted in one request.
-
-Consider the case where you'd like to add three soft links to the root group.
-The traditional way this would be done in h5py would be to add each link in turn:
-
-    >>> f = h5py.File('foo.hdf5', 'w')
-    >>> f['x'] = h5py.SoftLink('/g1.1/x')
-    >>> f['y'] = h5py.SoftLink('/g2.2/y')
-    >>> f['z'] = h5py.SoftLink('/g3.3/z')
-
-While this method works with h5pyd as well, with h5pyd it would be more efficient to 
-utilize multi-linking in this way:
-
-    >>> f = h5pyd.File('/home/test_user1/foo,h5', 'w')
-    >>> links = []
-    >>> links.append(h5py.SoftLink('/g1.1/x'))
-    >>> links.append(h5py.SoftLink('/g2.2/y'))
-    >>> links.append(h5py.SoftLink('/g3.3/z'))
-    >>> names = ['x', 'y', 'z']
-    >>> f[names] = links  # 3 links will be created in one request
- 
-To create multiple links in one call, just use a list of link names
-as the key and a list of link objects (HardLink, SoftLik, or ExternalLink)
-as the value (where the number of names is equal to the number of links).  
-The result will be the same as if you created the links 
-one by one, but the operation will take less time.
-
-Multi-linking can be used to fetch links as well.
-If you need to fetch a specific set of link names 
-from a group, you can do this:
-
-    >>> names = ['ACH293', 'BUR389', 'CDJ982']
-    >>> f.get(names, getlink=True)
-    {'ACH293': <HardLink to "g-1faa5ed5-740572c1-e32f-0a8a33-16d09a">, 
-     'BUR389': <HardLink to "g-1faa5ed5-740572c1-1738-e4a329-74cd22">, 
-     'CDJ392': <HardLink to "g-1faa5ed5-740572c1-b20f-5926cc-2503fb">}
-
-Multiple links can also be deleted simultaneously.  For example,
-
-    >>> names = ['ACH293', 'BUR389', 'CDJ982']
-    >>> del f[names]
-
 
 Reference
 ---------
@@ -293,7 +246,7 @@ Reference
     .. method:: __bool__()
 
         Check that the group is accessible.
-        Will always return True for a valid group reference
+        Will always return ``True`` for a valid group reference
 
     .. method:: keys()
 
@@ -323,15 +276,15 @@ Reference
         work like the standard Python ``dict.get``.
 
         :param name:    Name of the object to retrieve.  May be a relative or
-                        absolute path.
+                        absolute path, or an object id instance
         :param default: If the object isn't found, return this instead.
-        :param getclass:    If True, return the class of object instead;
+        :param getclass:    If ``True``, return the class of object instead;
                             :class:`Group` or :class:`Dataset`.
-        :param getlink: If true, return the type of link via a :class:`HardLink`,
+        :param getlink: If ``True``, return the type of link via a :class:`HardLink`,
                         :class:`SoftLink` or :class:`ExternalLink` instance.
-                        If ``getclass`` is also True, returns the corresponding
+                        If ``getclass`` is also ``True``, returns the corresponding
                         Link class without instantiating it.
-        :param track_order: If True, return links by creation order.  If False,
+        :param track_order: If ``True``, return links by creation order.  If False,
                         return link by alphanumeric order, if None, return links
                         based on the track_order setting in effect when the 
                         group was created.
@@ -502,17 +455,7 @@ Reference
 
         :keyword chunks:    Chunk shape, or True for auto-chunking.
 
-        
-
-    .. method:: getObjByUuid(obj_uuid)
-
-        Returns the object in the domain with the given low-level identifier UUID.   
-        Raises an IOError ("401 - Not Found")
-        if no object with the given identifier exists.
-
-       :param str obj_uuid:
-           Object identifier of the object to be returned.
-
+      
     .. attribute:: attrs
 
         :ref:`attributes` for this group.
