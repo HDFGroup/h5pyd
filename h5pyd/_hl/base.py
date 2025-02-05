@@ -227,7 +227,7 @@ def copyToArray(arr, rank, index, data, vlen_base=None):
             copyToArray(arr, rank + 1, index, data[i], vlen_base=vlen_base)
         else:
             if vlen_base:
-                if vlen_base == str:
+                if vlen_base in (str, bytes):
                     e = str(data[i])
                 else:
                     e = np.array(data[i], dtype=vlen_base)
