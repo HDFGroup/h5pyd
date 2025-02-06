@@ -351,14 +351,14 @@ class HttpConn:
 
             if token:
                 auth_string = b"Bearer " + token.encode("ascii")
-                headers["Authorization"] = auth_string
+                headers["Authorization"] = auth_string.decode("ascii")
         elif username is not None and password is not None:
             self.log.debug(f"use basic auth with username: {username}")
             auth_string = username + ":" + password
             auth_string = auth_string.encode("utf-8")
             auth_string = base64.b64encode(auth_string)
             auth_string = b"Basic " + auth_string
-            headers["Authorization"] = auth_string
+            headers["Authorization"] = auth_string.decode("utf-8")
         else:
             self.log.debug("no auth header")
             # no auth header
