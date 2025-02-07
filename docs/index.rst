@@ -14,7 +14,7 @@ that provides a Pythonic interface to the HDF5 library.  In fact, many applicati
 converted to using h5py, just by adding the statement ``import h5pyd as h5py``.
 
 However, not every h5py feature is supported in h5pyd (at least not yet!).  For example Virtual Datasets are not supported.
-For a complete list see the: :ref:`FAQ <faq>`.  In addition, there are some features that are supported, like Parallel HDF5,
+For a complete list see the: :ref:`FAQ <faq>`.  In addition, there are some features that are supported, like multi-threading,
 but work somewhat differently from the HDF5 library.  And finally, there are features of h5pyd, that don't have any 
 correspondence to h5py, such as Folders.
 

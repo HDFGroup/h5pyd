@@ -1,5 +1,5 @@
-Configuring h5py
-================
+Configuring h5pyd
+=================
 
 Library configuration
 ---------------------
@@ -19,8 +19,9 @@ attributes:
         is ("FALSE", "TRUE").
 
     **track_order**
-        Whether to track dataset/group/attribute creation order.  If
-        container creation order is tracked, its links and attributes
+        Controls whether links and attributes should be listed by
+        creation order (rather than alphanumerically).  If
+        track_order is True when an object is created, its links and attributes
         are iterated in ascending creation order (consistent with
         ``dict`` in Python 3.7+); otherwise in ascending alphanumeric
         order.  Global configuration value can be overridden for
