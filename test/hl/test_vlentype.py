@@ -274,11 +274,8 @@ class TestVlenTypes(TestCase):
         self.assertTrue("vlen" in vals.dtype.metadata)
 
         for i in range(10):
-            if config.get("use_h5py"):
-                # TBD: why is h5py returning str and not bytes?
-                word = words[i].decode("utf8")
-            else:
-                word = words[i]
+            # TBD: why is h5py returning str and not bytes?
+            word = words[i].decode("utf8")
             self.assertEqual(vals[i], word)
 
         f.close()
