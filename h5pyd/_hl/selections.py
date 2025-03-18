@@ -79,7 +79,9 @@ def select(obj, args):
                 raise TypeError("Mismatched selection shape")
             return arg
 
-        elif isinstance(arg, np.ndarray) or isinstance(arg, list):
+        elif (isinstance(arg, np.ndarray) and arg.dtype.kind == "b") or isinstance(
+            arg, list
+        ):
             sel = PointSelection(obj.shape)
             sel[arg]
             return sel
