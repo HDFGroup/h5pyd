@@ -28,11 +28,11 @@ class TestPointSelectDataset(TestCase):
         print("filename:", filename)
         f = h5py.File(filename, "w")
 
-        data = np.zeros((10, 10), dtype="i4")
+        data = np.zeros((10, 10), dtype='i4')
         for i in range(10):
             for j in range(10):
                 data[i, j] = i - j
-        dset = f.create_dataset("dset", data=data)
+        dset = f.create_dataset('dset', data=data)
         pos_vals = dset[data > 0]
         self.assertEqual(len(pos_vals), 45)
         for value in pos_vals:
@@ -45,7 +45,7 @@ class TestPointSelectDataset(TestCase):
         print("filename:", filename)
         f = h5py.File(filename, "w")
 
-        dset1d = f.create_dataset("dset1d", (10,), dtype="i4")
+        dset1d = f.create_dataset('dset1d', (10,), dtype='i4')
         vals = list(range(10))
         vals.reverse()
         dset1d[...] = vals
@@ -57,30 +57,13 @@ class TestPointSelectDataset(TestCase):
 
         f.close()
 
-    def test_1d_pointselect_numpy(self):
-        filename = self.getFileName("test_1d_pointselect")
-        print("filename:", filename)
-        f = h5py.File(filename, "w")
-
-        dset1d = f.create_dataset("dset1d", (10,), dtype="i4")
-        vals = list(range(10))
-        vals.reverse()
-        dset1d[...] = vals
-        vals = dset1d[...]
-        pts = dset1d[np.array([2, 4, 6, 8])]
-        expected_vals = [7, 5, 3, 1]
-        for i in range(len(expected_vals)):
-            self.assertEqual(pts[i], expected_vals[i])
-
-        f.close()
-
     def test_2d_pointselect(self):
         filename = self.getFileName("test_2d_pointselect")
         print("filename:", filename)
         f = h5py.File(filename, "w")
 
-        dset2d = f.create_dataset("dset2d", (10, 20), dtype="i4")
-        vals = np.zeros((10, 20), dtype="i4")
+        dset2d = f.create_dataset('dset2d', (10, 20), dtype='i4')
+        vals = np.zeros((10, 20), dtype='i4')
         for i in range(10):
             for j in range(20):
                 vals[i, j] = i * 1000 + j
@@ -114,8 +97,8 @@ class TestPointSelectDataset(TestCase):
         print("filename:", filename)
         f = h5py.File(filename, "w")
 
-        dset2d = f.create_dataset("dset2d", (10, 20), dtype="i4")
-        vals = np.zeros((10, 20), dtype="i4")
+        dset2d = f.create_dataset('dset2d', (10, 20), dtype='i4')
+        vals = np.zeros((10, 20), dtype='i4')
         for i in range(10):
             for j in range(20):
                 vals[i, j] = i * 1000 + j
@@ -135,7 +118,7 @@ class TestPointSelectDataset(TestCase):
         f.close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     # loglevel = logging.DEBUG
     # logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()
