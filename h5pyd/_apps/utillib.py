@@ -1169,7 +1169,7 @@ def create_dataset(dobj, ctx):
         print(msg)
     fout = ctx["fout"]
 
-    if dobj.name in fout:
+    if not ctx["no-checks"] and dobj.name in fout:
         dset = fout[dobj.name]
         logging.debug(f"{dobj.name} already exists")
         if ctx["no_clobber"]:
@@ -1687,7 +1687,7 @@ def create_group(gobj, ctx):
 
     grp = None
 
-    if gobj.name in fout:
+    if not ctx["no-checks"] and gobj.name in fout:
         grp = fout[gobj.name]
         logging.debug(f"{gobj.name} already exists")
         if ctx["no_clobber"]:
@@ -1708,7 +1708,7 @@ def create_group(gobj, ctx):
             if not ctx["ignore_error"]:
                 raise IOError(msg)
     else:
-        if ctx["verbose"]:
+        if not ctx["no-checks"] and ctx["verbose"]:
             print(f"{gobj.name} not found")
 
         grp = fout.create_group(gobj.name)
@@ -1834,6 +1834,7 @@ def load_file(
     ctx["extend_offset"] = extend_offset
     ctx["srcid_desobj_map"] = {}
     ctx["ignore_error"] = ignore_error
+    ctx["no-checks"] = True
 
     def copy_attribute_helper(name, obj):
         logging.info(f"copy attribute - name: {name}  obj: {obj.name}")
