@@ -1893,6 +1893,7 @@ def load_file(
                     future.result()
                 except Exception as e:
                     logging.exception(e)
+                    raise
 
     # build a rough map of the file using the internal function above
     # copy over any attributes
@@ -1905,7 +1906,6 @@ def load_file(
 
     # copy over any attributes
     logging.info("creating target attributes")
-
     _visit_in_parallell(copy_attribute_helper)
 
     # create soft/external links (and hardlinks not already created)
