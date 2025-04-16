@@ -1875,6 +1875,23 @@ def load_file(
         else:
             logging.error(f"no handler for object class: {type(obj)}")
 
+    def _visit_in_parallell(func):
+        logging.info("in parallell...")
+        jobs = []
+
+        def _add_to_jobs(name, obj):
+            jobs.append((name, obj))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            fin.visititems(_add_to_jobs)
+            futures = [executor.submit(func, item[0], item[1]) for item in jobs]
+
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logging.exception(e)
+
     # build a rough map of the file using the internal function above
     # copy over any attributes
     # create soft/external links (and hardlinks not already created)
@@ -1886,16 +1903,18 @@ def load_file(
 
     # copy over any attributes
     logging.info("creating target attributes")
-    fin.visititems(copy_attribute_helper)
+
+    _visit_in_parallell(copy_attribute_helper)
 
     # create soft/external links (and hardlinks not already created)
     create_links(fin, fout, ctx)  # create root soft/external links
-    fin.visititems(object_link_helper)
+
+    _visit_in_parallell(object_link_helper)
 
     if dataload == "ingest" or dataload == "link":
         # copy dataset data
         logging.info("copying dataset data")
-        fin.visititems(object_copy_helper)
+        _visit_in_parallell(object_copy_helper)
     else:
         logging.info("skipping dataset data copy (dataload is None)")
 
