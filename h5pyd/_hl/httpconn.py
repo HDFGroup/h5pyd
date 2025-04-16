@@ -441,10 +441,12 @@ class HttpConn:
 
         if check_cache:
             self.log.debug("httpcon - checking cache")
-            if req in self._cache:
+            try:
                 self.log.debug("httpcon - returning cache result")
                 rsp = self._cache[req]
                 return rsp
+            except KeyError:
+                pass
 
         self.log.info(f"GET: {self._endpoint + req} [{params['domain']}] timeout: {self._timeout}")
 
