@@ -1800,6 +1800,7 @@ def load_file(
     extend_dim=None,
     extend_offset=0,
     ignore_error=False,
+    no_checks=False
 ):
 
     logging.info(f"input file: {fin.filename}")
@@ -1835,7 +1836,7 @@ def load_file(
     ctx["extend_offset"] = extend_offset
     ctx["srcid_desobj_map"] = {}
     ctx["ignore_error"] = ignore_error
-    ctx["no-checks"] = True
+    ctx["no-checks"] = no_checks
 
     def copy_attribute_helper(name, obj):
         logging.info(f"copy attribute - name: {name}  obj: {obj.name}")

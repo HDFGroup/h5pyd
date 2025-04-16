@@ -123,6 +123,7 @@ def main():
                 help="use the given compression algorithm for -z option (lz4 is default)")
     cfg.setitem("ignorefilters", False, flags=["--ignore-filters"], help="ignore any filters used by source dataset")
     cfg.setitem("retries", 3, flags=["--retries",], choices=["N",], help="Set number of server retry attempts")
+    cfg.setitem("no_checks", False, flags=["-n", "--no-checks"], help="do not check for existence before creating resources")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
     try:
@@ -323,6 +324,7 @@ def main():
                     "extend_offset": cfg["extend_offset"],
                     "ignore_error": cfg["ignore_error"],
                     "no_clobber": no_clobber,
+                    "no_checks": cfg["no_checks"],
                 }
                 load_file(fin, fout, **kwargs)
 
