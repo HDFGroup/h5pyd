@@ -12,6 +12,7 @@
 
 import sys
 import logging
+import concurrent.futures
 
 try:
     import h5py
@@ -1883,7 +1884,7 @@ def load_file(
         def _add_to_jobs(name, obj):
             jobs.append((name, obj))
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
             fin.visititems(_add_to_jobs)
             futures = [executor.submit(func, item[0], item[1]) for item in jobs]
 

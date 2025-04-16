@@ -737,11 +737,11 @@ class HttpConn:
 
                 s.mount(
                     "http://",
-                    HTTPAdapter(max_retries=retry, pool_connections=16, pool_maxsize=16),
+                    HTTPAdapter(max_retries=retry, pool_connections=30, pool_maxsize=30),
                 )
                 s.mount(
                     "https://",
-                    HTTPAdapter(max_retries=retry, pool_connections=16, pool_maxsize=16),
+                    HTTPAdapter(max_retries=retry, pool_connections=30, pool_maxsize=30),
                 )
                 self._s = s
             else:
