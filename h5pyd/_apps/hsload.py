@@ -124,6 +124,7 @@ def main():
     cfg.setitem("ignorefilters", False, flags=["--ignore-filters"], help="ignore any filters used by source dataset")
     cfg.setitem("retries", 3, flags=["--retries",], choices=["N",], help="Set number of server retry attempts")
     cfg.setitem("no_checks", False, flags=["--no-checks"], help="do not check for existence before creating resources")
+    cfg.setitem("thread_count", 30, flags=["--thread-count"], choices=["N",] ,help="The number of threads to allocate when making requests in parallel, defaults to 30")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
     try:
@@ -259,6 +260,7 @@ def main():
                     "bucket": cfg["hs_bucket"],
                     "mode": mode,
                     "retries": int(cfg["retries"]),
+                    "thread_count": int(cfg["thread_count"]),
                 }
 
                 fout = h5pyd.File(tgt, **kwargs)
@@ -325,6 +327,7 @@ def main():
                     "ignore_error": cfg["ignore_error"],
                     "no_clobber": no_clobber,
                     "no_checks": cfg["no_checks"],
+                    "thread_count": int(cfg["thread_count"]),
                 }
                 load_file(fin, fout, **kwargs)
 

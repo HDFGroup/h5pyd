@@ -1170,7 +1170,7 @@ def create_dataset(dobj, ctx):
         print(msg)
     fout = ctx["fout"]
 
-    if not ctx["no-checks"] and dobj.name in fout:
+    if not ctx["no_checks"] and dobj.name in fout:
         dset = fout[dobj.name]
         logging.debug(f"{dobj.name} already exists")
         if ctx["no_clobber"]:
@@ -1688,7 +1688,7 @@ def create_group(gobj, ctx):
 
     grp = None
 
-    if not ctx["no-checks"] and gobj.name in fout:
+    if not ctx["no_checks"] and gobj.name in fout:
         grp = fout[gobj.name]
         logging.debug(f"{gobj.name} already exists")
         if ctx["no_clobber"]:
@@ -1709,7 +1709,7 @@ def create_group(gobj, ctx):
             if not ctx["ignore_error"]:
                 raise IOError(msg)
     else:
-        if not ctx["no-checks"] and ctx["verbose"]:
+        if not ctx["no_checks"] and ctx["verbose"]:
             print(f"{gobj.name} not found")
 
         grp = fout.create_group(gobj.name)
@@ -1800,7 +1800,8 @@ def load_file(
     extend_dim=None,
     extend_offset=0,
     ignore_error=False,
-    no_checks=False
+    no_checks=False,
+    thread_count=30,
 ):
 
     logging.info(f"input file: {fin.filename}")
@@ -1836,7 +1837,8 @@ def load_file(
     ctx["extend_offset"] = extend_offset
     ctx["srcid_desobj_map"] = {}
     ctx["ignore_error"] = ignore_error
-    ctx["no-checks"] = no_checks
+    ctx["no_checks"] = no_checks
+    ctx["thread_count"] = thread_count
 
     def copy_attribute_helper(name, obj):
         logging.info(f"copy attribute - name: {name}  obj: {obj.name}")
@@ -1885,7 +1887,7 @@ def load_file(
         def _add_to_jobs(name, obj):
             jobs.append((name, obj))
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=thread_count) as executor:
             fin.visititems(_add_to_jobs)
             futures = [executor.submit(func, item[0], item[1]) for item in jobs]
 
