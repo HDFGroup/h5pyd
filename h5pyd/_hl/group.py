@@ -574,10 +574,9 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 raise IOError(f"Unexpected uuid: {uuid}")
         objdb = self.id.http_conn.getObjDb()
-        if objdb and uuid in objdb and False:
+        if objdb and uuid in objdb:
             # we should be able to construct an object from objdb json
             obj_json = objdb[uuid]
-            print('fetch from db')
         else:
             # will need to get JSON from server
             req = f"/{collection_type}/{uuid}"
