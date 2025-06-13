@@ -83,6 +83,7 @@ class Folder:
         owner=None,
         batch_size=1000,
         retries=3,
+        thread_count=30,
         **kwds,
     ):
         """Create a new Folders object.
@@ -179,6 +180,7 @@ class Folder:
             mode=mode,
             logger=logger,
             retries=retries,
+            thread_count=thread_count
         )
         self.log = self._http_conn.logging
 
