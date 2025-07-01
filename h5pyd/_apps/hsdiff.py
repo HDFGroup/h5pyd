@@ -89,7 +89,7 @@ def diff_attrs(src, tgt, ctx):
                     print(msg)
                 ctx["differences"] += 1
                 return False
-            if hash(src_attr.tostring()) != hash(tgt_attr.tostring()):
+            if hash(src_attr.tobytes()) != hash(tgt_attr.tobytes()):
                 msg = f"values for attribute {name} of <{src.name}> differ"
                 if not ctx["quiet"]:
                     print(msg)
