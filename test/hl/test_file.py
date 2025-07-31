@@ -62,14 +62,9 @@ class TestFile(TestCase):
         self.assertEqual(f.mode, 'r+')
         self.assertTrue(h5py.is_hdf5(filename))
 
-        if h5py.__name__ == "h5pyd":
-            self.assertTrue(f.id.http_conn.endpoint.startswith("http"))
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
-        # should not see id as a file
-        # skip for h5py, since its is_hdf5 implementation expects a path
-        if h5py.__name__ == "h5pyd":
-            self.assertFalse(h5py.is_hdf5(f.id.id))
+ 
         # Check domain's timestamps
         if h5py.__name__ == "h5pyd":
             # print("modified:", datetime.fromtimestamp(f.modified), f.modified)

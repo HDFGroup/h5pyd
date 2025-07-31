@@ -15,8 +15,13 @@ from __future__ import absolute_import
 import io
 import os
 import json
+import logging
 import pathlib
 import time
+
+from h5json import Hdf5db
+from h5json.hsdsstore.hsds_reader import HSDSReader
+from h5json.hsdsstore.hsds_writer import HSDSWriter
 
 from .objectid import GroupID
 from .group import Group
@@ -31,13 +36,21 @@ def is_hdf5(domain, **kwargs):
     kwargs can be endpoint, username, password, etc. (same as with File)
     """
     found = False
+    for k in kwargs:
+        print(f"{k}: {kwargs[k]}")
+    app_logger = kwargs.get("app_Logger")
+    db = Hdf5db(app_logger=app_logger)
+    db.reader = HSDSReader(domain, **kwargs)
     try:
-        # set use_cache to False to avoid extensive load time
-        f = File(domain, use_cache=False, **kwargs)
-        if f:
-            found = True
-    except IOError:
-        pass  # ignore any non-200 error
+        db.open()
+        found = True
+    except IOError as ioe:
+        if ioe.errno in (404, 410):
+            # not found
+            pass
+        else:
+            # other exception (403, etc.)
+            raise
     return found
 
 
@@ -187,18 +200,32 @@ class File(Group):
     @property
     def attrs(self):
         """Attributes attached to this object"""
-        # hdf5 complains that a file identifier is an invalid location for an
-        # attribute. Instead of self, pass the root group to AttributeManager:
         from . import attrs
 
-        # parent_obj = {"id": self.id.uuid}
-        # return attrs.AttributeManager(self['/'])
         return attrs.AttributeManager(self)
 
     @property
     def filename(self):
         """File name on disk"""
-        return self.id.http_conn.domain
+        filepath = None
+        if self.id.db.reader:
+            filepath = self.id.db.reader.filepath
+        elif self.id.db.writer:
+            filepath = self.id.db.writer.filepath
+        else:
+            pass  # no persistent storage enabled
+        return filepath
+
+    def _getStats(self):
+        """ return info on storage usage """
+        if self.id.db.writer:
+            print(dir(self.id.db.writer))
+            stats = self.id.db.writer.getStats()
+        elif self.id.db.reader:
+            stats = self.id.db.reader.getStats()
+        else:
+            stats = {"created": 0, "lastModified": 0, "owner": 0}
+        return stats
 
     @property
     def driver(self):
@@ -207,12 +234,15 @@ class File(Group):
     @property
     def mode(self):
         """Python mode used to open file"""
-        return self.id.http_conn.mode
+        mode = 'r'
+        if self.id.db.writer:
+            mode += '+'
+        return mode
 
     @property
     def fid(self):
         """File ID (backwards compatibility)"""
-        return self.id.domain
+        return self.filename
 
     @property
     def libver(self):
@@ -231,12 +261,14 @@ class File(Group):
     @property
     def created(self):
         """Creation time of the domain"""
-        return self.id.http_conn.created
+        stats = self._getStats()
+        return stats["created"]
 
     @property
     def owner(self):
         """Username of the owner of the domain"""
-        return self.id.http_conn.owner
+        stats = self._getStats()
+        return stats["owner"]
 
     @property
     def limits(self):
@@ -250,7 +282,7 @@ class File(Group):
     @swmr_mode.setter
     def swmr_mode(self, value):
         # enforce the same rule as h5py - swrm_mode can't be changed after opening the file
-        mode = self.id.http_conn.mode
+        mode = self.mode
         if mode == "r":
             # read only mode
             msg = "SWMR mode can't be changed after file open"
@@ -327,182 +359,137 @@ class File(Group):
         timeout
             Timeout value in seconds
         """
-        groupid = None
-        dn_ids = []
+
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
-        no_endpoint_info = endpoint is None and username is None and password is None
-        if (mode is None and no_endpoint_info and isinstance(domain, GroupID)):
-            groupid = domain
-        else:
-            if mode and mode not in ("r", "r+", "w", "w-", "x", "a"):
-                raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
+        # TBD
+        # no_endpoint_info = endpoint is None and username is None and password is None
+        # if (mode is None and no_endpoint_info and isinstance(domain, GroupID)):
+        #    groupid = domain
+        # else:
 
-            if mode is None:
-                mode = "r"
+        self.log = logging.getLogger()
 
-            cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
+        self.log.setLevel(logging.DEBUG)
 
-            # accept domain values in the form:
-            #   http://server:port/home/user/myfile.h5
-            #    or
-            #   https://server:port/home/user/myfile.h5
-            #    or
-            #   hdf5://home/user/myfile.h5
-            #    or just
-            #   /home/user/myfile.h5
-            #
-            #  For http prefixed values, extract the endpont and use the rest as domain path
-            for protocol in ("http://", "https://", "hdf5://", "http+unix://"):
-                if domain and domain.startswith(protocol):
-                    if protocol.startswith("http"):
-                        domain = domain[len(protocol):]
-                        # extract the endpoint
-                        n = domain.find("/")
-                        if n < 0:
-                            raise IOError(400, "invalid url format")
-                        endpoint = protocol + domain[:n]
-                        domain = domain[n:]
-                        break
-                    else:  # hdf5://
-                        domain = domain[(len(protocol) - 1):]
+        if mode and mode not in ("r", "r+", "w", "w-", "x", "a"):
+            raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
 
-            if not domain:
-                raise IOError(400, "no domain provided")
+        if mode is None:
+            mode = "r"
 
-            domain_path = pathlib.PurePath(domain)
-            if isinstance(domain_path, pathlib.PureWindowsPath):
-                # Standardize path root to POSIX-style path
-                domain = '/' + '/'.join(domain_path.parts[1:])
+        cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
 
-            if domain[0] != "/":
-                raise IOError(400, "relative paths are not valid")
-
-            if endpoint is None:
-                if "hs_endpoint" in cfg:
-                    endpoint = cfg["hs_endpoint"]
-
-            # remove the trailing slash on endpoint if it exists
-            if endpoint and endpoint.endswith('/'):
-                endpoint = endpoint.strip('/')
-
-            if username is None:
-                if "hs_username" in cfg:
-                    username = cfg["hs_username"]
-
-            if password is None:
-                if "hs_password" in cfg:
-                    password = cfg["hs_password"]
-
-            if api_key is None and "hs_api_key" in cfg:
-                api_key = cfg["hs_api_key"]
-
-            if bucket is None:
-                if "HS_BUCKET" in os.environ:
-                    bucket = os.environ["HS_BUCKET"]
-                elif "hs_bucket" in cfg:
-                    bucket = cfg["hs_bucket"]
-
-            if swmr:
-                use_cache = False  # disable metadata caching in swmr mode
-
-            http_conn = HttpConn(
-                domain,
-                endpoint=endpoint,
-                username=username,
-                password=password,
-                bucket=bucket,
-                mode=mode,
-                api_key=api_key,
-                use_session=use_session,
-                use_cache=use_cache,
-                logger=logger,
-                retries=retries,
-                timeout=timeout,
-            )
-
-            root_json = None
-
-            # try to do a GET from the domain
-            req = "/"
-            params = {"getdnids": 1}  # return dn ids if available
-
-            if use_cache and mode == "r":
-                params["getobjs"] = "T"
-                params["include_attrs"] = "T"
-            if bucket:
-                params["bucket"] = bucket
-
-            # need some special logic for the first request in local mode
-            # to give the sockets time to initialize
-
-            if endpoint and endpoint.startswith("local"):
-                connect_backoff = [0.5, 1, 2, 4, 8, 16]
-            else:
-                connect_backoff = []
-
-            connect_try = 0
-
-            while True:
-                try:
-                    rsp = http_conn.GET(req, params=params)
+        # accept domain values in the form:
+        #   http://server:port/home/user/myfile.h5
+        #    or
+        #   https://server:port/home/user/myfile.h5
+        #    or
+        #   hdf5://home/user/myfile.h5
+        #    or just
+        #   /home/user/myfile.h5
+        #
+        #  For http prefixed values, extract the endpont and use the rest as domain path
+        for protocol in ("http://", "https://", "hdf5://", "http+unix://"):
+            if domain and domain.startswith(protocol):
+                if protocol.startswith("http"):
+                    domain = domain[len(protocol):]
+                    # extract the endpoint
+                    n = domain.find("/")
+                    if n < 0:
+                        raise IOError(400, "invalid url format")
+                    endpoint = protocol + domain[:n]
+                    domain = domain[n:]
                     break
-                except IOError:
-                    if connect_try < len(connect_backoff):
-                        time.sleep(connect_backoff[connect_try])
-                    else:
-                        raise
-                    connect_try += 1
+                else:  # hdf5://
+                    domain = domain[(len(protocol) - 1):]
 
-            if rsp.status_code == 200:
-                root_json = json.loads(rsp.text)
-            if rsp.status_code != 200 and mode in ("r", "r+"):
-                # file must exist
-                http_conn.close()
-                raise IOError(rsp.status_code, rsp.reason)
-            if rsp.status_code == 200 and mode in ("w-", "x"):
-                # Fail if exists
-                http_conn.close()
-                raise IOError(409, "domain already exists")
-            if rsp.status_code == 200 and mode == "w":
-                # delete existing domain
-                rsp = http_conn.DELETE(req, params=params)
-                if rsp.status_code not in (200, 410):
-                    # failed to delete
-                    http_conn.close()
-                    raise IOError(rsp.status_code, rsp.reason)
-                root_json = None
-            if root_json and "root" not in root_json:
-                http_conn.close()
-                raise IOError(404, "Location is a folder, not a file")
-            if root_json is None:
-                # create the domain
-                if mode not in ("w", "a", "x"):
-                    http_conn.close()
-                    raise IOError(404, "File not found")
-                body = {}
-                if owner:
-                    body["owner"] = owner
-                if linked_domain:
-                    body["linked_domain"] = linked_domain
-                if track_order or cfg.track_order:
-                    create_props = {"CreateOrder": 1}
-                    group_body = {"creationProperties": create_props}
-                    body["group"] = group_body
-                rsp = http_conn.PUT(req, params=params, body=body)
-                if rsp.status_code != 201:
-                    http_conn.close()
-                    raise IOError(rsp.status_code, rsp.reason)
+        if not domain:
+            raise IOError(400, "no domain provided")
 
-                root_json = json.loads(rsp.text)
-            if "root" not in root_json:
-                http_conn.close()
-                raise IOError(404, "Unexpected error")
+        domain_path = pathlib.PurePath(domain)
+        if isinstance(domain_path, pathlib.PureWindowsPath):
+            # Standardize path root to POSIX-style path
+            domain = '/' + '/'.join(domain_path.parts[1:])
 
-            if "dn_ids" in root_json:
-                dn_ids = root_json["dn_ids"]
+        if domain[0] != "/":
+            raise IOError(400, "relative paths are not valid")
 
-            root_uuid = root_json["root"]
+        if endpoint is None:
+            if "hs_endpoint" in cfg:
+                endpoint = cfg["hs_endpoint"]
+
+        # remove the trailing slash on endpoint if it exists
+        if endpoint and endpoint.endswith('/'):
+            endpoint = endpoint.strip('/')
+
+        if username is None:
+            if "hs_username" in cfg:
+                username = cfg["hs_username"]
+
+        if password is None:
+            if "hs_password" in cfg:
+                password = cfg["hs_password"]
+
+        if api_key is None and "hs_api_key" in cfg:
+            api_key = cfg["hs_api_key"]
+
+        if bucket is None:
+            if "HS_BUCKET" in os.environ:
+                bucket = os.environ["HS_BUCKET"]
+            elif "hs_bucket" in cfg:
+                bucket = cfg["hs_bucket"]
+
+        db = Hdf5db(app_logger=self.log)  # initialize hdf5 db
+
+        kwargs = {"app_logger": self.log}
+        if swmr:
+            kwargs["use_cache"] = False  # disable metadata caching in swmr mode
+        if username:
+            kwargs["username"] = username
+        if password:
+            kwargs["password"] = password
+        if endpoint:
+            kwargs["endpoint"] = endpoint
+        if bucket:
+            kwargs["bucket"] = bucket
+        if api_key:
+            kwargs["api_key"] = api_key
+        if use_session:
+            kwargs["use_session"] = use_session
+        if retries:
+            kwargs["retries"] = retries
+        if timeout:
+            kwargs["timeout"] = timeout
+
+        root_id = None
+
+        if mode != 'w':
+            file_exists = is_hdf5(domain, **kwargs)
+            if file_exists:
+                if mode in ('w-', 'x'):
+                    self.log.warning(f"Domain: {domain} already exists")
+                    raise FileExistsError()
+                db.reader = HSDSReader(domain, **kwargs)
+                root_id = db.open()
+            else:
+                if mode in ('r', 'r++'):
+                    self.log.warning(f"domain: {domain} not found")
+                    raise FileNotFoundError()
+        else:
+            file_exists = False  # will overwrite in either case
+
+        if not root_id:
+            # use writer to initialize domain
+            db.writer = HSDSWriter(domain, **kwargs)
+            root_id = db.open()
+            db.close()
+            # now set the reader
+            db.reader = HSDSReader(domain, **kwargs)
+            db.open()
+
+            root_json = db.getObjectById(root_id)
+            print("root_json:", root_json)
 
             if "limits" in root_json:
                 self._limits = root_json["limits"]
@@ -513,54 +500,14 @@ class File(Group):
             else:
                 self._version = None
 
-            if mode == "a":
-                # for append, verify we have 'update' permission on the domain
-                # try first with getting the acl for the current user, then as default
-                for name in (username, "default"):
-                    if not username:
-                        continue
-                    req = "/acls/" + name
-                    rsp = http_conn.GET(req)
-                    if rsp.status_code == 200:
-                        rspJson = json.loads(rsp.text)
-                        domain_acl = rspJson["acl"]
-                        if not domain_acl["update"]:
-                            http_conn.close()
-                            raise IOError(403, "Forbidden")
-                        else:
-                            break  # don't check with "default" user in this case
+        self._id = GroupID(None, root_id, obj_json=root_json, db=db)
 
-            if mode in ("w", "w-", "x", "a"):
-                http_conn._mode = "r+"
-
-            group_json = None
-            # do we already have the group_json?
-            if "domain_objs" in root_json and mode == "r":
-                objdb = root_json["domain_objs"]
-                http_conn._objdb = objdb
-                if root_uuid in objdb:
-                    group_json = objdb[root_uuid]
-
-            if not group_json:
-                # get the group json for the root group
-                req = "/groups/" + root_uuid
-
-                rsp = http_conn.GET(req)
-
-                if rsp.status_code != 200:
-                    http_conn.close()
-                    raise IOError(rsp.status_code, "Unexpected Error")
-                group_json = json.loads(rsp.text)
-
-            groupid = GroupID(None, group_json, http_conn=http_conn)
-        # end else
+        self._db = db
 
         self._name = "/"
-        self._id = groupid
         self._verboseInfo = None  # additional state we'll get when requested
         self._verboseUpdated = None  # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
-        self._dn_ids = dn_ids
         self._swmr_mode = swmr
 
         Group.__init__(self, self._id, track_order=track_order)
@@ -604,10 +551,13 @@ class File(Group):
     def modified(self):
         """Last modified time of the domain as a datetime object."""
         props = self._getVerboseInfo()
-        modified = self.id.http_conn.modified  # timestamp for the domain object
-        # update with latest time of any domain object (if available)
-        if "lastModified" in props:
+        if self.id.db.writer:
+            modified = self.id.db.writer.lastModified
+        elif "lastModified" in props:
+            # update with latest time of any domain object (if available)
             modified = props["lastModified"]
+        else:
+            modified = None  # no write timestamp
         return modified
 
     @property
@@ -707,7 +657,8 @@ class File(Group):
     def compressors(self):
         """return list of compressors supported by this server"""
         if self.id:
-            compressors = self.id.http_conn.compressors
+            # compressors = self.id.http_conn.compressors
+            compressors = None  # TBD
         else:
             compressors = []
         return compressors
@@ -769,40 +720,13 @@ class File(Group):
     def flush(self):
         """Tells the service to complete any pending updates to permanent storage"""
         self.log.debug("flush")
-        self.log.info("sending PUT flush request")
-        req = "/"
-        body = {"flush": 1, "getdnids": 1}
-        rsp = self.PUT(req, body=body)
-        if "dn_ids" in rsp:
-            dn_ids = rsp["dn_ids"]
-            orig_ids = set(self._dn_ids)
-            current_ids = set(dn_ids)
-            self._dn_ids = current_ids
-            if orig_ids and orig_ids != current_ids:
-                self.log.debug(f"original dn_ids: {orig_ids}")
-                self.log.debug(f"current dn_ids: {current_ids}")
-                self.log.warning("HSDS nodes have changed")
-                raise IOError(500, "Unexpected Error")
+        self.id.db.flush()
         self.log.info("PUT flush complete")
 
-    def close(self, flush=None):
+    def close(self):
         """Clears reference to remote resource."""
-        # this will close the socket of the http_conn singleton
-
-        self.log.debug(f"close, mode: {self.mode}")
-        if flush is None:
-            # set flush to true if this is a direct connect and file
-            # is writable
-            if self.mode == "r+" and self._id._http_conn._hsds:
-                flush = True
-            else:
-                flush = False
-        # do a PUT flush if this file is writable and the server is HSDS and flush is set
-        if flush:
-            self.flush()
-        if self._id._http_conn:
-            self._id._http_conn.close()
-        self._id.close()
+        # this will flush any pending changes and close the http connection
+        self.id.db.close()
 
     def __enter__(self):
         return self

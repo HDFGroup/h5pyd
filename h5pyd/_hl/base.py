@@ -15,15 +15,13 @@ from __future__ import absolute_import
 import posixpath
 import os
 import sys
-import json
 import numpy as np
 import logging
-import logging.handlers
 from collections.abc import (
     Mapping, MutableMapping, KeysView, ValuesView, ItemsView
 )
+from h5json.hdf5dtype import Reference, check_dtype, special_dtype
 from .objectid import GroupID
-from .h5type import Reference, check_dtype, special_dtype
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
 numpy_float_types = (np.float16, np.float32, np.float64)
@@ -795,108 +793,29 @@ class HLObject(CommonStateObject):
     def file(self):
         """ Return a File instance associated with this object """
         from .files import File
-        http_conn = self._id.http_conn
-        root_uuid = http_conn.root_uuid
-        # construct a group json, so we don't need to do a request
-        group_json = {}
-        group_json["root"] = root_uuid
-        group_json["id"] = root_uuid
-        group_json["domain"] = http_conn.domain
-        group_json["created"] = http_conn.created
-        group_json["lastModified"] = http_conn.modified
+        db = self._id.db
+        root_id = db.root_id
+        group_json = db.getObjectById(root_id)
 
-        groupid = GroupID(None, group_json, http_conn=http_conn)
+        groupid = GroupID(None, root_id, obj_json=group_json, db=db)
 
         return File(groupid)
-
-    def _getNameFromObjDb(self):
-        objdb = self._id._http_conn.getObjDb()
-
-        if not objdb:
-            return None
-
-        root_uuid = self._id.http_conn.root_uuid
-        objid = self._id.uuid
-        self.log.debug(f"_getNameFromObjDb: find name for: {objid}")
-        objids = set()
-        objids.add(objid)
-        h5path = ""
-        while not h5path.startswith("/"):
-            found_link = False
-            for id in objdb:
-                if id == objid:
-                    self.log.debug(f"_getNameFromObjDb - skipping id {id} - obj cannot link to itself")
-                    continue
-                self.log.debug(f"_getNameFromObjDb - searching id: {id}")
-                if not id.startswith("g-"):
-                    continue  # not a group, so no links
-                if id in objids:
-                    continue  # we've been here already
-                obj = objdb[id]
-                links = obj["links"]
-                for title in links:
-                    self.log.debug(f"_getNameFromObjDb - looking at linK: {title}")
-                    link = links[title]
-                    link_class = link["class"]
-                    if link_class != 'H5L_TYPE_HARD':
-                        self.log.debug(f"_getNameFromObjDb - skipping link type: {link_class}")
-                        continue
-                    if link["id"] == objid:
-                        # found a link to our target
-                        found_link = True
-                        if not h5path:
-                            h5path = title
-                        else:
-                            h5path = title + '/' + h5path
-                        self.log.debug(f"_getNameFromObjDb - update h5path: {h5path}")
-                        objids.add(id)
-                        if id == root_uuid:
-                            h5path = '/' + h5path  # we got to root
-                            self.log.debug("_getNameFromObjDb - found root")
-                        else:
-                            objid = id
-                            self.log.debug(f"_getNameFromObjDb - now looking for link to: {objid}")
-                        break
-            if not found_link:
-                self.log.info("_getNameFromObjDb - could not find link")
-                break
-        if h5path.startswith("/"):
-            # found path to obj
-            self.log.debug(f"_getNameFromObjDb - returning: {h5path}")
-            return h5path
-        else:
-            self.log.debug("_getNameFromObjDb - could not find path")
-            return None
 
     @property
     def name(self):
         """ Return the full name of this object.  None if anonymous. """
+
+        obj_name = None
         try:
             obj_name = self._name
         except AttributeError:
             # name hasn't been assigned yet
-            obj_name = self._getNameFromObjDb()  # pull from the objdb if present
-            if obj_name:
-                self._name = obj_name  # save this
-            if not obj_name:
-                # query the server for the name
-                self.log.debug(f"querying server for name to: {self._id.id}")
-                req = None
-                if self._id.id.startswith("g-"):
-                    req = "/groups/" + self._id.id
-                elif self._id.id.startswith("d-"):
-                    req = "/datasets/" + self._id.id
-                elif self._id.id.startswith("t-"):
-                    req = "/datatypes/" + self._id
-                if req:
-                    params = params = {"getalias": 1}
-                    self.log.info(f"sending get alias request for id: {self._id.id}")
-                    obj_json = self.GET(req, params, use_cache=False)
-                    if "alias" in obj_json:
-                        alias = obj_json["alias"]
-                        if len(alias) > 0:
-                            obj_name = alias[0]
-                            self._name = obj_name
+            obj_json = self.id.db.obj_json
+            if "alias" in obj_json:
+                alias = obj_json["alias"]
+                if len(alias) > 0:
+                    obj_name = alias[0]
+                    self._name = obj_name
 
         return obj_name
         # return self._d(h5i.get_name(self.id))
@@ -964,122 +883,10 @@ class HLObject(CommonStateObject):
                 return False
         return True
 
-    def GET(self, req, params=None, use_cache=True, format="json"):
-        if self.id.http_conn is None:
-            raise IOError("object not initialized")
-        # This should be the default - but explictly set anyway
-        headers = {"Accept-Encoding": "deflate, gzip"}
-
-        rsp = self.id._http_conn.GET(req, params=params, headers=headers, format=format, use_cache=use_cache)
-        if rsp.status_code != 200:
-            self.log.info(f"Got response: {rsp.status_code}")
-            raise IOError(rsp.status_code, rsp.reason)
-        if 'Content-Type' in rsp.headers and rsp.headers['Content-Type'] == "application/octet-stream":
-            if 'Content-Length' in rsp.headers:
-                # not available when http compression is used
-                self.log.debug("returning binary content, length: " + rsp.headers['Content-Length'])
-            else:
-                self.log.debug("returning binary content - length unknown")
-            HTTP_CHUNK_SIZE = 4096
-            http_chunks = []
-            downloaded_bytes = 0
-            for http_chunk in rsp.iter_content(chunk_size=HTTP_CHUNK_SIZE):
-                if http_chunk:  # filter out keep alive chunks
-                    self.log.debug(f"got http_chunk - {len(http_chunk)} bytes")
-                    downloaded_bytes += len(http_chunk)
-                    http_chunks.append(http_chunk)
-            if len(http_chunks) == 0:
-                raise IOError("no data returned")
-            if len(http_chunks) == 1:
-                # can return first and only chunk as response
-                rsp_content = http_chunks[0]
-            else:
-                msg = f"retrieved {len(http_chunks)} http_chunks "
-                msg += f" {downloaded_bytes} total bytes"
-                self.log.info(msg)
-                rsp_content = bytearray(downloaded_bytes)
-                index = 0
-                for http_chunk in http_chunks:
-                    rsp_content[index:(index + len(http_chunk))] = http_chunk
-                    index += len(http_chunk)
-            return rsp_content
-        else:
-            # assume JSON
-            rsp_json = json.loads(rsp.text)
-            self.log.debug(f"rsp_json - {len(rsp.text)} bytes")
-            return rsp_json
-
-    def PUT(self, req, body=None, params=None, format="json", replace=False):
-        if self.id.http_conn is None:
-            raise IOError("object not initialized")
-
-        # try to do a PUT to the domain
-        rsp = self._id._http_conn.PUT(req, body=body, params=params, format=format)
-        self.log.info(f"PUT rsp status_code: {rsp.status_code}")
-
-        if rsp.status_code not in (200, 201, 204):
-            if rsp.status_code == 409:
-                # Conflict error
-                if replace:
-                    self.log.info(f"replacing resource: {req}")
-                    rsp = self.id._http_conn.DELETE(req)
-                    if rsp.status_code != 200:
-                        raise IOError(rsp.reason)
-                    rsp = self._id._http_conn.PUT(req, body=body, params=params, format=format)
-                    if rsp.status_code not in (200, 201):
-                        raise IOError(rsp.reason)
-                else:
-                    raise RuntimeError(rsp.reason)
-            else:
-                raise IOError(f"{rsp.reason}:{rsp.status_code}")
-
-        if rsp.text:
-            rsp_json = json.loads(rsp.text)
-            return rsp_json
-
-    def POST(self, req, body=None, params=None, format="json"):
-        if self.id.http_conn is None:
-            raise IOError("object not initialized")
-
-        # try to do a POST to the domain
-
-        self.log.info(f"POST: {req} [{self.id.domain}]")
-
-        rsp = self.id._http_conn.POST(req, body=body, params=params, format=format)
-        if rsp.status_code == 409:
-            raise ValueError("name already exists")
-        if rsp.status_code not in (200, 201):
-            self.log.error(f"POST error - status_code: {rsp.status_code}, reason: {rsp.reason}")
-            raise IOError(rsp.reason)
-
-        if 'Content-Type' in rsp.headers and rsp.headers['Content-Type'] == "application/octet-stream":
-            if 'Content-Length' in rsp.headers:
-                # not available when http compression is used
-                self.log.info("returning binary content, length: " + rsp.headers['Content-Length'])
-            else:
-                self.log.info("returning binary compressed content")
-            return rsp.content
-        else:
-            # assume JSON
-            rsp_json = json.loads(rsp.text)
-            return rsp_json
-
-    def DELETE(self, req, params=None):
-        if self.id.http_conn is None:
-            raise IOError("object not initialized")
-
-        # try to do a DELETE of the resource
-
-        self.log.info(f"DEL: {req} [{self.id.domain}]")
-        rsp = self.id._http_conn.DELETE(req, params=params)
-        # self.log.info("RSP: " + str(rsp.status_code) + ':' + rsp.text)
-        if rsp.status_code != 200:
-            raise IOError(rsp.reason)
-
     def __init__(self, oid, file=None, track_order=None):
         """ Setup this object, given its low-level identifier """
         self._id = oid
-        self.log = self._id.http_conn.logging
+        self.log = self._id.db.log
         self.req_prefix = None  # derived class should set this to the URI of the object
         self._file = file
         # self._name = None
@@ -1097,7 +904,7 @@ class HLObject(CommonStateObject):
             pass
 
         if track_order is None:
-            # set order based on group creation props
+            # set order based on creation props
             obj_json = self.id.obj_json
             if "creationProperties" in obj_json:
                 cpl = obj_json["creationProperties"]
@@ -1128,28 +935,6 @@ class HLObject(CommonStateObject):
     def __bool__(self):
         with phil:
             return bool(self.id)
-
-    def getACL(self, username):
-        req = self._req_prefix + '/acls/' + username
-        rsp_json = self.GET(req)
-        acl_json = rsp_json["acl"]
-        return acl_json
-
-    def getACLs(self):
-        req = self._req_prefix + '/acls'
-        rsp_json = self.GET(req)
-        acls_json = rsp_json["acls"]
-        return acls_json
-
-    def putACL(self, acl):
-        if "userName" not in acl:
-            raise IOError("ACL has no 'userName' key")
-        perm = {}
-        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
-            perm[k] = acl[k]
-
-        req = self._req_prefix + '/acls/' + acl['userName']
-        self.PUT(req, body=perm)
 
 
 # --- Dictionary-style interface ----------------------------------------------

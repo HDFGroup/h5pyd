@@ -34,6 +34,7 @@ version = "0.21.0"
 
 dependencies = [
     "numpy >=2.0.0rc1; python_version>='3.9'",
+    "h5json@git+https://github.com/HDFGroup/hdf5-json@abstract",
     "requests_unixsocket",
     "pytz",
     "packaging"

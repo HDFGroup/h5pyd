@@ -15,6 +15,7 @@ from datetime import datetime
 import json
 import pytz
 import time
+from h5json.objid import getCollectionForId, isValidUuid
 from .h5type import createDataType
 
 
@@ -35,7 +36,7 @@ def parse_lastmodified(datestr):
 class ObjectID:
 
     """
-        Uniquely identifies an h5serv resource
+        Uniquely identifies an HDF5 resource
     """
 
     @property
@@ -52,40 +53,40 @@ class ObjectID:
     @property
     def domain(self):
         """ domain for this obj """
-        return self.http_conn.domain
+        filepath = self.db.reader.filepath
+        if not filepath:
+            filepath = self.db.writer.filepath
+        return filepath
 
     @property
     def obj_json(self):
         """json representation of the object"""
-        return self._obj_json
+        return self.db.getObjectById(self.uuid)
 
     @property
     def modified(self):
         """last modified timestamp"""
-        return self._modified
+        obj_json = self.obj_json
+        if "lastModified" in obj_json:
+            return obj_json["lastModified"]
+        else:
+            return None
 
     @property
-    def http_conn(self):
-        """ http connector """
-        return self._http_conn
+    def db(self):
+        """ db connector """
+        return self._db
 
     @property
     def collection_type(self):
         """ Return collection type based on uuid """
-        if self._uuid.startswith("g-"):
-            collection_type = "groups"
-        elif self._uuid.startswith("t-"):
-            collection_type = "datatypes"
-        elif self._uuid.startswith("d-"):
-            collection_type = "datasets"
-        else:
-            raise IOError(f"Unexpected uuid: {self._uuid}")
-        return collection_type
+        return getCollectionForId(self.uuid)
 
-    def __init__(self, parent, item, http_conn=None, **kwds):
+    def __init__(self, parent, obj_id, obj_json=None, db=None, **kwds):
 
         """Create a new objectId.
         """
+        print(f"object init - id: {obj_id}, obj_json={obj_json}")
         parent_id = None
         if parent is not None:
             if isinstance(parent, ObjectID):
@@ -94,24 +95,20 @@ class ObjectID:
                 # assume we were passed a Group/Dataset/datatype
                 parent_id = parent.id
 
-        if type(item) is not dict:
+        if obj_json and type(obj_json) is not dict:
             raise IOError("Unexpected Error")
 
-        if "id" not in item:
-            raise IOError("Unexpected Error")
+        if not isValidUuid(obj_id):
+            raise IOError(f"obj_id: {obj_id} is not valid")
 
-        self._uuid = item['id']
+        self._uuid = obj_id
 
-        self._modified = parse_lastmodified(item['lastModified'])
-
-        self._obj_json = item
-
-        if http_conn is not None:
-            self._http_conn = http_conn
-        elif parent_id is not None and parent_id.http_conn is not None:
-            self._http_conn = parent_id.http_conn
+        if db is not None:
+            self._db = db
+        elif parent_id is not None and parent_id.db is not None:
+            self._db = parent_id.db
         else:
-            raise IOError("Expected parent to have http connector")
+            raise IOError("Expected parent to have db connector")
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
@@ -125,29 +122,15 @@ class ObjectID:
     def refresh(self):
         """ get the latest obj_json data from server """
 
-        # will need to get JSON from server
-        req = f"/{self.collection_type}/{self.id}"
-        # make server request
-        rsp = self._http_conn.GET(req)
-        if rsp.status_code != 200:
-            raise IOError(f"refresh request got status: {rsp.satus_code}")
-        item = json.loads(rsp.text)
-
-        self._obj_json = item
-        self._modified = parse_lastmodified(item['lastModified'])
-
-        objdb = self.http_conn._objdb
-        if objdb and self.id in objdb:
-            # delete any cached data from objdb so that gets will reflect server state
-            del objdb[self.id]
+        # get the latest version of the object
+        self.db.getObjectById(self.uuid, refresh=True)
 
     def close(self):
         """Remove handles to id.
         """
         self._old_uuid = self._uuid  # for debugging
         self._uuid = 0
-        self._obj_json = None
-        self._http_conn = None
+        self._db = None
 
     def __bool__(self):
         return bool(self._uuid)
@@ -164,23 +147,23 @@ class TypeID(ObjectID):
         return self.obj_json['type']
 
     def get_type(self):
-        type_json = self._obj_json["type"]
+        type_json = self.obj_json["type"]
         dtype = createDataType(type_json)
         return dtype
 
     @property
     def tcpl_json(self):
-        if 'creationProperties' in self._obj_json:
+        if 'creationProperties' in self.obj_json:
             tcpl = self._obj_json['creationProperties']
         else:
             tcpl = {}
         return tcpl
 
-    def __init__(self, parent, item, **kwds):
+    def __init__(self, parent, obj_id, obj_json=None, **kwds):
         """Create a new TypeID.
         """
 
-        ObjectID.__init__(self, parent, item, **kwds)
+        ObjectID.__init__(self, parent, obj_id, obj_json=obj_json, **kwds)
 
         if self.collection_type != "datatypes":
             raise IOError(f"Unexpected collection_type: {self._collection_type}")
@@ -203,8 +186,8 @@ class DatasetID(ObjectID):
 
     @property
     def dcpl_json(self):
-        if 'creationProperties' in self._obj_json:
-            dcpl = self._obj_json['creationProperties']
+        if 'creationProperties' in self.obj_json:
+            dcpl = self.obj_json['creationProperties']
         else:
             dcpl = {}
         return dcpl
@@ -212,7 +195,7 @@ class DatasetID(ObjectID):
     @property
     def rank(self):
         rank = 0
-        shape = self._obj_json['shape']
+        shape = self.obj_json['shape']
         if shape['class'] == 'H5S_SIMPLE':
             dims = shape['dims']
             rank = len(dims)
@@ -243,11 +226,11 @@ class DatasetID(ObjectID):
 
         return chunks
 
-    def __init__(self, parent, item, **kwds):
+    def __init__(self, parent, obj_id, obj_json=None, **kwds):
         """Create a new DatasetID.
         """
 
-        ObjectID.__init__(self, parent, item, **kwds)
+        ObjectID.__init__(self, parent, obj_id, obj_json=obj_json, **kwds)
 
         if self.collection_type != "datasets":
             raise IOError(f"Unexpected collection_type: {self._collection_type}")
@@ -255,11 +238,11 @@ class DatasetID(ObjectID):
 
 class GroupID(ObjectID):
 
-    def __init__(self, parent, item, http_conn=None, **kwds):
+    def __init__(self, parent, obj_id, obj_json=None, **kwds):
         """Create a new GroupID.
         """
 
-        ObjectID.__init__(self, parent, item, http_conn=http_conn, **kwds)
+        ObjectID.__init__(self, parent, obj_id, obj_json=obj_json, **kwds)
 
         if self.collection_type != "groups":
             raise IOError(f"Unexpected collection_type: {self._collection_type}")
