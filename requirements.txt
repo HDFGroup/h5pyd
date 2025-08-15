@@ -60,7 +60,7 @@ python-dateutil==2.9.0.post0
 pytz==2024.2
 PyYAML==6.0.2
 pyzmq==26.2.0
-requests==2.31.0
+requests==2.32.4
 requests-unixsocket==0.3.0
 s3fs==2024.10.0
 simplejson==3.19.3
