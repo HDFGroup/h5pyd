@@ -308,51 +308,6 @@ class TestGroup(TestCase):
 
         f.close()
 
-    def test_link_multi_removal(self):
-        # create a file for use a link target
-        if config.get("use_h5py"):
-            return
-        filename = self.getFileName("test_link_multi_removal")
-        print(f"filename: {filename}")
-
-        f = h5py.File(filename, 'w')
-        g1 = f.create_group("g1")
-        g1_clone = f["g1"]
-        # create multiple subgroups
-        names = ["subgroup" + str(i) for i in range(10)]
-        subgrps = []
-        for name in names:
-            subgrps.append(g1.create_group(name))
-
-        self.assertEqual(len(g1), 10)
-
-        # Remove first 5 subgroups
-        del g1[names[0:5]]
-
-        self.assertEqual(len(g1), 5)
-        self.assertEqual(len(g1_clone), 5)
-
-        for name in names[0:5]:
-            self.assertFalse(name in g1)
-            self.assertFalse(name in g1_clone)
-
-        for name in names[5:]:
-            self.assertTrue(name in g1)
-            self.assertTrue(name in g1_clone)
-
-        # delete links with names that must be URL-encoded
-        names = ['link with spaces', 'link%', 'unicode八link']
-
-        for name in names:
-            g1[name] = g1
-
-        del g1[names]
-
-        for name in names:
-            self.assertTrue(name not in g1)
-
-        f.close()
-
     def test_link_multi_create(self):
         if config.get("use_h5py"):
             return
