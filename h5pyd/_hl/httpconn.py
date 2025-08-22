@@ -166,6 +166,7 @@ class HttpConn:
         logger=None,
         retries=3,
         timeout=DEFAULT_TIMEOUT,
+        thread_count=30,
         **kwds,
     ):
         self._domain = domain_name
@@ -179,6 +180,8 @@ class HttpConn:
         self._api_key = api_key
         self._s = None  # Sessions
         self._server_info = None
+        self._thread_count = thread_count
+        
         if use_cache:
             self._cache = {}
             self._objdb = {}
@@ -441,10 +444,12 @@ class HttpConn:
 
         if check_cache:
             self.log.debug("httpcon - checking cache")
-            if req in self._cache:
+            try:
                 self.log.debug("httpcon - returning cache result")
                 rsp = self._cache[req]
                 return rsp
+            except KeyError:
+                pass
 
         self.log.info(f"GET: {self._endpoint + req} [{params['domain']}] timeout: {self._timeout}")
 
@@ -737,11 +742,11 @@ class HttpConn:
 
                 s.mount(
                     "http://",
-                    HTTPAdapter(max_retries=retry, pool_connections=16, pool_maxsize=16),
+                    HTTPAdapter(max_retries=retry, pool_connections=self._thread_count, pool_maxsize=self._thread_count),
                 )
                 s.mount(
                     "https://",
-                    HTTPAdapter(max_retries=retry, pool_connections=16, pool_maxsize=16),
+                    HTTPAdapter(max_retries=retry, pool_connections=self._thread_count, pool_maxsize=self._thread_count),
                 )
                 self._s = s
             else:

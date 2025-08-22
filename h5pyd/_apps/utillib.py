@@ -12,6 +12,7 @@
 
 import sys
 import logging
+import concurrent.futures
 
 try:
     import h5py
@@ -67,7 +68,7 @@ def dump_dtype(dt):
 
 def is_h5py(obj):
     # Return True if objref is a h5py object and False is not
-    if isinstance(obj, object) and isinstance(obj.id.id, int):
+    if isinstance(obj, object) and isinstance(obj.id.id, int):  # type: ignore
         return True
     else:
         return False
@@ -233,7 +234,7 @@ def convert_dtype(srcdt, ctx):
                 tgt_dt = h5pyd.special_dtype(vlen=str)
         else:
             tgt_dt = srcdt
-    return tgt_dt
+    return tgt_dt  # type: ignore
 
 
 def guess_chunk(shape, typesize):
@@ -615,7 +616,7 @@ def get_chunktable_dims(dset):
     table_dims = []
     for dim in range(rank):
         dset_extent = dset.shape[dim]
-        chunk_extent = chunk_dims[dim]
+        chunk_extent = chunk_dims[dim]  # type: ignore
 
         if dset_extent > 0 and chunk_extent > 0:
             table_extent = -(dset_extent // -chunk_extent)
@@ -838,7 +839,7 @@ def create_chunktable(dset, dset_dims, ctx):
         chunktable_maxshape = [None,] if extend else []
         chunktable_maxshape.extend(get_chunktable_dims(dset))
         chunk_dims = [1,] if extend else []
-        chunk_dims.extend(get_chunk_dims(dset))
+        chunk_dims.extend(get_chunk_dims(dset))  # type: ignore
 
         fout = ctx["fout"]
         kwargs = {}
@@ -916,7 +917,7 @@ def create_chunktable(dset, dset_dims, ctx):
 
             chunk_key = ""
             for dim in range(rank):
-                chunk_key += str(index[dim] // chunk_dims[dim])
+                chunk_key += str(index[dim] // chunk_dims[dim])  # type: ignore
                 if dim < rank - 1:
                     chunk_key += "_"
             logging.debug(f"adding chunk_key: {chunk_key}")
@@ -1024,15 +1025,15 @@ def update_chunktable(src, tgt, ctx):
     chunktable = fout[f"datasets/{chunktable_id}"]
     chunk_arr = get_chunk_locations(src, ctx, include_file_uri=extend)
 
-    msg = f"dataset chunk dimensions {chunktable.shape} not compatible with {chunk_arr.shape}"
-    if len(chunktable.shape) == len(chunk_arr.shape):
-        if chunktable.shape != chunk_arr.shape:
+    msg = f"dataset chunk dimensions {chunktable.shape} not compatible with {chunk_arr.shape}"  # type: ignore
+    if len(chunktable.shape) == len(chunk_arr.shape): # type: ignore
+        if chunktable.shape != chunk_arr.shape:  # type: ignore
             logging.error(msg)
             if not ctx["ignore_error"]:
                 raise IOError(msg)
             return
-    elif len(chunk_arr.shape) + 1 == len(chunktable.shape):
-        if chunk_arr.shape != chunktable.shape[1:]:
+    elif len(chunk_arr.shape) + 1 == len(chunktable.shape):  # type: ignore
+        if chunk_arr.shape != chunktable.shape[1:]:  # type: ignore
             logging.error(msg)
             return
     else:
@@ -1069,7 +1070,7 @@ def update_chunktable(src, tgt, ctx):
                 for i in range(len(chunk_indices)):
                     index.append(int(chunk_indices[i]))
                 index = tuple(index)
-                chunk_arr[index] = v
+                chunk_arr[index] = v  # type: ignore
         elif src_layout_class == "H5D_CHUNKED_REF_INDIRECT":
             file_uri = src_layout["file_uri"]
             orig_chunktable_id = src_layout["chunk_table"]
@@ -1088,7 +1089,7 @@ def update_chunktable(src, tgt, ctx):
                 tgt_index = [0,]
                 tgt_index.extend(it.multi_index)
                 tgt_index = tuple(tgt_index)
-                chunk_arr[it.multi_index] = e
+                chunk_arr[it.multi_index] = e  # type: ignore
         else:
             msg = f"expected chunk ref class but got: {src_layout_class}"
             logging.error(msg)
@@ -1169,7 +1170,7 @@ def create_dataset(dobj, ctx):
         print(msg)
     fout = ctx["fout"]
 
-    if dobj.name in fout:
+    if not ctx["no_checks"] and dobj.name in fout:
         dset = fout[dobj.name]
         logging.debug(f"{dobj.name} already exists")
         if ctx["no_clobber"]:
@@ -1244,7 +1245,7 @@ def create_dataset(dobj, ctx):
             rank = 0
         else:
             tgt_shape.extend(dobj.shape)
-            tgt_maxshape.extend(dobj.maxshape)
+            tgt_maxshape.extend(dobj.maxshape)  # type: ignore
             rank = len(tgt_shape)
         if rank > 0 and ctx["extend_dim"]:
             # set maxshape to unlimited for any dimension that is the extend_dim
@@ -1259,8 +1260,8 @@ def create_dataset(dobj, ctx):
                     if ctx["verbose"]:
                         print(msg)
                 for i in range(rank):
-                    tgt_shape[i] = 0
-                    tgt_maxshape[i] = None
+                    tgt_shape[i] = 0  # type: ignore
+                    tgt_maxshape[i] = None  # type: ignore
             else:
                 # check to see if any dimension scale refers to the extend dim
                 for dim in range(len(dobj.dims)):
@@ -1272,8 +1273,8 @@ def create_dataset(dobj, ctx):
                         msg = f"dimscale for dim: {dim}: {dimscale}, type: {type(dimscale)}"
                         logging.debug(msg)
                         if dimscale.name.split("/")[-1] == ctx["extend_dim"]:
-                            tgt_shape[dim] = 0
-                            tgt_maxshape[dim] = None
+                            tgt_shape[dim] = 0 # type: ignore
+                            tgt_maxshape[dim] = None  # type: ignore
                             msg = f"setting dimension {dim} of dataset {dobj.name} to unlimited"
                             logging.info(msg)
                             if ctx["verbose"]:
@@ -1596,7 +1597,7 @@ def write_dataset(src, tgt, ctx):
             if ctx["verbose"]:
                 print(msg)
     except (IOError, TypeError) as e:
-        msg = f"ERROR : failed to copy dataset data {src_s}: {e}"
+        msg = f"ERROR : failed to copy dataset data {src_s}: {e}" # type: ignore
         logging.error(msg)
         if not ctx["ignore_error"]:
             raise
@@ -1687,7 +1688,7 @@ def create_group(gobj, ctx):
 
     grp = None
 
-    if gobj.name in fout:
+    if not ctx["no_checks"] and gobj.name in fout:
         grp = fout[gobj.name]
         logging.debug(f"{gobj.name} already exists")
         if ctx["no_clobber"]:
@@ -1708,7 +1709,7 @@ def create_group(gobj, ctx):
             if not ctx["ignore_error"]:
                 raise IOError(msg)
     else:
-        if ctx["verbose"]:
+        if not ctx["no_checks"] and ctx["verbose"]:
             print(f"{gobj.name} not found")
 
         grp = fout.create_group(gobj.name)
@@ -1799,6 +1800,8 @@ def load_file(
     extend_dim=None,
     extend_offset=0,
     ignore_error=False,
+    no_checks=False,
+    thread_count=30,
 ):
 
     logging.info(f"input file: {fin.filename}")
@@ -1834,6 +1837,8 @@ def load_file(
     ctx["extend_offset"] = extend_offset
     ctx["srcid_desobj_map"] = {}
     ctx["ignore_error"] = ignore_error
+    ctx["no_checks"] = no_checks
+    ctx["thread_count"] = thread_count
 
     def copy_attribute_helper(name, obj):
         logging.info(f"copy attribute - name: {name}  obj: {obj.name}")
@@ -1875,6 +1880,24 @@ def load_file(
         else:
             logging.error(f"no handler for object class: {type(obj)}")
 
+    def _visit_in_parallell(func):
+        logging.info("in parallell...")
+        jobs = []
+
+        def _add_to_jobs(name, obj):
+            jobs.append((name, obj))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=thread_count) as executor:
+            fin.visititems(_add_to_jobs)
+            futures = [executor.submit(func, item[0], item[1]) for item in jobs]
+
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logging.exception(e)
+                    raise
+
     # build a rough map of the file using the internal function above
     # copy over any attributes
     # create soft/external links (and hardlinks not already created)
@@ -1886,16 +1909,17 @@ def load_file(
 
     # copy over any attributes
     logging.info("creating target attributes")
-    fin.visititems(copy_attribute_helper)
+    _visit_in_parallell(copy_attribute_helper)
 
     # create soft/external links (and hardlinks not already created)
     create_links(fin, fout, ctx)  # create root soft/external links
-    fin.visititems(object_link_helper)
+
+    _visit_in_parallell(object_link_helper)
 
     if dataload == "ingest" or dataload == "link":
         # copy dataset data
         logging.info("copying dataset data")
-        fin.visititems(object_copy_helper)
+        _visit_in_parallell(object_copy_helper)
     else:
         logging.info("skipping dataset data copy (dataload is None)")
 
