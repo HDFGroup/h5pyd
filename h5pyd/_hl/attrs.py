@@ -20,13 +20,12 @@
 from __future__ import absolute_import
 
 import numpy
-import json
+
+from h5json.hdf5dtype import special_dtype, Reference
 
 from . import base
-from .base import jsonToArray, Empty
+from .base import Empty
 from .datatype import Datatype
-from .objectid import GroupID, DatasetID, TypeID
-from .h5type import getTypeItem, createDataType, special_dtype, Reference
 
 
 class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
@@ -54,25 +53,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         """ Private constructor.
         """
         self._parent = parent
-
-        if isinstance(parent.id, GroupID):
-            self._req_prefix = "/groups/" + parent.id.uuid + "/attributes/"
-        elif isinstance(parent.id, TypeID):
-            self._req_prefix = "/datatypes/" + parent.id.uuid + "/attributes/"
-        elif isinstance(parent.id, DatasetID):
-            self._req_prefix = "/datasets/" + parent.id.uuid + "/attributes/"
-        else:
-            # "unknown id"
-            self._req_prefix = "<unknown>"
-        objid = self._parent.id.uuid
-        objdb = self._parent.id.http_conn.getObjDb()
-        if objdb and objid in objdb:
-            # _objdb is meta-data pulled from the domain on open.
-            # use the link json from there if present
-            obj_json = objdb[objid]
-            self._objdb_attributes = obj_json["attributes"]
-        else:
-            self._objdb_attributes = None
+        self._attributes = self._parent.db.getAttributes(self._parent.id.uuid)
 
     def _bytesArrayToList(self, data):
         """
@@ -114,32 +95,28 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if isinstance(name, bytes):
             name = name.decode("utf-8")
 
-        if self._objdb_attributes is not None:
-            if name not in self._objdb_attributes:
-                raise KeyError
-            attr_json = self._objdb_attributes[name]
-        else:
-            req = self._req_prefix + name
-            try:
-                attr_json = self._parent.GET(req)
-            except IOError:
-                raise KeyError
+        attr_json = self._parent.db.getAttribute(self._parent.id.uuid, name)
 
-        shape_json = attr_json['shape']
-        type_json = attr_json['type']
-        dtype = createDataType(type_json)
-        if shape_json['class'] == 'H5S_NULL':
+        if attr_json is None:
+            raise KeyError
+
+        shape_json = attr_json["shape"]
+        print(f"attr[{name}].class: {shape_json['class']}")
+        if shape_json["class"] == "H5S_NULL":
+            # null space object, return an Empty instance
+            dtype = self._parent.db.getDtype(attr_json)
             return Empty(dtype)
-        value_json = attr_json['value']
 
-        if 'dims' in shape_json:
-            shape = shape_json['dims']
-        else:
-            shape = ()
+        obj_id = self._parent.id.uuid
 
-        # Do this first, as we'll be fiddling with the dtype for top-level
-        # array types
-        htype = dtype
+        arr = self._parent.db.getAttributeValue(obj_id, name)
+
+        if arr is None:
+            # attribute not found
+            raise KeyError
+        
+        dtype = arr.dtype
+        shape = arr.shape
 
         # NumPy doesn't support top-level array types, so we have to "fake"
         # the correct type and shape for the array.  For example, consider
@@ -148,8 +125,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             subdtype, subshape = dtype.subdtype
             shape = shape + subshape   # (5, 3)
             dtype = subdtype           # 'f'
-
-        arr = jsonToArray(shape, htype, value_json)
+            self.log.warning(f"attr.__getitem__, convert arr to shape: {shape} and dtype: {dtype}")
 
         if len(arr.shape) == 0:
             v = arr[()]
@@ -158,70 +134,11 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 try:
                     v.encode("utf-8")
                 except UnicodeEncodeError:
-                    self._parent.log.debug("converting utf8 unencodable string as bytes")
+                    self._parent.log.debug("converting utf8 un-encodable string as bytes")
                     v = v.encode("utf-8", errors="surrogateescape")
             return v
 
         return arr
-
-    def get_attributes(self, names=None, pattern=None, limit=None, marker=None):
-        """
-        Get all attributes or a subset of attributes from the target object.
-        If 'use_cache' is True, use the objdb cache if available.
-        The cache cannot be used with pattern, limit, or marker parameters.
-        - if 'pattern' is provided, retrieve all attributes with names that match the pattern
-          according to Unix pathname pattern expansion rules.
-        - if 'limit' is provided, retrieve at most 'limit' attributes.
-        - if 'marker' is provided, retrieve attributes whose names occur after the name 'marker' in the target object
-        """
-        if names and (pattern or limit or marker):
-            raise ValueError("names cannot be used with pattern, limit or marker")
-
-        if self._objdb_attributes is not None:
-            # use the objdb cache
-            out = {}
-            for a in self._objdb_attributes:
-                name = a['name']
-                out[name] = self._objdb_attributes[name]
-            return out
-
-        # Omit trailing slash
-        req = self._req_prefix[:-1]
-
-        body = {}
-        params = {"IncludeData": 1}
-
-        if pattern:
-            params["pattern"] = pattern
-        if limit:
-            params["Limit"] = limit
-        if marker:
-            params["Marker"] = marker
-
-        if names:
-            if isinstance(names, list):
-                names = [name.decode('utf-8') if isinstance(name, bytes) else name for name in names]
-            else:
-                if isinstance(names, bytes):
-                    names = names.decode("utf-8")
-                names = [names]
-
-            body['attr_names'] = names
-
-        if body:
-            rsp = self._parent.POST(req, body=body, params=params)
-        else:
-            rsp = self._parent.GET(req, params=params)
-
-        attrs_json = rsp['attributes']
-        names = [attr['name'] for attr in attrs_json]
-        values = [attr['value'] for attr in attrs_json]
-        out = {}
-
-        for i in range(len(names)):
-            out[names[i]] = values[i]
-
-        return out
 
     def __setitem__(self, name, value):
         """ Set a new attribute, overwriting any existing attribute.
@@ -230,7 +147,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         use a specific type or shape, or to preserve the type of an attribute,
         use the methods create() and modify().
         """
-        self.create(name, values=value, dtype=base.guess_dtype(value))
+        self.create(name, value=value, dtype=base.guess_dtype(value))
 
     def __delitem__(self, name):
         """ Delete an attribute (which must already exist). """
@@ -247,13 +164,13 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             req = self._req_prefix + name
         self._parent.DELETE(req, params=params)
 
-    def create(self, names, values, shape=None, dtype=None):
-        """ Create new attribute(s), overwriting any existing attributes.
+    def create(self, name, value, shape=None, dtype=None):
+        """ Create new attribute, overwriting any existing attributes.
 
-        names
-            Name of the new attribute or list of names (required)
-        values
-            Array to initialize the attribute or list of arrays (required)
+        name
+            Name of the new attribute (required)
+        value
+            Array to initialize the attribute (required)
         shape
             Shape of the attribute.  Overrides data.shape if both are
             given, in which case the total number of points must be unchanged.
@@ -261,150 +178,87 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             Data type of the attribute.  Overrides data.dtype if both
             are given.
         """
-        self._parent.log.info(f"attrs.create({names})")
+        self._parent.log.info(f"attrs.create({name})")
 
-        # Standardize single attribute arguments to lists
-        if not isinstance(names, list):
-            names = [names]
-            values = [values]
+        if self._parent.read_only:
+            raise IOError("No write intent")
+        
+        obj_id = self._parent.id.uuid
 
-        # Do not permit duplicate names
-        if len(names) != len(set(names)):
-            raise ValueError("Duplicate attribute names are not allowed")
+        # First, make sure we have a NumPy array.  We leave the data
+        # type conversion for HDF5 to perform.
+        if isinstance(value, Reference):
+            dtype = special_dtype(ref=Reference)
+        if not isinstance(value, Empty):
+            value = numpy.asarray(value, dtype=dtype, order='C')
 
-        if shape is not None and not isinstance(shape, list):
-            shapes = [shape]
-        elif shape is None:
-            shapes = [None] * len(names)
-        else:
-            # Given shape is already a list of shapes
-            shapes = shape
+        if shape is None and not isinstance(value, Empty):
+            shape = value.shape
 
-        if dtype is not None and not isinstance(dtype, list):
-            dtypes = [dtype]
+        use_htype = None  # If a committed type is given, we must use it in h5a.create.
+
+        if isinstance(dtype, Datatype):
+            use_htype = "datatypes:/" + dtype.id.uuid
+            dtype = dtype.dtype
+            
+            # Special case if data are complex numbers
+            is_complex = (value.dtype.kind == 'c') and (dtype.names is None) or (
+                dtype.names != ('r', 'i')) or (
+                any(dt.kind != 'f' for dt, off in dtype.fields.values())) or (
+                dtype.fields['r'][0] == dtype.fields['i'][0])
+
+            if is_complex:
+                raise TypeError(f'Wrong committed datatype for complex numbers: {dtype.name}')
         elif dtype is None:
-            dtypes = [None] * len(names)
-        else:
-            # Given dtype is already a list of dtypes
-            dtypes = dtype
-
-        type_jsons = [None] * len(names)
-
-        if (len(names) != len(values)) or (shapes is not None and len(shapes) != len(values)) or\
-           (dtypes is not None and len(dtypes) != len(values)):
-            raise ValueError("provided names, values, shapes and dtypes must have the same length")
-
-        for i in range(len(names)):
-            # First, make sure we have a NumPy array.  We leave the data
-            # type conversion for HDF5 to perform.
-            if isinstance(values[i], Reference):
-                dtypes[i] = special_dtype(ref=Reference)
-            if not isinstance(values[i], Empty):
-                values[i] = numpy.asarray(values[i], dtype=dtypes[i], order='C')
-
-            if shapes[i] is None and not isinstance(values[i], Empty):
-                shapes[i] = values[i].shape
-
-            use_htype = None  # If a committed type is given, we must use it in h5a.create.
-
-            if isinstance(dtypes[i], Datatype):
-                use_htype = dtypes[i].id
-                dtypes[i] = dtypes[i].dtype
-
-                # Special case if data are complex numbers
-                is_complex = (values[i].dtype.kind == 'c') and (dtypes[i].names is None) or (
-                    dtypes[i].names != ('r', 'i')) or (
-                    any(dt.kind != 'f' for dt, off in dtypes[i].fields.values())) or (
-                    dtypes[i].fields['r'][0] == dtypes[i].fields['i'][0])
-
-                if is_complex:
-                    raise TypeError(
-                        f'Wrong committed datatype for complex numbers: {dtypes[i].name}')
-            elif dtypes[i] is None:
-                if values[i].dtype.kind == 'U':
-                    # use vlen for unicode strings
-                    dtypes[i] = special_dtype(vlen=str)
-                else:
-                    dtypes[i] = values[i].dtype
+            if value.dtype.kind == 'U':
+                # use vlen for unicode strings
+                dtype = special_dtype(vlen=str)
             else:
-                dtypes[i] = numpy.dtype(dtypes[i])  # In case a string, e.g. 'i8' is passed
+                dtype = value.dtype
+        else:
+            dtype = numpy.dtype(dtype)  # In case a string, e.g. 'i8' is passed
 
-            # Where a top-level array type is requested, we have to do some
-            # fiddling around to present the data as a smaller array of
-            # subarrays.
-            if not isinstance(values[i], Empty):
-                if dtypes[i].subdtype is not None:
+        # Where a top-level array type is requested, we have to do some
+        # fiddling around to present the data as a smaller array of subarrays.
+        if not isinstance(value, Empty):
+            if dtype.subdtype is not None:
 
-                    subdtype, subshape = dtypes[i].subdtype
+                subdtype, subshape = dtype.subdtype
 
-                    # Make sure the subshape matches the last N axes' sizes.
-                    if shapes[i][-len(subshape):] != subshape:
-                        raise ValueError(f"Array dtype shape {subshape} is incompatible with data shape {shapes[i]}")
+                # Make sure the subshape matches the last N axes' sizes.
+                if shape[-len(subshape):] != subshape:
+                    raise ValueError(f"Array dtype shape {subshape} is incompatible with data shape {shape}")
 
-                    # New "advertised" shape and dtype
-                    shapes[i] = shapes[i][0:len(shapes[i]) - len(subshape)]
-                    dtypes[i] = subdtype
+                # New "advertised" shape and dtype
+                shape = shape[0:len(shape) - len(subshape)]
+                dtype = subdtype
 
-                # Not an array type; make sure to check the number of elements
-                # is compatible, and reshape if needed.
-                else:
-                    if numpy.prod(shapes[i]) != numpy.prod(values[i].shape):
-                        raise ValueError("Shape of new attribute conflicts with shape of data")
+            # Not an array type; make sure to check the number of elements
+            # is compatible, and reshape if needed.
+            else:
+                if numpy.prod(shape) != numpy.prod(value.shape):
+                    raise ValueError("Shape of new attribute conflicts with shape of data")
 
-                    if shapes[i] != values[i].shape:
-                        values[i] = values[i].reshape(shapes[i])
+                if shape != value.shape:
+                    value = value.reshape(shape)
 
                 # We need this to handle special string types.
 
-                    values[i] = numpy.asarray(values[i], dtype=dtypes[i])
+                value = numpy.asarray(value, dtype=dtype)
 
-            # Make HDF5 datatype and dataspace for the H5A calls
-            if use_htype is None:
-                type_jsons[i] = getTypeItem(dtypes[i])
-                self._parent.log.debug(f"attrs.create type_json: {format(type_jsons[i])}")
+        # Make HDF5 datatype and dataspace for the H5A calls
+        if use_htype:
+            dtype = use_htype
 
-        params = {}
-        body = {}
-        params['replace'] = 1
+        if isinstance(value, Empty):
+            print(f"using value: {value} as None")
+            print(f"using shape: {shape}")
+            value = None  # hdf5db doesn't know about the empty object
+            shape = "H5S_NULL"
 
-        attributes = {}
+        self._parent.db.createAttribute(obj_id, name, value, shape=shape, dtype=dtype)
 
-        for i in range(len(names)):
-            attr = {}
-            attr['type'] = type_jsons[i]
-            if isinstance(values[i], Empty):
-                attr['shape'] = 'H5S_NULL'
-            else:
-                attr['shape'] = shapes[i]
-                if values[i].dtype.kind != 'c':
-                    attr['value'] = self._bytesArrayToList(values[i])
-                else:
-                    # Special case: complex numbers
-                    special_dt = createDataType(type_jsons[i])
-                    tmp = numpy.empty(shape=values[i].shape, dtype=special_dt)
-                    tmp['r'] = values[i].real
-                    tmp['i'] = values[i].imag
-                    attr['value'] = json.loads(json.dumps(tmp.tolist()))
-            attributes[names[i]] = attr
-
-        if len(names) > 1:
-            # Create multiple attributes
-            # Omit trailing slash
-            req = self._req_prefix[:-1]
-            body['attributes'] = attributes
-
-        else:
-            # Create single attribute
-            req = self._req_prefix + names[0]
-            for key in attributes[names[0]]:
-                body[key] = attributes[names[0]][key]
-
-        try:
-            self._parent.PUT(req, body=body, params=params)
-        except RuntimeError:
-            # 'replace' parameter is used, so failure is not due to attribute already existing
-            raise RuntimeError("Failued to create attribute(s)")
-
+        
     def modify(self, name, value):
         """ Change the value of an attribute while preserving its type.
 
@@ -438,64 +292,40 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     def __len__(self):
         """ Number of attributes attached to the object. """
 
-        if self._objdb_attributes is not None:
-            count = len(self._objdb_attributes)
-        else:
-            # make a server requests
-            req = self._req_prefix
-            # backup over the '/attributes/' part of the req
-            req = req[:-(len('/attributes/'))]
-            rsp = self._parent.GET(req)  # get parent obj
-            count = rsp['attributeCount']
-        return count
+        obj_id = self._parent.id.uuid
+        names = self._parent.db.getAttributes(obj_id)
+        return len(names)
+
 
     def __iter__(self):
         """ Iterate over the names of attributes. """
-        if self._objdb_attributes is not None:
-            if self._parent.track_order:
-                attrs = sorted(self._objdb_attributes.items(), key=lambda x: x[1]['created'])
-            else:
-                attrs = sorted(self._objdb_attributes.items())
+        obj_id = self._parent.id.uuid
+        attrs = self._parent.db.getAttributes(obj_id)
 
-            ordered_attrs = {}
-            for a in attrs:
-                ordered_attrs[a[0]] = a[1]
+        def _get_created(name):
+            attr_json = self._parent.db.getAttribute(obj_id, include_data=False)
+            return attr_json["created"]
 
-            for name in ordered_attrs:
-                yield name
-
+        if self._parent.track_order:
+            attrs = sorted(attrs, key=lambda x: _get_created(x))
         else:
-            # make server request
-            req = self._req_prefix
-            # backup over the trailing slash in req
-            req = req[:-1]
-            rsp = self._parent.GET(req, params={"CreateOrder": "1" if self._parent.track_order else "0"})
-            attributes = rsp['attributes']
+            attrs = sorted(attrs)
 
-            attrlist = []
-            for attr in attributes:
-                attrlist.append(attr['name'])
+        for name in attrs:
+            yield name
 
-            for name in attrlist:
-                yield name
 
     def __contains__(self, name):
         """ Determine if an attribute exists, by name. """
-        exists = True
         if isinstance(name, bytes):
             name = name.decode("utf-8")
 
-        if self._objdb_attributes is not None:
-            exists = name in self._objdb_attributes
+        obj_id = self._parent.id.uuid
+        attrs = self._parent.db.getAttributes(obj_id)
+        if name in attrs:
+            return True
         else:
-            # make server request
-            req = self._req_prefix + name
-            try:
-                self._parent.GET(req)
-            except IOError:
-                # todo - verify this is a 404 response
-                exists = False
-        return exists
+            return False
 
     def __repr__(self):
         if not self._parent.id.id:
@@ -504,30 +334,17 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
     def __reversed__(self):
         """ Iterate over the names of attributes in reverse order. """
-        if self._objdb_attributes is not None:
-            if self._parent.track_order:
-                attrs = sorted(self._objdb_attributes.items(), key=lambda x: x[1]['created'])
-            else:
-                attrs = sorted(self._objdb_attributes.items())
+        obj_id = self._parent.id.uuid
+        attrs = self._parent.db.getAttributes(obj_id)
 
-            ordered_attrs = {}
-            for a in attrs:
-                ordered_attrs[a[0]] = a[1]
+        def _get_created(name):
+            attr_json = self._parent.db.getAttribute(obj_id, include_data=False)
+            return attr_json["created"]
 
-            for name in reversed(ordered_attrs):
-                yield name
-
+        if self._parent.track_order:
+            attrs = sorted(attrs, key=lambda x: _get_created(x))
         else:
-            # make server request
-            req = self._req_prefix
-            # backup over the trailing slash in req
-            req = req[:-1]
-            rsp = self._parent.GET(req, params={"CreateOrder": "1" if self._parent.track_order else "0"})
-            attributes = rsp['attributes']
+            attrs = sorted(attrs)
 
-            attrlist = []
-            for attr in attributes:
-                attrlist.append(attr['name'])
-
-            for name in reversed(attrlist):
-                yield name
+        for name in reversed(attrs):
+            yield name

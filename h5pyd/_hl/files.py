@@ -14,7 +14,6 @@ from __future__ import absolute_import
 
 import io
 import os
-import json
 import logging
 import pathlib
 import time
@@ -25,7 +24,6 @@ from h5json.hsdsstore.hsds_writer import HSDSWriter
 
 from .objectid import GroupID
 from .group import Group
-from .httpconn import HttpConn
 from .. import config
 
 VERBOSE_REFRESH_TIME = 1.0  # 1 second
@@ -208,23 +206,25 @@ class File(Group):
     def filename(self):
         """File name on disk"""
         filepath = None
-        if self.id.db.reader:
-            filepath = self.id.db.reader.filepath
-        elif self.id.db.writer:
-            filepath = self.id.db.writer.filepath
+        if self.db.reader:
+            filepath = self.db.reader.filepath
+        elif self.db.writer:
+            filepath = self.db.writer.filepath
         else:
             pass  # no persistent storage enabled
         return filepath
 
     def _getStats(self):
         """ return info on storage usage """
-        if self.id.db.writer:
-            print(dir(self.id.db.writer))
-            stats = self.id.db.writer.getStats()
-        elif self.id.db.reader:
-            stats = self.id.db.reader.getStats()
+        if self.db.writer:
+            stats = self.db.writer.getStats()
+            print("writer stats:", stats)
+        elif self.db.reader:
+            stats = self.db.reader.getStats()
+            print("reader stats:", stats)
         else:
             stats = {"created": 0, "lastModified": 0, "owner": 0}
+            print("default stats:", stats)
         return stats
 
     @property
@@ -235,7 +235,7 @@ class File(Group):
     def mode(self):
         """Python mode used to open file"""
         mode = 'r'
-        if self.id.db.writer:
+        if self.db.writer and self.db.writer.__class__.__name__ != "H5NullWriter":
             mode += '+'
         return mode
 
@@ -251,7 +251,9 @@ class File(Group):
 
     @property
     def serverver(self):
-        return self._version
+        stats = self._getStats()
+
+        return stats.get("version")
 
     @property
     def userblock_size(self):
@@ -272,7 +274,8 @@ class File(Group):
 
     @property
     def limits(self):
-        return self._limits
+        stats = self._getStats()
+        return stats.get("limits")
 
     @property
     def swmr_mode(self):
@@ -292,8 +295,7 @@ class File(Group):
             raise ValueError(msg)
         self._swmr_mode = True
 
-    def __init__(
-        self,
+    def _init_db(self,
         domain,
         mode=None,
         endpoint=None,
@@ -301,82 +303,12 @@ class File(Group):
         password=None,
         bucket=None,
         api_key=None,
-        use_session=True,
-        use_cache=True,
         swmr=False,
-        libver=None,
-        logger=None,
-        owner=None,
-        linked_domain=None,
-        track_order=None,
         retries=10,
         timeout=180,
         **kwds,
     ):
-        """Create a new file object.
-
-        See the h5py user guide for a detailed explanation of the options.
-
-        domain
-            URI of the domain name to access. E.g.: /home/username/tall.h5.  Can also
-            use DNS style:  tall.username.home
-        mode
-            Access mode: 'r', 'r+', 'w', or 'a'
-        endpoint
-            Server endpoint.   Defaults to "http://localhost:5101"
-        username
-            username for authentication
-        password
-            password for authentication
-        bucket
-            bucket (or storage container) to use for domain.  If not set, server default bucket will be used
-        api_key
-            user's api key (for server configurations that use api_key rather than username/password)
-        use_session
-            maintain http connect between calls
-        use_cache
-            save attribute and links values rather than retreiving from server each time they are accessed.
-            Set to False if the storage content is expected to change due to another application
-        swmr
-            For compatibility with h5py - has the effect of overriding use_cache so that metadata
-            will always be synchronized with the server
-        libver
-            For compatibility with h5py - library version bounds.  Has no effect other
-            than returning given value as property
-        logger
-            supply log handler to be used
-        owner
-            set the owner to be used when new domain is created (defaults to username).  Only valid when used
-            by admin users
-        linked_domain
-            Create new domain using the root of the linked domain
-        track_order
-            Whether to track dataset/group/attribute creation order within this file. Objects will be iterated
-            in ascending creation order if this is True, if False in ascending alphanumeric order.
-            If None use global default get_config().track_order.
-        retries
-            Number of retry attempts to be used if a server request fails
-        timeout
-            Timeout value in seconds
-        """
-
-        # if we're passed a GroupId as domain, just initialize the file object
-        # with that.  This will be faster and enable the File object to share the same http connection.
-        # TBD
-        # no_endpoint_info = endpoint is None and username is None and password is None
-        # if (mode is None and no_endpoint_info and isinstance(domain, GroupID)):
-        #    groupid = domain
-        # else:
-
-        self.log = logging.getLogger()
-
-        self.log.setLevel(logging.DEBUG)
-
-        if mode and mode not in ("r", "r+", "w", "w-", "x", "a"):
-            raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
-
-        if mode is None:
-            mode = "r"
+        # initialize h5db using domain path
 
         cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
 
@@ -455,8 +387,6 @@ class File(Group):
             kwargs["bucket"] = bucket
         if api_key:
             kwargs["api_key"] = api_key
-        if use_session:
-            kwargs["use_session"] = use_session
         if retries:
             kwargs["retries"] = retries
         if timeout:
@@ -465,40 +395,169 @@ class File(Group):
         root_id = None
 
         if mode != 'w':
+            print("mode is not w")
             file_exists = is_hdf5(domain, **kwargs)
             if file_exists:
+                print('file exists')
                 if mode in ('w-', 'x'):
                     self.log.warning(f"Domain: {domain} already exists")
                     raise FileExistsError()
+                print("open reader")
                 db.reader = HSDSReader(domain, **kwargs)
                 root_id = db.open()
+                print("got root_id:", root_id)
             else:
-                if mode in ('r', 'r++'):
+                if mode in ('r', 'r+'):
                     self.log.warning(f"domain: {domain} not found")
                     raise FileNotFoundError()
         else:
+            print("mode is w")
             file_exists = False  # will overwrite in either case
 
-        if not root_id:
-            # use writer to initialize domain
+        if root_id:
+            # if mode is not read only, setup the writer
+            if mode != 'r':
+                db.close()
+                print("set writer with existing root_id")
+                db.writer = HSDSWriter(domain, append=True, **kwargs)
+                db.open()
+        else:
+            # new domain, use writer to initialize domain
+            print("set writer to initialize domain")
             db.writer = HSDSWriter(domain, **kwargs)
             root_id = db.open()
-            db.close()
+            print("got root_id from writer:", root_id)
             # now set the reader
             db.reader = HSDSReader(domain, **kwargs)
+            db.close()
             db.open()
+        return db
 
-            root_json = db.getObjectById(root_id)
-            print("root_json:", root_json)
+    def __init__(
+        self,
+        domain,
+        mode=None,
+        endpoint=None,
+        username=None,
+        password=None,
+        bucket=None,
+        api_key=None,
+        swmr=False,
+        libver=None,
+        logger=None,
+        owner=None,
+        track_order=None,
+        retries=10,
+        timeout=180,
+        **kwds,
+    ):
+        """Create a new file object.
 
-            if "limits" in root_json:
-                self._limits = root_json["limits"]
-            else:
-                self._limits = None
-            if "version" in root_json:
-                self._version = root_json["version"]
-            else:
-                self._version = None
+        See the h5py user guide for a detailed explanation of the options.
+
+        domain
+            URI of the domain name to access. E.g.: /home/username/tall.h5.  Can also
+            use DNS style:  tall.username.home
+        mode
+            Access mode: 'r', 'r+', 'w', or 'a'
+        endpoint
+            Server endpoint.   Defaults to "http://localhost:5101"
+        username
+            username for authentication
+        password
+            password for authentication
+        bucket
+            bucket (or storage container) to use for domain.  If not set, server default bucket will be used
+        api_key
+            user's api key (for server configurations that use api_key rather than username/password)
+        use_session
+            maintain http connect between calls
+        use_cache
+            save attribute and links values rather than retreiving from server each time they are accessed.
+            Set to False if the storage content is expected to change due to another application
+        swmr
+            For compatibility with h5py - has the effect of overriding use_cache so that metadata
+            will always be synchronized with the server
+        libver
+            For compatibility with h5py - library version bounds.  Has no effect other
+            than returning given value as property
+        logger
+            supply log handler to be used
+        owner
+            set the owner to be used when new domain is created (defaults to username).  Only valid when used
+            by admin users
+        linked_domain
+            Create new domain using the root of the linked domain
+        track_order
+            Whether to track dataset/group/attribute creation order within this file. Objects will be iterated
+            in ascending creation order if this is True, if False in ascending alphanumeric order.
+            If None use global default get_config().track_order.
+        retries
+            Number of retry attempts to be used if a server request fails
+        timeout
+            Timeout value in seconds
+        """
+        print("FILE_INIT, domain:", domain, "mode:", mode)
+
+        # if we're passed a GroupId as domain, just initialize the file object
+        # with that.  This will be faster and enable the File object to share the same http connection.
+        # TBD
+        # no_endpoint_info = endpoint is None and username is None and password is None
+        # if (mode is None and no_endpoint_info and isinstance(domain, GroupID)):
+        #    groupid = domain
+        # else:
+
+        self.log = logging.getLogger()
+
+        self.log.setLevel(logging.DEBUG)
+
+        # if we're passed a GroupId as domain, just initialize the file object
+        # with that.  This will be faster and enable the File object to share the same http connection.
+        no_endpoint_info = endpoint is None and username is None and password is None
+        if (mode is None and no_endpoint_info and isinstance(domain, GroupID)):
+            groupid = domain
+            db = groupid.db
+            if db.closed:
+                db.open()
+
+        else:
+            if mode and mode not in ("r", "r+", "w", "w-", "x", "a"):
+                raise ValueError("Invalid mode; must be one of r, r+, w, w-, x, a")
+
+            if mode is None:
+                mode = "r"
+
+            kwargs = {"mode": mode}
+            # any specific settings
+            if api_key:
+                kwargs["api_key"] = api_key
+            if endpoint:
+                kwargs["endpoint"] = endpoint
+            if username:
+                kwargs["username"] = username
+            if password:
+                kwargs["password"] = password
+            if owner:
+                kwargs["owner"] = owner
+            if swmr:
+                kwargs["swmr"] = swmr
+            if bucket:
+                kwargs["bucket"] = bucket
+
+            db = self._init_db(domain, **kwargs)
+
+        root_id = db.root_id
+        root_json = db.getObjectById(root_id)
+        print("root_json:", root_json)
+
+        if "limits" in root_json:
+            self._limits = root_json["limits"]
+        else:
+            self._limits = None
+        if "version" in root_json:
+            self._version = root_json["version"]
+        else:
+            self._version = None
 
         self._id = GroupID(None, root_id, obj_json=root_json, db=db)
 
@@ -513,11 +572,13 @@ class File(Group):
         Group.__init__(self, self._id, track_order=track_order)
 
     def _getVerboseInfo(self):
-        now = time.time()
+        # now = time.time()
+        return {}
+        """
         if (self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME):
             # resynch the verbose data
             req = "/?verbose=1"
-            rsp_json = self.GET(req, use_cache=False, params={"CreateOrder": "1" if self._track_order else "0"})
+            rsp_json = self.(req, use_cache=False, params={"CreateOrder": "1" if self._track_order else "0"})
 
             self.log.debug("get verbose info")
             props = {}
@@ -546,19 +607,13 @@ class File(Group):
                     self._lastScan = scan_info["scan_complete"]
 
         return self._verboseInfo
+        """
 
     @property
     def modified(self):
         """Last modified time of the domain as a datetime object."""
-        props = self._getVerboseInfo()
-        if self.id.db.writer:
-            modified = self.id.db.writer.lastModified
-        elif "lastModified" in props:
-            # update with latest time of any domain object (if available)
-            modified = props["lastModified"]
-        else:
-            modified = None  # no write timestamp
-        return modified
+        stats = self._getStats()
+        return stats["lastModified"]
 
     @property
     def num_objects(self):
@@ -720,13 +775,15 @@ class File(Group):
     def flush(self):
         """Tells the service to complete any pending updates to permanent storage"""
         self.log.debug("flush")
-        self.id.db.flush()
+        self.db.flush()
         self.log.info("PUT flush complete")
 
     def close(self):
         """Clears reference to remote resource."""
         # this will flush any pending changes and close the http connection
-        self.id.db.close()
+        print("file.close")
+        if self.id:
+            self.id.close()
 
     def __enter__(self):
         return self

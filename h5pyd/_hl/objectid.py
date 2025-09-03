@@ -67,10 +67,25 @@ class ObjectID:
     def modified(self):
         """last modified timestamp"""
         obj_json = self.obj_json
+        print("obj_json:", obj_json)
         if "lastModified" in obj_json:
-            return obj_json["lastModified"]
+            lastModified = obj_json["lastModified"]
+        elif "created" in obj_json:
+            lastModified = obj_json["created"]
         else:
-            return None
+            lastModified = None
+        return lastModified
+    
+    @property
+    def created(self):
+        """ created timestamp"""
+        obj_json = self.obj_json
+    
+        if "created" in obj_json:
+            created = obj_json["created"]
+        else:
+            created = None
+        return created
 
     @property
     def db(self):
@@ -128,6 +143,8 @@ class ObjectID:
     def close(self):
         """Remove handles to id.
         """
+        if self.db:
+            self.db.close()
         self._old_uuid = self._uuid  # for debugging
         self._uuid = 0
         self._db = None
@@ -137,7 +154,7 @@ class ObjectID:
 
     def __del__(self):
         """ cleanup """
-        self.close()
+        #self.close()
 
 
 class TypeID(ObjectID):

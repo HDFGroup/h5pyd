@@ -20,7 +20,10 @@ import logging
 from collections.abc import (
     Mapping, MutableMapping, KeysView, ValuesView, ItemsView
 )
+from datetime import datetime
+
 from h5json.hdf5dtype import Reference, check_dtype, special_dtype
+from h5json.h5writer import H5NullWriter
 from .objectid import GroupID
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
@@ -835,6 +838,11 @@ class HLObject(CommonStateObject):
     def id(self):
         """ Low-level identifier appropriate for this object """
         return self._id
+    
+    @property
+    def db(self):
+        """ Return db singleton """
+        return self._id.db
 
     @property
     def ref(self):
@@ -865,11 +873,37 @@ class HLObject(CommonStateObject):
     @property
     def modified(self):
         """Last modified time as a datetime object"""
-        return self.id._modified
+
+        timestamp = self.id.modified
+        if timestamp:
+            dt = datetime.fromtimestamp(timestamp)
+        else:
+            dt = None
+
+        return dt
+    
+    @property
+    def created(self):
+        """create time as a datetime object"""
+
+        timestamp = self.id.created
+        if timestamp:
+            dt = datetime.fromtimestamp(timestamp)
+        else:
+            dt = None
+
+        return dt
 
     @property
     def track_order(self):
         return self._track_order
+    
+    @property
+    def read_only(self):
+        if isinstance(self.db.writer, H5NullWriter):
+            return True
+        else:
+            return False
 
     def verifyCert(self):
         # default to validate CERT for https requests, unless

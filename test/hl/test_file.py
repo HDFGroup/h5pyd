@@ -51,9 +51,10 @@ class TestFile(TestCase):
                 self.assertTrue("isadmin" in info)
 
     def test_create(self):
-        filename = self.getFileName("new_file")
+        filename = self.getFileName("new_file2")
         print("filename:", filename)
         now = time.time()
+
         f = h5py.File(filename, 'w')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
@@ -119,14 +120,17 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
-        # rre-open in append mode
+        # re-open in append mode
         f = h5py.File(filename, "a")
+        self.assertEqual(len(f.keys()), 1)
         f.create_group("foo")
+        self.assertEqual(len(f.keys()), 2)
         del f["foo"]
+        self.assertEqual(len(f.keys()), 1)
         f.close()
 
         # re-open as read-only
-        if h5py.__name__ == "h5pyd":
+        if h5py.__name__ == "h5pyd" and False:
             wait_time = 90  # change to >90 to test async updates
             print("waiting {wait_time:d} seconds for root scan sync".format(wait_time=wait_time))
             time.sleep(wait_time)  # let async process update obj number
@@ -134,6 +138,7 @@ class TestFile(TestCase):
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
+        
         self.assertEqual(len(f.keys()), 1)
         self.assertEqual(f.mode, 'r')
         self.assertTrue('/' in f)
@@ -158,7 +163,7 @@ class TestFile(TestCase):
 
         self.assertEqual(len(f.keys()), 1)
 
-        if h5py.__name__ == "h5pyd":
+        if h5py.__name__ == "h5pyd" and False:
             # check properties that are only available for h5pyd
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously

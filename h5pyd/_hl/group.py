@@ -72,7 +72,6 @@ class Group(HLObject, MutableMappingHDF5):
         else:
             parent_uuid = self.id.uuid
 
-        """
         if h5path.find('/') == -1:
             # no path to traverse, just return the link for this group (if it exists)
             tgt_json = self.id.db.getLink(self.id.uuid, h5path)
@@ -87,12 +86,14 @@ class Group(HLObject, MutableMappingHDF5):
                 # asking for the root, just return the root link
                 return self.id.db.root_id, tgt_json
 
-        """
-
         # fake link to start the iteration
         tgt_json = {"class": "H5L_TYPE_HARD", "id": parent_uuid}
         path = h5path.split('/')
+        print("path:", path)
         for name in path:
+            if not name:
+                continue
+            print("name:", name)
             parent_uuid = tgt_json["id"]
             tgt_json = self.id.db.getLink(parent_uuid, name)
             if not tgt_json:
@@ -100,7 +101,7 @@ class Group(HLObject, MutableMappingHDF5):
             link_class = tgt_json["class"]
             if link_class != "H5L_TYPE_HARD":
                 raise IOError(f"Unable to follow link type: {link_class}")
-
+        print(f"get_link_json){{h5path}} -> {tgt_json}")
         return parent_uuid, tgt_json
 
     def _make_group(self, parent_id=None, parent_name=None, link=None, track_order=None):
@@ -141,6 +142,9 @@ class Group(HLObject, MutableMappingHDF5):
         exists.
         """
 
+        if self.read_only:
+            raise ValueError("No write intent")
+
         if isinstance(h5path, bytes):
             h5path = h5path.decode('utf-8')
 
@@ -167,7 +171,7 @@ class Group(HLObject, MutableMappingHDF5):
             if not link:
                 continue  # skip
             self.log.debug(f"create_group - iterate for link: {link}")
-            link_json = self.db.getLink(parent_uuid, link)
+            link_json = self.id.db.getLink(parent_uuid, link)
             if link_json is None:
                 # link not found, create a sub-group
                 kwargs = {}
@@ -186,9 +190,9 @@ class Group(HLObject, MutableMappingHDF5):
                 parent_uuid = link_json["id"]
                 if parent_name:
                     if parent_name[-1] == '/':
-                        parent_name = parent_name + link_json["title"]
+                        parent_name = parent_name + link
                     else:
-                        parent_name = parent_name + '/' + link_json["title"]
+                        parent_name = parent_name + '/' + link
                     self.log.debug(f"create group - parent name: {parent_name}")
 
         if sub_group is None:
@@ -468,23 +472,26 @@ class Group(HLObject, MutableMappingHDF5):
                 # Note: set use_session to false since file.close won't be called
                 #  (and hence the http conn socket won't be closed)
                 from .files import File
-                external_domain = link_json['h5domain']
+                print("link_json:", link_json)
+                external_domain = link_json['file']
+                reader = self.id.db.reader
+
                 if not external_domain.startswith("hdf5://") and not op.isabs(external_domain):
-                    current_domain = self._id.http_conn.domain
+                    current_domain = reader.filepath
                     external_domain = op.join(op.dirname(current_domain), external_domain)
                     external_domain = op.normpath(external_domain)
                 try:
                     kwargs = {}
-                    kwargs["endpoint"] = self.id.http_conn.endpoint
-                    kwargs["username"] = self.id.http_conn.username
-                    kwargs["password"] = self.id.http_conn.password
+                    kwargs["endpoint"] = reader.http_conn.endpoint
+                    kwargs["username"] = reader.http_conn.username
+                    kwargs["password"] = reader.http_conn.password
                     kwargs["mode"] = 'r'
                     kwargs["track_order"] = track_order
 
                     f = File(external_domain, **kwargs)
                 except IOError:
                     # unable to find external link
-                    raise KeyError("Unable to open file: " + link_json['h5domain'])
+                    raise KeyError("Unable to open file: " + link_json['file'])
                 return f[link_json['h5path']]
             elif link_class == 'H5L_TYPE_USER_DEFINED':
                 raise IOError("Unable to fetch user-defined link")
@@ -528,10 +535,10 @@ class Group(HLObject, MutableMappingHDF5):
     def _objectify_link_Json(self, link_json):
         if "id" in link_json:
             link_obj = HardLink(link_json["id"])
-        elif "h5path" in link_json and "h5domain" not in link_json:
+        elif "h5path" in link_json and "file" not in link_json:
             link_obj = SoftLink(link_json["h5path"])
-        elif "h5path" in link_json and "h5domain" in link_json:
-            link_obj = ExternalLink(link_json["h5domain"], link_json["h5path"])
+        elif "h5path" in link_json and "file" in link_json:
+            link_obj = ExternalLink(link_json["file"], link_json["h5path"])
         else:
             raise ValueError("Invalid link JSON")
 
@@ -620,7 +627,7 @@ class Group(HLObject, MutableMappingHDF5):
                 if getclass:
                     return ExternalLink
                 else:
-                    return ExternalLink(link_json['h5domain'], link_json['h5path'])
+                    return ExternalLink(link_json['file'], link_json['h5path'])
             elif link_class == 'H5L_TYPE_HARD':
                 return HardLink if getclass else HardLink(link_json['id'])
             else:
@@ -651,6 +658,8 @@ class Group(HLObject, MutableMappingHDF5):
             can't understand the resulting array dtype.
         """
 
+        db = self.id.db
+
         if name.find('/') != -1:
             parent_path = op.dirname(name)
             basename = op.basename(name)
@@ -662,23 +671,30 @@ class Group(HLObject, MutableMappingHDF5):
             if link_json["class"] != 'H5L_TYPE_HARD':
                 raise IOError("cannot create subgroup of softlink")
             parent_uuid = link_json["id"]
-            group_json = self.id.db.getObjectById(parent_uuid)
+            group_json = db.getObjectById(parent_uuid)
             tgt = Group(GroupID(self, parent_uuid, obj_json=group_json))
             tgt[basename] = obj
 
-        elif isinstance(obj, HLObject):
-            self.id.db.createHardLink(obj.id.uuid, name, obj.id.uuid)
+            return
+        
+        # create a direct link, but first check to see if there's already a link here
+        if db.getLink(self.id.uuid, name):
+            raise IOError("Unable to create link (name already exists)")
+
+        if isinstance(obj, HLObject):
+            db.createHardLink(self.id.uuid, name, obj.id.uuid)
 
         elif isinstance(obj, SoftLink):
-            self.id.db.createSoftLink(self.id.uuid, name, obj.path)
+            db.createSoftLink(self.id.uuid, name, obj.path)
 
         elif isinstance(obj, ExternalLink):
-            self.id.db.createExternalLink(self.id.uuid, name, obj.path, obj.filename)
+            db.createExternalLink(self.id.uuid, name, obj.path, obj.filename)
 
         elif isinstance(obj, numpy.dtype):
             # print "create named type"
-            obj_json = self.id.db.createCommittedType(obj)
-            self.id.db.createHardLink(obj.id.uuid, name, obj_json["id"])
+            obj_json = db.createCommittedType(obj)
+            db.createHardLink(obj.id.uuid, name, obj_json["id"])
+
         else:
             if isinstance(obj, numpy.ndarray):
                 arr = obj
@@ -688,7 +704,7 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 dt = guess_dtype(obj)
                 arr = numpy.array(obj, dtype=dt)
-            self.create_dataset(name, shape=arr.shape, dtype=arr.dtype, data=arr[...])
+                self.create_dataset(name, shape=arr.shape, dtype=arr.dtype, data=arr[...])
 
     def __delitem__(self, name):
         """ Delete (unlink) an item from this group. """
@@ -710,11 +726,14 @@ class Group(HLObject, MutableMappingHDF5):
         """ Number of members attached to this group """
         # we can avoid a server request and just count the links in the obj json
         titles = self.id.db.getLinks(self.id.uuid)
+        print("titles:", titles)
+
         return len(titles)
 
     def __iter__(self):
         """ Iterate over member names """
         titles = self.id.db.getLinks(self.id.uuid)
+        print("titles:", titles)
         links = {}
         for title in titles:
             links[title] = self.id.db.getLink(self.id.uuid, title)
@@ -733,11 +752,13 @@ class Group(HLObject, MutableMappingHDF5):
 
     def __contains__(self, name):
         """ Test if a member name exists """
-        if name == '/' and self.id.uuid == self.id.db.root_id:
-            return True
-
-        link_json = self.id.db.getLink(self.id.uuid, name)
-        return True if link_json else None
+        found = False
+        try:
+            self._get_link_json(name)
+            found = True
+        except KeyError:
+            pass  # not found
+        return found
 
     def copy(self, source, dest, name=None,
              shallow=False, expand_soft=False, expand_external=False,
@@ -923,7 +944,7 @@ class Group(HLObject, MutableMappingHDF5):
                         # obj = SoftLink(link['h5path'])
                         pass  # don't visit soft links'
                     elif link['class'] == 'H5L_TYPE_EXTERNAL':
-                        # obj = ExternalLink(link['h5domain'], link['h5path'])
+                        # obj = ExternalLink(link['file'], link['h5path'])
                         pass  # don't visit external links'
                     elif link['class'] == 'H5L_TYPE_UDLINK':
                         obj = UserDefinedLink()

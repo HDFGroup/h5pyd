@@ -95,6 +95,9 @@ class TestGroup(TestCase):
         tmp_grp = r.create_group("tmp")
         r['g1.1'] = tmp_grp
 
+        del r['tmp']
+        self.assertEqual(len(r), 4)
+
         # try to replace the link
         try:
             r['g1.1'] = g1_1
@@ -103,9 +106,6 @@ class TestGroup(TestCase):
             pass  # expected
         except OSError:
             pass  # also acceptable
-
-        del r['tmp']
-        self.assertEqual(len(r), 4)
 
         # create a softlink
         r['mysoftlink'] = h5py.SoftLink('/g1/g1.1')
@@ -119,6 +119,7 @@ class TestGroup(TestCase):
 
         # create a file that we'll link to
         link_target_filename = self.getFileName("link_target")
+        print("link_target_filename:", link_target_filename)
         g = h5py.File(link_target_filename, 'w')
         g.create_group("somepath")
         g.close()
@@ -151,6 +152,8 @@ class TestGroup(TestCase):
             if title == 'myexternallink':
                 self.assertTrue(obj is not None)
                 self.assertEqual(len(obj), 0)
+                print("obj.file:", obj.file)
+                print("obj.file.filename:", obj.file.filename)
                 self.assertTrue(obj.file.filename != filename)
                 got_external_link = True
 
@@ -177,6 +180,7 @@ class TestGroup(TestCase):
 
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":
+            print("g1.modified:", g1.modified)
             self.assertTrue(isinstance(g1.modified, datetime))
 
         # try creating an anon group
@@ -187,6 +191,8 @@ class TestGroup(TestCase):
 
         # re-open file in read-only mode
         f = h5py.File(filename, 'r')
+
+        print("is_closed:", f.id.db.reader.closed)
         self.assertEqual(len(f), 6)
         for name in ("g1", "g2", "g4", "g1.1", "a space", "mysoftlink"):
             self.assertTrue(name in f)
@@ -194,12 +200,12 @@ class TestGroup(TestCase):
         g1_1 = f["/g1/g1.1"]
 
         if is_hsds:
-            linkee_class = r.get('mysoftlink', getclass=True)
+            linkee_class = f.get('mysoftlink', getclass=True)
             # TBD: investigate why h5py returned None here
             self.assertEqual(linkee_class, h5py.Group)
-            link_class = r.get('mysoftlink', getclass=True, getlink=True)
+            link_class = f.get('mysoftlink', getclass=True, getlink=True)
             self.assertEqual(link_class, h5py.SoftLink)
-            softlink = r.get('mysoftlink', getlink=True)
+            softlink = f.get('mysoftlink', getlink=True)
             self.assertEqual(softlink.path, '/g1/g1.1')
         linked_obj = f["mysoftlink"]
         self.assertEqual(linked_obj.id, g1_1.id)

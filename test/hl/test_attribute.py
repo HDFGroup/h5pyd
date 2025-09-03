@@ -106,6 +106,9 @@ class TestAttribute(TestCase):
         g11.attrs['name'] = 'g1.1'   # tag group with an attribute
 
         g11_ref = g11.ref   # get ref to g1/g1.1
+        print("g11_ref:", g11_ref)
+        print("g11_ref type:", type(g11_ref))
+        self.assertTrue(isinstance(g11_ref,))
         self.assertTrue(isinstance(g11_ref, h5py.Reference))
         refdt = h5py.special_dtype(ref=h5py.Reference)  # create ref dtype
         g1.attrs.create('f1', g11_ref, dtype=refdt)     # create attribute with ref to g1.1
