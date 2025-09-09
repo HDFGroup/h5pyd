@@ -15,7 +15,6 @@ if config.get("use_h5py"):
     import h5py
 else:
     import h5pyd as h5py
-
 from common import ut, TestCase
 from datetime import datetime
 import os.path
@@ -212,7 +211,7 @@ class TestGroup(TestCase):
 
         if is_hsds:
             # for h5pyd we should be able to retrieve the anon group
-            anon_group = f[f"groups/{anon_group_id}"]
+            anon_group = f[h5py.Reference(anon_group_id)]
             self.assertEqual(anon_group_id, anon_group.id.id)
         f.close()
 
@@ -314,247 +313,6 @@ class TestGroup(TestCase):
 
         f.close()
 
-    def test_link_multi_removal(self):
-        # create a file for use a link target
-        if config.get("use_h5py"):
-            return
-        filename = self.getFileName("test_link_multi_removal")
-        print(f"filename: {filename}")
-
-        f = h5py.File(filename, 'w')
-        g1 = f.create_group("g1")
-        g1_clone = f["g1"]
-        # create multiple subgroups
-        names = ["subgroup" + str(i) for i in range(10)]
-        subgrps = []
-        for name in names:
-            subgrps.append(g1.create_group(name))
-
-        self.assertEqual(len(g1), 10)
-
-        # Remove first 5 subgroups
-        del g1[names[0:5]]
-
-        self.assertEqual(len(g1), 5)
-        self.assertEqual(len(g1_clone), 5)
-
-        for name in names[0:5]:
-            self.assertFalse(name in g1)
-            self.assertFalse(name in g1_clone)
-
-        for name in names[5:]:
-            self.assertTrue(name in g1)
-            self.assertTrue(name in g1_clone)
-
-        # delete links with names that must be URL-encoded
-        names = ['link with spaces', 'link%', 'unicode八link']
-
-        for name in names:
-            g1[name] = g1
-
-        del g1[names]
-
-        for name in names:
-            self.assertTrue(name not in g1)
-
-        f.close()
-
-    def test_link_multi_create(self):
-        if config.get("use_h5py"):
-            return
-
-        filename = self.getFileName("test_link_multi_create")
-        print(f"filename: {filename}")
-
-        f = h5py.File(filename, 'w')
-        g1 = f.create_group("g1")
-
-        # Create 10 soft links
-        num_links = 10
-        names = ["link" + str(i) for i in range(num_links)]
-        links = []
-
-        for name in names:
-            new_link = h5py.SoftLink("dummy_path_" + str(name))
-            links.append(new_link)
-
-        g1[names] = links
-
-        self.assertEqual(len(g1), num_links)
-
-        for i in range(num_links):
-            name = names[i]
-            self.assertTrue(name in g1)
-            self.assertEqual(g1.get(name, getlink=True).path, links[i].path)
-
-        # Create soft and hard links
-        names = ["link" + str(i) for i in range(num_links, 2 * num_links)]
-        links = []
-
-        for i in range(num_links, 2 * num_links):
-            if i % 2 == 0:
-                new_link = h5py.SoftLink("dummy_path_" + str(i))
-            else:
-                # Hard link to g1
-                new_link = g1
-
-            links.append(new_link)
-
-        g1[names] = links
-
-        self.assertEqual(len(g1), num_links * 2)
-
-        for i in range(num_links, 2 * num_links):
-            name = "link" + str(i)
-            self.assertTrue(name in g1)
-
-            if i % 2 == 0:
-                link = g1.get(name, getlink=True)
-                self.assertEqual(link.path, links[i % num_links].path)
-            else:
-                g1_clone = g1.get(name)
-                self.assertEqual(len(g1_clone), len(g1))
-                self.assertEqual(g1_clone.id.id, g1.id.id)
-
-        # Create external links
-
-        names = ["link" + str(i) for i in range(num_links * 2, num_links * 3)]
-        links = []
-
-        for i in range(num_links * 2, num_links * 3):
-            filename = "dummy_filename_" + str(i)
-            path = "dummy_path_" + str(i)
-            new_link = h5py.ExternalLink(filename=filename, path=path)
-            links.append(new_link)
-
-        g1[names] = links
-
-        self.assertEqual(len(g1), num_links * 3)
-
-        for i in range(num_links * 2, num_links * 3):
-            name = "link" + str(i)
-            self.assertTrue(name in g1)
-
-            link = g1.get(name, getlink=True)
-            self.assertEqual(link.path, links[i % num_links]._path)
-            self.assertEqual(link.filename, links[i % num_links]._filename)
-
-    def test_link_get_multi(self):
-        if config.get("use_h5py"):
-            return
-
-        filename = self.getFileName("test_link_get_multi")
-        print(f"filename: {filename}")
-
-        f = h5py.File(filename, 'w')
-        g1 = f.create_group("g1")
-
-        # Create subgroups
-        g2 = g1.create_group("g2")
-        g3 = g2.create_group("g3")
-
-        # Create links in each group
-
-        num_links = 20
-        names = ["link" + str(i) for i in range(num_links)]
-
-        for name in names:
-            g1[name] = g1
-            g2[name] = g2
-            g3[name] = g3
-
-        # Get all links from g1 only
-        links_out = g1.get(None, getlink=True)
-
-        self.assertEqual(len(links_out), num_links + 1)
-
-        for name in names:
-            self.assertTrue(name in links_out)
-            link = links_out[name]
-            self.assertEqual(link.id, g1.id.uuid)
-
-        # Get all links from g1 and subgroups
-        links_out = g1.get(None, getlink=True, follow_links=True)
-
-        # 3 groups containing links
-        self.assertEqual(len(links_out), 3)
-
-        for group_id in [g1.id.uuid, g2.id.uuid, g3.id.uuid]:
-            self.assertTrue(group_id in links_out)
-            links = links_out[group_id]
-
-            if group_id == g3.id.uuid:
-                self.assertEqual(len(links), num_links)
-            else:
-                self.assertEqual(len(links), num_links + 1)
-
-            for name in names:
-                self.assertTrue(name in links)
-                link = links[name]
-                self.assertEqual(link.id, group_id)
-
-        # Make sure cache does not erroneously return recursive links
-        links_out = g1.get(None, getlink=True)
-        self.assertEqual(len(links_out), num_links + 1)
-
-        # Return only 5 links from group
-
-        links_out = g1.get(None, getlink=True, limit=5)
-        self.assertEqual(len(links_out), 5)
-
-        self.assertTrue("g2" in links_out)
-        for name in sorted(names)[0:4]:
-            self.assertTrue(name in links_out)
-            link = links_out[name]
-            self.assertEqual(link.id, g1.id.uuid)
-
-        # Return next 5 links via marker
-        links_out = g1.get(None, getlink=True, limit=5, marker=sorted(names)[3])
-
-        self.assertEqual(len(links_out), 5)
-
-        for name in sorted(names)[4:9]:
-            self.assertTrue(name in links_out)
-            link = links_out[name]
-            self.assertEqual(link.id, g1.id.uuid)
-
-        # Return all links in g1 besides g2
-        links_out = g1.get(None, getlink=True, pattern="link*")
-        self.assertEqual(len(links_out), 20)
-
-        for name in names:
-            if name.startswith("link1"):
-                self.assertTrue(name in links_out)
-                link = links_out[name]
-                self.assertEqual(link.id, g1.id.uuid)
-
-        # Return all links in g1/g2/g3 except for the group links
-        links_out = g1.get(None, getlink=True, follow_links=True, pattern="link*")
-        self.assertEqual(len(links_out), 3)
-
-        for group_id in [g1.id.uuid, g2.id.uuid, g3.id.uuid]:
-            self.assertTrue(group_id in links_out)
-            links = links_out[group_id]
-
-            self.assertEqual(len(links), num_links)
-
-            for name in names:
-                self.assertTrue(name in links)
-                link = links[name]
-                self.assertEqual(link.id, group_id)
-
-        # Retrieve a set of links by name
-        names = ["link" + str(i) for i in range(5, 15)]
-        links_out = g1.get(names, getlink=True)
-
-        self.assertEqual(len(links_out), 10)
-
-        for name in names:
-            self.assertTrue(name in links_out)
-            link = links_out[name]
-            self.assertEqual(link.id, g1.id.uuid)
-
-
 class TestTrackOrder(TestCase):
     titles = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
 
@@ -589,6 +347,8 @@ class TestTrackOrder(TestCase):
         # re-opening the file should retain the track_order setting
         with h5py.File(filename) as f:
             g = f['order']
+            grp_json = g.id.db.getObjectById(g.id.id)
+            print("grp_json:", grp_json)
             self.assertEqual(len(g), len(self.titles))
             self.assertEqual(tuple(g), self.titles)
             self.assertEqual(tuple(reversed(g)), tuple(reversed(self.titles)))

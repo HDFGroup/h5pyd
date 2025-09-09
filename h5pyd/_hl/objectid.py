@@ -12,11 +12,10 @@
 
 from __future__ import absolute_import
 from datetime import datetime
-import json
 import pytz
 import time
 from h5json.objid import getCollectionForId, isValidUuid
-from .h5type import createDataType
+from h5json.hdf5dtype import createDataType
 
 
 def parse_lastmodified(datestr):
@@ -67,7 +66,6 @@ class ObjectID:
     def modified(self):
         """last modified timestamp"""
         obj_json = self.obj_json
-        print("obj_json:", obj_json)
         if "lastModified" in obj_json:
             lastModified = obj_json["lastModified"]
         elif "created" in obj_json:
@@ -75,12 +73,12 @@ class ObjectID:
         else:
             lastModified = None
         return lastModified
-    
+
     @property
     def created(self):
         """ created timestamp"""
         obj_json = self.obj_json
-    
+
         if "created" in obj_json:
             created = obj_json["created"]
         else:
@@ -97,11 +95,10 @@ class ObjectID:
         """ Return collection type based on uuid """
         return getCollectionForId(self.uuid)
 
-    def __init__(self, parent, obj_id, obj_json=None, db=None, **kwds):
+    def __init__(self, parent, obj_id, db=None, **kwds):
 
         """Create a new objectId.
         """
-        print(f"object init - id: {obj_id}, obj_json={obj_json}")
         parent_id = None
         if parent is not None:
             if isinstance(parent, ObjectID):
@@ -109,9 +106,6 @@ class ObjectID:
             else:
                 # assume we were passed a Group/Dataset/datatype
                 parent_id = parent.id
-
-        if obj_json and type(obj_json) is not dict:
-            raise IOError("Unexpected Error")
 
         if not isValidUuid(obj_id):
             raise IOError(f"obj_id: {obj_id} is not valid")
@@ -154,33 +148,35 @@ class ObjectID:
 
     def __del__(self):
         """ cleanup """
-        #self.close()
+        #  self.close()
 
 
 class TypeID(ObjectID):
 
     @property
     def type_json(self):
-        return self.obj_json['type']
+        obj_json = self.obj_json
+        return obj_json['type']
 
     def get_type(self):
-        type_json = self.obj_json["type"]
+        type_json = self.type_json
         dtype = createDataType(type_json)
         return dtype
 
     @property
     def tcpl_json(self):
-        if 'creationProperties' in self.obj_json:
-            tcpl = self._obj_json['creationProperties']
+        obj_json = self.obj_json
+        if 'creationProperties' in obj_json:
+            tcpl = obj_json['creationProperties']
         else:
             tcpl = {}
         return tcpl
 
-    def __init__(self, parent, obj_id, obj_json=None, **kwds):
+    def __init__(self, parent, obj_id, **kwds):
         """Create a new TypeID.
         """
 
-        ObjectID.__init__(self, parent, obj_id, obj_json=obj_json, **kwds)
+        ObjectID.__init__(self, parent, obj_id, **kwds)
 
         if self.collection_type != "datatypes":
             raise IOError(f"Unexpected collection_type: {self._collection_type}")
@@ -190,21 +186,25 @@ class DatasetID(ObjectID):
 
     @property
     def type_json(self):
-        return self._obj_json['type']
+        obj_json = self.obj_json
+        return obj_json['type']
 
     @property
     def shape_json(self):
-        return self._obj_json['shape']
+        obj_json = self.obj_json
+        return obj_json['shape']
 
     def get_type(self):
-        type_json = self._obj_json["type"]
+        obj_json = self.obj_json
+        type_json = obj_json["type"]
         dtype = createDataType(type_json)
         return dtype
 
     @property
     def dcpl_json(self):
-        if 'creationProperties' in self.obj_json:
-            dcpl = self.obj_json['creationProperties']
+        obj_json = self.obj_json
+        if 'creationProperties' in obj_json:
+            dcpl = obj_json['creationProperties']
         else:
             dcpl = {}
         return dcpl
@@ -212,7 +212,7 @@ class DatasetID(ObjectID):
     @property
     def rank(self):
         rank = 0
-        shape = self.obj_json['shape']
+        shape = self.shape_json
         if shape['class'] == 'H5S_SIMPLE':
             dims = shape['dims']
             rank = len(dims)
@@ -221,9 +221,10 @@ class DatasetID(ObjectID):
     @property
     def layout(self):
         layout = None
+        obj_json = self.obj_json
 
-        if 'layout' in self.obj_json:
-            layout = self.obj_json['layout']
+        if 'layout' in obj_json:
+            layout = obj_json['layout']
         else:
             dcpl = self.dcpl_json
             if dcpl and 'layout' in dcpl:
@@ -243,11 +244,11 @@ class DatasetID(ObjectID):
 
         return chunks
 
-    def __init__(self, parent, obj_id, obj_json=None, **kwds):
+    def __init__(self, parent, obj_id, **kwds):
         """Create a new DatasetID.
         """
 
-        ObjectID.__init__(self, parent, obj_id, obj_json=obj_json, **kwds)
+        ObjectID.__init__(self, parent, obj_id, **kwds)
 
         if self.collection_type != "datasets":
             raise IOError(f"Unexpected collection_type: {self._collection_type}")
@@ -255,19 +256,20 @@ class DatasetID(ObjectID):
 
 class GroupID(ObjectID):
 
-    def __init__(self, parent, obj_id, obj_json=None, **kwds):
+    def __init__(self, parent, obj_id, **kwds):
         """Create a new GroupID.
         """
 
-        ObjectID.__init__(self, parent, obj_id, obj_json=obj_json, **kwds)
+        ObjectID.__init__(self, parent, obj_id, **kwds)
 
         if self.collection_type != "groups":
             raise IOError(f"Unexpected collection_type: {self._collection_type}")
 
     @property
     def gcpl_json(self):
-        if 'creationProperties' in self._obj_json:
-            gcpl = self._obj_json['creationProperties']
+        obj_json = self.obj_json
+        if 'creationProperties' in obj_json:
+            gcpl = obj_json['creationProperties']
         else:
             gcpl = {}
         return gcpl

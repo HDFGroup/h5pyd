@@ -16,10 +16,10 @@ import os.path as op
 import numpy
 import collections
 from h5json.objid import isValidUuid, getCollectionForId
+from h5json.hdf5dtype import special_dtype, Reference
 
 from .base import HLObject, MutableMappingHDF5, guess_dtype
 from .objectid import TypeID, GroupID, DatasetID
-from .h5type import special_dtype
 from . import dataset
 from .dataset import Dataset
 from . import table
@@ -89,11 +89,9 @@ class Group(HLObject, MutableMappingHDF5):
         # fake link to start the iteration
         tgt_json = {"class": "H5L_TYPE_HARD", "id": parent_uuid}
         path = h5path.split('/')
-        print("path:", path)
         for name in path:
             if not name:
                 continue
-            print("name:", name)
             parent_uuid = tgt_json["id"]
             tgt_json = self.id.db.getLink(parent_uuid, name)
             if not tgt_json:
@@ -101,7 +99,6 @@ class Group(HLObject, MutableMappingHDF5):
             link_class = tgt_json["class"]
             if link_class != "H5L_TYPE_HARD":
                 raise IOError(f"Unable to follow link type: {link_class}")
-        print(f"get_link_json){{h5path}} -> {tgt_json}")
         return parent_uuid, tgt_json
 
     def _make_group(self, parent_id=None, parent_name=None, link=None, track_order=None):
@@ -264,8 +261,15 @@ class Group(HLObject, MutableMappingHDF5):
             # convert byte input to string
             name = name.decode("utf-8")
 
-        dsid = dataset.make_new_dset(self, shape=shape, dtype=dtype, data=data, **kwds)
-        dset = dataset.Dataset(dsid)
+        if "track_order" in kwds:
+            track_order = kwds["track_order"]
+        else:
+            track_order = None
+
+        cfg = config.get_config()
+
+        datasetId = dataset.make_new_dset(self, shape=shape, dtype=dtype, data=data, **kwds)
+        dset = Dataset(datasetId, track_order=(track_order or cfg.track_order))
 
         if name is not None:
             items = name.split('/')
@@ -320,7 +324,7 @@ class Group(HLObject, MutableMappingHDF5):
                   'fillvalue'):
             kwupdate.setdefault(k, getattr(other, k))
         # TODO: more elegant way to pass these (dcpl to create_dataset?)
-
+        """
         dcpl_json = other.id.dcpl_json
         track_order = None
         if "CreateOrder" in dcpl_json:
@@ -329,6 +333,8 @@ class Group(HLObject, MutableMappingHDF5):
                 track_order = False
             else:
                 track_order = True
+        """
+        track_order = other.track_order
 
         kwupdate.setdefault('track_order', track_order)
 
@@ -446,10 +452,9 @@ class Group(HLObject, MutableMappingHDF5):
 
         tgt_id = None
         tgt_json = None
-        if isinstance(name, h5type.Reference):
-            tgt_json = name.objref()  # weak reference to ref object
-            if not tgt_json:
-                return None
+        if isinstance(name, Reference):
+            tgt_id = str(name)
+            tgt_json = self.db.getObjectById(tgt_id)
         elif isValidUuid(name):
             tgt_id = name
             tgt_json = self.db.getObjectById(name)
@@ -472,7 +477,6 @@ class Group(HLObject, MutableMappingHDF5):
                 # Note: set use_session to false since file.close won't be called
                 #  (and hence the http conn socket won't be closed)
                 from .files import File
-                print("link_json:", link_json)
                 external_domain = link_json['file']
                 reader = self.id.db.reader
 
@@ -517,17 +521,18 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 raise IOError(f"Unexpected collection_type: {collection}")
 
-            # assign name
-            if name[0] == '/':
-                tgt._name = name
-            else:
-                if self.name:
-                    if self.name[-1] == '/':
-                        tgt._name = self.name + name
-                    else:
-                        tgt._name = self.name + '/' + name
-                else:
+            if isinstance(name, str):
+                # assign name
+                if name[0] == '/':
                     tgt._name = name
+                else:
+                    if self.name:
+                        if self.name[-1] == '/':
+                            tgt._name = self.name + name
+                        else:
+                            tgt._name = self.name + '/' + name
+                    else:
+                        tgt._name = name
         else:
             tgt = None
         return tgt
@@ -676,7 +681,7 @@ class Group(HLObject, MutableMappingHDF5):
             tgt[basename] = obj
 
             return
-        
+
         # create a direct link, but first check to see if there's already a link here
         if db.getLink(self.id.uuid, name):
             raise IOError("Unable to create link (name already exists)")
@@ -726,14 +731,12 @@ class Group(HLObject, MutableMappingHDF5):
         """ Number of members attached to this group """
         # we can avoid a server request and just count the links in the obj json
         titles = self.id.db.getLinks(self.id.uuid)
-        print("titles:", titles)
 
         return len(titles)
 
     def __iter__(self):
         """ Iterate over member names """
         titles = self.id.db.getLinks(self.id.uuid)
-        print("titles:", titles)
         links = {}
         for title in titles:
             links[title] = self.id.db.getLink(self.id.uuid, title)

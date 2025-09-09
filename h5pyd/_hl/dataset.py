@@ -22,15 +22,17 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 
+from h5json.hdf5dtype import Reference
+from h5json.hdf5dtype import createDataType, getItemSize, check_dtype, special_dtype
+from h5json import selections
+
 from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes
 from .base import Empty, guess_dtype
-from .h5type import Reference, RegionReference
 from .base import _decode
 from .objectid import DatasetID
 from . import filters
 from . import selections as sel
 from .datatype import Datatype
-from .h5type import getTypeItem, createDataType, check_dtype, special_dtype, getItemSize
 from .. import config
 
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
@@ -65,6 +67,17 @@ def readtime_dtype(basetype, names):
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
 
 
+def _get_supported_compressors(parent):
+    """ return a tuple of compressors that can be used with the current writer """
+    stats = parent.id.db.reader.getStats()
+    if "compressors" in stats:
+        compressors = stats["compressors"]
+    else:
+        compressors = []
+
+    return tuple(compressors)
+
+
 def make_new_dset(
     parent,
     shape=None,
@@ -88,8 +101,6 @@ def make_new_dset(
     Only creates anonymous datasets.
     """
 
-    # fill in fields for the body of the POST request as we got
-    body = {}
     cfg = config.get_config()
 
     # Convert data to a C-contiguous ndarray
@@ -113,9 +124,8 @@ def make_new_dset(
             raise ValueError("Shape tuple is incompatible with data")
 
     if shape is None:
-        body["shape"] = "H5S_NULL"
-    else:
-        body["shape"] = shape
+        # use null space if no shape defined
+        shape = "H5S_NULL"
 
     if track_times is not None:
         if track_times not in (True, False):
@@ -123,6 +133,7 @@ def make_new_dset(
 
     if isinstance(maxshape, int):
         maxshape = (maxshape,)
+
     tmp_shape = maxshape if maxshape is not None else shape
 
     # Validate chunk shape
@@ -131,11 +142,11 @@ def make_new_dset(
     if isinstance(chunks, tuple) and any(
         chunk > dim for dim, chunk in zip(tmp_shape, chunks) if dim is not None
     ):
-        errmsg = (
+        err_msg = (
             "Chunk shape must not be greater than data shape in any dimension. "
             f"{chunks} is not compatible with {shape}"
         )
-        raise ValueError(errmsg)
+        raise ValueError(err_msg)
 
     # validate chunks is not False if maxshape or compression is set
     if chunks is False:
@@ -150,6 +161,7 @@ def make_new_dset(
     if isinstance(dtype, Datatype):
         # Named types are used as-is
         type_json = dtype.id.type_json
+        dtype = createDataType(type_json)
     else:
         # Validate dtype
         if dtype is None and data is None:
@@ -170,28 +182,11 @@ def make_new_dset(
         else:
             dtype = numpy.dtype(dtype)
 
-        if dtype.kind == "O" and dtype.metadata and "ref" in dtype.metadata:
-            type_json = {}
-            type_json["class"] = "H5T_REFERENCE"
-            meta_type = dtype.metadata["ref"]
-            if meta_type is Reference:
-                type_json["base"] = "H5T_STD_REF_OBJ"
-            elif meta_type is RegionReference:
-                type_json["base"] = "H5T_STD_REF_DSETREG"
-            else:
-                errmsg = "Unexpected metadata type"
-                raise ValueError(errmsg)
-        else:
-            type_json = getTypeItem(dtype)
-    body["type"] = type_json
-
     layout = None
     if chunks is not None and isinstance(chunks, dict):
         # use the given chunk layout
         layout = chunks
         chunks = None
-
-    compressors = parent.id.http_conn.compressors
 
     # Legacy
     if compression is True:
@@ -207,6 +202,7 @@ def make_new_dset(
         compression = "gzip"
 
     if compression:
+        compressors = _get_supported_compressors(parent)
         if isinstance(compression, int):
             if compression < 0:
                 raise ValueError(f"Invalid filter: {compression}")
@@ -219,7 +215,7 @@ def make_new_dset(
             msg += f"values: {compressors}"
             raise ValueError(msg)
 
-    dcpl = filters.generate_dcpl(
+    cpl = filters.generate_dcpl(
         shape,
         dtype,
         chunks=chunks,
@@ -250,51 +246,30 @@ def make_new_dset(
                 if len(dtype) > 1:
                     raise ValueError("Invalid fill value for compound type dataset")
 
-            dcpl["fillValue"] = fillvalue
+            cpl["fillValue"] = fillvalue
 
     if track_order or cfg.track_order:
-        dcpl["CreateOrder"] = 1
+        cpl["CreateOrder"] = 1
 
     if chunks and isinstance(chunks, dict):
-        dcpl["layout"] = chunks
-
-    body["creationProperties"] = dcpl
+        cpl["layout"] = chunks
 
     if maxshape is not None and len(maxshape) > 0:
         if shape is not None:
             maxshape = tuple(m if m is not None else 0 for m in maxshape)
-            body["maxdims"] = maxshape
         else:
             print("maxshape provided but no shape")
 
-    req = "/datasets"
-
-    rsp = parent.POST(req, body=body)
-
-    json_rep = {}
-    json_rep["id"] = rsp["id"]
-
-    req = "/datasets/" + rsp["id"]
-    rsp = parent.GET(req)
-
-    json_rep["shape"] = rsp["shape"]
-    json_rep["type"] = rsp["type"]
-    json_rep["lastModified"] = rsp["lastModified"]
-    if "creationProperties" in rsp:
-        json_rep["creationProperties"] = rsp["creationProperties"]
-    else:
-        json_rep["creationProperties"] = {}
-    if "layout" in rsp:
-        json_rep["layout"] = rsp["layout"]
-
-    dset_id = DatasetID(parent, json_rep)
+    dset_uuid = parent.id.db.createDataset(shape, maxdims=maxshape, dtype=dtype, cpl=cpl)
 
     if data is not None:
         # init data
-        dset = Dataset(dset_id, track_order=(track_order or cfg.track_order))
-        dset[...] = data
+        sel_all = selections.select(tuple(shape), ...)
+        parent.id.db.setDatasetValues(dset_uuid, sel_all, data)
 
-    return dset_id
+    dset = DatasetID(parent, dset_uuid)
+
+    return dset
 
 
 class AstypeWrapper:
@@ -624,7 +599,7 @@ class Dataset(HLObject):
 
         """iterate through list of filters and return compression filter
         or None if none found"""
-        compressors = self.id.http_conn.compressors
+        compressors = _get_supported_compressors(self)
         for filter in self._filters:
             if isinstance(filter, str):
                 filter_name = filter
@@ -640,7 +615,7 @@ class Dataset(HLObject):
     @property
     def compression_opts(self):
         """Compression setting.  Int(0-9) for gzip, 2-tuple for szip."""
-        compressors = self.id.http_conn.compressors
+        compressors = _get_supported_compressors(self)
         for filter in self._filters:
             if isinstance(filter, str):
                 return None  # compression filter, but no options

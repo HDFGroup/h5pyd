@@ -12,13 +12,13 @@
 
 from __future__ import absolute_import
 import numpy
+
+from h5json.hdf5dtype import Reference, check_dtype
 from .base import _decode
 from .base import bytesToArray
 from .dataset import Dataset
 from .objectid import DatasetID
 from . import selections as sel
-from .h5type import Reference
-from .h5type import check_dtype
 from .h5type import getQueryDtype
 
 

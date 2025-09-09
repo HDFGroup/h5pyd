@@ -14,11 +14,11 @@ from __future__ import absolute_import
 
 import posixpath as pp
 
-# from ..h5t import TypeID
+from h5json.hdf5dtype import createBaseDataType, createDataType
+
 from .base import HLObject
 
 from .objectid import TypeID
-from .h5type import createDataType
 
 
 class Datatype(HLObject):
@@ -46,7 +46,6 @@ class Datatype(HLObject):
         HLObject.__init__(self, bind)
 
         self._dtype = createDataType(self.id.type_json)
-        self._req_prefix = "/datatypes/" + self.id.uuid
 
     def __repr__(self):
         if not self.id:

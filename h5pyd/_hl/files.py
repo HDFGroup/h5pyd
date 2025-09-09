@@ -34,8 +34,7 @@ def is_hdf5(domain, **kwargs):
     kwargs can be endpoint, username, password, etc. (same as with File)
     """
     found = False
-    for k in kwargs:
-        print(f"{k}: {kwargs[k]}")
+
     app_logger = kwargs.get("app_Logger")
     db = Hdf5db(app_logger=app_logger)
     db.reader = HSDSReader(domain, **kwargs)
@@ -218,13 +217,10 @@ class File(Group):
         """ return info on storage usage """
         if self.db.writer:
             stats = self.db.writer.getStats()
-            print("writer stats:", stats)
         elif self.db.reader:
             stats = self.db.reader.getStats()
-            print("reader stats:", stats)
         else:
             stats = {"created": 0, "lastModified": 0, "owner": 0}
-            print("default stats:", stats)
         return stats
 
     @property
@@ -296,18 +292,18 @@ class File(Group):
         self._swmr_mode = True
 
     def _init_db(self,
-        domain,
-        mode=None,
-        endpoint=None,
-        username=None,
-        password=None,
-        bucket=None,
-        api_key=None,
-        swmr=False,
-        retries=10,
-        timeout=180,
-        **kwds,
-    ):
+                 domain,
+                 mode=None,
+                 endpoint=None,
+                 username=None,
+                 password=None,
+                 bucket=None,
+                 api_key=None,
+                 swmr=False,
+                 retries=10,
+                 timeout=180,
+                 **kwds,
+                 ):
         # initialize h5db using domain path
 
         cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
@@ -395,38 +391,30 @@ class File(Group):
         root_id = None
 
         if mode != 'w':
-            print("mode is not w")
             file_exists = is_hdf5(domain, **kwargs)
             if file_exists:
-                print('file exists')
                 if mode in ('w-', 'x'):
                     self.log.warning(f"Domain: {domain} already exists")
                     raise FileExistsError()
-                print("open reader")
                 db.reader = HSDSReader(domain, **kwargs)
                 root_id = db.open()
-                print("got root_id:", root_id)
             else:
                 if mode in ('r', 'r+'):
                     self.log.warning(f"domain: {domain} not found")
                     raise FileNotFoundError()
         else:
-            print("mode is w")
             file_exists = False  # will overwrite in either case
 
         if root_id:
             # if mode is not read only, setup the writer
             if mode != 'r':
                 db.close()
-                print("set writer with existing root_id")
                 db.writer = HSDSWriter(domain, append=True, **kwargs)
                 db.open()
         else:
             # new domain, use writer to initialize domain
-            print("set writer to initialize domain")
             db.writer = HSDSWriter(domain, **kwargs)
             root_id = db.open()
-            print("got root_id from writer:", root_id)
             # now set the reader
             db.reader = HSDSReader(domain, **kwargs)
             db.close()
@@ -497,7 +485,6 @@ class File(Group):
         timeout
             Timeout value in seconds
         """
-        print("FILE_INIT, domain:", domain, "mode:", mode)
 
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
@@ -548,7 +535,6 @@ class File(Group):
 
         root_id = db.root_id
         root_json = db.getObjectById(root_id)
-        print("root_json:", root_json)
 
         if "limits" in root_json:
             self._limits = root_json["limits"]
@@ -781,7 +767,6 @@ class File(Group):
     def close(self):
         """Clears reference to remote resource."""
         # this will flush any pending changes and close the http connection
-        print("file.close")
         if self.id:
             self.id.close()
 

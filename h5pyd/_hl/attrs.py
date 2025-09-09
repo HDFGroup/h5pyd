@@ -21,7 +21,9 @@ from __future__ import absolute_import
 
 import numpy
 
-from h5json.hdf5dtype import special_dtype, Reference
+from h5json.hdf5dtype import special_dtype, check_dtype
+from h5json.hdf5dtype import Reference
+from h5json.objid import getCollectionForId
 
 from . import base
 from .base import Empty
@@ -101,7 +103,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             raise KeyError
 
         shape_json = attr_json["shape"]
-        print(f"attr[{name}].class: {shape_json['class']}")
         if shape_json["class"] == "H5S_NULL":
             # null space object, return an Empty instance
             dtype = self._parent.db.getDtype(attr_json)
@@ -114,7 +115,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if arr is None:
             # attribute not found
             raise KeyError
-        
+
         dtype = arr.dtype
         shape = arr.shape
 
@@ -129,6 +130,17 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         if len(arr.shape) == 0:
             v = arr[()]
+            if check_dtype(ref=dtype) is Reference:
+                if not v:
+                    return None  # null reference
+                if isinstance(v, bytes):
+                    v = v.decode("utf-8")
+
+                if isinstance(v, Reference):
+                    ref = v
+                else:
+                    ref = Reference(v)
+                return ref
             if isinstance(v, str):
                 # if this is not utf-8, return bytes instead
                 try:
@@ -137,7 +149,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                     self._parent.log.debug("converting utf8 un-encodable string as bytes")
                     v = v.encode("utf-8", errors="surrogateescape")
             return v
-
         return arr
 
     def __setitem__(self, name, value):
@@ -151,18 +162,11 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
     def __delitem__(self, name):
         """ Delete an attribute (which must already exist). """
-        params = {}
 
-        if isinstance(name, list):
-            names = [name.decode('utf-8') if isinstance(name, bytes) else name for name in name]
-            # Omit trailing slash
-            req = self._req_prefix[:-1]
-            params["attr_names"] = "/".join(names)
-        else:
-            if isinstance(name, bytes):
-                name = name.decode("utf-8")
-            req = self._req_prefix + name
-        self._parent.DELETE(req, params=params)
+        if isinstance(name, bytes):
+            name = name.decode("utf-8")
+
+        self._parent.db.deleteAttribute(self._parent.id.uuid, name)
 
     def create(self, name, value, shape=None, dtype=None):
         """ Create new attribute, overwriting any existing attributes.
@@ -182,7 +186,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         if self._parent.read_only:
             raise IOError("No write intent")
-        
+
         obj_id = self._parent.id.uuid
 
         # First, make sure we have a NumPy array.  We leave the data
@@ -200,7 +204,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if isinstance(dtype, Datatype):
             use_htype = "datatypes:/" + dtype.id.uuid
             dtype = dtype.dtype
-            
+
             # Special case if data are complex numbers
             is_complex = (value.dtype.kind == 'c') and (dtype.names is None) or (
                 dtype.names != ('r', 'i')) or (
@@ -251,14 +255,11 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             dtype = use_htype
 
         if isinstance(value, Empty):
-            print(f"using value: {value} as None")
-            print(f"using shape: {shape}")
             value = None  # hdf5db doesn't know about the empty object
             shape = "H5S_NULL"
 
         self._parent.db.createAttribute(obj_id, name, value, shape=shape, dtype=dtype)
 
-        
     def modify(self, name, value):
         """ Change the value of an attribute while preserving its type.
 
@@ -296,14 +297,13 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         names = self._parent.db.getAttributes(obj_id)
         return len(names)
 
-
     def __iter__(self):
         """ Iterate over the names of attributes. """
         obj_id = self._parent.id.uuid
         attrs = self._parent.db.getAttributes(obj_id)
 
         def _get_created(name):
-            attr_json = self._parent.db.getAttribute(obj_id, include_data=False)
+            attr_json = self._parent.db.getAttribute(obj_id, name, includeData=False)
             return attr_json["created"]
 
         if self._parent.track_order:
@@ -313,7 +313,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         for name in attrs:
             yield name
-
 
     def __contains__(self, name):
         """ Determine if an attribute exists, by name. """

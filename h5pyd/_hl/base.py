@@ -838,7 +838,7 @@ class HLObject(CommonStateObject):
     def id(self):
         """ Low-level identifier appropriate for this object """
         return self._id
-    
+
     @property
     def db(self):
         """ Return db singleton """
@@ -847,7 +847,7 @@ class HLObject(CommonStateObject):
     @property
     def ref(self):
         """ An (opaque) HDF5 reference to this object """
-        return Reference(self)
+        return Reference(self.id.uuid)
         # return h5r.create(self.id, b'.', h5r.OBJECT)
 
     @property
@@ -881,7 +881,7 @@ class HLObject(CommonStateObject):
             dt = None
 
         return dt
-    
+
     @property
     def created(self):
         """create time as a datetime object"""
@@ -897,13 +897,21 @@ class HLObject(CommonStateObject):
     @property
     def track_order(self):
         return self._track_order
-    
+
     @property
     def read_only(self):
         if isinstance(self.db.writer, H5NullWriter):
             return True
         else:
             return False
+
+    @property
+    def creation_properties(self):
+        db = self.id.db
+        obj_json = db.getObjectById(self.id.uuid)
+        if "creationProperties" in obj_json:
+            return obj_json["creationProperties"]
+        return {}
 
     def verifyCert(self):
         # default to validate CERT for https requests, unless
