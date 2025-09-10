@@ -118,7 +118,6 @@ class TestGroup(TestCase):
 
         # create a file that we'll link to
         link_target_filename = self.getFileName("link_target")
-        print("link_target_filename:", link_target_filename)
         g = h5py.File(link_target_filename, 'w')
         g.create_group("somepath")
         g.close()
@@ -151,8 +150,6 @@ class TestGroup(TestCase):
             if title == 'myexternallink':
                 self.assertTrue(obj is not None)
                 self.assertEqual(len(obj), 0)
-                print("obj.file:", obj.file)
-                print("obj.file.filename:", obj.file.filename)
                 self.assertTrue(obj.file.filename != filename)
                 got_external_link = True
 
@@ -179,7 +176,6 @@ class TestGroup(TestCase):
 
         # Check group's last modified time
         if h5py.__name__ == "h5pyd":
-            print("g1.modified:", g1.modified)
             self.assertTrue(isinstance(g1.modified, datetime))
 
         # try creating an anon group
@@ -191,7 +187,6 @@ class TestGroup(TestCase):
         # re-open file in read-only mode
         f = h5py.File(filename, 'r')
 
-        print("is_closed:", f.id.db.reader.closed)
         self.assertEqual(len(f), 6)
         for name in ("g1", "g2", "g4", "g1.1", "a space", "mysoftlink"):
             self.assertTrue(name in f)
@@ -313,6 +308,7 @@ class TestGroup(TestCase):
 
         f.close()
 
+
 class TestTrackOrder(TestCase):
     titles = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
 
@@ -347,8 +343,6 @@ class TestTrackOrder(TestCase):
         # re-opening the file should retain the track_order setting
         with h5py.File(filename) as f:
             g = f['order']
-            grp_json = g.id.db.getObjectById(g.id.id)
-            print("grp_json:", grp_json)
             self.assertEqual(len(g), len(self.titles))
             self.assertEqual(tuple(g), self.titles)
             self.assertEqual(tuple(reversed(g)), tuple(reversed(self.titles)))

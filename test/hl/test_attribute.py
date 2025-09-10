@@ -117,7 +117,7 @@ class TestAttribute(TestCase):
 
         # close file
         f.close()
- 
+
 
 class TestTrackOrder(TestCase):
 
@@ -136,8 +136,6 @@ class TestTrackOrder(TestCase):
         print(f"filename: {filename}")
         with h5py.File(filename, 'w') as f:
             grp1 = f.create_group('grp1', track_order=True)
-            grp1_json = grp1.db.getObjectById(grp1.id.id)
-            # grp1_json: {'attributes': {}, 'links': {}, 'cpl': {'CreateOrder': 1}, 'created': 1757068917.42593}
             self.fill_attrs(grp1)
             self.assertEqual(list(grp1.attrs), list(self.titles))
             dset1 = f.create_dataset('dset1', data=[42,], track_order=True)
@@ -149,11 +147,6 @@ class TestTrackOrder(TestCase):
         # group should return track order
         with h5py.File(filename) as f:
             grp1 = f['grp1']
-            grp1_json = grp1.id.db.getObjectById(grp1.id.id)
-            attrs_json = grp1_json["attributes"]
-            for title in attrs_json:
-                attr_json = attrs_json[title]
-                ts = attr_json["created"]
             self.assertEqual(list(grp1.attrs), list(self.titles))
 
             dset1 = f['dset1']

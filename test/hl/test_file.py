@@ -65,7 +65,7 @@ class TestFile(TestCase):
 
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
- 
+
         # Check domain's timestamps
         if h5py.__name__ == "h5pyd":
             # print("modified:", datetime.fromtimestamp(f.modified), f.modified)
@@ -138,7 +138,7 @@ class TestFile(TestCase):
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
-        
+
         self.assertEqual(len(f.keys()), 1)
         self.assertEqual(f.mode, 'r')
         self.assertTrue('/' in f)
