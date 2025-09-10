@@ -697,8 +697,8 @@ class Group(HLObject, MutableMappingHDF5):
 
         elif isinstance(obj, numpy.dtype):
             # print "create named type"
-            obj_json = db.createCommittedType(obj)
-            db.createHardLink(obj.id.uuid, name, obj_json["id"])
+            ctype_id = db.createCommittedType(obj)
+            db.createHardLink(self.id.uuid, name, ctype_id)
 
         else:
             if isinstance(obj, numpy.ndarray):
