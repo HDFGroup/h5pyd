@@ -12,11 +12,9 @@
 
 from __future__ import absolute_import
 from h5json.hdf5dtype import Reference, RegionReference
-#from h5json.hdf5dtype import string_dtype, enum_dtype, vlen_dtype
-#from h5json.hdf5dtype import check_opaque_dtype, check_ref_dtype, check_dtype
 from . import version
 from ._hl.base import Empty
-from ._hl.h5type import special_dtype #, Reference, RegionReference
+from ._hl.h5type import special_dtype
 from ._hl.h5type import vlen_dtype, string_dtype, enum_dtype
 from ._hl.h5type import check_vlen_dtype, check_string_dtype, check_enum_dtype
 from ._hl.h5type import check_opaque_dtype, check_ref_dtype, check_dtype
