@@ -25,7 +25,6 @@ from .dataset import Dataset
 from . import table
 from .table import Table
 from .datatype import Datatype
-from . import h5type
 from .. import config
 
 

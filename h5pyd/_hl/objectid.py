@@ -66,6 +66,7 @@ class ObjectID:
     def modified(self):
         """last modified timestamp"""
         obj_json = self.obj_json
+        print("obj_json:", obj_json)
         if "lastModified" in obj_json:
             lastModified = obj_json["lastModified"]
         elif "created" in obj_json:
@@ -133,6 +134,13 @@ class ObjectID:
 
         # get the latest version of the object
         self.db.getObjectById(self.uuid, refresh=True)
+
+    def flush(self):
+        """ persist any recent changes to the object """
+
+        # TBD: this actually flushes all objects in the file,
+        #    update hdf5-json hdf5db to take an optional id arg?
+        self.db.flush()
 
     def close(self):
         """Remove handles to id.
@@ -208,15 +216,6 @@ class DatasetID(ObjectID):
         else:
             dcpl = {}
         return dcpl
-
-    @property
-    def rank(self):
-        rank = 0
-        shape = self.shape_json
-        if shape['class'] == 'H5S_SIMPLE':
-            dims = shape['dims']
-            rank = len(dims)
-        return rank
 
     @property
     def layout(self):

@@ -23,7 +23,6 @@ import numpy
 
 from h5json.hdf5dtype import special_dtype, check_dtype
 from h5json.hdf5dtype import Reference
-from h5json.objid import getCollectionForId
 
 from . import base
 from .base import Empty

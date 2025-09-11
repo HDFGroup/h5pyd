@@ -18,7 +18,6 @@ import numpy as np
 # so just use is_reference, is_regionreference helpers to identify
 # from .base import Reference, RegionReference
 
-import weakref
 import codecs
 from collections import namedtuple
 from h5json import hdf5dtype

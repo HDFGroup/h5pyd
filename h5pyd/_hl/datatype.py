@@ -14,7 +14,7 @@ from __future__ import absolute_import
 
 import posixpath as pp
 
-from h5json.hdf5dtype import createBaseDataType, createDataType
+from h5json.hdf5dtype import createDataType
 
 from .base import HLObject
 
