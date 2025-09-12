@@ -25,7 +25,7 @@ from ._hl.dataset import Dataset, MultiManager
 from ._hl.table import Table
 from ._hl.datatype import Datatype
 from ._hl.attrs import AttributeManager
-from ._hl.serverinfo import getServerInfo
+from .serverinfo import getServerInfo
 from . import h5ds
 
 

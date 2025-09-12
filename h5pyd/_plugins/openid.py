@@ -6,6 +6,8 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 
+from . import config as hsconfig
+
 
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -27,9 +29,6 @@ try:
 except ModuleNotFoundError:
     pass  # change this to the eprint below to see the import error
     # eprint("Unable to import google auth packages")
-
-
-from .. import config as hsconfig
 
 
 class OpenIDHandler(ABC):

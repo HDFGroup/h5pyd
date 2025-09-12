@@ -19,12 +19,14 @@ import pathlib
 import time
 
 from h5json import Hdf5db
-from h5json.hsdsstore.hsds_reader import HSDSReader
-from h5json.hsdsstore.hsds_writer import HSDSWriter
 
 from .objectid import GroupID
 from .group import Group
+from ..hsds_reader import HSDSReader
+from ..hsds_writer import HSDSWriter
+
 from .. import config
+
 
 VERBOSE_REFRESH_TIME = 1.0  # 1 second
 

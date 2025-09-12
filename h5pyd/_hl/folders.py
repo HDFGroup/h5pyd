@@ -16,7 +16,7 @@ import os.path as op
 import json
 import time
 import logging
-from .httpconn import HttpConn
+from ..httpconn import HttpConn
 from .. import config
 
 
