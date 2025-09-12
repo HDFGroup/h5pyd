@@ -14,12 +14,33 @@ from __future__ import absolute_import
 import numpy
 
 from h5json.hdf5dtype import Reference, check_dtype
+from h5json import selections as sel
+
 from .base import _decode
 from .base import bytesToArray
 from .dataset import Dataset
 from .objectid import DatasetID
-from . import selections as sel
-from .h5type import getQueryDtype
+
+
+def getQueryDtype(dt):
+    """
+    Return dtype with field added for Index values
+    """
+    field_names = dt.names
+    #  make up a index field name that doesn't conflict with existing names
+    index_name = "index"
+    for i in range(len(field_names)):
+        if index_name in field_names:
+            index_name = "_" + index_name
+        else:
+            break
+
+    dt_fields = [(index_name, 'uint64'),]
+    for i in range(len(dt)):
+        dt_fields.append((dt.names[i], dt[i]))
+    query_dt = numpy.dtype(dt_fields)
+
+    return query_dt
 
 
 class Cursor():

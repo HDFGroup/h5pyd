@@ -536,7 +536,7 @@ class Dataset(HLObject):
         elif shape_json["class"] == "H5S_SCALAR":
             dims = ()  # return empty
         else:
-            dims = shape_json["dims"]
+            dims = tuple(shape_json["dims"])
 
         return dims
 

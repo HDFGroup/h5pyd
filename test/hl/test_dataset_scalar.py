@@ -93,7 +93,7 @@ class TestScalarDataset(TestCase):
         val = dset[...]
 
         self.assertTrue(isinstance(val, np.ndarray))
-        # TBD-fix, self.assertEqual(val, str2.encode("ascii"))
+        self.assertEqual(val[()], str2.encode("ascii"))
 
         # try setting value using tuple
         dset[()] = str3
