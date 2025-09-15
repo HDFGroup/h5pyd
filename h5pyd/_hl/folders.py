@@ -13,7 +13,6 @@
 from __future__ import absolute_import
 
 import os.path as op
-import json
 import time
 import logging
 from ..httpconn import HttpConn
@@ -169,7 +168,7 @@ class Folder:
         self._batch_size = batch_size
         self._verbose = verbose
 
-        self._http_conn = HttpConn(
+        http_conn = HttpConn(
             self._domain,
             endpoint=endpoint,
             username=username,
@@ -180,7 +179,11 @@ class Folder:
             logger=logger,
             retries=retries,
         )
-        self.log = self._http_conn.logging
+        http_conn.open()
+
+        self.log = http_conn.logging
+
+        self._http_conn = http_conn
 
         domain_json = None
 
@@ -224,10 +227,10 @@ class Folder:
             if rsp.status_code < 500:
                 self.log.warning(f"folder put status_code: {rsp.status_code}")
             else:
-                self.log.error("status_code: {}".format(rsp.status_code))
+                self.log.error(f"status_code: {rsp.status_code}")
             raise IOError(rsp.status_code, rsp.reason)
-        domain_json = json.loads(rsp.text)
-        self.log.info("domain_json: {}".format(domain_json))
+        domain_json = rsp.json()
+        self.log.info(f"domain_json: {domain_json}")
         if "class" in domain_json:
             if domain_json["class"] != "folder":
                 self.log.warning("Not a folder domain")
@@ -258,7 +261,7 @@ class Folder:
         rsp = self._http_conn.GET(req)
         if rsp.status_code != 200:
             raise IOError(rsp.reason)
-        rsp_json = json.loads(rsp.text)
+        rsp_json = rsp.json()
         acl_json = rsp_json["acl"]
         return acl_json
 
@@ -269,7 +272,7 @@ class Folder:
         rsp = self._http_conn.GET(req)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
-        rsp_json = json.loads(rsp.text)
+        rsp_json = rsp.json()
         acls_json = rsp_json["acls"]
         return acls_json
 
@@ -283,7 +286,7 @@ class Folder:
         perm = {}
         for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
             if k not in acl:
-                raise IOError(404, "Missing ACL field: {}".format(k))
+                raise IOError(404, f"Missing ACL field: {k}")
             perm[k] = acl[k]
 
         req = "/acls/" + acl["userName"]
@@ -315,7 +318,7 @@ class Folder:
         rsp = self._http_conn.GET(req, params=params)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
-        rsp_json = json.loads(rsp.text)
+        rsp_json = rsp.json()
         if "domains" not in rsp_json:
             raise IOError(500, "Unexpected Error")
         domains = rsp_json["domains"]
