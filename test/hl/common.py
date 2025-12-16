@@ -38,6 +38,34 @@ else:
     del fname
     del testfile
 
+    def get_test_user1():
+        # HS_USERNAME is the username h5pyd will look up if
+        #   if not provided in the File constructor
+        user1 = {}
+        if "HS_USERNAME" in os.environ:
+            user1["name"] = os.environ["HS_USERNAME"]
+        else:
+            user1["name"] = "test_user1"
+        if "HS_PASSWORD" in os.environ:
+            user1["password"] = os.environ["HS_PASSWORD"]
+        else:
+            # only use "test_user1/test" for desktop testing
+            user1["password"] = "test"
+        return user1
+
+    def get_test_user2(self):
+        user2 = {}
+        if "TEST12_USERNAME" in os.environ:
+            user2["name"] = os.environ["TEST2_USERNAME"]
+        else:
+            user2["name"] = "test_user2"
+        if "TEST2_PASSWORD" in os.environ:
+            user2["password"] = os.environ["TEST2_PASSWORD"]
+        else:
+            # only use "test_user1/test" for desktop testing
+            user2["password"] = "test"
+        return user2
+
 
 def getTestFileName(basename, subfolder=None):
     """
@@ -57,8 +85,9 @@ def getTestFileName(basename, subfolder=None):
         if "H5PYD_TEST_FOLDER" in os.environ:
             filename = os.environ["H5PYD_TEST_FOLDER"]
         else:
-            # default to the root folder
-            filename = "/"
+            # default to "/home/test_user1/h5pyd_test/"
+            test_user1 = get_test_user1()["name"]
+            filename = f"/home/{test_user1}/h5pyd_test/"
         if subfolder:
             filename = os.path.join(filename, subfolder)
         filename = os.path.join(filename, f"{basename}.h5")
@@ -85,31 +114,11 @@ class TestCase(ut.TestCase):
     def test_user1(self):
         # HS_USERNAME is the username h5pyd will look up if
         #   if not provided in the File constructor
-        user1 = {}
-        if "HS_USERNAME" in os.environ:
-            user1["name"] = os.environ["HS_USERNAME"]
-        else:
-            user1["name"] = "test_user1"
-        if "HS_PASSWORD" in os.environ:
-            user1["password"] = os.environ["HS_PASSWORD"]
-        else:
-            # only use "test_user1/test" for desktop testing
-            user1["password"] = "test"
-        return user1
+        return get_test_user1()
 
     @property
     def test_user2(self):
-        user2 = {}
-        if "TEST12_USERNAME" in os.environ:
-            user2["name"] = os.environ["TEST2_USERNAME"]
-        else:
-            user2["name"] = "test_user2"
-        if "TEST2_PASSWORD" in os.environ:
-            user2["password"] = os.environ["TEST2_PASSWORD"]
-        else:
-            # only use "test_user1/test" for desktop testing
-            user2["password"] = "test"
-        return user2
+        return get_test_user2()
 
     @classmethod
     def use_h5py():

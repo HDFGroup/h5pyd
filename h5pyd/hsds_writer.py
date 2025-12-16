@@ -16,7 +16,7 @@ from h5json.objid import getCollectionForId
 
 from h5json.hdf5dtype import isVlen
 from h5json.array_util import arrayToBytes, bytesArrayToList
-from h5json.dset_util import getNumElements, getDims
+from h5json.shape_util import getNumElements, getShapeDims
 from h5json import selections
 from h5json.h5writer import H5Writer
 from .httpconn import HttpConn
@@ -291,7 +291,7 @@ class HSDSWriter(H5Writer):
 
             # initialize dataset values if provided and not too large
             if collection == "datasets":
-                dset_dims = getDims(obj_json)  # will be None for null space datasets
+                dset_dims = getShapeDims(obj_json)  # will be None for null space datasets
                 dset_size = self.getDatasetSize(obj_id)  # number of bytes defined by the shape
                 init_arr = None  # data to be passed to post create method
                 updates = obj_json.get("updates")
@@ -533,7 +533,7 @@ class HSDSWriter(H5Writer):
             if getCollectionForId(dset_id) != "datasets":
                 continue  # ignore groups and datatypes
             dset_json = self.db.getObjectById(dset_id)
-            dset_dims = getDims(dset_json)
+            dset_dims = getShapeDims(dset_json)
             if dset_dims is None:
                 # no data to update
                 continue
@@ -629,3 +629,19 @@ class HSDSWriter(H5Writer):
             'owner': owner name
         """
         return self._stats
+
+    def getFilters(self, compressors_only=False):
+        """ return list of filters supported by the server """
+
+        h5py_filters = ["H5Z_FILTER_DEFLATE",]
+
+        if not compressors_only:
+            h5py_filters.append("H5Z_FILTER_SHUFFLE")
+            h5py_filters.append("H5Z_FILTER_FLETCHER32")
+            h5py_filters.append("H5Z_FILTER_SZIP")
+            h5py_filters.append("H5Z_FILTER_NBIT")
+            h5py_filters.append("H5Z_FILTER_SCALEOFFSET")
+
+        # TBD: add blosc, etc.
+
+        return tuple(h5py_filters)
