@@ -13,7 +13,10 @@
 import sys
 import logging
 import time
-import h5pyd
+
+from ..httpconn import HttpConn
+from h5pyd import Folder
+from h5pyd.version import version as h5pyd_version
 
 if __name__ == "__main__":
     from config import Config
@@ -47,8 +50,8 @@ def usage():
             print(f"    {help_msg}")
     print("")
     print("examples:")
-    print(f"   {cmd} -e http://hsdshdflab.hdfgroup.org")
-    print(f"   {cmd} -e http://hsdshdflab.hdfgroup.org /shared/tall.h5")
+    print(f"   {cmd} -e http://hsds.hdf.test")
+    print(f"   {cmd} -e http://hsds.hdf.test /shared/tall.h5")
     print(cfg.get_see_also(cmd))
     print("")
     sys.exit()
@@ -83,10 +86,19 @@ def getServerInfo(cfg):
     username = cfg["hs_username"]
     password = cfg["hs_password"]
     endpoint = cfg["hs_endpoint"]
+    http_conn = None
+
     try:
-        info = h5pyd.getServerInfo(
-            username=username, password=password, endpoint=endpoint
-        )
+        kwargs = {}
+        kwargs["username"] = username
+        kwargs["password"] = password
+        kwargs["endpoint"] = endpoint
+        http_conn = HttpConn(None, **kwargs)
+
+        http_conn.open()
+
+        info = http_conn.serverInfo()
+
         info_name = info["name"]
         print(f"server name: {info_name}")
         if "state" in info:
@@ -97,11 +109,9 @@ def getServerInfo(cfg):
             admin_tag = "(admin)"
         else:
             admin_tag = ""
-
         info_username = info["username"]
         print(f"username: {info_username} {admin_tag}")
-        info_password = info["password"]
-        print(f"password: {info_password}")
+
         if info["state"] == "READY":
             try:
                 home_folder = getHomeFolder()
@@ -119,7 +129,7 @@ def getServerInfo(cfg):
         if "start_time" in info:
             uptime = getUpTime(info["start_time"])
             print(f"up: {uptime}")
-        print(f"h5pyd version: {h5pyd.version.version}")
+        print(f"h5pyd version: {h5pyd_version}")
 
     except IOError as ioe:
         if ioe.errno == 401:
@@ -130,6 +140,9 @@ def getServerInfo(cfg):
                 print("authentication failure")
         else:
             print(f"Error: {ioe}")
+    finally:
+        if http_conn:
+            http_conn.close()
 
 
 #
@@ -141,9 +154,14 @@ def getHomeFolder():
     endpoint = cfg["hs_endpoint"]
     if not username:
         return None
-    dir = h5pyd.Folder(
-        "/home/", username=username, password=password, endpoint=endpoint
-    )  # get folder object for root
+
+    kwargs = {}
+    kwargs["username"] = username
+    kwargs["password"] = password
+    kwargs["endpoint"] = endpoint
+    dir = Folder("/home/", **kwargs)  # get folder object for root
+
+    # get folder object for root
     homefolder = None
     for name in dir:
         # we should come across the given domain
@@ -152,18 +170,18 @@ def getHomeFolder():
             # e.g. folder: "/home/bob/" for username "bob@acme.com"
             path = "/home/" + name + "/"
             try:
-                f = h5pyd.Folder(
-                    path, username=username, password=password, endpoint=endpoint
-                )
+                f = Folder(path, **kwargs)
+                if f.owner == username:
+                    homefolder = path
             except IOError as ioe:
                 logging.info(f"find home folder - got ioe: {ioe}")
                 continue
             except Exception as e:
                 logging.warning(f"find home folder - got exception: {e}")
                 continue
-            if f.owner == username:
-                homefolder = path
-            f.close()
+            finally:
+                if f:
+                    f.close()
             if homefolder:
                 break
 
