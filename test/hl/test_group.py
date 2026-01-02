@@ -27,6 +27,7 @@ class TestGroup(TestCase):
         filename = self.getFileName("create_group")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
+
         is_hsds = False
         if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
             is_hsds = True  # HSDS has different permission defaults
@@ -445,5 +446,6 @@ class TestTrackOrder(TestCase):
 
 if __name__ == '__main__':
     loglevel = logging.ERROR
-    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
+    # logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
+    logging.basicConfig(level=loglevel)
     ut.main()

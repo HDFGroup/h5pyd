@@ -45,6 +45,7 @@ class TestDatasetInitializer(TestCase):
         self.assertEqual(len(dset.shape), 1)
         self.assertEqual(dset.shape[0], extent)
         self.assertEqual(str(dset.dtype), 'int64')
+
         arr = dset[...]   # read all the elements
         for i in range(extent):
             if is_hsds:

@@ -16,6 +16,7 @@ import pytz
 import time
 from h5json.objid import getCollectionForId, isValidUuid
 from h5json.hdf5dtype import createDataType
+from h5json.shape_util import getRank
 
 
 def parse_lastmodified(datestr):
@@ -66,7 +67,6 @@ class ObjectID:
     def modified(self):
         """last modified timestamp"""
         obj_json = self.obj_json
-        print("obj_json:", obj_json)
         if "lastModified" in obj_json:
             lastModified = obj_json["lastModified"]
         elif "created" in obj_json:
@@ -220,16 +220,24 @@ class DatasetID(ObjectID):
     @property
     def layout(self):
         layout = None
-        obj_json = self.obj_json
 
-        if 'layout' in obj_json:
-            layout = obj_json['layout']
-        else:
-            dcpl = self.dcpl_json
-            if dcpl and 'layout' in dcpl:
-                layout = dcpl['layout']
+        dcpl = self.dcpl_json
+        if dcpl and 'layout' in dcpl:
+            layout = dcpl['layout']
 
         return layout
+
+    @property
+    def filters(self):
+        filters = []
+        dcpl = self.dcpl_json
+        if dcpl and 'filters' in dcpl:
+            filters = dcpl['filters']
+        return filters
+
+    @property
+    def rank(self):
+        return getRank(self.shape_json)
 
     @property
     def chunks(self):

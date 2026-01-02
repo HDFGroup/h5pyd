@@ -464,7 +464,6 @@ class HttpConn:
             headers["accept"] = "application/octet-stream"
 
         self.log.info(f"GET: {self._endpoint + req} [{params['domain']}] timeout: {self._timeout}")
-
         for k in params:
             if k != "domain":
                 v = params[k]
@@ -493,6 +492,8 @@ class HttpConn:
 
         if rsp.status_code != 200:
             self.log.warning(f"GET {req} returned status: {rsp.status_code}")
+        else:
+            pass
 
         return HttpResponse(rsp)
 

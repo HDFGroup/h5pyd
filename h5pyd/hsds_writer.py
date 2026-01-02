@@ -339,6 +339,22 @@ class HSDSWriter(H5Writer):
             if http_rsp.status_code not in (200, 410):
                 self.log.error(f"got {http_rsp.status_code} for DELETE {req}")
 
+    def resizeDatasets(self, dset_ids):
+        self.log.debug("hsds_writer> resizeDatasets")
+
+        # HSDS doesn't yet support multi-object resize so send put request one by one
+
+        for dset_id in dset_ids:
+            dset_json = self.db.getObjectById(dset_id)
+            shape_dims = getShapeDims(dset_json)
+            body = {"shape": shape_dims}
+            put_rsp = self.http_conn.PUT("/shape", body=body)
+            if put_rsp.status_code not in (200, 201):
+                msg = f"update shape for {dset_id} to {shape_dims} "
+                msg += f"failed with status code: {put_rsp.status_code}"
+                self.log.error(msg)
+                raise IOError(msg)
+
     def updateLinks(self, grp_ids):
         """ update any modified links of the given objects """
 
@@ -545,14 +561,12 @@ class HSDSWriter(H5Writer):
                 if arr is not None:
                     self.updateValue(dset_id, sel_all, arr)
             else:
-                if "updates" not in dset_json:
-                    continue
-                updates = dset_json["updates"]
-                if updates:
-                    self.log.debug(f"hsds_writer> {dset_id} update count: {len(updates)}")
+                # TBD: use multi if there are multiple updates
+                updates = self.db._getDatasetUpdates(dset_id)
+
+                for (sel, val) in updates:
                     for (sel, arr) in updates:
                         self.updateValue(dset_id, sel, arr)
-                    updates.clear()
 
     def flush(self):
         """ Write dirty items """
@@ -569,11 +583,12 @@ class HSDSWriter(H5Writer):
         self.log.debug(f"    deleted object count: {len(self.db.deleted_objects)}")
         root_id = self._root_id
         dirty_ids = self.db.dirty_objects.copy()
+        resized_dset_ids = self.db.resized_datasets.copy()
         if self._init:
             # initialize objects
             self.log.debug(f"hsds_writer> flush -- init is True self.db: {len(self.db.db)} objects")
             self.db.readAll()
-            self.log.debug(f"hsds_writer>flush, init after readAll, {len(self.db.db)} objects")
+            self.log.debug(f"hsds_writer> flush, init after readAll, {len(self.db.db)} objects")
             obj_ids = set(self.db.db.keys())
             obj_ids.remove(root_id)  # root group created when domain was
             self.log.debug(f"init createObjects: {obj_ids}")
@@ -593,6 +608,10 @@ class HSDSWriter(H5Writer):
             dirty_ids.update(self.db.new_objects)
         else:
             self.log.debug("no new objects to persist")
+
+        if resized_dset_ids:
+            self.log.debug(f"hsds_writer> resized ids: {resized_dset_ids}")
+            self.resizeDatasets(resized_dset_ids)
 
         if dirty_ids:
             self.log.debug(f"hsds_writer> dirty ids: {dirty_ids}")
@@ -633,14 +652,20 @@ class HSDSWriter(H5Writer):
     def getFilters(self, compressors_only=False):
         """ return list of filters supported by the server """
 
-        h5py_filters = ["H5Z_FILTER_DEFLATE",]
+        h5py_filters = ["H5Z_FILTER_DEFLATE", 
+                        "H5Z_FILTER_LZF",
+                        "H5Z_FILTER_BLOSC",
+                        "H5Z_FILTER_LZ4",
+                        "H5Z_FILTER_LZ4HC"]
 
         if not compressors_only:
             h5py_filters.append("H5Z_FILTER_SHUFFLE")
+            h5py_filters.append("H5Z_FILTER_BITSHUFFLE")
             h5py_filters.append("H5Z_FILTER_FLETCHER32")
             h5py_filters.append("H5Z_FILTER_SZIP")
             h5py_filters.append("H5Z_FILTER_NBIT")
             h5py_filters.append("H5Z_FILTER_SCALEOFFSET")
+
 
         # TBD: add blosc, etc.
 

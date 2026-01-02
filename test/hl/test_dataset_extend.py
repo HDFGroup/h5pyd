@@ -38,7 +38,6 @@ class TestExtendDataset(TestCase):
         shape = dset.shape
         self.assertEqual(shape[0], 1)
         self.assertEqual(shape[1], len(primes))
-        # print('chunks:', dset.chunks)
 
         # write primes
         dset[0:, :] = primes
@@ -58,6 +57,11 @@ class TestExtendDataset(TestCase):
 
         dset[1:, :] = primes
 
+        print(dset.id.obj_json)
+        updates = dset.id.obj_json.get("updates")
+        if updates:
+            for update in updates:
+                print(update)
         # retrieve  an element from updated dataset
         self.assertEqual(dset[1, 2], 10)
 

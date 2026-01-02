@@ -21,15 +21,18 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 
-from h5json.hdf5dtype import Reference
-from h5json.hdf5dtype import createDataType, check_dtype, special_dtype
+from h5json.hdf5dtype import Reference, RegionReference
+from h5json.hdf5dtype import createDataType, check_dtype, special_dtype, guess_dtype, getTypeItem
+from h5json.hdf5db import _decode
+from h5json.shape_util import getShapeJson, getShapeClass, getMaxDims
+from h5json.dset_util import generateLayout
+from h5json.filters import getFilterItem, isCompressionFilter
+from h5json.array_util import array_for_new_object
 from h5json import selections as sel
 
 from .base import HLObject
-from .base import Empty, guess_dtype
-from .base import _decode
+from .base import Empty
 from .objectid import DatasetID
-from . import filters
 from .datatype import Datatype
 from .. import config
 
@@ -65,17 +68,6 @@ def readtime_dtype(basetype, names):
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
 
 
-def _get_supported_compressors(parent):
-    """ return a tuple of compressors that can be used with the current writer """
-    stats = parent.id.db.reader.getStats()
-    if "compressors" in stats:
-        compressors = stats["compressors"]
-    else:
-        compressors = []
-
-    return tuple(compressors)
-
-
 def make_new_dset(
     parent,
     shape=None,
@@ -101,11 +93,15 @@ def make_new_dset(
 
     cfg = config.get_config()
 
+    if track_times is not None:
+        if track_times not in (True, False):
+            raise TypeError("invalid track_times")
+
     # Convert data to a C-contiguous ndarray
     if data is not None and not isinstance(data, Empty):
         from . import base
 
-        data = base.array_for_new_object(data, specified_dtype=dtype)
+        data = array_for_new_object(data, specified_dtype=dtype)
 
     # Validate shape
     if shape is None:
@@ -121,45 +117,13 @@ def make_new_dset(
         ):
             raise ValueError("Shape tuple is incompatible with data")
 
-    if shape is None:
-        # use null space if no shape defined
-        shape = "H5S_NULL"
-
-    if track_times is not None:
-        if track_times not in (True, False):
-            raise TypeError("invalid track_times")
-
-    if isinstance(maxshape, int):
-        maxshape = (maxshape,)
-
-    tmp_shape = maxshape if maxshape is not None else shape
-
-    # Validate chunk shape
-    if isinstance(chunks, int) and not isinstance(chunks, bool):
-        chunks = (chunks,)
-    if isinstance(chunks, tuple) and any(
-        chunk > dim for dim, chunk in zip(tmp_shape, chunks) if dim is not None
-    ):
-        err_msg = (
-            "Chunk shape must not be greater than data shape in any dimension. "
-            f"{chunks} is not compatible with {shape}"
-        )
-        raise ValueError(err_msg)
-
-    # validate chunks is not False if maxshape or compression is set
-    if chunks is False:
-        if maxshape is not None:
-            raise ValueError("chunks must not be False with extendible datasets")
-        if compression is not None:
-            raise ValueError("chunks must not be False with compression")
-
-    if chunks and shape is None and (data is None or isinstance(data, Empty)):
-        raise TypeError("Chunk layout may not be specified with empty dataset")
+    shape_json = getShapeJson(shape, maxdims=maxshape)
+    if getShapeClass(shape_json) == "H5S_NULL":
+        shape = "H5S_NULL"  # pass this to the createDataset method
 
     if isinstance(dtype, Datatype):
         # Named types are used as-is
         type_json = dtype.id.type_json
-        dtype = createDataType(type_json)
     else:
         # Validate dtype
         if dtype is None and data is None:
@@ -180,53 +144,70 @@ def make_new_dset(
         else:
             dtype = numpy.dtype(dtype)
 
-    layout = None
-    if chunks is not None and isinstance(chunks, dict):
-        # use the given chunk layout
-        layout = chunks
-        chunks = None
+        if dtype.kind == "O" and dtype.metadata and "ref" in dtype.metadata:
+            type_json = {}
+            type_json["class"] = "H5T_REFERENCE"
+            meta_type = dtype.metadata["ref"]
+            if meta_type is Reference:
+                type_json["base"] = "H5T_STD_REF_OBJ"
+            elif meta_type is RegionReference:
+                type_json["base"] = "H5T_STD_REF_DSETREG"
+            else:
+                errmsg = "Unexpected metadata type"
+                raise ValueError(errmsg)
+        else:
+            type_json = getTypeItem(dtype)
+
+    filters = []
+    if shuffle:
+        shuffle_filter = getFilterItem("shuffle")
+        filters.append(shuffle_filter)
+
+    if scaleoffset:
+        scaleoffset_filter = getFilterItem("scaleoffset")
+        filters.append(scaleoffset_filter)
+
+    if fletcher32:
+        fletcher32_filter = getFilterItem("fletcher32")
+        filters.append(fletcher32_filter)
 
     # Legacy
     if compression is True:
-        if compression_opts is None:
-            compression_opts = 4
-        compression = "gzip"
-
-    # Legacy
-    if compression in _LEGACY_GZIP_COMPRESSION_VALS:
-        if compression_opts is not None:
-            raise TypeError("Conflict in compression options")
-        compression_opts = compression
-        compression = "gzip"
-
-    if compression:
-        compressors = _get_supported_compressors(parent)
+        compression_filter = getFilterItem("gzip")
+        if compression_opts:
+            compression_filter["level"] = compression_opts
+        filters.append(compression_filter)
+    elif compression:
         if isinstance(compression, int):
-            if compression < 0:
-                raise ValueError(f"Invalid filter: {compression}")
-            if compression not in range(0, 10):
-                raise ValueError(f"Unknown compression: {compression}")
-            compression_opts = compression
-            compression = "gzip"
-        elif compression not in compressors:
-            msg = "Unknown compression, expect one of the following "
-            msg += f"values: {compressors}"
-            raise ValueError(msg)
+            compression_filter = getFilterItem("gzip")
+            compression_filter["level"] = compression
+        else:
+            compression_filter = getFilterItem(compression)
+            if compression_opts:
+                compression_filter["level"] = compression_opts
+            # TBD: how to set options for non-gzip filters?
+        filters.append(compression_filter)
+    else:
+        pass  # no compression filter
 
-    cpl = filters.generate_dcpl(
-        shape,
-        dtype,
-        chunks=chunks,
-        compression=compression,
-        compression_opts=compression_opts,
-        shuffle=shuffle,
-        fletcher32=fletcher32,
-        maxshape=maxshape,
-        scaleoffset=scaleoffset,
-        layout=layout,
-        initializer=initializer,
-        initializer_opts=initializer_opts
-    )
+    if filters and chunks is None:
+        chunks = True  # specify chunking if filter is used
+
+    # TBD - make these values part of config
+    CHUNK_MIN = 512 * 1024  # Soft lower limit (512k)
+    CHUNK_MAX = 8096 * 1024  # Hard upper limit (8M)
+    kwargs = {"chunk_min": CHUNK_MIN, "chunk_max": CHUNK_MAX, "chunks": chunks}
+    layout = generateLayout(shape_json, type_json, **kwargs)
+
+    dcpl = {}  # creation property list
+    if layout:
+        dcpl["layout"] = layout
+    if filters:
+        dcpl["filters"] = filters
+    if initializer:
+        dcpl["initiallizer"] = initializer
+    if initializer_opts:
+        dcpl["initializer_opts"] = initializer_opts
 
     if fillvalue is not None:
         # is it compatible with the array type?
@@ -244,13 +225,13 @@ def make_new_dset(
                 if len(dtype) > 1:
                     raise ValueError("Invalid fill value for compound type dataset")
 
-            cpl["fillValue"] = fillvalue
+            dcpl["fillValue"] = fillvalue
 
     if track_order or cfg.track_order:
-        cpl["CreateOrder"] = 1
+        dcpl["CreateOrder"] = 1
 
     if chunks and isinstance(chunks, dict):
-        cpl["layout"] = chunks
+        dcpl["layout"] = chunks
 
     if maxshape is not None and len(maxshape) > 0:
         if shape is not None:
@@ -258,9 +239,9 @@ def make_new_dset(
         else:
             print("maxshape provided but no shape")
 
-    dset_uuid = parent.id.db.createDataset(shape, maxdims=maxshape, dtype=dtype, cpl=cpl)
+    dset_uuid = parent.id.db.createDataset(shape, maxdims=maxshape, dtype=dtype, cpl=dcpl)
 
-    if data is not None:
+    if data is not None and not isinstance(data, Empty):
         # init data
         sel_all = sel.select(tuple(shape), ...)
         parent.id.db.setDatasetValues(dset_uuid, sel_all, data)
@@ -556,9 +537,8 @@ class Dataset(HLObject):
     def nbytes(self):
         """Numpy-style attribute giving the raw dataset size as the number of bytes"""
         size = self.size
-        if (
-            size is None
-        ):  # if we are an empty 0-D array, then there are no bytes in the dataset
+        if (size is None):
+            # if we are an empty 0-D array, then there are no bytes in the dataset
             return 0
         return self.dtype.itemsize * size
 
@@ -587,62 +567,47 @@ class Dataset(HLObject):
 
         """iterate through list of filters and return compression filter
         or None if none found"""
-        compressors = _get_supported_compressors(self)
-        for filter in self._filters:
-            if isinstance(filter, str):
-                filter_name = filter
-            elif isinstance(filter, dict) and "name" in filter:
-                filter_name = filter["name"]
-            else:
-                filter_name = None
 
-            if filter_name and filter_name in compressors:
-                return filter_name
-        return None
+        compressor = None
+        filters = self.id.filters
+        for filter in filters:
+            if isCompressionFilter(filter):
+                compressor = filter["name"]
+                break
+        return compressor
 
     @property
     def compression_opts(self):
         """Compression setting.  Int(0-9) for gzip, 2-tuple for szip."""
-        compressors = _get_supported_compressors(self)
-        for filter in self._filters:
-            if isinstance(filter, str):
-                return None  # compression filter, but no options
-            elif isinstance(filter, dict) and "name" in filter:
-                filter_name = filter["name"]
-                if filter_name not in compressors:
-                    continue
-                if filter_name == "szip":
-                    opt_keys = (
-                        "bitsPerPixel",
-                        "coding",
-                        "pixelsPerBlock",
-                        "pixelsPerScanline",
-                    )
-                    opt = []
-                    for opt_key in opt_keys:
-                        if opt_key in filter:
-                            opt.append(filter[opt_key])
-                    if len(opt) == len(opt_keys):
-                        # expected number of options
-                        return tuple(opt)
-                    else:
-                        return None
-                if "level" in filter:
-                    # just return level as an int
-                    return filter["level"]
-                else:
-                    return None
 
-        return None
+        opts = None
+        filters = self.id.filters
+
+        for filter in filters:
+            if isCompressionFilter(filter):
+                if "level" in filter:
+                    # deflate and lz4 both use this filter option
+                    opts = filter["level"]
+                elif filter["class"] == "H5Z_FILTER_SZIP":
+                    # TBD - what about bitsPerScanline and coding?
+                    if "bitsPerPixel" in filter and "pixelsPerBlock" in filter:
+                        opts = []
+                        opts.append(filter["bitsPerPixel"])
+                        opts.append(filter["pixelsPerBlock"])
+                        opts = tuple(opts)
+                else:
+                    pass  # TBD: support other filter opts?
+
+        return opts
 
     @property
     def shuffle(self):
         """Shuffle filter present (T/F)"""
-        for filter in self._filters:
+
+        filters = self.id.filters
+        for filter in filters:
             # check by class or name
-            if "class" in filter and filter["class"] == "H5Z_FILTER_SHUFFLE":
-                return True
-            if "name" in filter and filter["name"] == "shuffle":
+            if filter["class"] == "H5Z_FILTER_SHUFFLE":
                 return True
 
         return False
@@ -650,7 +615,14 @@ class Dataset(HLObject):
     @property
     def fletcher32(self):
         """Fletcher32 filter is present (T/F)"""
-        return "fletcher32" in self._filters
+
+        filters = self.id.filters
+        for filter in filters:
+            # check by class or name
+            if filter["class"] == "H5Z_FILTER_FLETCHER32":
+                return True
+
+        return False
 
     @property
     def scaleoffset(self):
@@ -658,11 +630,11 @@ class Dataset(HLObject):
         the number of bits stored, or 0 for auto-detected. For floating
         point data types, this is the number of decimal places retained.
         If the scale/offset filter is not in use, this is None."""
-        for filter in self._filters:
+
+        filters = self.id.filters
+        for filter in filters:
             # check by class or name
-            if ("class" in filter and filter["class"] == "H5Z_FILTER_SCALEOFFSET") or (
-                "name" in filter and filter["name"] == "scaleoffset"
-            ):
+            if filter["class"] == "H5Z_FILTER_SCALEOFFSET":
                 if "scaleOffset" in filter:
                     return filter["scaleOffset"]
                 else:
@@ -675,14 +647,14 @@ class Dataset(HLObject):
         None have no resize limit."""
 
         shape_json = self.id.shape_json
-        if self.id.shape_json["class"] == "H5S_SCALAR":
-            return ()  # empty tuple
-
-        if "maxdims" not in shape_json:
-            # not resizable, just return dims
-            dims = shape_json["dims"]
+        shape_class = getShapeClass(shape_json)
+        if shape_class == "H5S_NULL":
+            return None
+        elif shape_class == "H5S_SCALAR":
+            return ()
         else:
-            dims = shape_json["maxdims"]
+            pass  # H5S_SIMPLE
+        dims = getMaxDims(shape_json)
 
         # HSDS returns H5S_UNLIMITED for unlimited dims
         return tuple(x if (x != 0 and x != "H5S_UNLIMITED") else None for x in dims)
@@ -727,8 +699,6 @@ class Dataset(HLObject):
         if not isinstance(bind, DatasetID):
             raise ValueError(f"{bind} is not a DatasetID")
         HLObject.__init__(self, bind, track_order=track_order)
-
-        self._filters = filters.get_filters(self.id.dcpl_json)
 
         self._local = None  # local()
 

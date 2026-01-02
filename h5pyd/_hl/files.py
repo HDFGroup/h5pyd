@@ -19,6 +19,7 @@ import pathlib
 import time
 
 from h5json import Hdf5db
+from h5json.filters import COMPRESSION_FILTER_NAMES
 
 from .objectid import GroupID
 from .group import Group
@@ -207,20 +208,20 @@ class File(Group):
     def filename(self):
         """File name on disk"""
         filepath = None
-        if self.db.reader:
-            filepath = self.db.reader.filepath
-        elif self.db.writer:
-            filepath = self.db.writer.filepath
+        if self.id.db.reader:
+            filepath = self.id.db.reader.filepath
+        elif self.id.db.writer:
+            filepath = self.id.db.writer.filepath
         else:
             pass  # no persistent storage enabled
         return filepath
 
     def _getStats(self):
         """ return info on storage usage """
-        if self.db.writer:
-            stats = self.db.writer.getStats()
-        elif self.db.reader:
-            stats = self.db.reader.getStats()
+        if self.id.db.writer:
+            stats = self.id.db.writer.getStats()
+        elif self.id.db.reader:
+            stats = self.id.db.reader.getStats()
         else:
             stats = {"created": 0, "lastModified": 0, "owner": 0}
         return stats
@@ -233,7 +234,7 @@ class File(Group):
     def mode(self):
         """Python mode used to open file"""
         mode = 'r'
-        if self.db.writer and self.db.writer.__class__.__name__ != "H5NullWriter":
+        if self.id.db.writer and self.id.db.writer.__class__.__name__ != "H5NullWriter":
             mode += '+'
         return mode
 
@@ -488,17 +489,9 @@ class File(Group):
             Timeout value in seconds
         """
 
-        # if we're passed a GroupId as domain, just initialize the file object
-        # with that.  This will be faster and enable the File object to share the same http connection.
-        # TBD
-        # no_endpoint_info = endpoint is None and username is None and password is None
-        # if (mode is None and no_endpoint_info and isinstance(domain, GroupID)):
-        #    groupid = domain
-        # else:
-
         self.log = logging.getLogger()
 
-        self.log.setLevel(logging.DEBUG)
+        self.log.setLevel(logging.ERROR)
 
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
@@ -701,7 +694,7 @@ class File(Group):
         """return list of compressors supported by this server"""
         if self.id:
             # compressors = self.id.http_conn.compressors
-            compressors = None  # TBD
+            compressors = COMPRESSION_FILTER_NAMES
         else:
             compressors = []
         return compressors
@@ -759,12 +752,6 @@ class File(Group):
             self.log.warning("run_scan failed to update")
 
         return
-
-    def flush(self):
-        """Tells the service to complete any pending updates to permanent storage"""
-        self.log.debug("flush")
-        self.db.flush()
-        self.log.info("PUT flush complete")
 
     def close(self):
         """Clears reference to remote resource."""

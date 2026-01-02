@@ -116,7 +116,7 @@ class Folder:
 
         """
 
-        self.log = logging.getLogger("h5pyd")
+        self.log = logging.getLogger()
 
         if len(domain_name) == 0:
             raise ValueError("Invalid folder name")

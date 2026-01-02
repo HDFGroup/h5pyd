@@ -15,9 +15,9 @@ import numpy
 
 from h5json.hdf5dtype import Reference, check_dtype
 from h5json import selections as sel
+from h5json.hdf5db import _decode
+from h5json.array_util import bytesToArray
 
-from .base import _decode
-from .base import bytesToArray
 from .dataset import Dataset
 from .objectid import DatasetID
 

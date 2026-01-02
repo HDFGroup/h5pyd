@@ -89,10 +89,13 @@ class TestScalarDataset(TestCase):
         self.assertTrue(isinstance(val, bytes))
         self.assertEqual(val, str2.encode("utf-8"))
 
-        # try will ellipsis
+        # try with ellipsis
         val = dset[...]
 
         self.assertTrue(isinstance(val, np.ndarray))
+        print("dtype:", val.dtype, "meta:", val.dtype.metadata)
+        x = val[()]
+        print("val[()]:", x, "type:", type(x))
         self.assertEqual(val[()], str2.encode("ascii"))
 
         # try setting value using tuple

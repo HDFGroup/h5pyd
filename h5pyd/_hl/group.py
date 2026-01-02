@@ -16,9 +16,9 @@ import os.path as op
 import numpy
 import collections
 from h5json.objid import isValidUuid, getCollectionForId
-from h5json.hdf5dtype import special_dtype, Reference
+from h5json.hdf5dtype import special_dtype, Reference, guess_dtype
 
-from .base import HLObject, MutableMappingHDF5, guess_dtype
+from .base import HLObject, MutableMappingHDF5
 from .objectid import TypeID, GroupID, DatasetID
 from . import dataset
 from .dataset import Dataset
@@ -110,12 +110,12 @@ class Group(HLObject, MutableMappingHDF5):
         else:
             cpl = None
 
-        grp_uuid = self.db.createGroup(cpl=cpl)
-        group_json = self.db.getObjectById(grp_uuid)
+        grp_uuid = self.id.db.createGroup(cpl=cpl)
+        group_json = self.id.db.getObjectById(grp_uuid)
 
         if parent_id and link:
             # create link from parent_id to grp_id
-            self.db.createHardLink(parent_id, link, grp_uuid)
+            self.id.db.createHardLink(parent_id, link, grp_uuid)
 
         groupId = GroupID(self, grp_uuid, obj_json=group_json)
 
@@ -451,14 +451,25 @@ class Group(HLObject, MutableMappingHDF5):
 
         tgt_id = None
         tgt_json = None
+        is_anon = False
         if isinstance(name, Reference):
             tgt_id = str(name)
-            tgt_json = self.db.getObjectById(tgt_id)
-        elif isValidUuid(name):
-            tgt_id = name
-            tgt_json = self.db.getObjectById(name)
+            tgt_json = self.id.db.getObjectById(tgt_id)
             if not tgt_json:
-                return None
+                raise IOError("reference not found")
+            is_anon = True
+        elif isValidUuid(name):
+            # name should be a uuid in the format <collection>/<uuid>
+            # just use the later part as the tgt_id
+            collection = getCollectionForId(name)
+            if not name.startswith(f"{collection}/"):
+                raise IOError(f"Invalid object id for reference: {name}")
+            parts = name.split("/")
+            tgt_id = parts[1]
+            tgt_json = self.id.db.getObjectById(tgt_id)
+            if not tgt_json:
+                raise IOError("object id not found")
+            is_anon = True
         else:
             parent_uuid, link_json = self._get_link_json(name)
             link_class = link_json['class']
@@ -520,7 +531,9 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 raise IOError(f"Unexpected collection_type: {collection}")
 
-            if isinstance(name, str):
+            if is_anon:
+                tgt._name = None
+            else:
                 # assign name
                 if name[0] == '/':
                     tgt._name = name
@@ -713,12 +726,22 @@ class Group(HLObject, MutableMappingHDF5):
     def __delitem__(self, name):
         """ Delete (unlink) an item from this group. """
 
+        if self.read_only:
+            raise ValueError("No write intent")
+
         if isValidUuid(name):
             # delete the actual object
-            obj_json = self.id.db.getObjectById(name)
+            # TBD: construct a rererence object, or at least consolidate the code
+            # to extract the tgt_id with the code in __get__
+            collection = getCollectionForId(name)
+            if not name.startswith(f"{collection}/"):
+                raise IOError(f"Invalid object id for reference: {name}")
+            parts = name.split("/")
+            tgt_id = parts[1]
+            obj_json = self.id.db.getObjectById(tgt_id)
             if obj_json:
                 # remove object
-                self.id.db.deleteObject(name)
+                self.id.db.deleteObject(tgt_id)
             else:
                 raise IOError("Not found")
 
@@ -802,7 +825,6 @@ class Group(HLObject, MutableMappingHDF5):
         """
         pass
         """
-        with phil:
             if isinstance(source, HLObject):
                 source_path = '.'
             else:
@@ -854,7 +876,6 @@ class Group(HLObject, MutableMappingHDF5):
         """
         pass
         """
-        with phil:
             if source == dest:
                 return
             self.id.links.move(self._e(source), self.id, self._e(dest),
@@ -882,12 +903,6 @@ class Group(HLObject, MutableMappingHDF5):
         >>> f.visit(list_of_names.append)
         """
         return self.visititems(func)
-        """
-        with phil:
-            def proxy(name):
-                return func(self._d(name))
-            return h5o.visit(self.id, proxy)
-        """
 
     def visititems(self, func):
         """ Recursively visit names and objects in this group (HDF5 1.8).

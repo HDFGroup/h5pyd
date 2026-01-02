@@ -277,7 +277,6 @@ class TestCreateDataset(TestCase):
         else:
             self.assertEqual(chunks[0], 20)
             self.assertEqual(chunks[1], 40)
-
         self.assertEqual(dset.compression, 'gzip')
         self.assertEqual(dset.compression_opts, 9)
         self.assertFalse(dset.shuffle)
@@ -310,7 +309,7 @@ class TestCreateDataset(TestCase):
         # create some test data
         arr = np.random.rand(dims[0], dims[1])
 
-        dset = f.create_dataset('simple_dset_lz4', data=arr, dtype='i4',
+        dset = f.create_dataset('simple_dset_lz4', data=arr, dtype='f8',
                                 compression='lz4', compression_opts=5)
 
         self.assertEqual(dset.name, "/simple_dset_lz4")
@@ -318,7 +317,7 @@ class TestCreateDataset(TestCase):
         self.assertEqual(len(dset.shape), 2)
         self.assertEqual(dset.shape[0], 40)
         self.assertEqual(dset.shape[1], 80)
-        self.assertEqual(str(dset.dtype), 'int32')
+        self.assertEqual(str(dset.dtype), 'float64')
         self.assertTrue(isinstance(dset.maxshape, tuple))
         self.assertEqual(len(dset.maxshape), 2)
         self.assertEqual(dset.maxshape[0], 40)
@@ -548,6 +547,7 @@ class TestCreateDataset(TestCase):
 
         filename = self.getFileName("create_anon_dset")
         print("filename:", filename)
+
         f = h5py.File(filename, "w")
 
         dims = (40, 80)
@@ -567,7 +567,7 @@ class TestCreateDataset(TestCase):
 
         f.close()
 
-        f = h5py.File(filename, "a")  # re-open
+        f = h5py.File(filename, "r")  # re-open
         num_links = len(f)
         self.assertEqual(num_links, 0)
         if not config.get("use_h5py"):
@@ -577,14 +577,32 @@ class TestCreateDataset(TestCase):
             validate_dset(dset)
             self.assertEqual(dset.id.id, dset_id)
 
-            # explictly delete dataset
+            # try to delete dataset
+            try:
+                del f[uuid_ref]
+                self.assertTrue(False)
+            except ValueError:
+                pass  # expected
+        f.close()
+
+        f = h5py.File(filename, "a")  # re-open in append mode
+        num_links = len(f)
+        self.assertEqual(num_links, 0)
+        if not config.get("use_h5py"):
+            # can get a reference to the dataset using the dataset id
+            uuid_ref = f"datasets/{dset_id}"
+            dset = f[uuid_ref]
+            validate_dset(dset)
+            self.assertEqual(dset.id.id, dset_id)
+
+            # delete dataset
             del f[uuid_ref]
 
             # should not be returned now
             try:
                 dset = f[uuid_ref]
                 print(f"didn't expect to get: {dset}")
-                self.asertTrue(False)
+                self.assertTrue(False)
             except IOError:
                 pass  # expected
         f.close()

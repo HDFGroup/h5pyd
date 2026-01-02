@@ -21,7 +21,7 @@ from __future__ import absolute_import
 
 import numpy
 
-from h5json.hdf5dtype import special_dtype, check_dtype
+from h5json.hdf5dtype import special_dtype, check_dtype, guess_dtype
 from h5json.hdf5dtype import Reference
 
 from . import base
@@ -54,7 +54,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         """ Private constructor.
         """
         self._parent = parent
-        self._attributes = self._parent.db.getAttributes(self._parent.id.uuid)
+        self._attributes = self._parent.id.db.getAttributes(self._parent.id.uuid)
 
     def _bytesArrayToList(self, data):
         """
@@ -96,7 +96,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if isinstance(name, bytes):
             name = name.decode("utf-8")
 
-        attr_json = self._parent.db.getAttribute(self._parent.id.uuid, name)
+        attr_json = self._parent.id.db.getAttribute(self._parent.id.uuid, name)
 
         if attr_json is None:
             raise KeyError
@@ -104,12 +104,12 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         shape_json = attr_json["shape"]
         if shape_json["class"] == "H5S_NULL":
             # null space object, return an Empty instance
-            dtype = self._parent.db.getDtype(attr_json)
+            dtype = self._parent.id.db.getDtype(attr_json)
             return Empty(dtype)
 
         obj_id = self._parent.id.uuid
 
-        arr = self._parent.db.getAttributeValue(obj_id, name)
+        arr = self._parent.id.db.getAttributeValue(obj_id, name)
 
         if arr is None:
             # attribute not found
@@ -157,7 +157,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         use a specific type or shape, or to preserve the type of an attribute,
         use the methods create() and modify().
         """
-        self.create(name, value=value, dtype=base.guess_dtype(value))
+        self.create(name, value=value, dtype=guess_dtype(value))
 
     def __delitem__(self, name):
         """ Delete an attribute (which must already exist). """
@@ -165,7 +165,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         if isinstance(name, bytes):
             name = name.decode("utf-8")
 
-        self._parent.db.deleteAttribute(self._parent.id.uuid, name)
+        self._parent.id.db.deleteAttribute(self._parent.id.uuid, name)
 
     def create(self, name, value, shape=None, dtype=None):
         """ Create new attribute, overwriting any existing attributes.
@@ -257,7 +257,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             value = None  # hdf5db doesn't know about the empty object
             shape = "H5S_NULL"
 
-        self._parent.db.createAttribute(obj_id, name, value, shape=shape, dtype=dtype)
+        self._parent.id.db.createAttribute(obj_id, name, value, shape=shape, dtype=dtype)
 
     def modify(self, name, value):
         """ Change the value of an attribute while preserving its type.
@@ -271,7 +271,6 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         pass
         # TBD
         """
-        with phil:
             if not name in self:
                 self[name] = value
             else:
@@ -293,16 +292,16 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         """ Number of attributes attached to the object. """
 
         obj_id = self._parent.id.uuid
-        names = self._parent.db.getAttributes(obj_id)
+        names = self._parent.id.db.getAttributes(obj_id)
         return len(names)
 
     def __iter__(self):
         """ Iterate over the names of attributes. """
         obj_id = self._parent.id.uuid
-        attrs = self._parent.db.getAttributes(obj_id)
+        attrs = self._parent.id.db.getAttributes(obj_id)
 
         def _get_created(name):
-            attr_json = self._parent.db.getAttribute(obj_id, name, includeData=False)
+            attr_json = self._parent.id.db.getAttribute(obj_id, name, includeData=False)
             return attr_json["created"]
 
         if self._parent.track_order:
@@ -319,7 +318,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             name = name.decode("utf-8")
 
         obj_id = self._parent.id.uuid
-        attrs = self._parent.db.getAttributes(obj_id)
+        attrs = self._parent.id.db.getAttributes(obj_id)
         if name in attrs:
             return True
         else:
@@ -333,10 +332,10 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
     def __reversed__(self):
         """ Iterate over the names of attributes in reverse order. """
         obj_id = self._parent.id.uuid
-        attrs = self._parent.db.getAttributes(obj_id)
+        attrs = self._parent.id.db.getAttributes(obj_id)
 
         def _get_created(name):
-            attr_json = self._parent.db.getAttribute(obj_id, include_data=False)
+            attr_json = self._parent.id.db.getAttribute(obj_id, include_data=False)
             return attr_json["created"]
 
         if self._parent.track_order:
