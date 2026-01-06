@@ -218,6 +218,7 @@ class File(Group):
 
     def _getStats(self):
         """ return info on storage usage """
+        self._verifyOpen()
         if self.id.db.writer:
             stats = self.id.db.writer.getStats()
         elif self.id.db.reader:
@@ -226,6 +227,10 @@ class File(Group):
             stats = {"created": 0, "lastModified": 0, "owner": 0}
         return stats
 
+    def _verifyOpen(self):
+        if not self.id:
+            raise ValueError("file is closed")
+
     @property
     def driver(self):
         return "rest_driver"
@@ -233,6 +238,8 @@ class File(Group):
     @property
     def mode(self):
         """Python mode used to open file"""
+
+        self._verifyOpen()
         mode = 'r'
         if self.id.db.writer and self.id.db.writer.__class__.__name__ != "H5NullWriter":
             mode += '+'
@@ -241,6 +248,7 @@ class File(Group):
     @property
     def fid(self):
         """File ID (backwards compatibility)"""
+        self._verifyOpen()
         return self.filename
 
     @property
@@ -262,6 +270,7 @@ class File(Group):
     @property
     def created(self):
         """Creation time of the domain"""
+        self._verifyOpen()
         stats = self._getStats()
         return stats["created"]
 
@@ -279,11 +288,14 @@ class File(Group):
     @property
     def swmr_mode(self):
         """ Controls use of cached metadata """
+        self._verifyOpen()
         return self._swmr_mode
 
     @swmr_mode.setter
     def swmr_mode(self, value):
-        # enforce the same rule as h5py - swrm_mode can't be changed after opening the file
+        """ enforce the same rule as h5py - swmr_mode can't be changed after
+          opening the file for read-only """
+        self._verifyOpen()
         mode = self.mode
         if mode == "r":
             # read only mode
@@ -375,7 +387,7 @@ class File(Group):
 
         kwargs = {"app_logger": self.log}
         if swmr:
-            kwargs["use_cache"] = False  # disable metadata caching in swmr mode
+            kwargs["swmr"] = True  # disable metadata caching in swmr mode
         if username:
             kwargs["username"] = username
         if password:
@@ -553,6 +565,7 @@ class File(Group):
         Group.__init__(self, self._id, track_order=track_order)
 
     def _getVerboseInfo(self):
+        self.verifyOpen()
         # now = time.time()
         return {}
         """
@@ -692,6 +705,7 @@ class File(Group):
     @property
     def compressors(self):
         """return list of compressors supported by this server"""
+        self._verifyOpen()
         if self.id:
             # compressors = self.id.http_conn.compressors
             compressors = COMPRESSION_FILTER_NAMES

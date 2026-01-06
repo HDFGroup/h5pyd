@@ -66,6 +66,21 @@ class TestCreateDataset(TestCase):
 
         f.close()
 
+        # re-open and verify contents
+        f = h5py.File(filename, "r")
+        self.assertTrue('/simple_dset' in f)
+        dset = f['/simple_dset']
+        self.assertEqual(len(dset.shape), 2)
+        self.assertEqual(dset.ndim, 2)
+        self.assertEqual(dset.shape[0], 40)
+        self.assertEqual(dset.shape[1], 80)
+        self.assertEqual(str(dset.dtype), 'float32')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 2)
+        self.assertEqual(dset.maxshape[0], 40)
+        self.assertEqual(dset.maxshape[1], 80)
+        f.close()
+
     def test_create_float16_dset(self):
 
         filename = self.getFileName("create_float16_dset")

@@ -12,7 +12,7 @@
 import os
 
 cfg = {
-    'use_h5py': False
+    'use_h5py': True
 }
 
 

@@ -35,7 +35,7 @@ class HSDSReader(H5Reader):
         bucket=None,
         api_key=None,
         use_session=True,
-        use_cache=True,
+        swmr=False,
         expire_time=0,
         max_objects=0,
         max_age=0,
@@ -86,8 +86,9 @@ class HSDSReader(H5Reader):
             self.log.debug(f"    timeout: {timeout}")
             kwargs["timeout"] = timeout
         # save these for when we create the connection
-        if not use_cache:
+        if swmr:
             self.log.warning("no cache feature is not yet supported")
+        self._swmr = swmr
         self._http_kwargs = kwargs
         self._http_conn = None
         self._stats = {"created": 0, "lastModified": 0, "owner": ""}
@@ -175,7 +176,7 @@ class HSDSReader(H5Reader):
         """ return object with given id """
 
         collection = getCollectionForId(obj_id)
-        
+
         req = f"/{collection}/{obj_id}"
         self.log.debug(f"sending req: {req}")
 

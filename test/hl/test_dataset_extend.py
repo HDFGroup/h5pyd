@@ -57,14 +57,15 @@ class TestExtendDataset(TestCase):
 
         dset[1:, :] = primes
 
-        print(dset.id.obj_json)
-        updates = dset.id.obj_json.get("updates")
-        if updates:
-            for update in updates:
-                print(update)
-        # retrieve  an element from updated dataset
+        # retrieve an element from updated dataset
         self.assertEqual(dset[1, 2], 10)
 
+        f.close()
+
+        # reopen file and verify data
+        f = h5py.File(filename, "r")
+        dset = f['primes']
+        self.assertEqual(dset.maxshape, (None, len(primes)))
         f.close()
 
     def test_extend_multidim_dset(self):

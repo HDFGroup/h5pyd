@@ -39,6 +39,7 @@ class HSDSWriter(H5Writer):
         bucket=None,
         api_key=None,
         use_session=True,
+        swmr=False,
         expire_time=0,
         max_objects=0,
         max_age=0,
@@ -63,6 +64,8 @@ class HSDSWriter(H5Writer):
             self._no_data = True
         else:
             self._no_data = False
+
+        self._swmr = swmr
 
         self.log.debug("HSDSWriter init")
 
@@ -252,6 +255,10 @@ class HSDSWriter(H5Writer):
                 self.log.debug(f"hsds_writer> POST item: {item}")
             post_rsp = self.http_conn.POST("/" + collection, items)
             self.log.debug(f"hsds_writer> POST post_rsp.status_code: {post_rsp.status_code}")
+            if post_rsp.status_code not in (200, 201):
+                msg = f"createObjects POST to {collection} failed with status: {post_rsp.status_code}"
+                self.log.error(msg)
+                raise IOError(msg)
             items.clear()
 
         self.log.debug(f"hsds_writer> createObjects, {len(obj_ids)} objects")
@@ -285,6 +292,9 @@ class HSDSWriter(H5Writer):
                     if shape_json["class"] == "H5S_SIMPLE":
                         dims = shape_json["dims"]
                         item[key] = dims
+                    if "maxdims" in shape_json:
+                        maxdims = shape_json["maxdims"]
+                        item["maxdims"] = maxdims
                 else:
                     # just copy the key value directly
                     item[key] = obj_json[key]
@@ -348,7 +358,8 @@ class HSDSWriter(H5Writer):
             dset_json = self.db.getObjectById(dset_id)
             shape_dims = getShapeDims(dset_json)
             body = {"shape": shape_dims}
-            put_rsp = self.http_conn.PUT("/shape", body=body)
+            req = f"/datasets/{dset_id}/shape"
+            put_rsp = self.http_conn.PUT(req, body=body)
             if put_rsp.status_code not in (200, 201):
                 msg = f"update shape for {dset_id} to {shape_dims} "
                 msg += f"failed with status code: {put_rsp.status_code}"
@@ -652,7 +663,7 @@ class HSDSWriter(H5Writer):
     def getFilters(self, compressors_only=False):
         """ return list of filters supported by the server """
 
-        h5py_filters = ["H5Z_FILTER_DEFLATE", 
+        h5py_filters = ["H5Z_FILTER_DEFLATE",
                         "H5Z_FILTER_LZF",
                         "H5Z_FILTER_BLOSC",
                         "H5Z_FILTER_LZ4",
@@ -665,7 +676,6 @@ class HSDSWriter(H5Writer):
             h5py_filters.append("H5Z_FILTER_SZIP")
             h5py_filters.append("H5Z_FILTER_NBIT")
             h5py_filters.append("H5Z_FILTER_SCALEOFFSET")
-
 
         # TBD: add blosc, etc.
 

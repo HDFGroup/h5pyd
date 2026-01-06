@@ -36,11 +36,7 @@ class TestDatasetSwmrRead(TestCase):
 
         self.data = np.arange(13).astype('f')
         self.dset = self.f.create_dataset('data', chunks=(13,), maxshape=(None,), data=self.data)
-        print("init self.dset:", self.dset)
         fname = self.f.filename
-        print("dset id:", self.dset.id.id)
-        obj_json = self.dset.id.db.getObjectById(self.dset.id.id)
-        print("init obj_json:", obj_json)
         self.f.close()
 
         self.f = h5py.File(fname, 'r', swmr=True)
@@ -51,8 +47,6 @@ class TestDatasetSwmrRead(TestCase):
         self.assertTrue(self.f.swmr_mode)
 
     def test_read_data(self):
-        print("self.dset:", self.dset)
-        print("self.dset[...]:", self.dset[...])
         self.assertArrayEqual(self.dset, self.data)
 
     def test_refresh(self):
@@ -92,11 +86,8 @@ class TestDatasetSwmrWrite(TestCase):
         self.f = h5py.File(filename, 'w', libver='latest')
 
         self.data = np.arange(4).astype('f')
-        self.dset = self.f.create_dataset('data', shape=(0,), dtype=self.data.dtype, chunks=(2,), maxshape=(None,))
-        print("init self.dset:", self.dset)
-        print("dset id:", self.dset.id.id)
-        obj_json = self.dset.id.db.getObjectById(self.dset.id.id)
-        print("init obj_json:", obj_json)
+        kwargs = {"dtype": self.data.dtype, "shape": (0,), "maxshape": (None,), "chunks": (2,)}
+        self.dset = self.f.create_dataset('data', **kwargs)
 
     def test_initial_swmr_mode_off(self):
         """ Verify that the file is not initially in SWMR mode"""
@@ -136,16 +127,19 @@ class TestDatasetSwmrWrite(TestCase):
         self.f.swmr_mode = True
         self.assertTrue(self.f.swmr_mode)
 
+        self.assertEqual(self.dset.maxshape, (None,))
+
         self.dset.resize((4,))
+
+        self.assertEqual(self.dset.maxshape, (None,))
+
         self.dset[0:] = self.data
         self.dset.flush()
 
         # Refresh and read back 1st data block for assertion
         self.dset.refresh()
         self.assertArrayEqual(self.dset, self.data)
-        print("dset.maxdims:", self.dset.maxshape)
-        obj_json = self.dset.id.db.getObjectById(self.dset.id.id)
-        print("obj_json:", obj_json)
+
         self.dset.resize((8,))
         self.dset[4:] = self.data
         self.dset.flush()
