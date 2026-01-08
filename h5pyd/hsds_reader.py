@@ -11,7 +11,7 @@
 ##############################################################################
 import logging
 
-from h5json.objid import getCollectionForId, getUuidFromId
+from h5json.objid import getCollectionForId, getUuidFromId, isValidUuid
 
 from h5json.hdf5dtype import createDataType
 from h5json.array_util import jsonToArray, bytesToArray
@@ -36,6 +36,7 @@ class HSDSReader(H5Reader):
         api_key=None,
         use_session=True,
         swmr=False,
+        getobjs=False,
         expire_time=0,
         max_objects=0,
         max_age=0,
@@ -89,6 +90,8 @@ class HSDSReader(H5Reader):
         if swmr:
             self.log.warning("no cache feature is not yet supported")
         self._swmr = swmr
+        self._getobjs = getobjs  # get consolidated metadata if true
+        self._domain_objs = {} # consolidated metadata objects
         self._http_kwargs = kwargs
         self._http_conn = None
         self._stats = {"created": 0, "lastModified": 0, "owner": ""}
@@ -113,6 +116,8 @@ class HSDSReader(H5Reader):
         # try to do a GET from the domain
         req = "/"
         params = {}
+        if self._getobjs:
+            params["getobjs"] = 1
         """
         if max_objects is None or max_objects > 0:
             # get object meta objects
@@ -144,11 +149,23 @@ class HSDSReader(H5Reader):
         root_id = domain_json["root"]
         self._root_id = root_id
 
-        """
-        if "domain_objs" in root_json:
-            domain_objs = root_json["domain_objs"]
-            objdb.load(domain_objs)
-        """
+        if "domain_objs" in domain_json:
+            domain_objs = domain_json["domain_objs"]
+           
+            if not isinstance(domain_objs, dict):
+                raise TypeError("Unexpected type")
+            for obj_id in domain_objs:
+                if not isValidUuid(obj_id):
+                    self.log.warning(f"HSDSReader domain_objs - unexpected id: {obj_id}")
+                    continue
+                print(f"got {obj_id} on open")     
+                if obj_id in self.db:
+                    continue  # already loaded
+                if obj_id in self._domain_objs:
+                    continue  # already in the prefetch cache
+                print(f"adding {obj_id} to domain_objs")            
+                self._domain_objs[obj_id] = domain_objs[obj_id]  
+            print(f"loaded {len(self._domain_objs)} objects")   
 
         self._http_conn = http_conn
 
@@ -177,21 +194,31 @@ class HSDSReader(H5Reader):
 
         collection = getCollectionForId(obj_id)
 
-        req = f"/{collection}/{obj_id}"
-        self.log.debug(f"sending req: {req}")
+        if obj_id in self._domain_objs:
+            # this was included in the consolidated metadata returned
+            # with the domain request
+            obj_json = self._domain_objs[obj_id]
+            print(f"got {obj_id} from domain json")
+            # delete so we don't accidently return stale object if requested again
+            del self._domain_objs[obj_id]
+        else:
+            # fetch from the server
+            req = f"/{collection}/{obj_id}"
+            self.log.debug(f"sending req: {req}")
 
-        params = {}
-        if include_attrs:
-            params["include_attrs"] = 1
-        if include_links:
-            params["include_links"] = 1
+            params = {}
+            if include_attrs:
+                params["include_attrs"] = 1
+            if include_links:
+                params["include_links"] = 1
 
-        rsp = self.http_conn.GET(req, params=params)
+            rsp = self.http_conn.GET(req, params=params)
 
-        if rsp.status_code != 200:
-            raise IOError(rsp.status_code, rsp.reason)
+            if rsp.status_code != 200:
+                raise IOError(rsp.status_code, rsp.reason)
 
-        obj_json = rsp.json()
+            obj_json = rsp.json()
+
         # remove any unneeded keys
         redundant_keys = ("hrefs", "root", "domain", "bucket", "linkCount", "attributeCount")
         for key in redundant_keys:

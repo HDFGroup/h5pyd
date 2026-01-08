@@ -25,7 +25,6 @@ from common import ut, TestCase
 
 class TestDatasetSwmrRead(TestCase):
     """ Testing SWMR functions when reading a dataset.
-    Skip this test if the HDF5 library does not have the SWMR features.
     """
 
     def setUp(self):
@@ -148,6 +147,56 @@ class TestDatasetSwmrWrite(TestCase):
         self.dset.refresh()
         self.assertArrayEqual(self.dset[0:4], self.data)
         self.assertArrayEqual(self.dset[4:8], self.data)
+
+    def test_swmr_read(self):
+        """ Verify that a SWMR file can be opened for reading
+        while it is still open for writing.
+        """
+
+        # open the same file for read-only with swmr=True
+        fname = self.f.filename
+        f_read = h5py.File(fname, 'r', swmr=True)
+        dset_read = f_read['data']
+
+        # read and verify data written so far
+        dset_read.refresh()
+        self.assertArrayEqual(dset_read, self.data)
+
+        f_read.close()
+
+
+class TestDatasetSwmrReadWrite(TestCase):
+    """ Testing SWMR functions when reading a dataset while the file
+    is open for writing.
+    """
+
+    def setUp(self):
+        """ First setup a file with a small chunked and empty dataset.
+        No data written yet.
+        """
+
+        filename = self.getFileName("test_data_swmr_read_write")
+        print("filename:", filename)
+
+        # Note that when creating the file, the swmr=True is not required for
+        # write, but libver='latest' is required.
+        self.f = h5py.File(filename, 'w', libver='latest')
+
+        self.data = np.asarray([1, 2, 3, 4], dtype=np.int32)
+        self.dset = self.f.create_dataset('data', data=self.data)
+        self.f.flush()  # this is needed for h5pyd but apparently not with h5py
+
+    def test_swmr_read_write(self):
+        # open the same file for read-only with swmr=True
+        fname = self.f.filename
+        f_read = h5py.File(fname, 'r', swmr=True)
+        dset_read = f_read['data']
+
+        # read and verify data written so far
+        dset_read.refresh()
+        self.assertArrayEqual(dset_read, self.data)
+
+        f_read.close()
 
 
 if __name__ == '__main__':

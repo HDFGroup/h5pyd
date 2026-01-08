@@ -315,6 +315,7 @@ class File(Group):
                  bucket=None,
                  api_key=None,
                  swmr=False,
+                 getobjs=True,
                  retries=10,
                  timeout=180,
                  **kwds,
@@ -537,6 +538,7 @@ class File(Group):
                 kwargs["swmr"] = swmr
             if bucket:
                 kwargs["bucket"] = bucket
+            kwargs["getobjs"] = True  # TBD: disable this optionally?
 
             db = self._init_db(domain, **kwargs)
 

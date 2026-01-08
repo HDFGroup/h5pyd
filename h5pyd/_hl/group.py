@@ -17,6 +17,8 @@ import numpy
 import collections
 from h5json.objid import isValidUuid, getCollectionForId
 from h5json.hdf5dtype import special_dtype, Reference, guess_dtype
+from h5json.link_util import getLinkClass
+from h5json.shape_util import getRank
 
 from .base import HLObject, MutableMappingHDF5
 from .objectid import TypeID, GroupID, DatasetID
@@ -95,7 +97,7 @@ class Group(HLObject, MutableMappingHDF5):
             tgt_json = self.id.db.getLink(parent_uuid, name)
             if not tgt_json:
                 raise KeyError("Unable to open object (Component not found)")
-            link_class = tgt_json["class"]
+            link_class = getLinkClass(tgt_json)
             if link_class != "H5L_TYPE_HARD":
                 raise IOError(f"Unable to follow link type: {link_class}")
         return parent_uuid, tgt_json
@@ -180,7 +182,7 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 # sub-group already exists
                 self.log.debug(f"create group - found subgroup: {link}")
-                if link_json["class"] != 'H5L_TYPE_HARD':
+                if getLinkClass(link_json) != 'H5L_TYPE_HARD':
                     # TBD: get the referenced object for softlink?
                     raise IOError("cannot create subgroup of softlink")
                 parent_uuid = link_json["id"]
@@ -524,7 +526,7 @@ class Group(HLObject, MutableMappingHDF5):
                 shape_json = tgt_json["shape"]
                 dtype_json = tgt_json["type"]
                 dset_id = DatasetID(self, tgt_id, obj_json=tgt_json, track_order=track_order)
-                if "dims" in shape_json and len(shape_json["dims"]) == 1 and dtype_json["class"] == 'H5T_COMPOUND':
+                if getRank(shape_json) == 1 and dtype_json["class"] == 'H5T_COMPOUND':
                     tgt = Table(dset_id, track_order=track_order)
                 else:
                     tgt = Dataset(dset_id, track_order=track_order)
@@ -597,11 +599,34 @@ class Group(HLObject, MutableMappingHDF5):
             except KeyError:
                 return default
 
-        if not isinstance(name, list) and name is not None and name not in self:
+        if not name or name == '/':
             return default
 
-        elif getclass and not getlink:
-            obj = self.__getitem__(name, track_order)
+        if name[-1] == '/':
+            name = name[:-1]  # trailing slash not relevant
+
+        parent_path = op.dirname(name)
+        if name[0] == '/':
+            parent = self.__getitem('/')
+        elif not parent_path:
+            parent = self
+        else:
+            try:
+                parent = self.__getitem__(parent_path)
+            except KeyError:
+                return default
+
+        link_name = op.basename(name)
+
+        obj_id = parent.id.id
+        link_json = self.id.db.getLink(obj_id, link_name)
+        if not link_json:
+            return default
+
+        link_class = getLinkClass(link_json)
+
+        if getclass and not getlink:
+            obj = parent.__getitem__(name, track_order=track_order)
             if obj is None:
                 return None
             if obj.id.__class__ is GroupID:
@@ -614,27 +639,6 @@ class Group(HLObject, MutableMappingHDF5):
                 raise TypeError("Unknown object type")
 
         elif getlink:
-            if name[0] == '/':
-                obj_id = self.id.db.root_id
-            else:
-                obj_id = self.id.uuid
-
-            parts = name.split('/')
-            link_json = None
-            for part in parts:
-                if not obj_id:
-                    return None
-
-                link_json = self.id.db.getLink(obj_id, name)
-                if not link_json:
-                    return None
-
-                obj_id = link_json.get("id")  # will return None for soft and external links
-
-            if not link_json:
-                return None
-
-            link_class = link_json["class"]
             if link_class == 'H5L_TYPE_SOFT':
                 if getclass:
                     return SoftLink
@@ -644,7 +648,19 @@ class Group(HLObject, MutableMappingHDF5):
                 if getclass:
                     return ExternalLink
                 else:
-                    return ExternalLink(link_json['file'], link_json['h5path'])
+                    # earlier HSDS storage formats usd h5domain, rather than file
+                    # so check if either is set
+                    if "file" in link_json:
+                        link_json_file = link_json["file"]
+                    elif "h5domain" in link_json:
+                        link_json_file = link_json["h5domain"]
+                    else:
+                        raise KeyError(f"Unexpected link format: {link_json}")
+                    if "h5path" in link_json:
+                        link_json_path = link_json["h5path"]
+                    else:
+                        raise KeyError(f"Unexpected link format: {link_json}")
+                    return ExternalLink(link_json_file, link_json_path)
             elif link_class == 'H5L_TYPE_HARD':
                 return HardLink if getclass else HardLink(link_json['id'])
             else:
