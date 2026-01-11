@@ -42,6 +42,7 @@ class HSDSReader(H5Reader):
         max_age=0,
         retries=3,
         timeout=30.0,
+        **kwargs
     ):
         if app_logger:
             self.log = app_logger
@@ -91,7 +92,7 @@ class HSDSReader(H5Reader):
             self.log.warning("no cache feature is not yet supported")
         self._swmr = swmr
         self._getobjs = getobjs  # get consolidated metadata if true
-        self._domain_objs = {} # consolidated metadata objects
+        self._domain_objs = {}   # consolidated metadata objects
         self._http_kwargs = kwargs
         self._http_conn = None
         self._stats = {"created": 0, "lastModified": 0, "owner": ""}
@@ -111,7 +112,8 @@ class HSDSReader(H5Reader):
         http_conn.open()
 
         hsds_info = http_conn.serverInfo()
-        self.log.debug(f"got hsds info: {hsds_info}")
+        for k in hsds_info:
+            self._stats[k] = hsds_info[k]
 
         # try to do a GET from the domain
         req = "/"
@@ -151,21 +153,18 @@ class HSDSReader(H5Reader):
 
         if "domain_objs" in domain_json:
             domain_objs = domain_json["domain_objs"]
-           
+
             if not isinstance(domain_objs, dict):
                 raise TypeError("Unexpected type")
             for obj_id in domain_objs:
                 if not isValidUuid(obj_id):
                     self.log.warning(f"HSDSReader domain_objs - unexpected id: {obj_id}")
                     continue
-                print(f"got {obj_id} on open")     
                 if obj_id in self.db:
                     continue  # already loaded
                 if obj_id in self._domain_objs:
                     continue  # already in the prefetch cache
-                print(f"adding {obj_id} to domain_objs")            
-                self._domain_objs[obj_id] = domain_objs[obj_id]  
-            print(f"loaded {len(self._domain_objs)} objects")   
+                self._domain_objs[obj_id] = domain_objs[obj_id]
 
         self._http_conn = http_conn
 
@@ -198,7 +197,6 @@ class HSDSReader(H5Reader):
             # this was included in the consolidated metadata returned
             # with the domain request
             obj_json = self._domain_objs[obj_id]
-            print(f"got {obj_id} from domain json")
             # delete so we don't accidently return stale object if requested again
             del self._domain_objs[obj_id]
         else:
@@ -218,6 +216,9 @@ class HSDSReader(H5Reader):
                 raise IOError(rsp.status_code, rsp.reason)
 
             obj_json = rsp.json()
+            for k in ("id", "root", "linkCount", "attributeCount", "domain", "hrefs"):
+                if k in obj_json:
+                    del obj_json[k]  # don't need these
 
         # remove any unneeded keys
         redundant_keys = ("hrefs", "root", "domain", "bucket", "linkCount", "attributeCount")
@@ -343,6 +344,39 @@ class HSDSReader(H5Reader):
             self.log.debug(f"jsonToArray returned: {arr}")
 
         return arr
+
+    def getACL(self, username):
+        """ Return the ACL for the given username """
+
+        req = "/acls/" + username
+        try:
+            rsp = self.http_conn.GET(req)
+        except IOError as ioe:
+            self.log.info(f"got IOError: {ioe.errno}")
+            raise IOError(ioe.errno, "Error fetching ACL")
+        if rsp.status_code != 200:
+            self.log.info(f"get http error on getACL: {rsp.status_code}")
+            raise IOError(rsp.status_code, "Error fetching ACL")
+
+        acl_json = rsp.json()["acl"]
+        return acl_json
+
+    def getACLs(self):
+        """ Return all the ACLs for the domain"""
+
+        req = "/acls"
+        try:
+            rsp = self.http_conn.GET(req)
+        except IOError as ioe:
+            self.log.info(f"got IOError: {ioe.errno}")
+            raise IOError(ioe.errno, "Error fetching ACLs")
+        if rsp.status_code != 200:
+            self.log.info(f"get http error on getACLs: {rsp.status_code}")
+            raise IOError(rsp.status_code, "Error fetching ACLs")
+
+        acls_json = rsp.json()["acls"]
+
+        return acls_json
 
     def getStats(self):
         """ return a dictionary object with at minimum the following keys:

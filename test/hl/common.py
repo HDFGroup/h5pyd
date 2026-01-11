@@ -53,7 +53,7 @@ else:
             user1["password"] = "test"
         return user1
 
-    def get_test_user2(self):
+    def get_test_user2():
         user2 = {}
         if "TEST12_USERNAME" in os.environ:
             user2["name"] = os.environ["TEST2_USERNAME"]

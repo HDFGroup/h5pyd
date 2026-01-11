@@ -304,7 +304,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             attr_json = self._parent.id.db.getAttribute(obj_id, name, includeData=False)
             return attr_json["created"]
 
-        if self._parent.track_order:
+        if self._parent.id.create_order:
             attrs = sorted(attrs, key=lambda x: _get_created(x))
         else:
             attrs = sorted(attrs)

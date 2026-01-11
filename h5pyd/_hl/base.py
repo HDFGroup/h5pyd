@@ -332,23 +332,11 @@ class HLObject(CommonStateObject):
         return dt
 
     @property
-    def track_order(self):
-        return self._track_order
-
-    @property
     def read_only(self):
         if isinstance(self.id.db.writer, H5NullWriter):
             return True
         else:
             return False
-
-    @property
-    def creation_properties(self):
-        db = self.id.db
-        obj_json = db.getObjectById(self.id.uuid)
-        if "creationProperties" in obj_json:
-            return obj_json["creationProperties"]
-        return {}
 
     def verifyCert(self):
         # default to validate CERT for https requests, unless
@@ -393,24 +381,7 @@ class HLObject(CommonStateObject):
             self.log.addHandler(fh)
         else:
             pass
-
-        if track_order is None:
-            # set order based on creation props
-            obj_json = self.id.obj_json
-            if "creationProperties" in obj_json:
-                cpl = obj_json["creationProperties"]
-            else:
-                cpl = {}
-            if "CreateOrder" in cpl:
-                createOrder = cpl["CreateOrder"]
-                if not createOrder or createOrder == "0":
-                    self._track_order = False
-                else:
-                    self._track_order = True
-            else:
-                self._track_order = False
-        else:
-            self._track_order = track_order
+        self._track_order = None  # TBD: set by track_order?
 
     def __hash__(self):
         return hash(self.id.id)

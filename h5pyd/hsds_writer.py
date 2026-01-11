@@ -45,7 +45,7 @@ class HSDSWriter(H5Writer):
         max_age=0,
         retries=3,
         timeout=30.0,
-        track_order=False,
+        track_order=None,
         owner=None,
         linked_domain=None
 
@@ -142,6 +142,8 @@ class HSDSWriter(H5Writer):
 
         hsds_info = self._http_conn.serverInfo()
         self.log.debug(f"got hsds info: {hsds_info}")
+        for k in hsds_info:
+            self._stats[k] = hsds_info[k]
 
         # fetch the domain json
 
@@ -157,7 +159,7 @@ class HSDSWriter(H5Writer):
             params["include_links"] = 1
         """
 
-        domain_json = None
+        create_domain = True
         rsp = http_conn.GET(req, params=params)
         self.log.debug(f"hsdswriter initial get status_code: {rsp.status_code}")
 
@@ -175,6 +177,18 @@ class HSDSWriter(H5Writer):
                     self.log.warning(f"folder: {self.filepath} has no root property")
                     http_conn.close()
                     raise IOError(404, "Location is a folder, not a file")
+                # for append, verify we have 'update' permission on the domain
+                # try doing a PUT on the domain
+                self.log.debug("hsds_writer> verify append permissions by POST group")
+                params = {"flush": 1}
+                post_rsp = self.http_conn.PUT("/", params=params)
+                if post_rsp.status_code in (200, 204):
+                    self.log.debug("append is ok")
+                else:
+                    msg = "no append permision on domain"
+                    self.log.warning(msg)
+                    raise IOError(post_rsp.status_code, msg)
+                create_domain = False
             else:
                 # not append - delete existing domain
                 self.log.info("hsds_writer - delete domain")
@@ -183,9 +197,9 @@ class HSDSWriter(H5Writer):
                 if delete_rsp.status_code not in (200, 410):
                     # failed to delete
                     http_conn.close()
-                    raise IOError(rsp.status_code, rsp.reason)
+                    raise IOError(delete_rsp.status_code, rsp.reason)
 
-        if not domain_json:
+        if create_domain:
             # domain doesn't exist, create it
             self.log.debug("hsds_writer create domain")
             body = {}
@@ -196,8 +210,9 @@ class HSDSWriter(H5Writer):
                 body["owner"] = self._owner
             if self._linked_domain:
                 body["linked_domain"] = self._linked_domain
-            if self._track_order:
-                create_props = {"CreateOrder": 1}
+            if self._track_order is not None:
+                create_order = 1 if self._track_order else 0
+                create_props = {"CreateOrder": create_order}
                 group_body = {"creationProperties": create_props}
                 body["group"] = group_body
             rsp = http_conn.PUT(req, params=params, body=body)
@@ -215,6 +230,11 @@ class HSDSWriter(H5Writer):
         if "root" not in domain_json:
             http_conn.close()
             raise IOError(404, "Location is a folder, not a file")
+
+        # update stats
+        for key in ("created", "lastModified", "owner", "limits", "version", "compressors"):
+            if key in domain_json:
+                self._stats[key] = domain_json[key]
 
         root_id = domain_json["root"]
         self.log.debug(f"hsds_writer got root_id: {root_id}")
@@ -578,6 +598,31 @@ class HSDSWriter(H5Writer):
                 for (sel, val) in updates:
                     for (sel, arr) in updates:
                         self.updateValue(dset_id, sel, arr)
+
+    def putACL(self, acl):
+        """ create an ACL for the domain """
+
+        if self.closed:
+            # no db set yet
+            self.log.warning("hsds_writer> putACL called but no db")
+            return IOError("writer is closed")
+        if not self._http_conn:
+            self.log.warning("hsds_writer no http connection")
+            raise IOError("no http connection")
+
+        if "userName" not in acl:
+            raise IOError(404, "ACL has no 'userName' key")
+        perm = {}
+        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
+            if k not in acl:
+                raise IOError(404, "Missing ACL field: {}".format(k))
+            perm[k] = acl[k]
+
+        req = "/acls/" + acl["userName"]
+        rsp = self.http_conn.PUT(req, body=perm)
+        if rsp.status_code not in (200, 201):
+            self.log.warning(f"PUT ACL failed with status code: {rsp.status_code}")
+            raise IOError(rsp.status_code, "Error setting ACL")
 
     def flush(self):
         """ Write dirty items """

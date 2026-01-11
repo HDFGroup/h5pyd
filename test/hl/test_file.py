@@ -237,12 +237,12 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 2)
 
         # no explicit ACLs yet
-        file_acls = f.getACLs()
+        file_acls = f.id.db.reader.getACLs()
         self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl
 
         username = f.owner
 
-        file_acl = f.getACL(username)
+        file_acl = f.id.db.reader.getACL(username)
         # default owner ACL should grant full permissions
         acl_keys = ("create", "read", "update", "delete", "readACL", "updateACL")
         # self.assertEqual(file_acl["userName"], "default")
@@ -250,7 +250,7 @@ class TestFile(TestCase):
             self.assertEqual(file_acl[k], True)
 
         try:
-            default_acl = f.getACL("default")
+            default_acl = f.id.db.reader.getACL("default")
         except IOError as ioe:
             if ioe.errno == 404:
                 pass  # expected
@@ -263,7 +263,8 @@ class TestFile(TestCase):
             else:
                 default_acl[key] = False
         default_acl["userName"] = "default"
-        f.putACL(default_acl)
+        f.id.db.writer.putACL(default_acl)
+
         f.close()
 
         # ooen with test_user2 should succeed for read mode
@@ -294,7 +295,7 @@ class TestFile(TestCase):
         user2_acl["read"] = True  # allow read access
         user2_acl["update"] = True
         user2_acl["readACL"] = True
-        f.putACL(user2_acl)
+        f.id.db.writer.putACL(user2_acl)
 
         f.close()
 
@@ -387,14 +388,17 @@ class TestTrackOrder(TestCase):
         # write file using creation order
         cfg = h5py.get_config()
         cfg.track_order = True
+        self.assertTrue(cfg.track_order)
         with h5py.File(filename, 'w') as f:
             self.populate(f)
             self.assertEqual(list(f), list(self.titles))
             self.assertEqual(list(f.attrs), list(self.titles))
+
         cfg.track_order = False  # reset
 
         with h5py.File(filename) as f:
             # domain/file should have been saved with track_order state
+
             self.assertEqual(list(f), list(self.titles))
             self.assertEqual(list(f.attrs), list(self.titles))
 

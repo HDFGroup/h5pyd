@@ -25,7 +25,7 @@ import json
 import logging
 
 from . import openid
-from . import config
+from .config import get_config
 
 
 def eprint(*args, **kwargs):
@@ -59,7 +59,7 @@ def getAzureApiKey():
     api_key = None
 
     # if Azure AD ids are set, pass them to HttpConn via api_key dict
-    cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
+    cfg = get_config()  # pulls in state from a .hscfg file (if found).
 
     ad_app_id = None  # Azure AD HSDS Server id
     if "HS_AD_APP_ID" in os.environ:
@@ -100,7 +100,7 @@ def getAzureApiKey():
 
 def getKeycloakApiKey():
     # check for keycloak next
-    cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
+    cfg = get_config()  # pulls in state from a .hscfg file (if found).
     api_key = None
     # check to see if we are configured for keycloak authentication
     if "HS_KEYCLOAK_URI" in os.environ:
@@ -266,6 +266,37 @@ class HttpConn:
         timeout=DEFAULT_TIMEOUT,
         **kwds,
     ):
+        self._logger = logger
+        if logger is None:
+            self.log = logging
+        else:
+            self.log = logging.getLogger(logger)
+
+        cfg = get_config()  # pulls in state from a .hscfg file (if found).
+
+        if not endpoint:
+            if "hs_endpoint" in cfg:
+                endpoint = cfg["hs_endpoint"]
+
+        # remove the trailing slash on endpoint if it exists
+        if endpoint and endpoint.endswith('/'):
+            endpoint = endpoint.strip('/')
+
+        if not username:
+            if "hs_username" in cfg:
+                username = cfg["hs_username"]
+
+        if not password:
+            if "hs_password" in cfg:
+                password = cfg["hs_password"]
+
+        if not api_key and "hs_api_key" in cfg:
+            api_key = cfg["hs_api_key"]
+
+        if not bucket:
+            if "hs_bucket" in cfg:
+                bucket = cfg["hs_bucket"]
+
         self._domain = domain_name
         self._mode = mode
         self._domain_json = None
@@ -276,11 +307,6 @@ class HttpConn:
         self._server_info = None
         self._external_refs = []
 
-        self._logger = logger
-        if logger is None:
-            self.log = logging
-        else:
-            self.log = logging.getLogger(logger)
         msg = f"HttpConn.init(domain: {domain_name}"
         msg += f"expire_time: {expire_time:6.2f} sec retries: {retries}"
         self.log.debug(msg)
@@ -297,27 +323,19 @@ class HttpConn:
 
         self._endpoint = endpoint
 
-        if not username:
-            if "HS_USERNAME" in os.environ:
-                username = os.environ["HS_USERNAME"]
         if isinstance(username, str) and (not username or username.upper() == "NONE"):
             username = None
         self._username = username
 
-        if not password:
-            if "HS_PASSWORD" in os.environ:
-                password = os.environ["HS_PASSWORD"]
         if isinstance(password, str) and (not password or password.upper() == "NONE"):
             password = None
         self._password = password
 
-        if not bucket:
-            if "HS_BUCKET" in os.environ:
-                bucket = os.environ["HS_BUCKET"]
-            if isinstance(bucket, str) and (not bucket or bucket.upper() == "NONE"):
-                bucket = None
+        if isinstance(bucket, str) and (not bucket or bucket.upper() == "NONE"):
+            bucket = None
         self._bucket = bucket
 
+        # TBD: should this be in config?
         if api_key is None and "HS_API_KEY" in os.environ:
             api_key = os.environ["HS_API_KEY"]
         if isinstance(api_key, str) and (not api_key or api_key.upper() == "NONE"):
@@ -326,6 +344,7 @@ class HttpConn:
             api_key = getAzureApiKey()
         if not api_key:
             api_key = getKeycloakApiKey()
+        self._api_key = api_key
 
         # Convert api_key to OpenIDHandler
         if isinstance(api_key, dict):

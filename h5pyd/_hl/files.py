@@ -219,10 +219,11 @@ class File(Group):
     def _getStats(self):
         """ return info on storage usage """
         self._verifyOpen()
-        if self.id.db.writer:
-            stats = self.id.db.writer.getStats()
-        elif self.id.db.reader:
+
+        if self.id.db.reader:
             stats = self.id.db.reader.getStats()
+        elif self.id.db.writer:
+            stats = self.id.db.writer.getStats()
         else:
             stats = {"created": 0, "lastModified": 0, "owner": 0}
         return stats
@@ -272,13 +273,13 @@ class File(Group):
         """Creation time of the domain"""
         self._verifyOpen()
         stats = self._getStats()
-        return stats["created"]
+        return stats.get("created")
 
     @property
     def owner(self):
         """Username of the owner of the domain"""
         stats = self._getStats()
-        return stats["owner"]
+        return stats.get("owner")
 
     @property
     def limits(self):
@@ -315,14 +316,13 @@ class File(Group):
                  bucket=None,
                  api_key=None,
                  swmr=False,
+                 track_order=None,
                  getobjs=True,
                  retries=10,
                  timeout=180,
                  **kwds,
                  ):
         # initialize h5db using domain path
-
-        cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
 
         # accept domain values in the form:
         #   http://server:port/home/user/myfile.h5
@@ -359,30 +359,9 @@ class File(Group):
         if domain[0] != "/":
             raise IOError(400, "relative paths are not valid")
 
-        if endpoint is None:
-            if "hs_endpoint" in cfg:
-                endpoint = cfg["hs_endpoint"]
-
         # remove the trailing slash on endpoint if it exists
         if endpoint and endpoint.endswith('/'):
             endpoint = endpoint.strip('/')
-
-        if username is None:
-            if "hs_username" in cfg:
-                username = cfg["hs_username"]
-
-        if password is None:
-            if "hs_password" in cfg:
-                password = cfg["hs_password"]
-
-        if api_key is None and "hs_api_key" in cfg:
-            api_key = cfg["hs_api_key"]
-
-        if bucket is None:
-            if "HS_BUCKET" in os.environ:
-                bucket = os.environ["HS_BUCKET"]
-            elif "hs_bucket" in cfg:
-                bucket = cfg["hs_bucket"]
 
         db = Hdf5db(app_logger=self.log)  # initialize hdf5 db
 
@@ -403,6 +382,8 @@ class File(Group):
             kwargs["retries"] = retries
         if timeout:
             kwargs["timeout"] = timeout
+        if track_order:
+            kwargs["track_order"] = track_order
 
         root_id = None
 
@@ -503,8 +484,11 @@ class File(Group):
         """
 
         self.log = logging.getLogger()
+        cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
 
         self.log.setLevel(logging.ERROR)
+        if track_order is None:
+            track_order = cfg.track_order
 
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
@@ -538,12 +522,14 @@ class File(Group):
                 kwargs["swmr"] = swmr
             if bucket:
                 kwargs["bucket"] = bucket
+            if track_order is not None:
+                kwargs["track_order"] = track_order
             kwargs["getobjs"] = True  # TBD: disable this optionally?
 
             db = self._init_db(domain, **kwargs)
 
         root_id = db.root_id
-        root_json = db.getObjectById(root_id)
+        root_json = db.getObjectById(root_id, refresh=True)
 
         if "limits" in root_json:
             self._limits = root_json["limits"]
@@ -563,6 +549,9 @@ class File(Group):
         self._verboseUpdated = None  # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
         self._swmr_mode = swmr
+
+        if track_order is None:
+            track_order = cfg.track_order
 
         Group.__init__(self, self._id, track_order=track_order)
 
@@ -714,31 +703,6 @@ class File(Group):
         else:
             compressors = []
         return compressors
-
-    # override base implemention of ACL methods to use the domain rather than update root group
-    def getACL(self, username):
-        req = "/acls/" + username
-        rsp_json = self.GET(req)
-        acl_json = rsp_json["acl"]
-        return acl_json
-
-    def getACLs(self):
-        req = "/acls"
-        rsp_json = self.GET(req)
-        acls_json = rsp_json["acls"]
-        return acls_json
-
-    def putACL(self, acl):
-        if "userName" not in acl:
-            raise IOError(404, "ACL has no 'userName' key")
-        perm = {}
-        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
-            if k not in acl:
-                raise IOError(404, "Missing ACL field: {}".format(k))
-            perm[k] = acl[k]
-
-        req = "/acls/" + acl["userName"]
-        self.PUT(req, body=perm)
 
     def run_scan(self):
         MAX_WAIT = 10

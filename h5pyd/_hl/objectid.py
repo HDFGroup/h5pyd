@@ -64,6 +64,25 @@ class ObjectID:
         return self.db.getObjectById(self.uuid)
 
     @property
+    def cpl_json(self):
+        """ return creationProperties if found """
+        obj_json = self.obj_json
+        if "creationProperties" in obj_json:
+            cpl = obj_json["creationProperties"]
+        else:
+            cpl = {}
+        return cpl
+
+    @property
+    def create_order(self):
+        """ return create order from cpl or None if not set """
+        cpl = self.cpl_json
+        if "CreateOrder" in cpl:
+            return cpl["CreateOrder"]
+        else:
+            return None
+
+    @property
     def modified(self):
         """last modified timestamp"""
         obj_json = self.obj_json
@@ -171,15 +190,6 @@ class TypeID(ObjectID):
         dtype = createDataType(type_json)
         return dtype
 
-    @property
-    def tcpl_json(self):
-        obj_json = self.obj_json
-        if 'creationProperties' in obj_json:
-            tcpl = obj_json['creationProperties']
-        else:
-            tcpl = {}
-        return tcpl
-
     def __init__(self, parent, obj_id, **kwds):
         """Create a new TypeID.
         """
@@ -209,19 +219,10 @@ class DatasetID(ObjectID):
         return dtype
 
     @property
-    def dcpl_json(self):
-        obj_json = self.obj_json
-        if 'creationProperties' in obj_json:
-            dcpl = obj_json['creationProperties']
-        else:
-            dcpl = {}
-        return dcpl
-
-    @property
     def layout(self):
         layout = None
 
-        dcpl = self.dcpl_json
+        dcpl = self.cpl_json
         if dcpl and 'layout' in dcpl:
             layout = dcpl['layout']
 
@@ -230,7 +231,7 @@ class DatasetID(ObjectID):
     @property
     def filters(self):
         filters = []
-        dcpl = self.dcpl_json
+        dcpl = self.cpl_json
         if dcpl and 'filters' in dcpl:
             filters = dcpl['filters']
         return filters
@@ -271,12 +272,3 @@ class GroupID(ObjectID):
 
         if self.collection_type != "groups":
             raise IOError(f"Unexpected collection_type: {self._collection_type}")
-
-    @property
-    def gcpl_json(self):
-        obj_json = self.obj_json
-        if 'creationProperties' in obj_json:
-            gcpl = obj_json['creationProperties']
-        else:
-            gcpl = {}
-        return gcpl

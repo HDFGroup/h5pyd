@@ -422,8 +422,7 @@ class TestTrackOrder(TestCase):
 
     def test_get_group_track_order(self):
         # h5py does not support track_order on group.get()
-        if config.get("use_h5py"):
-            return
+
         filename = self.getFileName("test_get_group_track_order")
         print(f"filename: {filename}")
         with h5py.File(filename, 'w') as f:

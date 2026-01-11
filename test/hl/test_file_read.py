@@ -50,7 +50,7 @@ class TestFileRead(TestCase):
             """
             self.assertTrue(len(f.owner) > 0)
             version = f.serverver
-            server version should be of form "n.n.n"
+            # server version should be of form "n.n.n"
             n = version.find(".")
             self.assertTrue(n >= 1)
             limits = f.limits

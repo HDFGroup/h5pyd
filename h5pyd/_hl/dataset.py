@@ -662,7 +662,7 @@ class Dataset(HLObject):
     @property
     def fillvalue(self):
         """Fill value for this dataset (0 by default)"""
-        dcpl = self.id.dcpl_json
+        dcpl = self.id.cpl_json
         if "fillValue" in dcpl:
             fill_value = dcpl["fillValue"]
             if isinstance(fill_value, list):

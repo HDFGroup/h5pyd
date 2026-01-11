@@ -40,25 +40,9 @@ class Group(HLObject, MutableMappingHDF5):
 
         """ Create a new Group object by binding to a low-level GroupID.
         """
-
         if not isinstance(bind, GroupID):
             raise ValueError(f"{bind} is not a GroupID")
         HLObject.__init__(self, bind, track_order=track_order, **kwargs)
-        """
-        if track_order is None:
-            # set order based on group creation props
-            gcpl = self.id.gcpl_json
-            if "CreateOrder" in gcpl:
-                createOrder = gcpl["CreateOrder"]
-                if not createOrder or createOrder == "0":
-                    self._track_order = False
-                else:
-                    self._track_order = True
-            else:
-                self._track_order = False
-        else:
-            self._track_order = track_order
-        """
 
     def _get_link_json(self, h5path):
         """ Return parent_uuid and json description of link for given path """
@@ -326,7 +310,7 @@ class Group(HLObject, MutableMappingHDF5):
             kwupdate.setdefault(k, getattr(other, k))
         # TODO: more elegant way to pass these (dcpl to create_dataset?)
         """
-        dcpl_json = other.id.dcpl_json
+        dcpl_json = other.id.cpl_json
         track_order = None
         if "CreateOrder" in dcpl_json:
             createOrder = dcpl_json["CreateOrder"]
@@ -779,7 +763,16 @@ class Group(HLObject, MutableMappingHDF5):
         for title in titles:
             links[title] = self.id.db.getLink(self.id.uuid, title)
 
-        if self.track_order:
+        track_order = None
+        if self._track_order is not None:
+            print("self._track_order:", self._track_order)
+            # track_order = self._track_order
+        elif self.id.create_order is not None:
+            track_order = self.id.create_order
+        else:
+            track_order = False
+
+        if track_order:
             links = sorted(links.items(), key=lambda x: x[1]['created'])
         else:
             links = sorted(links.items())
@@ -1021,7 +1014,7 @@ class Group(HLObject, MutableMappingHDF5):
         for title in titles:
             links[title] = self.id.db.getLink(self.id.uuid, title)
 
-        if self.track_order:
+        if self.id.create_order:
             links = sorted(links.items(), key=lambda x: x[1]['created'])
         else:
             links = sorted(links.items())

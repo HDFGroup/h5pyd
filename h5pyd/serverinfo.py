@@ -19,24 +19,25 @@ from . import config
 
 def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **kwds):
 
+    print("GetServerInfo")
+
     cfg = config.get_config()  # get credentials from .hscfg file (if found)
 
+    kwargs = {}
     if endpoint is None and "hs_endpoint" in cfg:
-        endpoint = cfg["hs_endpoint"]
+        kwargs["endpoint"] = cfg["hs_endpoint"]
 
     if username is None and "hs_username" in cfg:
-        username = cfg["hs_username"]
+        kwargs["username"] = cfg["hs_username"]
 
     if password is None and "hs_password" in cfg:
-        password = cfg["hs_password"]
+        kwargs["password"] = cfg["hs_password"]
 
     if api_key is None and "hs_api_key" in cfg:
-        api_key = cfg["hs_api_key"]
+        kwargs["api_key"] = cfg["hs_api_key"]
 
     # http_conn without a domain
-    http_conn = HttpConn(
-        None, endpoint=endpoint, username=username, password=password, api_key=api_key
-    )
+    http_conn = HttpConn(None, **kwargs)
 
     # need some special logic for the first request in local mode
     # to give the sockets time to initialize
@@ -46,6 +47,7 @@ def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **k
         connect_backoff = []
 
     connect_try = 0
+    http_conn.open()
 
     while True:
         try:
@@ -57,6 +59,8 @@ def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **k
             else:
                 raise
             connect_try += 1
+
+    http_conn.close()
 
     if rsp.status_code == 400:
         # h5serv uses info for status
@@ -77,8 +81,5 @@ def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **k
         rspJson["password"] = ""
     else:
         rspJson["password"] = "*" * len(password)
-
-    http_conn.close()
-    http_conn = None
 
     return rspJson
