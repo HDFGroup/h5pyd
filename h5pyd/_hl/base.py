@@ -381,7 +381,8 @@ class HLObject(CommonStateObject):
             self.log.addHandler(fh)
         else:
             pass
-        self._track_order = None  # TBD: set by track_order?
+
+        self._track_order = track_order  # TBD: set by track_order?
 
     def __hash__(self):
         return hash(self.id.id)

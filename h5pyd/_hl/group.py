@@ -127,6 +127,13 @@ class Group(HLObject, MutableMappingHDF5):
         if self.read_only:
             raise ValueError("No write intent")
 
+        if track_order is None:
+            cfg = config.get_config()
+            if cfg.track_order:
+                track_order = True
+            else:
+                track_order = None
+
         if isinstance(h5path, bytes):
             h5path = h5path.decode('utf-8')
 
@@ -249,12 +256,14 @@ class Group(HLObject, MutableMappingHDF5):
         if "track_order" in kwds:
             track_order = kwds["track_order"]
         else:
-            track_order = None
-
-        cfg = config.get_config()
+            cfg = config.get_config()
+            if cfg.track_order:
+                track_order = True
+            else:
+                track_order = None
 
         datasetId = dataset.make_new_dset(self, shape=shape, dtype=dtype, data=data, **kwds)
-        dset = Dataset(datasetId, track_order=(track_order or cfg.track_order))
+        dset = Dataset(datasetId, track_order=track_order)
 
         if name is not None:
             items = name.split('/')
@@ -500,16 +509,15 @@ class Group(HLObject, MutableMappingHDF5):
 
         if tgt_id is not None:
             collection = getCollectionForId(tgt_id)
-
             if collection == 'groups':
-                tgt = Group(GroupID(self, tgt_id, obj_json=tgt_json), track_order=track_order)
+                tgt = Group(GroupID(self, tgt_id), track_order=track_order)
             elif collection == 'datatypes':
-                tgt = Datatype(TypeID(self, tgt_id, obj_json=tgt_json))
+                tgt = Datatype(TypeID(self, tgt_id), track_order=track_order)
             elif collection == 'datasets':
                 # create a Table if the dataset is one dimensional and compound
                 shape_json = tgt_json["shape"]
                 dtype_json = tgt_json["type"]
-                dset_id = DatasetID(self, tgt_id, obj_json=tgt_json, track_order=track_order)
+                dset_id = DatasetID(self, tgt_id)
                 if getRank(shape_json) == 1 and dtype_json["class"] == 'H5T_COMPOUND':
                     tgt = Table(dset_id, track_order=track_order)
                 else:
@@ -565,7 +573,7 @@ class Group(HLObject, MutableMappingHDF5):
             Return HardLink, SoftLink and ExternalLink classes.  Return
             "default" if nothing with that name exists.
 
-        "track_order" is (T/F):
+        "track_order" is (T/F/None):
             If a group is returned, it's items will be listed by creation order if track_order
             is True and lexicographically if False.  If track_order is not set, the track_order
             used at group creation time will be used.
@@ -708,7 +716,6 @@ class Group(HLObject, MutableMappingHDF5):
             db.createExternalLink(self.id.uuid, name, obj.path, obj.filename)
 
         elif isinstance(obj, numpy.dtype):
-            # print "create named type"
             ctype_id = db.createCommittedType(obj)
             db.createHardLink(self.id.uuid, name, ctype_id)
 
@@ -765,8 +772,7 @@ class Group(HLObject, MutableMappingHDF5):
 
         track_order = None
         if self._track_order is not None:
-            print("self._track_order:", self._track_order)
-            # track_order = self._track_order
+            track_order = self._track_order
         elif self.id.create_order is not None:
             track_order = self.id.create_order
         else:

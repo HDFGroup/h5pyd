@@ -413,8 +413,8 @@ class TestTrackOrder(TestCase):
         with h5py.File(filename) as f:
             g = f['order']
 
-            d = g.get('dset', track_order=True)
-            self.assertEqual(list(d.attrs), list(self.titles))
+            d1 = g.get('dset', track_order=True)
+            self.assertEqual(list(d1.attrs), list(self.titles))
 
             d2 = g.get('dset2', track_order=False)
             ref = sorted(self.titles)

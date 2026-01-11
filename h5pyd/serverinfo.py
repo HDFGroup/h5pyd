@@ -19,7 +19,7 @@ from . import config
 
 def getServerInfo(endpoint=None, username=None, password=None, api_key=None, **kwds):
 
-    print("GetServerInfo")
+    """ return server state info """
 
     cfg = config.get_config()  # get credentials from .hscfg file (if found)
 

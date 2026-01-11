@@ -365,6 +365,13 @@ class File(Group):
 
         db = Hdf5db(app_logger=self.log)  # initialize hdf5 db
 
+        if track_order is None:
+            cfg = config.get_config()
+            if cfg.track_order:
+                track_order = True
+            else:
+                track_order = None
+
         kwargs = {"app_logger": self.log}
         if swmr:
             kwargs["swmr"] = True  # disable metadata caching in swmr mode
@@ -484,11 +491,8 @@ class File(Group):
         """
 
         self.log = logging.getLogger()
-        cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
 
         self.log.setLevel(logging.ERROR)
-        if track_order is None:
-            track_order = cfg.track_order
 
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
@@ -549,9 +553,6 @@ class File(Group):
         self._verboseUpdated = None  # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
         self._swmr_mode = swmr
-
-        if track_order is None:
-            track_order = cfg.track_order
 
         Group.__init__(self, self._id, track_order=track_order)
 
