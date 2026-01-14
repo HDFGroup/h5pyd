@@ -979,11 +979,11 @@ class Group(HLObject, MutableMappingHDF5):
                         # obj = ExternalLink(link['file'], link['h5path'])
                         pass  # don't visit external links'
                     elif link['class'] == 'H5L_TYPE_UDLINK':
-                        obj = UserDefinedLink()
+                        pass  # don't visit user defined links
                     elif link['class'] == 'H5L_TYPE_HARD':
                         if link['id'] in visited:
                             continue  # already been there
-                        obj = parent.__getitem__(link['title'])
+                        obj = parent.__getitem__(title)
                         tovisit[obj.id.uuid] = obj
                         obj = None
                     if obj is not None:
