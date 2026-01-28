@@ -318,7 +318,7 @@ class Group(HLObject, MutableMappingHDF5):
                   'fillvalue'):
             kwupdate.setdefault(k, getattr(other, k))
         # TODO: more elegant way to pass these (dcpl to create_dataset?)
-        """
+
         dcpl_json = other.id.cpl_json
         track_order = None
         if "CreateOrder" in dcpl_json:
@@ -327,8 +327,6 @@ class Group(HLObject, MutableMappingHDF5):
                 track_order = False
             else:
                 track_order = True
-        """
-        track_order = other.track_order
 
         kwupdate.setdefault('track_order', track_order)
 

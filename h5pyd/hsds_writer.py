@@ -482,7 +482,7 @@ class HSDSWriter(H5Writer):
             raise IOError("hsds_writer failed to delete attribute")
 
     def updateAttributes(self, obj_ids):
-        """ update any modified links of the given objects """
+        """ update any modified attributes of the given objects """
 
         self.log.debug("hsds_writer> updateAttributes")
         items = {}  # dict which will hold a map of objects ids to attributes to create
