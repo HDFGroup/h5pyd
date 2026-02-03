@@ -726,7 +726,7 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 dt = guess_dtype(obj)
                 arr = numpy.array(obj, dtype=dt)
-                self.create_dataset(name, shape=arr.shape, dtype=arr.dtype, data=arr[...])
+            self.create_dataset(name, shape=arr.shape, dtype=arr.dtype, data=arr[...])
 
     def __delitem__(self, name):
         """ Delete (unlink) an item from this group. """

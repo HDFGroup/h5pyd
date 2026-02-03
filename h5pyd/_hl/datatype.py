@@ -37,13 +37,13 @@ class Datatype(HLObject):
         """Numpy dtype equivalent for this datatype"""
         return self._dtype
 
-    def __init__(self, bind):
+    def __init__(self, bind, track_order=None):
         """ Create a new Datatype object by binding to a low-level TypeID.
         """
         if not isinstance(bind, TypeID):
             # todo: distinguish type from other hl objects
             raise ValueError(f"{bind} is not a TypeID")
-        HLObject.__init__(self, bind)
+        HLObject.__init__(self, bind, track_order=track_order)
 
         self._dtype = createDataType(self.id.type_json)
 

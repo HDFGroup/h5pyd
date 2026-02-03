@@ -910,14 +910,15 @@ class Dataset(HLObject):
             sel_all = sel.select((), ...)
             arr = db.getDatasetValues(self.id.uuid, sel_all)
 
+            # h5py always returns bytes for string data, so encode any str values
+            val = arr[()]
+            if isinstance(val, str):
+                val = val.encode("utf-8")
+                arr = numpy.array(val, dtype=arr.dtype)
+
             if selection.mshape is None:
                 msg = f"return scalar selection of: {arr}, dtype: {arr.dtype}, shape: {arr.shape}"
                 self.log.info(msg)
-                val = arr[()]
-                if isinstance(val, str):
-                    # h5py always returns bytes, so encode the str
-                    # TBD: what about compound types containing strings?
-                    val = val.encode("utf-8")
                 return val
 
             return arr

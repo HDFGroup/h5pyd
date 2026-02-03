@@ -148,6 +148,17 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                     self._parent.log.debug("converting utf8 un-encodable string as bytes")
                     v = v.encode("utf-8", errors="surrogateescape")
             return v
+
+        # For vlen string/bytes types, convert 0-d array elements to Python strings
+        vlen_base_class = check_dtype(vlen=dtype)
+        if vlen_base_class in (str, bytes):
+            for i in range(arr.size):
+                if isinstance(arr.flat[i], numpy.ndarray) and arr.flat[i].shape == ():
+                    val = arr.flat[i][()]
+                    if isinstance(val, bytes):
+                        val = val.decode("utf-8")
+                    arr.flat[i] = str(val)
+
         return arr
 
     def __setitem__(self, name, value):

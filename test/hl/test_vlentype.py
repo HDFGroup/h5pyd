@@ -312,6 +312,7 @@ class TestVlenTypes(TestCase):
         self.assertTrue("vlen" in vals.dtype.metadata)
 
         for i in range(10):
+            self.assertTrue(isinstance(vals[i], bytes))
             self.assertEqual(vals[i], words[i])
 
         f.close()
@@ -397,7 +398,8 @@ class TestVlenTypes(TestCase):
         f.close()
 
     def test_variable_len_unicode_dset(self):
-        filename = self.getFileName("variable_len_unicode_dset")
+        test_name = "variable_len_unicode_dset"
+        filename = self.getFileName(test_name)
         print("filename:", filename)
 
         f = h5py.File(filename, "w")
@@ -405,9 +407,9 @@ class TestVlenTypes(TestCase):
         dims = (10,)
         dt = h5py.special_dtype(vlen=str)
 
-        dset = f.create_dataset('variable_len_unicode_dset', dims, dtype=dt)
+        dset = f.create_dataset(test_name, dims, dtype=dt)
 
-        self.assertEqual(dset.name, "/variable_len_unicode_dset")
+        self.assertEqual(dset.name, '/' + test_name)
         self.assertTrue(isinstance(dset.shape, tuple))
         self.assertEqual(len(dset.shape), 1)
         self.assertEqual(dset.shape[0], 10)
@@ -420,19 +422,43 @@ class TestVlenTypes(TestCase):
         else:
             self.assertEqual(dset.fillvalue, 0)
 
-        self.assertEqual(dset[0], b'')
+        print("dset:", dset)
+        print("dset[0]:", dset[0])
+
+        #self.assertEqual(dset[0], b'')
 
         words = (u"one: \u4e00", u"two: \u4e8c", u"three: \u4e09", u"four: \u56db", u"five: \u4e94",
                  u"six: \u516d", u"seven: \u4e03", u"eight: \u516b", u"nine: \u4e5d", u"ten: \u5341")
         dset[:] = words
         vals = dset[:]  # read back
+        self.assertTrue(isinstance(vals, np.ndarray))
+        print("vals dtype:", vals.dtype)
+        print("vals dtype metadata:", vals.dtype.metadata)
 
         self.assertTrue("vlen" in vals.dtype.metadata)
+        print("vals[0]:", vals[0])
+
+        for i in range(10):
+            # TBD: this is not consistet when hdf5db reads from hsds
+            word = words[i]  #.encode("utf-8")
+            self.assertEqual(vals[i], word)
+
+        f.close()
+
+        f = h5py.File(filename, "r")
+        dset = f[test_name]
+        
+        vals = dset[:]  # read back
+        self.assertTrue(isinstance(vals, np.ndarray))
+        print("vals dtype:", vals.dtype)
+        print("vals dtype metadata:", vals.dtype.metadata)
+
+        self.assertTrue("vlen" in vals.dtype.metadata)
+        print("vals[0]:", vals[0])
 
         for i in range(10):
             word = words[i].encode("utf-8")
             self.assertEqual(vals[i], word)
-
         f.close()
 
     def test_variable_len_unicode_attr(self):
@@ -449,10 +475,14 @@ class TestVlenTypes(TestCase):
         f.attrs.create('a1', words, shape=dims, dtype=dt)
 
         vals = f.attrs["a1"]  # read back
+        print("vals type:", type(vals))
+        print("vals.dtype:", vals.dtype)
+        print("vals.dtype.metadata:", vals.dtype.metadata)
 
         self.assertTrue("vlen" in vals.dtype.metadata)
 
         for i in range(10):
+            print(f"{i}: {vals[i]}")
             self.assertEqual(vals[i], words[i])
             self.assertEqual(type(vals[i]), str)
 

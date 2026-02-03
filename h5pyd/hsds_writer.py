@@ -498,7 +498,9 @@ class HSDSWriter(H5Writer):
                 attr_json = obj_attrs[attr_name]
 
                 if "created" not in attr_json:
-                    self.log.error(f"hsds_writer> expected created timestamp in attr: {attr_json}")
+                    msg = f"expected created timestamp in attr: {attr_json}"
+                    self.log.error(f"hsds_writer> {msg}")
+                    raise IOError(msg)
                 created = attr_json["created"]
                 if "DELETED" in attr_json:
                     if created > self._last_flush_time:
@@ -547,7 +549,9 @@ class HSDSWriter(H5Writer):
             req = f"/groups/{self._root_id}/attributes"
             put_rsp = self.http_conn.PUT(req, body=body)
             if put_rsp.status_code not in (200, 201):
-                self.log.error(f"hsds_writer> put {req} failed, status: {put_rsp.status_code}")
+                msg = f"put {req} failed, status: {put_rsp.status_code}"
+                self.log.error(f"hsds_writer> {msg}")
+                raise IOError(msg)
             else:
                 self.log.debug(f"hsds_writer> {count} attributes updated")
                 self._lastModified = time.time()
