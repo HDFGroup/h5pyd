@@ -162,7 +162,7 @@ def get_chunk_layout(dset):
         msg = "get_chunk_layout called on hdf5 dataset"
         logging.error(msg)
         raise IOError(msg)
-    dset_json = dset.id.dcpl_json
+    dset_json = dset.id.cpl_json
     if "layout" not in dset_json:
         msg = f"expect to find layout key in dset_json: {dset_json}"
         logging.error(msg)
@@ -1711,7 +1711,8 @@ def create_group(gobj, ctx):
         if ctx["verbose"]:
             print(f"{gobj.name} not found")
 
-        grp = fout.create_group(gobj.name)
+        grp = fout.create_group(gobj.name) 
+
         srcid_desobj_map = ctx["srcid_desobj_map"]
         msg = f"adding group id {gobj.id.id} to {grp} in srcid_desobj_map"
         logging.debug(msg)
@@ -1837,7 +1838,10 @@ def load_file(
 
     def copy_attribute_helper(name, obj):
         logging.info(f"copy attribute - name: {name}  obj: {obj.name}")
-        tgt = fout[name]
+        fout = ctx["fout"]
+
+        tgt = fout[name] 
+
         for a in obj.attrs:
             copy_attribute(tgt, a, obj, ctx)
 
@@ -1859,6 +1863,7 @@ def load_file(
             fout = ctx["fout"]
             grp = fout[name]
             create_links(obj, grp, ctx)
+
 
     def object_copy_helper(name, obj):
         class_name = obj.__class__.__name__
@@ -1883,10 +1888,12 @@ def load_file(
     # build a rough map of the file using the internal function above
     logging.info("creating target objects")
     fin.visititems(object_create_helper)
+    fout.flush()
 
     # copy over any attributes
     logging.info("creating target attributes")
     fin.visititems(copy_attribute_helper)
+    fout.flush()
 
     # create soft/external links (and hardlinks not already created)
     create_links(fin, fout, ctx)  # create root soft/external links

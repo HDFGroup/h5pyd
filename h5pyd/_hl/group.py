@@ -52,17 +52,18 @@ class Group(HLObject, MutableMappingHDF5):
         if isinstance(h5path, bytes):
             h5path = h5path.decode('utf-8')
 
-        if h5path[0] == '/':
-            parent_uuid = self.id.db.root_id
-        else:
-            parent_uuid = self.id.uuid
-
         if h5path.find('/') == -1:
             # no path to traverse, just return the link for this group (if it exists)
+
             tgt_json = self.id.db.getLink(self.id.uuid, h5path)
             if not tgt_json:
                 raise KeyError("Unable to open object (Component not found)")
             return self.id.uuid, tgt_json
+
+        if h5path[0] == '/':
+            parent_uuid = self.id.db.root_id
+        else:
+            parent_uuid = self.id.uuid
 
         if h5path == '/':
             # make a fake tgt_json to represent 'link' to root group

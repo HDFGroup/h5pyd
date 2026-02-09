@@ -642,7 +642,7 @@ class HttpConn:
             raise IOError(str(ce))
 
         if rsp.status_code not in (200, 201):
-            self.log.error(f"got status_code: {rsp.status_code} for DELETE: {req}")
+            self.log.error(f"got status_code: {rsp.status_code} for POST: {req}")
 
         return HttpResponse(rsp)
 
