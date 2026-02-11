@@ -1244,8 +1244,12 @@ def create_dataset(dobj, ctx):
             rank = 0
         else:
             tgt_shape.extend(dobj.shape)
-            tgt_maxshape.extend(dobj.maxshape)
             rank = len(tgt_shape)
+            if rank > 0:
+                tgt_maxshape.extend(dobj.maxshape)
+            else:
+                tgt_maxshape = None
+
         if rank > 0 and ctx["extend_dim"]:
             # set maxshape to unlimited for any dimension that is the extend_dim
             if dobj.name.split("/")[-1] == ctx["extend_dim"]:
@@ -1711,7 +1715,7 @@ def create_group(gobj, ctx):
         if ctx["verbose"]:
             print(f"{gobj.name} not found")
 
-        grp = fout.create_group(gobj.name) 
+        grp = fout.create_group(gobj.name)
 
         srcid_desobj_map = ctx["srcid_desobj_map"]
         msg = f"adding group id {gobj.id.id} to {grp} in srcid_desobj_map"
@@ -1840,7 +1844,7 @@ def load_file(
         logging.info(f"copy attribute - name: {name}  obj: {obj.name}")
         fout = ctx["fout"]
 
-        tgt = fout[name] 
+        tgt = fout[name]
 
         for a in obj.attrs:
             copy_attribute(tgt, a, obj, ctx)
@@ -1863,7 +1867,6 @@ def load_file(
             fout = ctx["fout"]
             grp = fout[name]
             create_links(obj, grp, ctx)
-
 
     def object_copy_helper(name, obj):
         class_name = obj.__class__.__name__
