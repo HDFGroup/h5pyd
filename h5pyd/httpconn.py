@@ -258,9 +258,6 @@ class HttpConn:
         bucket=None,
         api_key=None,
         mode="a",
-        expire_time=1.0,
-        max_objects=None,
-        max_age=1.0,
         logger=None,
         retries=3,
         timeout=DEFAULT_TIMEOUT,
@@ -308,7 +305,7 @@ class HttpConn:
         self._external_refs = []
 
         msg = f"HttpConn.init(domain: {domain_name}"
-        msg += f"expire_time: {expire_time:6.2f} sec retries: {retries}"
+        msg += f" retries: {retries}"
         self.log.debug(msg)
 
         if self._timeout != DEFAULT_TIMEOUT:

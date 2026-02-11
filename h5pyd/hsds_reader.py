@@ -12,6 +12,7 @@
 import logging
 
 from h5json.objid import getCollectionForId, getUuidFromId, isValidUuid
+from h5json.shape_util import getShapeDims
 
 from h5json.hdf5dtype import createDataType
 from h5json.array_util import jsonToArray, bytesToArray
@@ -37,9 +38,6 @@ class HSDSReader(H5Reader):
         use_session=True,
         swmr=False,
         getobjs=False,
-        expire_time=0,
-        max_objects=0,
-        max_age=0,
         retries=3,
         timeout=30.0,
         **kwargs
@@ -49,7 +47,7 @@ class HSDSReader(H5Reader):
         else:
             self.log = logging.getLogger()
 
-        self.log.debug("HSDSReader init(")
+        self.log.debug("HSDSReader init()")
 
         kwargs = {}
         self.log.debug(f"    domain_path: {domain_path}")
@@ -71,16 +69,6 @@ class HSDSReader(H5Reader):
         if use_session:
             self.log.debug(f"    use_session: {use_session}")
             kwargs["user_session"] = use_session
-
-        if expire_time:
-            self.log.debug(f"    expire_time: {expire_time}")
-            kwargs["expire_time"] = expire_time
-        if max_objects:
-            self.log.debug(f"    max_objects: {max_objects}")
-            kwargs["max_objects"] = max_objects
-        if max_age:
-            self.log.debug(f"    max_age: {max_age}")
-            kwargs["max_age"] = max_age
         if retries:
             self.log.debug(f"    retries: {retries}")
             kwargs["retries"] = retries
@@ -108,9 +96,7 @@ class HSDSReader(H5Reader):
         else:
             kwargs = self._http_kwargs
             http_conn = HttpConn(self.filepath, **kwargs)
-
         http_conn.open()
-
         hsds_info = http_conn.serverInfo()
         for k in hsds_info:
             self._stats[k] = hsds_info[k]
@@ -120,15 +106,6 @@ class HSDSReader(H5Reader):
         params = {}
         if self._getobjs:
             params["getobjs"] = 1
-        """
-        if max_objects is None or max_objects > 0:
-            # get object meta objects
-            # TBD: have hsds support a max limit of objects to return
-            params["getobjs"] = 1
-        params["include_attrs"] = 1
-        params["include_links"] = 1
-        """
-
         rsp = http_conn.GET(req, params=params)
 
         if rsp.status_code != 200:
@@ -150,7 +127,6 @@ class HSDSReader(H5Reader):
 
         root_id = domain_json["root"]
         self._root_id = root_id
-
         if "domain_objs" in domain_json:
             domain_objs = domain_json["domain_objs"]
 
@@ -192,13 +168,13 @@ class HSDSReader(H5Reader):
         """ return object with given id """
 
         collection = getCollectionForId(obj_id)
-
         if obj_id in self._domain_objs:
             # this was included in the consolidated metadata returned
             # with the domain request
+
             obj_json = self._domain_objs[obj_id]
-            # delete so we don't accidently return stale object if requested again
-            del self._domain_objs[obj_id]
+            # TBD - need to add a invalidate cache method to remove this from the cache
+            #  when the object is modified
         else:
             # fetch from the server
             req = f"/{collection}/{obj_id}"
@@ -296,6 +272,22 @@ class HSDSReader(H5Reader):
 
         mtype = dtype  # TBD - support read time dtype
         mshape = sel.mshape
+        arr = None
+
+        # check to see if we have the dataset value cached in the domain_objs
+        if dset_id in self._domain_objs:
+            # this was included in the consolidated metadata returned
+            # with the domain request
+            self.log.debug(f"dataset {dset_id} value found in domain_objs cache")
+            dset_json = self._domain_objs[dset_id]
+            if "value" in dset_json:
+                self.log.debug("dataset value found in domain_objs cache")
+                dims = getShapeDims(dset_json)
+                dset_arr = jsonToArray(dims, mtype, dset_json["value"])
+                arr = dset_arr[sel.slices]
+                # TBD: need to add a invalidate cache method to remove this from the cache
+                #  when the dataset is modified
+                return arr
 
         req = f"/{collection}/{dset_id}/value"
         params = {}

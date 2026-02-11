@@ -394,18 +394,18 @@ class File(Group):
 
         root_id = None
 
-        if mode != 'w':
+        if mode in ('w-', 'x'):
             file_exists = is_hdf5(domain, **kwargs)
             if file_exists:
-                if mode in ('w-', 'x'):
-                    self.log.warning(f"Domain: {domain} already exists")
-                    raise FileExistsError()
-                db.reader = HSDSReader(domain, **kwargs)
-                root_id = db.open()
-            else:
+                raise FileExistsError()
+        elif mode in ('r', 'r+', 'a'):
+            db.reader = HSDSReader(domain, getobjs=getobjs, **kwargs)
+            root_id = db.open()
+            """
                 if mode in ('r', 'r+'):
                     self.log.warning(f"domain: {domain} not found")
                     raise FileNotFoundError()
+            """
         else:
             file_exists = False  # will overwrite in either case
 
