@@ -975,10 +975,13 @@ class Group(HLObject, MutableMappingHDF5):
 
         self.DELETE(req)
 
+        if not isinstance(name, list):
+            # convert to a list to avoid code duplication in link cache cleanup
+            name = [name,]
         for n in name:
             if n.find('/') == -1 and n in self._link_db:
                 # remove from link cache
-                del self._link_db[name]
+                del self._link_db[n]
 
     def __len__(self):
         """ Number of members attached to this group """
