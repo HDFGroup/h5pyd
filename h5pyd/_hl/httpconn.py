@@ -187,9 +187,10 @@ class HttpConn:
             self._objdb = None
         self._logger = logger
         if logger is None:
-            self.log = logging
+            self.log = logging.getLogger("h5pyd")
         else:
-            self.log = logging.getLogger(logger)
+            self.log = logger
+
         msg = f"HttpConn.init(domain: {domain_name} use_session: {use_session} "
         msg += f"use_cache: {use_cache} retries: {retries}"
         self.log.debug(msg)
