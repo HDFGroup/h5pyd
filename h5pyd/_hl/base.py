@@ -1082,19 +1082,6 @@ class HLObject(CommonStateObject):
         self.log = self._id.http_conn.logging
         self.req_prefix = None  # derived class should set this to the URI of the object
         self._file = file
-        # self._name = None
-
-        if not self.log.handlers:
-            # setup logging
-            log_path = os.getcwd()
-            if not os.access(log_path, os.W_OK):
-                log_path = "/tmp"
-            log_file = os.path.join(log_path, "h5pyd.log")
-            self.log.setLevel(logging.INFO)
-            fh = logging.FileHandler(log_file)
-            self.log.addHandler(fh)
-        else:
-            pass
 
         if track_order is None:
             # set order based on group creation props
