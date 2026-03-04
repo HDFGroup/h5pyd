@@ -35,10 +35,7 @@ def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
 
-DEFAULT_TIMEOUT = (
-    10,
-    1000,
-)  # #20  # 180  # seconds - allow time for hsds service to bounce
+DEFAULT_TIMEOUT = 180  # seconds - allow time for hsds service to bounce
 
 
 class CacheResponse(object):
@@ -583,6 +580,7 @@ class HttpConn:
                 data=data,
                 headers=headers,
                 params=params,
+                timeout=self._timeout,
                 verify=self.verifyCert(),
             )
             self.log.info(f"status: {rsp.status_code}")
@@ -653,6 +651,7 @@ class HttpConn:
                 data=data,
                 headers=headers,
                 params=params,
+                timeout=self._timeout,
                 verify=self.verifyCert(),
             )
         except ConnectionError as ce:
@@ -695,6 +694,7 @@ class HttpConn:
                 self._endpoint + req,
                 headers=headers,
                 params=params,
+                timeout=self._timeout,
                 verify=self.verifyCert(),
             )
             self.log.info(f"status: {rsp.status_code}")
