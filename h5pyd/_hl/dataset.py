@@ -952,6 +952,17 @@ class Dataset(HLObject):
 
         arr = db.getDatasetValues(self.id.uuid, selection)
 
+        self.log.info(f"got arr: {arr.shape}, cleaning up shape!")
+        # Patch up the output for NumPy
+        if len(names) == 1:
+            arr = arr[names[0]]  # Single-field recarray convention
+        if arr.shape == ():
+            arr = numpy.asscalar(arr)
+        elif single_element:
+            arr = arr[0]
+        elif len(arr.shape) > 1:
+            arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
+
         return arr
 
     def __setitem__(self, args, val):
