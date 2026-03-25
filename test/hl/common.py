@@ -273,6 +273,23 @@ class TestCase(ut.TestCase):
 
         return path
 
+    def compare_unicodestr(self, val, expected):
+        if expected == 0:
+            if config.get("use_h5py"):
+                self.assertTrue(isinstance(val, bytes))
+                self.assertEqual(val, b'')
+            else:
+                self.assertTrue(isinstance(val, int))
+                self.assertEqual(val, 0)
+        else:
+            if config.get("use_h5py"):
+                self.assertTrue(isinstance(val, bytes))
+                self.assertEqual(val, expected.encode("utf-8"))
+            else:
+                # unicode strings returned as is in h5pyd
+                self.assertTrue(isinstance(val, str))
+                self.assertEqual(val, expected)
+
     def is_hsds(self, id=None):
         """ Return True if the given identifier is HSDS (i.e. a string),
             of False if not. (HDF5Lib uses integer identifiers).

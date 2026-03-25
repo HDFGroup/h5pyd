@@ -99,8 +99,6 @@ def make_new_dset(
 
     # Convert data to a C-contiguous ndarray
     if data is not None and not isinstance(data, Empty):
-        from . import base
-
         data = array_for_new_object(data, specified_dtype=dtype)
 
     # Validate shape
@@ -700,17 +698,12 @@ class Dataset(HLObject):
             raise ValueError(f"{bind} is not a DatasetID")
         HLObject.__init__(self, bind, track_order=track_order)
 
-        self._local = None  # local()
-
         # make a numpy dtype out of the type json
         self._dtype = createDataType(self.id.type_json)
-        # self._item_size = getItemSize(self.id.type_json)
 
         self._num_chunks = None      # additional state we'll get when requested
         self._allocated_size = None  # as above
         self._verboseUpdated = None  # when the verbose data was fetched
-
-        # self._local.astype = None #todo
 
     def _getVerboseInfo(self):
         now = time.time()
@@ -855,16 +848,6 @@ class Dataset(HLObject):
         else:
             self.log.debug(f"new_dtype: {new_dtype}")
 
-        """
-        new_dtype = getattr(self._local, "astype", None)
-        if new_dtype is not None:
-            new_dtype = readtime_dtype(new_dtype, names)
-        else:
-            # This is necessary because in the case of array types, NumPy
-            # discards the array information at the top level.
-            new_dtype = readtime_dtype(self.dtype, names)
-            self.log.debug(f"new_dtype: {new_dtype}")
-        """
         if new_dtype.kind == "S" and check_dtype(ref=self.dtype):
             new_dtype = special_dtype(ref=Reference)
 
@@ -910,15 +893,10 @@ class Dataset(HLObject):
             sel_all = sel.select((), ...)
             arr = db.getDatasetValues(self.id.uuid, sel_all)
 
-            # h5py always returns bytes for string data, so encode any str values
-            val = arr[()]
-            if isinstance(val, str):
-                val = val.encode("utf-8")
-                arr = numpy.array(val, dtype=arr.dtype)
-
             if selection.mshape is None:
                 msg = f"return scalar selection of: {arr}, dtype: {arr.dtype}, shape: {arr.shape}"
                 self.log.info(msg)
+                val = arr[()]
                 return val
 
             return arr
@@ -935,7 +913,7 @@ class Dataset(HLObject):
             return numpy.ndarray(shape, dtype=new_dtype)
         # Up-converting to (1,) so that numpy.ndarray correctly creates
         # np.void rows in case of multi-field dtype. (issue 135)
-        single_element = selection.mshape == ()
+        single_element = selection.mshape == () or numpy.prod(selection.mshape) == 1
         mshape = (1,) if single_element else selection.mshape
 
         self.log.debug(f"dataset shape: {self.shape}")
@@ -949,7 +927,6 @@ class Dataset(HLObject):
 
         if fields:
             raise IOError("field selection not supported yet")  # TBD
-
         arr = db.getDatasetValues(self.id.uuid, selection)
 
         self.log.info(f"got arr: {arr.shape}, cleaning up shape!")
@@ -957,9 +934,10 @@ class Dataset(HLObject):
         if len(names) == 1:
             arr = arr[names[0]]  # Single-field recarray convention
         if arr.shape == ():
-            arr = numpy.asscalar(arr)
+            return arr[()]   # 0 dim array -> numpy scalar
         elif single_element:
-            arr = arr[0]
+            arr = arr.reshape(())
+            arr = arr[()]  # 1 element array -> numpy scalar
         elif len(arr.shape) > 1:
             arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
 
@@ -1011,6 +989,7 @@ class Dataset(HLObject):
         vlen_base_class = check_dtype(vlen=self.dtype)
         if vlen_base_class is not None and vlen_base_class not in (bytes, str):
             self.log.debug(f"asarray to base_class: {vlen_base_class}")
+
             try:
                 # Attempt to directly convert the input array of vlen data to its base class
                 val = numpy.asarray(val, dtype=vlen_base_class)
@@ -1019,13 +998,21 @@ class Dataset(HLObject):
                 # Failed to convert input array to vlen base class directly, instead create a new array where
                 # each element is an array of the Dataset's dtype
                 try:
-                    # Force output shape
-                    tmp = numpy.empty(shape=val.shape, dtype=self.dtype)
-                    tmp[:] = [numpy.array(x, dtype=self.dtype) for x in val]
-                    val = tmp
+                    val = numpy.array([numpy.array(x, dtype=vlen_base_class)
+                                       for x in val], dtype=self.dtype)
                 except (ValueError, TypeError):
-                    msg = "ValueError converting value element by element"
-                    self.log.debug(msg)
+                    pass
+
+            if vlen_base_class == val.dtype:
+                if val.ndim > 1:
+                    tmp = numpy.empty(shape=val.shape[:-1], dtype=self.dtype)
+                    tmp.ravel()[:] = [i for i in val.reshape(
+                        (numpy.prod(val.shape[:-1]), val.shape[-1])
+                    )]
+                else:
+                    tmp = numpy.array([None], dtype=self.dtype)
+                    tmp[0] = val
+                val = tmp
 
             if vlen_base_class == val.dtype:
                 if val.ndim > 1:
@@ -1068,7 +1055,6 @@ class Dataset(HLObject):
             # TBD: Do we need something like the following in the above if condition:
             # (self.dtype.str != val.dtype.str)
             # for cases where the val is a numpy array but different type than self?
-
             if len(names) == 1 and self.dtype.fields is not None:
                 # Single field selected for write, from a non-array source
                 if not names[0] in self.dtype.fields:
@@ -1089,9 +1075,9 @@ class Dataset(HLObject):
         elif isinstance(val, numpy.ndarray):
             # convert array if needed
             # TBD - need to handle cases where the type shape is different
-            self.log.debug("got numpy array")
             if val.dtype != self.dtype and val.dtype.shape == self.dtype.shape:
                 self.log.info(f"converting {val.dtype} to {self.dtype}")
+
                 # convert array
                 tmp = numpy.empty(val.shape, dtype=self.dtype)
                 tmp[...] = val[...]
@@ -1123,7 +1109,7 @@ class Dataset(HLObject):
                 mismatch = ", ".join(f"{x}" for x in mismatch)
                 raise ValueError(f"Illegal slicing argument (fields {mismatch} not in dataset type)")
 
-        # Use mtype derived from array (let DatasetID.write figure it out)
+        # Use mtype derived from array
 
         mshape = val.shape
         self.log.debug(f"mshape: {mshape}")
@@ -1136,23 +1122,20 @@ class Dataset(HLObject):
             return
 
         # Broadcast scalars if necessary.
-
         if mshape == () and selection.mshape is not None and selection.mshape != ():
 
             if self.dtype.subdtype is not None:
                 raise TypeError("Scalar broadcasting is not supported for array dtypes")
 
-            if False:
-                # Perform the write, with broadcasting
-                pass  # TBD
-            else:
-                self.log.debug("broadcast scalar on client")
-                val2 = numpy.empty(selection.mshape, dtype=val.dtype)
-                val2[...] = val
-                val = val2
-                mshape = val.shape
+            self.log.debug("broadcast scalar on client")
+            val2 = numpy.empty(selection.mshape, dtype=val.dtype)
+            val2[...] = val
+            val = val2
+            mshape = val.shape
 
+        val = val.reshape(selection.tgtshape)  # reshape to same rank as dataset
         db = self.id.db
+
         db.setDatasetValues(self.id.uuid, selection, val)
 
     def read_direct(self, dest, source_sel=None, dest_sel=None):

@@ -138,7 +138,10 @@ class TestCreateDataset(TestCase):
         self.assertEqual(len(dset.maxshape), 1)
         self.assertEqual(dset.maxshape[0], 10)
         self.assertEqual(dset.fillvalue, 0xdeadbeef)
+
+        dset[5] = 42
         self.assertEqual(dset[0], 0xdeadbeef)
+        self.assertEqual(dset[5], 42)
 
         f.close()
 
@@ -316,7 +319,7 @@ class TestCreateDataset(TestCase):
             return  # lz4 not supported with h5py
 
         if "lz4" not in f.compressors:
-            print("lz4 not supproted")
+            print("lz4 not supported")
             return
 
         dims = (40, 80)

@@ -15,7 +15,7 @@ from __future__ import absolute_import
 import os.path as op
 import numpy
 import collections
-from h5json.objid import isValidUuid, getCollectionForId
+from h5json.objid import isValidUuid, getCollectionForId, getHashTagForId
 from h5json.hdf5dtype import special_dtype, Reference, guess_dtype
 from h5json.link_util import getLinkClass
 from h5json.shape_util import getRank
@@ -453,13 +453,9 @@ class Group(HLObject, MutableMappingHDF5):
                 raise IOError("reference not found")
             is_anon = True
         elif isValidUuid(name):
-            # name should be a uuid in the format <collection>/<uuid>
-            # just use the later part as the tgt_id
+            # if name is a obj uuid, get the object using the reference
             collection = getCollectionForId(name)
-            if not name.startswith(f"{collection}/"):
-                raise IOError(f"Invalid object id for reference: {name}")
-            parts = name.split("/")
-            tgt_id = parts[1]
+            tgt_id = getHashTagForId(name)
             tgt_json = self.id.db.getObjectById(tgt_id)
             if not tgt_json:
                 raise IOError("object id not found")

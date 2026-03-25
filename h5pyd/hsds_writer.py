@@ -572,6 +572,7 @@ class HSDSWriter(H5Writer):
         rsp = self.http_conn.PUT(req, body=data, params=params, format="binary")
         if rsp.status_code != 200:
             self.log.error(f"PUT {req} returned error: {rsp.status_code}")
+            raise IOError(f"PUT {req} failed with status code: {rsp.status_code}")
         else:
             self.log.debug(f"PUT {len(data)} bytes successful")
             self._lastModified = time.time()

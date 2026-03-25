@@ -84,7 +84,6 @@ class TestDatasetSwmrWrite(TestCase):
         # write, but libver='latest' is required.
         self.f = h5py.File(filename, 'w', libver='latest')
 
-        #self.data = np.range(4).astype(np.int32)
         kwargs = {"dtype": np.int32, "shape": (0,), "maxshape": (None,), "chunks": (2,)}
         self.dset = self.f.create_dataset('data', **kwargs)
         self.f.flush()  # this is needed for h5pyd but apparently not with h5py
@@ -127,7 +126,6 @@ class TestDatasetSwmrWrite(TestCase):
             dset_read.refresh()
             self.assertEqual(dset_read.shape, data.shape)
             self.assertArrayEqual(dset_read[:], data)
-
 
     def test_extend_dset_multiple(self):
 
