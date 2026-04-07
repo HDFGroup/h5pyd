@@ -249,19 +249,18 @@ class HLObject(CommonStateObject):
     @property
     def name(self):
         """ Return the full name of this object.  None if anonymous. """
-
         obj_name = None
         try:
             obj_name = self._name
         except AttributeError:
             # name hasn't been assigned yet
-            obj_json = self.id.obj_json
-            if "alias" in obj_json:
-                alias = obj_json["alias"]
+            paths = self._id.db.getPathsForObjectId(self.id.uuid)
 
-                if len(alias) > 0:
-                    obj_name = alias[0]
-                    self._name = obj_name
+            if len(paths) == 0:
+                obj_name = None
+            else:
+                obj_name = paths[0]
+                self._name = obj_name
 
         return obj_name
 

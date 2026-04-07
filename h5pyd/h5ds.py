@@ -13,22 +13,6 @@ import json
 from ._hl.objectid import DatasetID
 
 
-def _getAttributeJson(attr_name: str, dsetid: DatasetID) -> dict:
-    uuid = dsetid.id
-    objdb = dsetid.http_conn.getObjDb()
-    if objdb and uuid in objdb:
-        dset_json = objdb[uuid]
-        attrs_json = dset_json["attributes"]
-        return attrs_json.get(attr_name, dict())
-    else:
-        req = f"/datasets/{uuid}/attributes/{attr_name}"
-        rsp = dsetid.http_conn.GET(req)
-        if rsp.status_code == 200:
-            return json.loads(rsp.text)
-        else:
-            return dict()
-
-
 def is_scale(dsetid: DatasetID) -> bool:
     """True if HDF5 dataset is a Dimension Scale."""
     # This is the expected CLASS attribute's JSON...
@@ -47,7 +31,9 @@ def is_scale(dsetid: DatasetID) -> bool:
     #     },
     #     'value': 'DIMENSION_SCALE'
     # }
-    class_json = _getAttributeJson("CLASS", dsetid)
+    class_json = dsetid.db.getAttribute(dsetid.uuid, "CLASS")
+    if class_json is None:
+        return False
     try:
         if class_json["value"] != "DIMENSION_SCALE":
             return False
@@ -55,7 +41,7 @@ def is_scale(dsetid: DatasetID) -> bool:
             return False
         elif class_json["type"]["class"] != "H5T_STRING":
             return False
-        elif class_json["type"]["strPad"] != "H5T_STR_NULLTERM":
+        elif class_json["type"]["strPad"] != "H5T_STR_NULLTERM" and False:
             return False
         elif class_json["type"]["length"] != 16:
             return False
@@ -69,8 +55,9 @@ def is_attached(dsetid: DatasetID, dscaleid: DatasetID, idx: int) -> bool:
     """True if Dimension Scale ``dscale`` is attached to Dataset ``dset`` at dimension ``idx``"""
     if not is_scale(dscaleid) or is_scale(dsetid):
         return False
-    dimlist = _getAttributeJson("DIMENSION_LIST", dsetid)
-    reflist = _getAttributeJson("REFERENCE_LIST", dscaleid)
+
+    dimlist = dsetid.db.getAttribute(dsetid.uuid, "DIMENSION_LIST")
+    reflist = dscaleid.db.getAttribute(dscaleid.uuid, "REFERENCE_LIST")
     try:
         return ([f"datasets/{dsetid.id}", idx] in
                 reflist["value"] and f"datasets/{dscaleid.id}" in dimlist["value"][idx])

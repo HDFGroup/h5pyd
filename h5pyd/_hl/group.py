@@ -151,7 +151,7 @@ class Group(HLObject, MutableMappingHDF5):
             parent_name = "/"
         else:
             parent_uuid = self.id.id
-            parent_name = self._name
+            parent_name = self.name
 
         self.log.info(f"create_group: {h5path}")
 
@@ -520,9 +520,7 @@ class Group(HLObject, MutableMappingHDF5):
             else:
                 raise IOError(f"Unexpected collection_type: {collection}")
 
-            if is_anon:
-                tgt._name = None
-            else:
+            if not is_anon:
                 # assign name
                 if name[0] == '/':
                     tgt._name = name

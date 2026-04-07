@@ -11,59 +11,183 @@
 ##############################################################################
 
 from __future__ import absolute_import
-import json
+from h5json.hdf5dtype import createDataType
 from . import base
 from .dataset import Dataset
 from .objectid import DatasetID
 
 
+def _get_obj_class(objid):
+    ''' Helper function to get the class of the object by id
+    '''
+    attr_json = objid.db.getAttribute(objid.uuid, 'CLASS')
+    if not attr_json:
+        return None
+    else:
+        return attr_json['value']
+
+
+def _set_obj_class(objid, class_name):
+    ''' Set the class name for given object '''
+
+    type_json = {
+        'charSet': 'H5T_CSET_ASCII',
+        'class': 'H5T_STRING',
+        'length': len(class_name) + 1,
+        'strPad': 'H5T_STR_NULLTERM'
+    }
+    dtype = createDataType(type_json)
+    objid.db.createAttribute(objid.uuid, 'CLASS', class_name, dtype=dtype)
+
+
+def _set_obj_name(objid, value):
+    ''' Set the NAME attribute for the given object '''
+
+    type_json = {
+        'class': 'H5T_STRING',
+        'charSet': 'H5T_CSET_UTF8',
+        'length': 'H5T_VARIABLE',
+        'strPad': 'H5T_STR_NULLTERM'
+    }
+    dtype = createDataType(type_json)
+    objid.db.createAttribute(objid.uuid, 'NAME', value, dtype=dtype)
+
+
+def _get_obj_name(objid):
+    ''' return the NAME attribute value '''
+
+    attr_json = objid.db.getAttribute(objid.uuid, 'NAME')
+    if not attr_json:
+        return None
+    else:
+        return attr_json["value"]
+
+
 class DimensionProxy(base.CommonStateObject):
     '''Represents an HDF5 'dimension'.'''
 
-    def _getAttributeJson(self, attr_name, objid=None):
-        """ Helper function to get attribute json if present
-        """
-        if not objid:
-            objid = self._id.id
-        objdb = self._id.http_conn.getObjDb()
-        if objdb and objid in objdb:
-            dset_json = objdb[objid]
-            attrs_json = dset_json["attributes"]
-            if attr_name not in attrs_json:
-                return None
-            return attrs_json[attr_name]
-        # no objdb
-        req = "/datasets/" + objid + "/attributes/" + attr_name
-        rsp = self._id.http_conn.GET(req)
-        if rsp.status_code == 200:
-            attr_json = json.loads(rsp.text)
-            return attr_json
+    def _get_reflist(self, scale_id):
+        ''' Return value of reference list attribute if present '''
+        attr_json = self._id.db.getAttribute(scale_id.uuid, 'REFERENCE_LIST')
+        if attr_json:
+            return attr_json['value']
         else:
-            return None
+            return []
 
-    def _getDatasetJson(self, objid):
-        """ Helper function to get dataset json by id
-        """
+    def _update_reflist(self, scale_id, remove=False):
+        ''' Add a reference to the REFERNCE_LIST attribute for the given scale and dimension index '''
 
-        objdb = self._id.http_conn.getObjDb()
-        if objdb and objid in objdb:
-            # objdb present, get JSON for this dataset
-            dset_json = objdb[objid]
-            return dset_json
-
-        # no objdb, make server request
-        req = "/datasets/" + objid
-        rsp = self._id.http_conn.GET(req)
-        if rsp.status_code == 200:
-            dset_json = json.loads(rsp.text)
-            return dset_json
+        attr_json = self._id.db.getAttribute(scale_id.uuid, 'REFERENCE_LIST')
+        if attr_json is None:
+            if remove:
+                # nothing to remove, just return
+                return
+            value = []
         else:
-            return None
+            value = attr_json["value"]
+
+        ref = 'datasets/' + self._id.uuid  # the reference to add or remove
+
+        type_json = {
+            'class': 'H5T_COMPOUND',
+            'fields': [
+                {
+                    'name': 'dataset',
+                    'type': {
+                        'base': 'H5T_STD_REF_OBJ',
+                        'class': 'H5T_REFERENCE'
+                    }
+                },
+                {
+                    'name': 'index',
+                    'type': {
+                        'base': 'H5T_STD_I32LE',
+                        'class': 'H5T_INTEGER'
+                    }
+                }
+            ]
+        }
+
+        if remove:
+            # look through existing values and remove any with the same ref and dimension
+            value_update = []
+            for e in value:
+                if e[0] == ref and e[1] == self._dimension:
+                    continue
+                value_update.append(e)  # keep the current item
+            if len(value) == len(value_update):
+                # no change, just return
+                return
+            value = value_update
+            if len(value) == 0:
+                # Remove REFERENCE_LIST attribute if this dimension scale is
+                # not attached to any dataset
+                self._id.db.deleteAttribute(scale_id.uuid, 'REFERENCE_LIST')
+        else:
+            # scan through list and see if this ref is already present
+            for e in value:
+                if e[0] == ref and e[1] == self._dimension:
+                    # reference already exists, just return
+                    return
+            # not found, append the new ref, dimension tuple
+            value.append([ref, self._dimension])
+
+        dtype = createDataType(type_json)
+
+        shape = [len(value),]
+
+        self._id.db.createAttribute(scale_id.uuid, 'REFERENCE_LIST', value, dtype=dtype, shape=shape)
+
+    def _get_dimlist(self):
+        """ return a dimension list for given dimension """
+
+        attr_json = self._id.db.getAttribute(self._id.uuid, 'DIMENSION_LIST')
+
+        if attr_json is None:
+            return []
+        value = attr_json['value']
+        if len(value) != self._id.rank:
+            raise IOError(f"invalid dimension list value: {value}")
+        return value[self._dimension]
+
+    def _update_dimlist(self, scale_id, remove=False):
+        ''' append a reference to the DIMENSION_LIST attribute for the given dimension index '''
+
+        attr_json = self._id.db.getAttribute(self._id.uuid, 'DIMENSION_LIST')
+        if attr_json is None:
+            value = [[] for _ in range(self._id.rank)]
+        else:
+            value = attr_json['value']
+
+        if len(value) != self._id.rank:
+            raise IOError(f"invalid dimension list value: {value}")
+
+        ref = "datasets/" + scale_id.uuid
+        if remove and ref not in value[self._dimension]:
+            return
+        if not remove and ref in value[self._dimension]:
+            return
+
+        type_json = {
+            'base': {
+                'base': 'H5T_STD_REF_OBJ',
+                'class': 'H5T_REFERENCE'
+            },
+            'class': 'H5T_VLEN'
+        }
+        dtype = createDataType(type_json)
+        shape = [self._id.rank,]
+        if remove:
+            value[self._dimension].remove(ref)
+        else:
+            value[self._dimension].append(ref)
+
+        self._id.db.createAttribute(self._id.uuid, 'DIMENSION_LIST', value, dtype=dtype, shape=shape)
 
     @property
     def label(self):
         ''' Get the dimension scale label '''
-        labels_json = self._getAttributeJson('DIMENSION_LABELS')
+        labels_json = self._id.db.getAttribute(self._id.uuid, 'DIMENSION_LABELS')
 
         if not labels_json:
             return ''
@@ -78,29 +202,25 @@ class DimensionProxy(base.CommonStateObject):
 
     @label.setter
     def label(self, val):
-        # pylint: disable=missing-docstring
-        dset = Dataset(self._id)
-        req = dset.attrs._req_prefix + 'DIMENSION_LABELS'
-        try:
-            labels = dset.GET(req)
-            dset.DELETE(req)
-        except IOError:
-            rank = len(dset.shape)
-            labels = {
-                'shape': {
-                    'class': 'H5S_SIMPLE',
-                    'dims': [rank]
-                },
-                'type': {
-                    'class': 'H5T_STRING',
-                    'charSet': 'H5T_CSET_UTF8',
-                    'length': 'H5T_VARIABLE',
-                    'strPad': 'H5T_STR_NULLTERM'
-                },
-                'value': ['' for n in range(rank)]
-            }
-        labels['value'][self._dimension] = val
-        dset.PUT(req, body=labels, replace=True)
+        name = 'DIMENSION_LABELS'
+        labels_json = self._id.db.getAttribute(self._id.uuid, 'DIMENSION_LABELS')
+        if labels_json:
+            labels = labels_json['value']
+            if len(labels) != self._id.rank:
+                raise ValueError("unexpected lenght of DIMENSION_LABELS attribute")
+        else:
+            labels = ['' for _ in range(self._id.rank)]
+
+        type_json = {
+            'class': 'H5T_STRING',
+            'charSet': 'H5T_CSET_UTF8',
+            'length': 'H5T_VARIABLE',
+            'strPad': 'H5T_STR_NULLTERM'
+        }
+        dtype = createDataType(type_json)
+        labels[self._dimension] = val
+
+        self._id.db.createAttribute(self._id.uuid, name, labels, dtype=dtype)
 
     def __init__(self, id_, dimension):
         self._id = id_
@@ -117,60 +237,44 @@ class DimensionProxy(base.CommonStateObject):
             yield k
 
     def __len__(self):
-        dimlist_json = self._getAttributeJson('DIMENSION_LIST')
-        if not dimlist_json:
-            return 0
-        dimlist_values = dimlist_json['value']
-        if self._dimension >= len(dimlist_values):
-            # dimension scale len request out of range
-            return 0
-        return len(dimlist_values[self._dimension])
+        dimlist = self._get_dimlist()
+
+        return len(dimlist)
 
     def __getitem__(self, item):
 
-        dimlist_attr_json = self._getAttributeJson('DIMENSION_LIST')
-        dimlist_attr_values = []
-        if dimlist_attr_json:
-            dimlist_attr_values = dimlist_attr_json["value"]
+        dimlist = self._get_dimlist()
+        if dimlist is None:
+            dimlist = []
 
-        if self._dimension >= len(dimlist_attr_values):
-            # dimension scale len request out of range")
-            return None
-        dimlist_values = dimlist_attr_values[self._dimension]
-        dset_scale_id = None
+        scale_id = None  # DatasetID instance
         if isinstance(item, int):
-            if item >= len(dimlist_values):
+            if item >= len(dimlist):
                 # no dimension scale
-                raise IndexError(
-                    "No dimension scale found for index: {}".format(item))
-            ref_id = dimlist_values[item]
+                raise IndexError(f"No dimension scale found for index: {item}")
+            ref_id = dimlist[item]
             if ref_id and not ref_id.startswith("datasets/"):
-                msg = "unexpected ref_id: {}".format(ref_id)
+                msg = f"unexpected ref_id: {ref_id}"
                 raise IOError(msg)
-            else:
-                dset_scale_id = ref_id[len("datasets/"):]
+            scale_id = DatasetID(self._id, ref_id)
         else:
             # Iterate through the dimension scales finding one with the
             # correct name
-            for ref_id in dimlist_values:
+            for ref_id in dimlist:
                 if not ref_id:
                     continue
                 if not ref_id.startswith("datasets/"):
-                    msg = "unexpected ref_id: {}".format(ref_id)
+                    msg = f"unexpected ref_id: {ref_id}"
                     raise IOError(msg)
-                    continue
-                dset_id = ref_id[len("datasets/"):]
-                attr_json = self._getAttributeJson('NAME', objid=dset_id)
-                if attr_json["value"] == item:
+                dset_id = DatasetID(self._id, ref_id)
+                dim_name = _get_obj_name(dset_id)
+                if dim_name == item:
                     # found it!
-                    dset_scale_id = dset_id
+                    scale_id = dset_id
                     break
-        if not dset_scale_id:
-            raise KeyError(
-                'No dimension scale with name"{}" found'.format(item))
-        dscale_json = self._getDatasetJson(dset_scale_id)
-        dscale = Dataset(DatasetID(
-            parent=None, item=dscale_json, http_conn=self._id.http_conn))
+        if not scale_id:
+            raise KeyError(f'No dimension scale with name {item} found')
+        dscale = Dataset(scale_id)
         return dscale
 
     def attach_scale(self, dscale):
@@ -179,165 +283,44 @@ class DimensionProxy(base.CommonStateObject):
         Provide the Dataset of the scale you would like to attach.
         '''
         dset = Dataset(self._id)
-        try:
-            rsp = dscale.GET(dscale.attrs._req_prefix + 'CLASS')
-        except IOError:
+        dscale_class = _get_obj_class(dscale.id)
+        if not dscale_class:
             dset.dims.create_scale(dscale)
-            rsp = None
+            dscale_class = _get_obj_class(dscale.id)
 
-        if not rsp:
-            rsp = dscale.GET(dscale.attrs._req_prefix + 'CLASS')
-        if rsp['value'] != 'DIMENSION_SCALE':
-            raise RuntimeError(
-                '{} is not a dimension scale'.format(dscale.name))
+        if dscale_class != 'DIMENSION_SCALE':
+            raise RuntimeError(f"{dscale.name} is not a dimension scale")
 
-        try:
-            rsp = dset.GET(dset.attrs._req_prefix + 'CLASS')
-            if rsp['value'] == 'DIMENSION_SCALE':
-                raise RuntimeError(
-                    '{} cannot attach a dimension scale to a dimension scale'
-                    .format(dset.name))
-        except IOError:
-            pass
+        dset_class = _get_obj_class(dset.id)
+        if dset_class == 'DIMENSION_SCALE':
+            msg = f"{dset.name}"
+            raise RuntimeError(msg)
 
         # Create a DIMENSION_LIST attribute if needed
-        req = dset.attrs._req_prefix + 'DIMENSION_LIST'
-        rank = len(dset.shape)
-        value = [list() for r in range(rank)]
-        try:
-            dimlist = dset.GET(req)
-            value = dimlist["value"]
-            dset.DELETE(req)
-        except IOError:
-            pass
+        self._update_dimlist(dscale.id)
 
-        dimlist = {
-            'creationProperties': {
-                'nameCharEncoding': 'H5T_CSET_ASCII'
-            },
-            'shape': {
-                'class': 'H5S_SIMPLE',
-                'dims': [rank]
-            },
-            'type': {
-                'base': {
-                    'base': 'H5T_STD_REF_OBJ',
-                    'class': 'H5T_REFERENCE'
-                },
-                'class': 'H5T_VLEN'
-            },
-            'value': value
-        }
-
-        # Update the DIMENSION_LIST attribute with the object reference to the
-        # dimension scale
-        dimlist['value'][self._dimension].append('datasets/' + dscale.id.id)
-        dset.PUT(req, body=dimlist, replace=True)
-
-        req = dscale.attrs._req_prefix + 'REFERENCE_LIST'
-
-        try:
-            old_reflist = dscale.GET(req)
-        except IOError:
-            old_reflist = {
-                'creationProperties': {
-                    'nameCharEncoding': 'H5T_CSET_ASCII'
-                },
-                'shape': {
-                    'class': 'H5S_SIMPLE'
-                },
-                'type': {
-                    'class': 'H5T_COMPOUND',
-                    'fields': [
-                        {
-                            'name': 'dataset',
-                            'type': {
-                                'base': 'H5T_STD_REF_OBJ',
-                                'class': 'H5T_REFERENCE'
-                            }
-                        },
-                        {
-                            'name': 'index',
-                            'type': {
-                                'base': 'H5T_STD_I32LE',
-                                'class': 'H5T_INTEGER'
-                            }
-                        }
-                    ]
-                }
-            }
-
-        new_reflist = {}
-        new_reflist["type"] = old_reflist["type"]
-        new_reflist["shape"] = old_reflist["shape"]
-        if "value" in old_reflist:
-            reflist_value = old_reflist["value"]
-            if reflist_value is None:
-                reflist_value = []
-        else:
-            reflist_value = []
-        reflist_value.append(['datasets/' + dset.id.id, self._dimension])
-        new_reflist["value"] = reflist_value
-        new_reflist["shape"]["dims"] = [len(reflist_value), ]
-
-        # Update the REFERENCE_LIST attribute of the dimension scale
-        dscale.PUT(req, body=new_reflist, replace=True)
+        # create a REFERENCE_LIST attribute for the dimension scale
+        self._update_reflist(dscale.id)
 
     def detach_scale(self, dscale):
         ''' Remove a scale from this dimension.
 
         Provide the Dataset of the scale you would like to remove.
         '''
-        dset = Dataset(self._id)
-        req = dset.attrs._req_prefix + 'DIMENSION_LIST'
-        dimlist = dset.GET(req)
-        dset.DELETE(req)
-        try:
-            ref = 'datasets/' + dscale.id.id
-            dimlist['value'][self._dimension].remove(ref)
-        except Exception as e:
-            # Restore the attribute's old value then raise the same
-            # exception
-            dset.PUT(req, body=dimlist)
-            raise e
-        dset.PUT(req, body=dimlist)
 
-        req = dscale.attrs._req_prefix + 'REFERENCE_LIST'
-        old_reflist = dscale.GET(req)
-        if "value" in old_reflist and len(old_reflist["value"]) > 0:
-            new_refs = list()
-
-            remove = ['datasets/' + dset.id.id, self._dimension]
-            for el in old_reflist['value']:
-                if remove[0] != el[0] and remove[1] != el[1]:
-                    new_refs.append(el)
-
-            new_reflist = {}
-            new_reflist["type"] = old_reflist["type"]
-            if len(new_refs) > 0:
-                new_reflist["value"] = new_refs
-                new_reflist["shape"] = [len(new_refs), ]
-                dscale.PUT(req, body=new_reflist, replace=True)
-            else:
-                # Remove REFERENCE_LIST attribute if this dimension scale is
-                # not attached to any dataset
-                try:
-                    dscale.DELETE(req)
-                except OSError:
-                    pass
+        self._update_dimlist(dscale.id, remove=True)
+        self._update_reflist(dscale.id, remove=True)
 
     def items(self):
         ''' Get a list of (name, Dataset) pairs with all scales on this
         dimension.
         '''
+
         scales = []
         num_scales = self.__len__()
         for i in range(num_scales):
             dscale = self.__getitem__(i)
-            name_attr_json = self._getAttributeJson('NAME', objid=dscale.id.id)
-            dscale_name = ''
-            if name_attr_json:
-                dscale_name = name_attr_json['value']
+            dscale_name = _get_obj_name(dscale.id)
             scales.append((dscale_name, dscale))
         return scales
 
@@ -377,11 +360,11 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
 
     def __len__(self):
         ''' Number of dimensions associated with the dataset. '''
-        return len(Dataset(self._id).shape)
+        return self._id.rank
 
     def __iter__(self):
         ''' Iterate over the dimensions. '''
-        for i in range(len(self)):
+        for i in range(self._id.rank):
             yield self[i]
 
     def __repr__(self):
@@ -395,48 +378,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
         Provide the dataset and a name for the scale.
         '''
 
-        # CLASS attribute with the value 'DIMENSION_SCALE'
-        class_attr = {
-            'creationProperties': {
-                'nameCharEncoding': 'H5T_CSET_ASCII'
-            },
-            'shape': {
-                'class': 'H5S_SCALAR'
-            },
-            'type': {
-                'charSet': 'H5T_CSET_ASCII',
-                'class': 'H5T_STRING',
-                'length': 16,
-                'strPad': 'H5T_STR_NULLTERM'
-            },
-            'value': 'DIMENSION_SCALE'
-        }
-
-        # NAME attribute with dimension scale's name
-        if isinstance(name, bytes):
-            name = name.decode('ascii')
-        else:
-            name = name.encode('utf-8').decode('ascii')
-
-        name_attr = {
-            'creationProperties': {
-                'nameCharEncoding': 'H5T_CSET_ASCII'
-            },
-            'shape': {
-                'class': 'H5S_SCALAR'
-            },
-            'type': {
-                'charSet': 'H5T_CSET_ASCII',
-                'class': 'H5T_STRING',
-                'length': len(name) + 1,
-                'strPad': 'H5T_STR_NULLTERM'
-            },
-            'value': name
-        }
-        req_class = dset.attrs._req_prefix + 'CLASS'
-        req_name = dset.attrs._req_prefix + 'NAME'
-        dset.PUT(req_class, body=class_attr, replace=True)
-        try:
-            dset.PUT(req_name, body=name_attr, replace=True)
-        except Exception:
-            dset.DELETE(req_class)
+        if not isinstance(name, str):
+            raise TypeError("Expected string for dimension_scale name")
+        _set_obj_class(dset.id, 'DIMENSION_SCALE')
+        _set_obj_name(dset.id, name)
