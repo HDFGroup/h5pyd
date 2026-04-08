@@ -45,21 +45,22 @@ class TestDimensionScale(TestCase):
             self.assertIsInstance(d, h5py._hl.dims.DimensionProxy)
 
         # Create and name dimension scales
-        dset.dims.create_scale(f['scale_x'], 'Simulation X (North) axis')
-        self.assertTrue(h5py.h5ds.is_scale(f['scale_x'].id))
-        dset.dims.create_scale(f['scale_y'], 'Simulation Y (East) axis')
-        self.assertTrue(h5py.h5ds.is_scale(f['scale_y'].id))
-        dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
-        self.assertTrue(h5py.h5ds.is_scale(f['scale_z'].id))
+        f['scale_x'].make_scale(name='Simulation X (North) axis')
+        self.assertTrue(f['scale_x'].is_scale)
+        f['scale_y'].make_scale(name='Simulation Y (East) axis')
+        self.assertTrue(f['scale_y'].is_scale)
+        f['scale_z'].make_scale(name='Simulation Z (Vertical) axis')
+        self.assertTrue(f['scale_z'].is_scale)
 
         # Try re-creating the last dimscale
-        dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
-        self.assertTrue(h5py.h5ds.is_scale(f['scale_z'].id))
+        f['scale_z'].make_scale(name='Simulation Z (Vertical) axis')
+        self.assertTrue(f['scale_z'].is_scale)
 
-        # Attach a non-dimension scale (and in the process make it a dimension
-        # scale)
+        # Try attaching a non-dimension scale
+        self.assertFalse(f['not_scale'].is_scale)
         dset.dims[1].attach_scale(f['not_scale'])
-        self.assertTrue(h5py.h5ds.is_scale(f['not_scale'].id))
+        # should now be a dimension scale
+        self.assertTrue(f['not_scale'].is_scale)
 
         # Cannot attach a dimension scale to another dimension scale
         with self.assertRaises(RuntimeError):
@@ -129,10 +130,10 @@ class TestDimensionScale(TestCase):
 
         # Test dimension scale names
 
-        dset.dims.create_scale(f['scale_name'], '√')
+        f['scale_name'].make_scale('√')
 
         with self.assertRaises((AttributeError, TypeError)):
-            dset.dims.create_scale(f['scale_name'], 67)
+            f['scale_name'].make_scale(67)
 
         f.close()
 

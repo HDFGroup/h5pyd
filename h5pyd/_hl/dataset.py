@@ -30,6 +30,8 @@ from h5json.filters import getFilterItem, isCompressionFilter
 from h5json.array_util import array_for_new_object
 from h5json import selections as sel
 
+from .. import h5ds as ds
+
 from .base import HLObject
 from .base import Empty
 from .objectid import DatasetID
@@ -1257,16 +1259,24 @@ class Dataset(HLObject):
         self._allocated_size = None  # as above
         self._verboseUpdated = None  # when the verbose data was fetched
 
-    def make_scale(self, name=""):
+    def make_scale(self, name=''):
         """Make this dataset an HDF5 dimension scale.
 
-        You can then attach it to dimensions of other datasets like this:
+        You can then attach it to dimensions of other datasets like this::
 
             other_ds.dims[0].attach_scale(ds)
 
         You can optionally pass a name to associate with this scale.
         """
-        self.dims.create_scale(self, name=name)
+        ds.set_scale(self._id, name)
+
+    @property
+    def is_scale(self):
+        """Return ``True`` if this dataset is also a dimension scale.
+
+        Return ``False`` otherwise.
+        """
+        return ds.is_scale(self._id)
 
     """
       Convert a list to a tuple, recursively.

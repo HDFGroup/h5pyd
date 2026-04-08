@@ -11,56 +11,13 @@
 ##############################################################################
 
 from __future__ import absolute_import
+
 from h5json.hdf5dtype import createDataType
+
+from .. import h5ds as ds
 from . import base
 from .dataset import Dataset
 from .objectid import DatasetID
-
-
-def _get_obj_class(objid):
-    ''' Helper function to get the class of the object by id
-    '''
-    attr_json = objid.db.getAttribute(objid.uuid, 'CLASS')
-    if not attr_json:
-        return None
-    else:
-        return attr_json['value']
-
-
-def _set_obj_class(objid, class_name):
-    ''' Set the class name for given object '''
-
-    type_json = {
-        'charSet': 'H5T_CSET_ASCII',
-        'class': 'H5T_STRING',
-        'length': len(class_name) + 1,
-        'strPad': 'H5T_STR_NULLTERM'
-    }
-    dtype = createDataType(type_json)
-    objid.db.createAttribute(objid.uuid, 'CLASS', class_name, dtype=dtype)
-
-
-def _set_obj_name(objid, value):
-    ''' Set the NAME attribute for the given object '''
-
-    type_json = {
-        'class': 'H5T_STRING',
-        'charSet': 'H5T_CSET_UTF8',
-        'length': 'H5T_VARIABLE',
-        'strPad': 'H5T_STR_NULLTERM'
-    }
-    dtype = createDataType(type_json)
-    objid.db.createAttribute(objid.uuid, 'NAME', value, dtype=dtype)
-
-
-def _get_obj_name(objid):
-    ''' return the NAME attribute value '''
-
-    attr_json = objid.db.getAttribute(objid.uuid, 'NAME')
-    if not attr_json:
-        return None
-    else:
-        return attr_json["value"]
 
 
 class DimensionProxy(base.CommonStateObject):
@@ -267,7 +224,7 @@ class DimensionProxy(base.CommonStateObject):
                     msg = f"unexpected ref_id: {ref_id}"
                     raise IOError(msg)
                 dset_id = DatasetID(self._id, ref_id)
-                dim_name = _get_obj_name(dset_id)
+                dim_name = ds.get_obj_name(dset_id)
                 if dim_name == item:
                     # found it!
                     scale_id = dset_id
@@ -283,15 +240,15 @@ class DimensionProxy(base.CommonStateObject):
         Provide the Dataset of the scale you would like to attach.
         '''
         dset = Dataset(self._id)
-        dscale_class = _get_obj_class(dscale.id)
+        dscale_class = ds.get_obj_class(dscale.id)
         if not dscale_class:
             dset.dims.create_scale(dscale)
-            dscale_class = _get_obj_class(dscale.id)
+            dscale_class = ds.get_obj_class(dscale.id)
 
         if dscale_class != 'DIMENSION_SCALE':
             raise RuntimeError(f"{dscale.name} is not a dimension scale")
 
-        dset_class = _get_obj_class(dset.id)
+        dset_class = ds.get_obj_class(dset.id)
         if dset_class == 'DIMENSION_SCALE':
             msg = f"{dset.name}"
             raise RuntimeError(msg)
@@ -320,7 +277,7 @@ class DimensionProxy(base.CommonStateObject):
         num_scales = self.__len__()
         for i in range(num_scales):
             dscale = self.__getitem__(i)
-            dscale_name = _get_obj_name(dscale.id)
+            dscale_name = ds.get_obj_name(dscale.id)
             scales.append((dscale_name, dscale))
         return scales
 
@@ -376,9 +333,9 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
         ''' Create a new dimension, from an initial scale.
 
         Provide the dataset and a name for the scale.
+
+        This method is deprecated and will be removed in future releases.
+        Use ds.set_scale instead.
         '''
 
-        if not isinstance(name, str):
-            raise TypeError("Expected string for dimension_scale name")
-        _set_obj_class(dset.id, 'DIMENSION_SCALE')
-        _set_obj_name(dset.id, name)
+        ds.set_scale(dset.id, name=name)
