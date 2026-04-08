@@ -220,12 +220,27 @@ class File(Group):
         """ return info on storage usage """
         self._verifyOpen()
 
-        if self.id.db.reader:
-            stats = self.id.db.reader.getStats()
-        elif self.id.db.writer:
-            stats = self.id.db.writer.getStats()
+        now = time.time()
+        if self._verboseInfo is None or now - self._verboseUpdated > 1:
+            # refresh info from server
+
+            if self.id.db.reader:
+                stats = self.id.db.reader.getStats(verbose=True)
+            elif self.id.db.writer:
+                stats = self.id.db.writer.getStats(verbose=True)
+            else:
+                stats = {"created": 0, "lastModified": 0, "owner": 0}
+
+            self._verboseUpdated = time.time()
+            if "scan_info" in stats:
+                scan_info = stats["scan_info"]
+                if "scan_complete" in stats:
+                    self.log.debug("updating _lastScan")
+                    self._lastScan = scan_info["scan_complete"]
+            self._verboseInfo = stats.copy()  # keep a copy
         else:
-            stats = {"created": 0, "lastModified": 0, "owner": 0}
+            stats = self._verboseInfo.copy()  # use cached copy
+
         return stats
 
     def _verifyOpen(self):
@@ -550,50 +565,11 @@ class File(Group):
 
         self._name = "/"
         self._verboseInfo = None  # additional state we'll get when requested
-        self._verboseUpdated = None  # when the verbose data was fetched
+        self._verboseUpdated = 0  # when the verbose data was fetched
         self._lastScan = None  # when summary stats where last updated by server
         self._swmr_mode = swmr
 
         Group.__init__(self, self._id, track_order=track_order)
-
-    def _getVerboseInfo(self):
-        self.verifyOpen()
-        # now = time.time()
-        return {}
-        """
-        if (self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME):
-            # resynch the verbose data
-            req = "/?verbose=1"
-            rsp_json = self.(req, use_cache=False, params={"CreateOrder": "1" if self._track_order else "0"})
-
-            self.log.debug("get verbose info")
-            props = {}
-            for k in (
-                "num_objects",
-                "num_datatypes",
-                "num_groups",
-                "num_datasets",
-                "num_chunks",
-                "num_linked_chunks",
-                "allocated_bytes",
-                "metadata_bytes",
-                "linked_bytes",
-                "total_size",
-                "lastModified",
-                "md5_sum",
-            ):
-                if k in rsp_json:
-                    props[k] = rsp_json[k]
-            self._verboseInfo = props
-            self._verboseUpdated = now
-            if "scan_info" in rsp_json:
-                scan_info = rsp_json["scan_info"]
-                if "scan_complete" in scan_info:
-                    self.log.debug("updating _lastScan")
-                    self._lastScan = scan_info["scan_complete"]
-
-        return self._verboseInfo
-        """
 
     @property
     def modified(self):
@@ -603,95 +579,95 @@ class File(Group):
 
     @property
     def num_objects(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         num_objects = 0
-        if "num_objects" in props:
-            num_objects = props["num_objects"]
+        if "num_objects" in stats:
+            num_objects = stats["num_objects"]
         return num_objects
 
     @property
     def num_datatypes(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         num_datatypes = 0
-        if "num_datatypes" in props:
-            num_datatypes = props["num_datatypes"]
+        if "num_datatypes" in stats:
+            num_datatypes = stats["num_datatypes"]
         return num_datatypes
 
     @property
     def num_groups(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         num_groups = 0
-        if "num_groups" in props:
-            num_groups = props["num_groups"]
+        if "num_groups" in stats:
+            num_groups = stats["num_groups"]
         return num_groups
 
     @property
     def num_chunks(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         num_chunks = 0
-        if "num_chunks" in props:
-            num_chunks = props["num_chunks"]
+        if "num_chunks" in stats:
+            num_chunks = stats["num_chunks"]
         return num_chunks
 
     @property
     def num_linked_chunks(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         num_linked_chunks = 0
-        if "num_linked_chunks" in props:
-            num_linked_chunks = props["num_linked_chunks"]
+        if "num_linked_chunks" in stats:
+            num_linked_chunks = stats["num_linked_chunks"]
         return num_linked_chunks
 
     @property
     def num_datasets(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         num_datasets = 0
-        if "num_datasets" in props:
-            num_datasets = props["num_datasets"]
+        if "num_datasets" in stats:
+            num_datasets = stats["num_datasets"]
         return num_datasets
 
     @property
     def allocated_bytes(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         allocated_bytes = 0
-        if "allocated_bytes" in props:
-            allocated_bytes = props["allocated_bytes"]
+        if "allocated_bytes" in stats:
+            allocated_bytes = stats["allocated_bytes"]
         return allocated_bytes
 
     @property
     def metadata_bytes(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         metadata_bytes = 0
-        if "metadata_bytes" in props:
-            metadata_bytes = props["metadata_bytes"]
+        if "metadata_bytes" in stats:
+            metadata_bytes = stats["metadata_bytes"]
         return metadata_bytes
 
     @property
     def linked_bytes(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         linked_bytes = 0
-        if "linked_bytes" in props:
-            linked_bytes = props["linked_bytes"]
+        if "linked_bytes" in stats:
+            linked_bytes = stats["linked_bytes"]
         return linked_bytes
 
     @property
     def total_size(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         total_size = 0
-        if "total_size" in props:
-            total_size = props["total_size"]
+        if "total_size" in stats:
+            total_size = stats["total_size"]
         return total_size
 
     @property
     def md5_sum(self):
-        props = self._getVerboseInfo()
+        stats = self._getStats()
         md5_sum = None
-        if "md5_sum" in props:
-            md5_sum = props["md5_sum"]
+        if "md5_sum" in stats:
+            md5_sum = stats["md5_sum"]
         return md5_sum
 
     @property
     def last_scan(self):
-        self._getVerboseInfo()  # will update _lastScan
+        self._getStats()  # will update _lastScan
         return self._lastScan
 
     @property
@@ -707,7 +683,7 @@ class File(Group):
 
     def run_scan(self):
         MAX_WAIT = 10
-        self._getVerboseInfo()
+        self._getStats(verbose=True)
         prev_scan = self._lastScan
         if prev_scan is None:
             prev_scan = 0

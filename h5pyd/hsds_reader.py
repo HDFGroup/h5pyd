@@ -370,10 +370,45 @@ class HSDSReader(H5Reader):
 
         return acls_json
 
-    def getStats(self):
+    def getStats(self, verbose=False):
         """ return a dictionary object with at minimum the following keys:
             'created': creation time
             'lastModified': modificationTime
             'owner': owner name
         """
+
+        params = {}
+        if verbose:
+            params["verbose"] = 1
+
+        req = "/"
+
+        try:
+            rsp = self.http_conn.GET(req)
+        except IOError as ioe:
+            self.log.info(f"got IOError: {ioe.errno}")
+            raise IOError(ioe.errno, "Error fetching ACLs")
+        if rsp.status_code != 200:
+            self.log.info(f"get http error on getStats: {rsp.status_code}")
+            raise IOError(rsp.status_code, "Error fetching stats")
+
+        rsp_json = rsp.json()
+
+        for k in (
+            "num_objects",
+            "num_datatypes",
+            "num_groups",
+            "num_datasets",
+            "num_chunks",
+            "num_linked_chunks",
+            "allocated_bytes",
+            "metadata_bytes",
+            "linked_bytes",
+            "total_size",
+            "lastModified",
+            "md5_sum",
+        ):
+            if k in rsp_json:
+                self._stats[k] = rsp_json[k]
+
         return self._stats
