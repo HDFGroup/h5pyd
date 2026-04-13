@@ -118,9 +118,12 @@ class TestDimensionScale(TestCase):
             self.assertIsInstance(s[0], str)
             self.assertEqual(s[0], 'Simulation Z (Vertical) axis')
 
+        for s in dset.dims[2].values():
+            self.assertIsInstance(s, h5py.Dataset)
+            self.assertEqual(s.name, '/scale_z')
+
         self.assertIsInstance(dset.dims[0][0], h5py.Dataset)
-        self.assertIsInstance(dset.dims[0]['Simulation X (North) axis'],
-                              h5py.Dataset)
+        self.assertIsInstance(dset.dims[0]['Simulation X (North) axis'], h5py.Dataset)
 
         with self.assertRaises(IndexError):
             dset.dims[0][10]

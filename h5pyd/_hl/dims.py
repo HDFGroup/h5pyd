@@ -12,7 +12,7 @@
 
 from __future__ import absolute_import
 
-from h5json.hdf5dtype import createDataType
+from h5json.hdf5dtype import Reference, createDataType
 
 from .. import h5ds as ds
 from . import base
@@ -199,6 +199,7 @@ class DimensionProxy(base.CommonStateObject):
         return len(dimlist)
 
     def __getitem__(self, item):
+        ''' Return the dimension scale for this dimension with the given name or index. '''
 
         dimlist = self._get_dimlist()
         if dimlist is None:
@@ -209,11 +210,13 @@ class DimensionProxy(base.CommonStateObject):
             if item >= len(dimlist):
                 # no dimension scale
                 raise IndexError(f"No dimension scale found for index: {item}")
-            ref_id = dimlist[item]
-            if ref_id and not ref_id.startswith("datasets/"):
-                msg = f"unexpected ref_id: {ref_id}"
+            try:
+                ref = Reference(dimlist[item])
+            except (ValueError, TypeError):
+                msg = f"unexpected ref: {dimlist[item]}"
                 raise IOError(msg)
-            scale_id = DatasetID(self._id, ref_id)
+
+            scale_id = DatasetID(None, ref.id, db=self._id.db)
         else:
             # Iterate through the dimension scales finding one with the
             # correct name
