@@ -144,6 +144,9 @@ class DimensionProxy(base.CommonStateObject):
                 raise IndexError(
                     "No dimension scale found for index: {}".format(item))
             ref_id = dimlist_values[item]
+            if ref_id and ref_id.startswith("d-"):
+                # add the class name in front
+                ref_id = "datasets/" + ref_id
             if ref_id and not ref_id.startswith("datasets/"):
                 msg = "unexpected ref_id: {}".format(ref_id)
                 raise IOError(msg)
