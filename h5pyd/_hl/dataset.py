@@ -15,6 +15,7 @@ from __future__ import absolute_import
 import posixpath as pp
 import sys
 import time
+
 import numpy
 import os
 import logging
@@ -349,6 +350,32 @@ class FieldsWrapper:
         >>> length = len(dataset.fields(['x', 'y']))
         """
         return len(self._dset)
+    
+class PointsAccessor:
+    def __init__(self, dset: 'Dataset'):
+        self.dset = dset
+
+    def __getitem__(self, points):
+        #ps = sel.PointSelection(self.dset.shape, points)
+        ps = sel.select(self.dset.shape, points)
+        if not isinstance(ps, sel.PointSelection):
+            raise TypeError("Invalid points selection")
+        db = self.dset.id.db
+        arr = db.getDatasetValues(self.dset.id.uuid, ps)
+        #arr = numpy.empty(ps.array_shape, self.dset.dtype)
+        #self.dset.read_direct(arr, source_sel=ps)
+        return arr
+
+    def __setitem__(self, points, values):
+        ps = sel.PointSelection(self.dset.shape, points)
+        values = numpy.asarray(values, order='C', dtype=self.dset.dtype)
+
+        # Require shape to match exactly
+        if values.shape != ps.mshape:
+            raise ValueError(f"Expected data shape {ps.mshape}, got {values.shape}")
+        
+        db = self.dset.id.db
+        db.setDatasetValues(self.dset.id.uuid, ps, values)
 
 
 class ChunkIterator(object):
@@ -488,6 +515,17 @@ class Dataset(HLObject):
         if _prior_dtype is None:
             _prior_dtype = self.dtype
         return FieldsWrapper(self, _prior_dtype, names)
+    
+    @property
+    def points(self):
+        """Read/write data to specfied individual points within the dataset
+
+        E.g. for a 2D dataset:
+
+        >>> arr = dataset.points[[(1, 3), (5, 1), (2, 7)]]
+        >>> dataset.points[[(1, 3), (5, 1), (2, 7)]] = [4, 5, 6]
+        """
+        return PointsAccessor(self)
 
     @property
     def dims(self):
@@ -820,6 +858,7 @@ class Dataset(HLObject):
 
         * Boolean "mask" array indexing
         """
+        
         if new_dtype is not None:
             self.log.debug(f"getitem.new_dtype: {new_dtype}")
         args = args if isinstance(args, tuple) else (args,)
@@ -906,8 +945,16 @@ class Dataset(HLObject):
         # === Everything else ===================
 
         # Perform the dataspace selection
-        selection = sel.select(self, args)
-        self.log.debug("selection_constructor")
+         
+        if args and isinstance(args[0], numpy.ndarray) and args[0].dtype.kind == 'b':
+            # use argument as a mask to create a point selection
+            if args[0].shape != self.shape:
+                raise TypeError("Boolean mask shape must match dataset shape")
+            points = numpy.transpose(args[0].nonzero())
+            selection = sel.PointSelection(self.shape, points)
+        else:
+            # create selection from the args
+            selection = sel.select(self.shape, args)
 
         if selection.nselect == 0:
             # force compliance with h5py selection behavior
@@ -929,6 +976,7 @@ class Dataset(HLObject):
 
         if fields:
             raise IOError("field selection not supported yet")  # TBD
+        
         arr = db.getDatasetValues(self.id.uuid, selection)
 
         self.log.info(f"got arr: {arr.shape}, cleaning up shape!")

@@ -11,6 +11,7 @@
 ##############################################################################
 import logging
 import time
+import base64
 
 from h5json.objid import getCollectionForId
 
@@ -296,7 +297,7 @@ class HSDSWriter(H5Writer):
             obj_json = self.db.getObjectById(obj_id)
             item = {"id": obj_id}
             self.log.debug(f"create id: {obj_id}")
-            for key in obj_json:  # ("links", "attributes"):
+            for key in obj_json:
                 if key == "updates":
                     # not part of the obj json
                     continue
@@ -327,7 +328,7 @@ class HSDSWriter(H5Writer):
                 updates = obj_json.get("updates")
                 if updates and len(updates) == 1 and dset_size < MAX_INIT_SIZE:
                     sel, arr = updates[0]
-                    if sel.select_type == selections.H5S_SELECT_ALL:
+                    if sel.select_type == selections.H5S_SEL_ALL or sel.shape == sel.mshape:
                         init_arr = arr
                         updates.clear()  # reset the update list
                 if self._init and init_arr is None and dset_dims is not None:
@@ -562,14 +563,26 @@ class HSDSWriter(H5Writer):
         params = {}
         data = arrayToBytes(arr)
         self.log.debug(f"writing binary data, {len(data)} bytes")
-
-        if sel.select_type != selections.H5S_SELECT_ALL:
-            select_param = sel.getQueryParam()
-            self.log.debug(f"got select query param: {select_param}")
-            params["select"] = select_param
-
         req = f"/datasets/{dset_id}/value"
-        rsp = self.http_conn.PUT(req, body=data, params=params, format="binary")
+
+        if isinstance(sel, selections.PointSelection):
+            # send put request with point update
+            points = bytesArrayToList(sel.points)
+            value_base64 = base64.b64encode(data)
+            value_base64 = value_base64.decode("ascii")
+
+            body = {"points": points, "value_base64": value_base64}
+            format = "json"
+        else:
+
+            if sel.select_type != selections.H5S_SEL_ALL and sel.shape != sel.mshape:
+                select_param = sel.getQueryParam()
+                self.log.debug(f"got select query param: {select_param}")
+                params["select"] = select_param
+            body = data  # do a binary put
+            format = "binary"
+
+        rsp = self.http_conn.PUT(req, body=body, params=params, format=format)
         if rsp.status_code != 200:
             self.log.error(f"PUT {req} returned error: {rsp.status_code}")
             raise IOError(f"PUT {req} failed with status code: {rsp.status_code}")

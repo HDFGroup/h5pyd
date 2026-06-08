@@ -10,6 +10,7 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 import logging
+import numpy as np
 
 from h5json.objid import getCollectionForId, getUuidFromId, isValidUuid
 from h5json.shape_util import getShapeDims
@@ -263,10 +264,12 @@ class HSDSReader(H5Reader):
             self.log.warning(msg)
             return ValueError(msg)
 
-        if sel is None or sel.select_type == selections.H5S_SELECT_ALL:
+        if sel is None or sel.select_type == selections.H5S_SEL_ALL or sel.shape == sel.mshape:
             query_param = None  # just return the entire array
         elif isinstance(sel, (selections.SimpleSelection, selections.FancySelection)):
             query_param = sel.getQueryParam()
+        elif isinstance(sel, selections.PointSelection):
+            query_param = None  # no query param fo point selection
         else:
             raise NotImplementedError(f"selection type: {type(sel)} not supported")
 
@@ -284,7 +287,17 @@ class HSDSReader(H5Reader):
                 self.log.debug("dataset value found in domain_objs cache")
                 dims = getShapeDims(dset_json)
                 dset_arr = jsonToArray(dims, mtype, dset_json["value"])
-                arr = dset_arr[sel.slices]
+                if sel is None or sel.select_type == selections.H5S_SEL_ALL:
+                    arr = dset_arr
+                elif isinstance(sel, selections.SimpleSelection):
+                    arr = dset_arr[sel.slices]
+                elif isinstance(sel, selections.PointSelection):
+                    arr = np.zeros((sel.nselect,), dtype=mtype)
+                    for i, pt in enumerate(selections._iter_points(sel)):
+                        arr[i] = dset_arr[pt]
+                else:
+                    raise NotImplementedError("selection type not supported")
+
                 # TBD: need to add a invalidate cache method to remove this from the cache
                 #  when the dataset is modified
                 return arr
@@ -299,7 +312,15 @@ class HSDSReader(H5Reader):
             params["fields"] = ":".join(mtype.names)
 
         MAX_SELECT_QUERY_LEN = 100
-        if query_param and len(query_param) > MAX_SELECT_QUERY_LEN:
+        if isinstance(sel, selections.PointSelection):
+            # Use a POST to send point selection data
+            body = sel._points.tobytes()
+            try:
+                rsp = self.http_conn.POST(req, body=body, format="binary")
+            except IOError as ioe:
+                self.log.info(f"got IOError: {ioe.errno}")
+                raise IOError(ioe.errno, "Error retrieving data")
+        elif query_param and len(query_param) > MAX_SELECT_QUERY_LEN:
             # use a post method to avoid possible long query strings
             try:
                 rsp = self.http_conn.POST(req, body=params, format="binary")
