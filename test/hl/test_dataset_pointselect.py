@@ -203,16 +203,15 @@ class TestPointSelectDataset(TestCase):
                 vals[i, j] = i * 1000 + j
 
         dset2d[...] = vals
-        if config.get("use_h5py"):
-            # TODO - not working for h5pyd
-            pts = dset2d[(2, 4, 7), :]
-            self.assertEqual(len(pts), 3)
-            row1 = pts[0, :]
-            self.assertEqual(list(row1), list(range(2000, 2020)))
-            row2 = pts[1, :]
-            self.assertEqual(list(row2), list(range(4000, 4020)))
-            row3 = pts[2, :]
-            self.assertEqual(list(row3), list(range(7000, 7020)))
+
+        pts = dset2d[[2, 4, 7], :]
+        self.assertEqual(len(pts), 3)
+        row1 = pts[0, :]
+        self.assertEqual(list(row1), list(range(2000, 2020)))
+        row2 = pts[1, :]
+        self.assertEqual(list(row2), list(range(4000, 4020)))
+        row3 = pts[2, :]
+        self.assertEqual(list(row3), list(range(7000, 7020)))
 
         f.close()
 

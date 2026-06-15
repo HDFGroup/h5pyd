@@ -266,7 +266,7 @@ class HSDSReader(H5Reader):
 
         if sel is None or sel.select_type == selections.H5S_SEL_ALL or sel.shape == sel.mshape:
             query_param = None  # just return the entire array
-        elif isinstance(sel, (selections.SimpleSelection, selections.FancySelection)):
+        elif isinstance(sel, (selections.SimpleSelection)):
             query_param = sel.getQueryParam()
         elif isinstance(sel, selections.PointSelection):
             query_param = None  # no query param fo point selection
@@ -276,6 +276,7 @@ class HSDSReader(H5Reader):
         mtype = dtype  # TBD - support read time dtype
         mshape = sel.mshape
         arr = None
+        rank = len(sel.shape)
 
         # check to see if we have the dataset value cached in the domain_objs
         if dset_id in self._domain_objs:
@@ -312,9 +313,15 @@ class HSDSReader(H5Reader):
             params["fields"] = ":".join(mtype.names)
 
         MAX_SELECT_QUERY_LEN = 100
-        if isinstance(sel, selections.PointSelection):
+
+        if sel.select_type == selections.H5S_SEL_POINTS:
             # Use a POST to send point selection data
-            body = sel._points.tobytes()
+            pt_arr = np.zeros((sel.nselect, rank), dtype=np.uint64)
+            for i in range(sel.nselect):
+                for d in range(rank):
+                    pt_arr[i, d] = sel.slices[d][i]
+
+            body = pt_arr.tobytes()
             try:
                 rsp = self.http_conn.POST(req, body=body, format="binary")
             except IOError as ioe:

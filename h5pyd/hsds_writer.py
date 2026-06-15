@@ -12,6 +12,7 @@
 import logging
 import time
 import base64
+import numpy
 
 from h5json.objid import getCollectionForId
 
@@ -564,10 +565,16 @@ class HSDSWriter(H5Writer):
         data = arrayToBytes(arr)
         self.log.debug(f"writing binary data, {len(data)} bytes")
         req = f"/datasets/{dset_id}/value"
+        rank = len(sel.shape)
 
-        if isinstance(sel, selections.PointSelection):
+        if sel.select_type == selections.H5S_SEL_POINTS:
             # send put request with point update
-            points = bytesArrayToList(sel.points)
+            pt_arr = numpy.zeros((sel.nselect, rank), dtype=numpy.uint64)
+            for i in range(sel.nselect):
+                for d in range(rank):
+                    pt_arr[i, d] = sel.slices[d][i]
+
+            points = bytesArrayToList(pt_arr)
             value_base64 = base64.b64encode(data)
             value_base64 = value_base64.decode("ascii")
 
