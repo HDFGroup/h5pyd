@@ -13,7 +13,7 @@
 from __future__ import absolute_import
 import numpy
 
-from h5json.hdf5dtype import Reference, check_dtype
+from h5json.hdf5dtype import Reference, check_dtype, getItemSize
 from h5json import selections as sel
 from h5json.hdf5db import _decode
 from h5json.array_util import bytesToArray
@@ -114,7 +114,7 @@ class Table(Dataset):
         if len(self._dtype) < 1:
             raise ValueError("Table type must be compound")
 
-        if len(self._shape) > 1:
+        if self.id.rank > 1:
             raise ValueError("Table must be one-dimensional")
 
     @property
@@ -128,13 +128,13 @@ class Table(Dataset):
 
     @property
     def nrows(self):
-        return self._shape[0]
+        return self.shape[0]
 
     def read(self, start=None, stop=None, step=None, field=None, out=None):
         if start is None:
             start = 0
         if stop is None:
-            stop = self._shape[0]
+            stop = self.shape[0]
         if step is None:
             step = 1
         arr = self[start:stop:step]
@@ -185,10 +185,10 @@ class Table(Dataset):
             if not start:
                 start = 0
             if not stop:
-                stop = self._shape[0]
+                stop = self.shape[0]
         else:
             start = 0
-            stop = self._shape[0]
+            stop = self.shape[0]
 
         selection_arg = slice(start, stop)
         selection = sel.select(self, selection_arg)
@@ -301,10 +301,10 @@ class Table(Dataset):
             if not start:
                 start = 0
             if not stop:
-                stop = self._shape[0]
+                stop = self.shape[0]
         else:
             start = 0
-            stop = self._shape[0]
+            stop = self.shape[0]
 
         selection_arg = slice(start, stop)
         selection = sel.select(self, selection_arg)
@@ -349,7 +349,7 @@ class Table(Dataset):
             # Append ops only work with HSDS
             raise ValueError("append not supported")
 
-        if self._item_size != "H5T_VARIABLE":
+        if getItemSize(self.id.type_json) != "H5T_VARIABLE":
             use_base64 = True   # may need to set this to false below for some types
         else:
             use_base64 = False  # never use for variable length types
@@ -437,5 +437,5 @@ class Table(Dataset):
         self.PUT(req, body=body, format=format, params=params)
 
         # if we get here, the request was successful, adjust the shape
-        total_rows = self._shape[0] + numrows
+        total_rows = self.shape[0] + numrows
         self._shape = (total_rows,)
