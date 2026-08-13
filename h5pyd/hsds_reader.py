@@ -267,7 +267,7 @@ class HSDSReader(H5Reader):
         if sel is None or sel.select_type == selections.H5S_SEL_ALL or sel.shape == sel.mshape:
             query_param = None  # just return the entire array
         elif isinstance(sel, (selections.SimpleSelection)):
-            query_param = sel.getQueryParam()
+            query_param = sel.query_param
         elif isinstance(sel, selections.PointSelection):
             query_param = None  # no query param fo point selection
         else:
@@ -412,7 +412,7 @@ class HSDSReader(H5Reader):
         req = "/"
 
         try:
-            rsp = self.http_conn.GET(req)
+            rsp = self.http_conn.GET(req, params=params)
         except IOError as ioe:
             self.log.info(f"got IOError: {ioe.errno}")
             raise IOError(ioe.errno, "Error fetching ACLs")
@@ -421,7 +421,7 @@ class HSDSReader(H5Reader):
             raise IOError(rsp.status_code, "Error fetching stats")
 
         rsp_json = rsp.json()
-
+\
         for k in (
             "num_objects",
             "num_datatypes",

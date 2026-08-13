@@ -216,7 +216,7 @@ class Table(Dataset):
             selection_arg = slice(cursor, end_row)
             selection = sel.select(self, selection_arg)
 
-            sel_param = selection.getQueryParam()
+            sel_param = selection.query_string
             self.log.debug(f"query param: {sel_param}")
             if sel_param:
                 params["select"] = sel_param
@@ -308,7 +308,7 @@ class Table(Dataset):
 
         selection_arg = slice(start, stop)
         selection = sel.select(self, selection_arg)
-        sel_param = selection.getQueryParam()
+        sel_param = selection.query_string
         params = {}
         params["query"] = condition
         if limit:

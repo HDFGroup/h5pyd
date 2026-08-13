@@ -583,7 +583,7 @@ class HSDSWriter(H5Writer):
         else:
 
             if sel.select_type != selections.H5S_SEL_ALL and sel.shape != sel.mshape:
-                select_param = sel.getQueryParam()
+                select_param = sel.query_string
                 self.log.debug(f"got select query param: {select_param}")
                 params["select"] = select_param
             body = data  # do a binary put
