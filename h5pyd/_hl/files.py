@@ -279,6 +279,7 @@ class File(Group):
         track_order=None,
         retries=10,
         timeout=180,
+        thread_count=30,
         **kwds,
     ):
         """Create a new file object.
@@ -419,6 +420,7 @@ class File(Group):
                 logger=logger,
                 retries=retries,
                 timeout=timeout,
+                thread_count=thread_count,
             )
 
             root_json = None
