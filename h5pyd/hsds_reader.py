@@ -250,11 +250,12 @@ class HSDSReader(H5Reader):
         dtype = createDataType(type_item)
         return dtype
 
-    def getDatasetValues(self, dset_id, sel=None, dtype=None):
+    def getDatasetValues(self, dset_id, sel=None, dtype=None, query=None):
         """
         Get values from dataset identified by obj_id.
         If a slices list or tuple is provided, it should have the same
         number of elements as the rank of the dataset.
+        If query is provided, it should be a string with a query expression.
         """
 
         self.log.debug(f"getDatasetValues({dset_id}), sel={sel}")
@@ -267,7 +268,7 @@ class HSDSReader(H5Reader):
         if sel is None or sel.select_type == selections.H5S_SEL_ALL or sel.shape == sel.mshape:
             query_param = None  # just return the entire array
         elif isinstance(sel, (selections.SimpleSelection)):
-            query_param = sel.query_param
+            query_param = sel.query_string
         elif isinstance(sel, selections.PointSelection):
             query_param = None  # no query param fo point selection
         else:
@@ -279,7 +280,7 @@ class HSDSReader(H5Reader):
         rank = len(sel.shape)
 
         # check to see if we have the dataset value cached in the domain_objs
-        if dset_id in self._domain_objs:
+        if dset_id in self._domain_objs and not query:
             # this was included in the consolidated metadata returned
             # with the domain request
             self.log.debug(f"dataset {dset_id} value found in domain_objs cache")
@@ -311,6 +312,8 @@ class HSDSReader(H5Reader):
 
         if mtype.names != dtype.names:
             params["fields"] = ":".join(mtype.names)
+        if query:
+            params["query"] = query
 
         MAX_SELECT_QUERY_LEN = 100
 
@@ -349,7 +352,9 @@ class HSDSReader(H5Reader):
         if rsp.is_binary:
             # got binary response
             self.log.info(f"binary response, {len(rsp.text)} bytes")
-            arr = bytesToArray(rsp.text, mtype, mshape)
+            # a query response is a 1D array of matching elements whose length
+            # isn't known until the data comes back, so let it infer its own shape
+            arr = bytesToArray(rsp.text, mtype, None if query else mshape)
         else:
             # got JSON response
             # need some special conversion for compound types --
@@ -360,7 +365,7 @@ class HSDSReader(H5Reader):
             data = rsp.json()["value"]
             # self.log.debug(data)
 
-            arr = jsonToArray(mshape, mtype, data)
+            arr = jsonToArray((len(data),) if query else mshape, mtype, data)
             self.log.debug(f"jsonToArray returned: {arr}")
 
         return arr

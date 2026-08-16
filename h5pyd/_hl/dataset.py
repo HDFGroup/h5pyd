@@ -846,7 +846,7 @@ class Dataset(HLObject):
             raise TypeError("iter_chunks not supported for zero-dimension datasets")
         return ChunkIterator(self, sel)
 
-    def __getitem__(self, args, new_dtype=None):
+    def __getitem__(self, args, new_dtype=None, query=None):
         """Read a slice from the HDF5 dataset.
 
         Takes slices and recarray-style field names (more than one is
@@ -856,6 +856,13 @@ class Dataset(HLObject):
         Also supports:
 
         * Boolean "mask" array indexing
+
+        If query is provided, it should be a string representing a boolean
+        expression (see Dataset.query).  args is still used to restrict the
+        elements considered to a selection, but the return value is a 1D
+        ndarray of the (full-record) dataset values within that selection
+        that satisfy the query, rather than the values of the selection
+        itself.
         """
 
         if new_dtype is not None:
@@ -927,6 +934,9 @@ class Dataset(HLObject):
         # === Scalar dataspaces =================
 
         if self.shape == ():
+            if query is not None:
+                raise TypeError("query is not supported for scalar datasets")
+
             selection = sel.select(self, args)
             self.log.info(f"selection.mshape: {selection.mshape}")
 
@@ -955,6 +965,11 @@ class Dataset(HLObject):
         else:
             # create selection from the args
             selection = sel.select(self.shape, args)
+
+        if query is not None:
+            if mtype.names != self.dtype.names:
+                raise IOError("field selection not supported with query")  # TBD
+            return db.getDatasetValues(self.id.uuid, selection, query=query)
 
         if selection.nselect == 0:
             # force compliance with h5py selection behavior
@@ -1187,6 +1202,35 @@ class Dataset(HLObject):
         db = self.id.db
 
         db.setDatasetValues(self.id.uuid, selection, val)
+
+    def query(self, query, selection=None, limit=0):
+        """Query the dataset for elements matching the given query expression.
+
+        query
+            A string expression, e.g. "dset > 100.0 AND dset < 200.0".
+
+        selection
+            Optional selection (anything accepted by __getitem__, e.g. a
+            slice or tuple of slices) restricting which elements are
+            queried.  If not provided, the entire dataset is queried.
+
+        limit
+            If non-zero, only return the first limit matching elements.
+
+        Returns a numpy array of indices for the elements that match the
+        query.
+        """
+        if not isinstance(query, str):
+            raise TypeError("query must be a string")
+
+        db = self.id.db
+
+        if selection is None:
+            query_sel = None
+        else:
+            query_sel = sel.select(self.shape, selection)
+
+        return db.queryDataset(self.id.uuid, query, sel=query_sel, limit=limit)
 
     def read_direct(self, dest, source_sel=None, dest_sel=None):
         """Read data directly from HDF5 into an existing NumPy array.
