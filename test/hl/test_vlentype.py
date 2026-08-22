@@ -138,12 +138,8 @@ class TestVlenTypes(TestCase):
         self.assertTrue(isinstance(ret_val, np.ndarray))
         self.assertEqual(len(ret_val), 2)
         e0 = ret_val[0]
-        if config.get('use_h5py'):
-            self.assertTrue(isinstance(e0, np.ndarray))
-            self.assertEqual(e0.size, 0)
-        else:
-            self.assertTrue(isinstance(e0, int))
-            self.assertEqual(e0, 0)
+        self.assertTrue(isinstance(e0, np.ndarray))
+        self.assertEqual(e0.size, 0)
 
         data = np.array([42], dtype=dtbase)
         dset1[0] = data
@@ -350,12 +346,8 @@ class TestVlenTypes(TestCase):
         self.assertEqual(len(ret_val), 2)
         e0 = ret_val[0]
 
-        if config.get("use_h5py"):
-            self.assertTrue(isinstance(e0, np.ndarray))
-            self.assertEqual(e0.shape, (0,))
-        else:
-            self.assertTrue(isinstance(e0, int))
-            self.assertEqual(e0, 0)
+        self.assertTrue(isinstance(e0, np.ndarray))
+        self.assertEqual(e0.shape, (0,))
 
         e0 = np.array([1.1, 2.2, 3.3], dtype=np.float64)
         e1 = np.array([1.9, 2.8, 3.7], dtype=np.float64)

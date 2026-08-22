@@ -53,10 +53,7 @@ class ObjectID:
     @property
     def domain(self):
         """ domain for this obj """
-        filepath = self.db.reader.filepath
-        if not filepath:
-            filepath = self.db.writer.filepath
-        return filepath
+        return self.db.plugin.filepath
 
     @property
     def obj_json(self):
@@ -171,7 +168,15 @@ class ObjectID:
         self._db = None
 
     def __bool__(self):
-        return bool(self._uuid)
+        # An object's own uuid stays set even after some OTHER object sharing
+        # the same db (e.g. the File) has been closed - the db (and its
+        # storage plugin) is shared across every object opened from the same
+        # file, so closed-ness has to be checked there too.
+        if not self._uuid:
+            return False
+        if self._db is None:
+            return False
+        return not self._db.closed
 
     def __del__(self):
         """ cleanup """

@@ -23,6 +23,7 @@ import numpy
 
 from h5json.hdf5dtype import special_dtype, check_dtype, guess_dtype
 from h5json.hdf5dtype import Reference
+from h5json.array_util import array_for_new_object
 
 from . import base
 from .base import Empty
@@ -118,6 +119,21 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         dtype = arr.dtype
         shape = arr.shape
 
+        # HDF5 has no native complex type - h5json represents complex
+        # numbers as a compound with 'r'/'i' float fields (see create()) -
+        # convert back to a genuine complex dtype on read.
+        if dtype.names == ("r", "i") and all(dtype[n].kind == "f" for n in ("r", "i")) \
+                and dtype["r"] == dtype["i"]:
+            byteorder = dtype["r"].byteorder
+            if dtype.itemsize == 16:
+                complex_dt = numpy.dtype('c16').newbyteorder(byteorder)
+                arr = arr.view(complex_dt).reshape(shape)
+                dtype = arr.dtype
+            elif dtype.itemsize == 8:
+                complex_dt = numpy.dtype('c8').newbyteorder(byteorder)
+                arr = arr.view(complex_dt).reshape(shape)
+                dtype = arr.dtype
+
         # NumPy doesn't support top-level array types, so we have to "fake"
         # the correct type and shape for the array.  For example, consider
         # attr.shape == (5,) and attr.dtype == '(3,)f'. Then:
@@ -147,6 +163,15 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 except UnicodeEncodeError:
                     self._parent.log.debug("converting utf8 un-encodable string as bytes")
                     v = v.encode("utf-8", errors="surrogateescape")
+            elif isinstance(v, bytes) and check_dtype(vlen=dtype) in (str, bytes):
+                # HDF5 doesn't enforce that the declared charset (e.g. ASCII)
+                # matches what's actually stored, so decode with
+                # surrogateescape to preserve any byte exactly - matching
+                # h5py's behavior of always returning attribute vlen
+                # strings as `str`, regardless of the declared charset.
+                # (A *fixed-length* bytes attribute isn't a vlen string at
+                # all, and always stays bytes, matching h5py.)
+                v = v.decode("utf-8", errors="surrogateescape")
             return v
 
         # For vlen string/bytes types, convert 0-d array elements to Python strings
@@ -168,7 +193,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         use a specific type or shape, or to preserve the type of an attribute,
         use the methods create() and modify().
         """
-        self.create(name, value=value, dtype=guess_dtype(value))
+        self.create(name, data=value, dtype=guess_dtype(value))
 
     def __delitem__(self, name):
         """ Delete an attribute (which must already exist). """
@@ -178,12 +203,12 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         self._parent.id.db.deleteAttribute(self._parent.id.uuid, name)
 
-    def create(self, name, value, shape=None, dtype=None):
+    def create(self, name, data, shape=None, dtype=None):
         """ Create new attribute, overwriting any existing attributes.
 
         name
             Name of the new attribute (required)
-        value
+        data
             Array to initialize the attribute (required)
         shape
             Shape of the attribute.  Overrides data.shape if both are
@@ -194,20 +219,42 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         """
         self._parent.log.info(f"attrs.create({name})")
 
+        if not isinstance(name, str):
+            raise TypeError(f"attribute name must be a string, got {type(name)}")
+
         if self._parent.read_only:
             raise IOError("No write intent")
 
         obj_id = self._parent.id.uuid
 
         # First, make sure we have a NumPy array.  We leave the data
-        # type conversion for HDF5 to perform.
-        if isinstance(value, Reference):
+        # type conversion for HDF5 to perform.  Unlike a raw Python str/list/
+        # tuple (auto-converted to vlen str/bytes below), an already-built
+        # numpy array keeps its own dtype as-is - e.g. a 'U'-kind array is
+        # *not* auto-converted, matching h5py (HDF5 has no equivalent type,
+        # so it's caught later as a TypeError instead).
+        if isinstance(data, Reference):
             dtype = special_dtype(ref=Reference)
-        if not isinstance(value, Empty):
-            value = numpy.asarray(value, dtype=dtype, order='C')
+        if not isinstance(data, Empty):
+            data = array_for_new_object(data, specified_dtype=dtype)
+            if data.dtype.kind == "U":
+                raise TypeError("Fixed-length unicode data is not supported")
 
-        if shape is None and not isinstance(value, Empty):
-            shape = value.shape
+            # HDF5 stores vlen strings as null-terminated C strings, so an
+            # embedded NULL would silently truncate the value - reject it
+            # up front instead, matching h5py.
+            vlen_class = check_dtype(vlen=data.dtype)
+            if vlen_class in (bytes, str):
+                for elem in data.flat:
+                    raw = elem if isinstance(elem, bytes) else elem.encode("utf-8", errors="surrogateescape")
+                    if b"\x00" in raw:
+                        raise ValueError("VLEN strings do not support embedded NULLs")
+
+        if shape is None:
+            if not isinstance(data, Empty):
+                shape = data.shape
+        elif isinstance(shape, int):
+            shape = (shape,)
 
         use_htype = None  # If a committed type is given, we must use it in h5a.create.
 
@@ -216,7 +263,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             dtype = dtype.dtype
 
             # Special case if data are complex numbers
-            is_complex = (value.dtype.kind == 'c') and (dtype.names is None) or (
+            is_complex = (data.dtype.kind == 'c') and (dtype.names is None) or (
                 dtype.names != ('r', 'i')) or (
                 any(dt.kind != 'f' for dt, off in dtype.fields.values())) or (
                 dtype.fields['r'][0] == dtype.fields['i'][0])
@@ -224,51 +271,39 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             if is_complex:
                 raise TypeError(f'Wrong committed datatype for complex numbers: {dtype.name}')
         elif dtype is None:
-            if value.dtype.kind == 'U':
-                # use vlen for unicode strings
-                dtype = special_dtype(vlen=str)
-            else:
-                dtype = value.dtype
+            dtype = data.dtype
         else:
             dtype = numpy.dtype(dtype)  # In case a string, e.g. 'i8' is passed
 
-        # Where a top-level array type is requested, we have to do some
-        # fiddling around to present the data as a smaller array of subarrays.
-        if not isinstance(value, Empty):
-            if dtype.subdtype is not None:
-
-                subdtype, subshape = dtype.subdtype
-
-                # Make sure the subshape matches the last N axes' sizes.
-                if shape[-len(subshape):] != subshape:
-                    raise ValueError(f"Array dtype shape {subshape} is incompatible with data shape {shape}")
-
-                # New "advertised" shape and dtype
-                shape = shape[0:len(shape) - len(subshape)]
-                dtype = subdtype
-
-            # Not an array type; make sure to check the number of elements
-            # is compatible, and reshape if needed.
+        if not use_htype and dtype.kind == 'c':
+            # HDF5 has no native complex type - h5json represents complex
+            # numbers as a compound with 'r'/'i' float fields (matching
+            # h5py's own convention), so convert both the dtype and the
+            # underlying data the same way before handing off.
+            if dtype.itemsize == 8:
+                float_dt = numpy.dtype('f4').newbyteorder(dtype.byteorder)
+            elif dtype.itemsize == 16:
+                float_dt = numpy.dtype('f8').newbyteorder(dtype.byteorder)
             else:
-                if numpy.prod(shape) != numpy.prod(value.shape):
-                    raise ValueError("Shape of new attribute conflicts with shape of data")
+                raise TypeError(f"Unsupported dtype for complex numbers: {dtype}")
+            compound_dt = numpy.dtype([('r', float_dt), ('i', float_dt)])
+            data = data.view(compound_dt)
+            dtype = compound_dt
 
-                if shape != value.shape:
-                    value = value.reshape(shape)
-
-                # We need this to handle special string types.
-
-                value = numpy.asarray(value, dtype=dtype)
+        # Any top-level array type (dtype.subdtype), or shape/data-shape
+        # mismatch, is validated and unpacked by Hdf5db.createAttribute()
+        # itself - it needs the original (un-reshaped) data and the
+        # original (possibly array-typed) dtype/shape to do that correctly.
 
         # Make HDF5 datatype and dataspace for the H5A calls
         if use_htype:
             dtype = use_htype
 
-        if isinstance(value, Empty):
-            value = None  # hdf5db doesn't know about the empty object
+        if isinstance(data, Empty):
+            data = None  # hdf5db doesn't know about the empty object
             shape = "H5S_NULL"
 
-        self._parent.id.db.createAttribute(obj_id, name, value, shape=shape, dtype=dtype)
+        self._parent.id.db.createAttribute(obj_id, name, data, shape=shape, dtype=dtype)
 
     def modify(self, name, value):
         """ Change the value of an attribute while preserving its type.
@@ -279,25 +314,37 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
 
         If the attribute doesn't exist, it will be automatically created.
         """
-        pass
-        # TBD
-        """
-            if not name in self:
-                self[name] = value
-            else:
-                value = numpy.asarray(value, order='C')
+        if isinstance(name, bytes):
+            name = name.decode("utf-8")
 
-                attr = h5a.open(self._id, self._e(name))
+        if name not in self:
+            self[name] = value
+            return
 
-                if attr.get_space().get_simple_extent_type() == h5s.NULL:
-                    raise IOError("Empty attributes can't be modified")
+        obj_id = self._parent.id.uuid
+        attr_json = self._parent.id.db.getAttribute(obj_id, name)
+        shape_json = attr_json["shape"]
 
-                # Allow the case of () <-> (1,)
-                if (value.shape != attr.shape) and not \
-                   (numpy.prod(value.shape) == 1 and numpy.prod(attr.shape) == 1):
-                    raise TypeError("Shape of data is incompatible with existing attribute")
-                attr.write(value)
-        """
+        if shape_json["class"] == "H5S_NULL":
+            raise IOError("Empty attributes can't be modified")
+        elif shape_json["class"] == "H5S_SCALAR":
+            shape = ()
+        else:
+            shape = tuple(shape_json["dims"])
+
+        dtype = self._parent.id.db.getDtype(attr_json)
+
+        # If the input data is already an array, let dtype conversion happen
+        # naturally; otherwise coerce to the existing attribute's dtype so
+        # its type is preserved.
+        dt = None if isinstance(value, numpy.ndarray) else dtype
+        value = numpy.asarray(value, order='C', dtype=dt)
+
+        # Allow the case of () <-> (1,)
+        if value.shape != shape and not (value.size == 1 and numpy.prod(shape) == 1):
+            raise TypeError("Shape of data is incompatible with existing attribute")
+
+        self.create(name, data=value, shape=shape, dtype=dtype)
 
     def __len__(self):
         """ Number of attributes attached to the object. """
@@ -312,7 +359,7 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         attrs = self._parent.id.db.getAttributes(obj_id)
 
         def _get_created(name):
-            attr_json = self._parent.id.db.getAttribute(obj_id, name, includeData=False)
+            attr_json = self._parent.id.db.getAttribute(obj_id, name)
             return attr_json["created"]
 
         track_order = None

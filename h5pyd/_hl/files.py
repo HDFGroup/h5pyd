@@ -23,8 +23,7 @@ from h5json.filters import COMPRESSION_FILTER_NAMES
 
 from .objectid import GroupID
 from .group import Group
-from ..hsds_reader import HSDSReader
-from ..hsds_writer import HSDSWriter
+from ..hsds_plugin import HsdsPlugin
 
 from .. import config
 
@@ -38,9 +37,9 @@ def is_hdf5(domain, **kwargs):
     """
     found = False
 
-    app_logger = kwargs.get("app_Logger")
+    app_logger = kwargs.get("app_logger")
     db = Hdf5db(app_logger=app_logger)
-    db.reader = HSDSReader(domain, **kwargs)
+    db.plugin = HsdsPlugin(domain, read_only=True, **kwargs)
     try:
         db.open()
         found = True
@@ -208,12 +207,8 @@ class File(Group):
     def filename(self):
         """File name on disk"""
         filepath = None
-        if self.id.db.reader:
-            filepath = self.id.db.reader.filepath
-        elif self.id.db.writer:
-            filepath = self.id.db.writer.filepath
-        else:
-            pass  # no persistent storage enabled
+        if self.id.db.plugin:
+            filepath = self.id.db.plugin.filepath
         return filepath
 
     def _getStats(self):
@@ -224,10 +219,8 @@ class File(Group):
         if self._verboseInfo is None or now - self._verboseUpdated > 1:
             # refresh info from server
 
-            if self.id.db.reader:
-                stats = self.id.db.reader.getStats(verbose=True)
-            elif self.id.db.writer:
-                stats = self.id.db.writer.getStats(verbose=True)
+            if self.id.db.plugin:
+                stats = self.id.db.plugin.getStats(verbose=True)
             else:
                 stats = {"created": 0, "lastModified": 0, "owner": 0}
 
@@ -257,7 +250,7 @@ class File(Group):
 
         self._verifyOpen()
         mode = 'r'
-        if self.id.db.writer and self.id.db.writer.__class__.__name__ != "H5NullWriter":
+        if not self.id.db.plugin.read_only:
             mode += '+'
         return mode
 
@@ -407,37 +400,35 @@ class File(Group):
         if track_order:
             kwargs["track_order"] = track_order
 
-        root_id = None
+        new_domain = False
 
         if mode in ('w-', 'x'):
             file_exists = is_hdf5(domain, **kwargs)
             if file_exists:
                 raise FileExistsError()
+            # domain doesn't exist - fall through and create it below
+            db.plugin = HsdsPlugin(domain, getobjs=getobjs, **kwargs)
+            new_domain = True
         elif mode in ('r', 'r+', 'a'):
-            db.reader = HSDSReader(domain, getobjs=getobjs, **kwargs)
-            root_id = db.open()
-            """
-                if mode in ('r', 'r+'):
-                    self.log.warning(f"domain: {domain} not found")
-                    raise FileNotFoundError()
-            """
+            read_only = mode == 'r'
+            db.plugin = HsdsPlugin(domain, append=True, read_only=read_only, getobjs=getobjs, **kwargs)
         else:
-            file_exists = False  # will overwrite in either case
+            # mode == 'w' - create/overwrite the domain
+            db.plugin = HsdsPlugin(domain, getobjs=getobjs, **kwargs)
+            new_domain = True
 
-        if root_id:
-            # if mode is not read only, setup the writer
-            if mode != 'r':
-                db.close()
-                db.writer = HSDSWriter(domain, append=True, **kwargs)
-                db.open()
-        else:
-            # new domain, use writer to initialize domain
-            db.writer = HSDSWriter(domain, **kwargs)
-            root_id = db.open()
-            # now set the reader
-            db.reader = HSDSReader(domain, **kwargs)
-            db.close()
-            db.open()
+        db.open()
+
+        if new_domain:
+            # Flip the plugin out of its initial "bulk create" mode (_init) while
+            # the domain is still empty, so real content added afterward by the
+            # caller always goes through the normal per-object/per-selection
+            # update path on flush, rather than a single merged full-array
+            # rewrite the next time flush() happens to run - which loses the
+            # original write selections and can conflict with chunking for a
+            # resized/extended dataset.
+            db.flush()
+
         return db
 
     def __init__(
@@ -674,11 +665,12 @@ class File(Group):
     def compressors(self):
         """return list of compressors supported by this server"""
         self._verifyOpen()
-        if self.id:
-            # compressors = self.id.http_conn.compressors
+        stats = self._getStats()
+        compressors = stats.get("compressors")
+        if compressors is None:
+            # server didn't report a list - fall back to every compressor
+            # h5pyd knows how to represent client-side
             compressors = COMPRESSION_FILTER_NAMES
-        else:
-            compressors = []
         return compressors
 
     def run_scan(self):

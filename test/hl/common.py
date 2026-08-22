@@ -168,11 +168,16 @@ class TestCase(ut.TestCase):
                 if not match:
                     raise AssertionError(f"Item '{x}' appears in b but not a")
 
-    def assertArrayEqual(self, dset, arr, message=None, precision=None):
+    def assertArrayEqual(self, dset, arr, message=None, precision=None, check_alignment=None):
         """ Make sure dset and arr have the same shape, dtype and contents, to
             within the given precision.
 
             Note that dset may be a NumPy array or an HDF5 dataset.
+
+            check_alignment is accepted (and ignored) for compatibility with
+            tests ported from h5py's own suite - h5pyd never compares raw
+            struct memory layout (it has no C-struct representation to begin
+            with), so field alignment/padding is not a meaningful concept here.
         """
         if precision is None:
             precision = 1e-5
@@ -186,11 +191,8 @@ class TestCase(ut.TestCase):
                 np.isscalar(dset) and np.isscalar(arr),
                 f'Scalar/array mismatch ("{dset}" vs "{arr}"){message}'
             )
-            self.assertTrue(
-                dset - arr < precision,
-                f"Scalars differ by more than {precision:.3}{message}"
-            )
-            return
+            dset = np.asarray(dset)
+            arr = np.asarray(arr)
 
         self.assertTrue(
             dset.shape == arr.shape,
@@ -210,6 +212,12 @@ class TestCase(ut.TestCase):
                 np.all(np.abs(dset[...] - arr[...]) < precision),
                 f"Arrays differ by more than {precision:.3}{message}"
             )
+        elif arr.dtype.kind == 'O':
+            # vlen fields (e.g. vlen ints, or vlen compounds) - compare
+            # element-by-element rather than as a single ufunc call, since
+            # they don't have a fixed itemsize and may recurse further.
+            for v1, v2 in zip(dset.flat, arr.flat):
+                self.assertArrayEqual(v1, v2, message=message, precision=precision)
         else:
             self.assertTrue(
                 np.all(dset[...] == arr[...]),
@@ -275,20 +283,12 @@ class TestCase(ut.TestCase):
 
     def compare_unicodestr(self, val, expected):
         if expected == 0:
-            if config.get("use_h5py"):
-                self.assertTrue(isinstance(val, bytes))
-                self.assertEqual(val, b'')
-            else:
-                self.assertTrue(isinstance(val, int))
-                self.assertEqual(val, 0)
+            # unwritten vlen bytes default value
+            self.assertTrue(isinstance(val, bytes))
+            self.assertEqual(val, b'')
         else:
-            if config.get("use_h5py"):
-                self.assertTrue(isinstance(val, bytes))
-                self.assertEqual(val, expected.encode("utf-8"))
-            else:
-                # unicode strings returned as is in h5pyd
-                self.assertTrue(isinstance(val, str))
-                self.assertEqual(val, expected)
+            self.assertTrue(isinstance(val, bytes))
+            self.assertEqual(val, expected.encode("utf-8"))
 
     def is_hsds(self, id=None):
         """ Return True if the given identifier is HSDS (i.e. a string),

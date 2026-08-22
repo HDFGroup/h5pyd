@@ -118,6 +118,34 @@ class TestAttribute(TestCase):
         # close file
         f.close()
 
+    def test_modify(self):
+        """ Attributes are modified by the modify() method """
+        filename = self.getFileName("modify_attribute")
+        print("filename:", filename)
+        f = h5py.File(filename, 'w')
+
+        f.attrs.modify('a', 3)
+        self.assertTrue('a' in f.attrs)
+        self.assertEqual(f.attrs['a'], 3)
+
+        f.attrs.modify('a', 4)
+        self.assertTrue('a' in f.attrs)
+        self.assertEqual(f.attrs['a'], 4)
+
+        # if the attribute doesn't exist, create new
+        f.attrs.modify('b', 5)
+        self.assertTrue('a' in f.attrs)
+        self.assertTrue('b' in f.attrs)
+        self.assertEqual(f.attrs['a'], 4)
+        self.assertEqual(f.attrs['b'], 5)
+
+        # shape of new value is incompatible with the previous
+        new_value = np.arange(5)
+        with self.assertRaises(TypeError):
+            f.attrs.modify('b', new_value)
+
+        f.close()
+
 
 class TestTrackOrder(TestCase):
 

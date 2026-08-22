@@ -24,6 +24,7 @@ from concurrent.futures import as_completed
 
 from h5json.hdf5dtype import Reference, RegionReference
 from h5json.hdf5dtype import createDataType, check_dtype, special_dtype, guess_dtype, getTypeItem
+from h5json.hdf5dtype import isVlen, vlenBaseType
 from h5json.hdf5db import _decode
 from h5json.shape_util import getShapeJson, getShapeClass, getMaxDims
 from h5json.dset_util import generateLayout
@@ -71,6 +72,45 @@ def readtime_dtype(basetype, names):
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
 
 
+def _vlenStrToBytes(arr, dt):
+    """Recursively convert any vlen-of-str (utf-8) elements of dt within arr to
+    utf-8-encoded bytes, in place.
+
+    h5json decodes a utf-8 vlen string element to a Python str when reading,
+    but h5py's own convention is that a raw read always returns bytes for any
+    vlen string data (ascii or utf-8) - decoding to str only happens via
+    Dataset.asstr(). This bridges that gap at the h5pyd boundary. """
+    if len(dt) > 0:
+        for name in dt.names:
+            _vlenStrToBytes(arr[name], dt[name])
+        return
+    if isVlen(dt) and vlenBaseType(dt) is str:
+        for idx in numpy.ndindex(arr.shape):
+            v = arr[idx]
+            if isinstance(v, str):
+                # surrogateescape recovers the exact original bytes for a value
+                # HDF5 never validated the encoding of (see h5json's matching
+                # decode in array_util.readElement)
+                arr[idx] = v.encode("utf-8", errors="surrogateescape")
+
+
+def _encodeVlenAsciiStrict(arr, dt):
+    """Recursively encode any str element of an ascii-declared vlen (vlen: bytes)
+    field of dt within arr via the 'ascii' codec, in place.
+
+    Raises UnicodeEncodeError for non-ascii text, matching h5py's behavior of
+    not silently accepting non-ascii text for an ascii-declared string dataset. """
+    if len(dt) > 0:
+        for name in dt.names:
+            _encodeVlenAsciiStrict(arr[name], dt[name])
+        return
+    if isVlen(dt) and vlenBaseType(dt) is bytes:
+        for idx in numpy.ndindex(arr.shape):
+            v = arr[idx]
+            if isinstance(v, str):
+                arr[idx] = v.encode("ascii")
+
+
 def make_new_dset(
     parent,
     shape=None,
@@ -113,10 +153,21 @@ def make_new_dset(
         shape = data.shape
     else:
         shape = (shape,) if isinstance(shape, int) else tuple(shape)
-        if data is not None and (
-            numpy.prod(shape, dtype=numpy.ulonglong) != numpy.prod(data.shape, dtype=numpy.ulonglong)
-        ):
-            raise ValueError("Shape tuple is incompatible with data")
+        if data is not None:
+            if numpy.prod(shape, dtype=numpy.ulonglong) != numpy.prod(data.shape, dtype=numpy.ulonglong):
+                raise ValueError("Shape tuple is incompatible with data")
+            if data.shape != shape:
+                # data fits the given shape by element count, but isn't
+                # already that shape (e.g. flat data for a multi-dim shape)
+                data = data.reshape(shape)
+
+    if isinstance(maxshape, int):
+        maxshape = (maxshape,)
+
+    if shape is None and (chunks or maxshape is not None):
+        raise TypeError("Chunks/maxshape not allowed for null space datasets")
+    if shape == () and chunks:
+        raise TypeError("Chunks not allowed for scalar datasets")
 
     shape_json = getShapeJson(shape, maxdims=maxshape)
     if getShapeClass(shape_json) == "H5S_NULL":
@@ -145,6 +196,9 @@ def make_new_dset(
         else:
             dtype = numpy.dtype(dtype)
 
+        if dtype.kind == "U":
+            raise TypeError("Fixed-length unicode data is not supported")
+
         if dtype.kind == "O" and dtype.metadata and "ref" in dtype.metadata:
             type_json = {}
             type_json["class"] = "H5T_REFERENCE"
@@ -164,8 +218,31 @@ def make_new_dset(
         shuffle_filter = getFilterItem("shuffle")
         filters.append(shuffle_filter)
 
-    if scaleoffset:
-        scaleoffset_filter = getFilterItem("scaleoffset")
+    if scaleoffset is not None:
+        # scaleoffset must be a non-negative number, except for integer data,
+        # for which scaleoffset == True is permissible (auto-detected precision)
+        if scaleoffset < 0:
+            raise ValueError("scale factor must be >= 0")
+
+        so_dtype = dtype.dtype if isinstance(dtype, Datatype) else dtype
+        if so_dtype.kind == "f":
+            if scaleoffset is True:
+                raise ValueError(
+                    "integer scaleoffset must be provided for floating point types"
+                )
+            scale_type = "H5Z_SO_FLOAT_DSCALE"
+        elif so_dtype.kind in ("u", "i"):
+            if scaleoffset is True:
+                scaleoffset = 0  # auto-detect precision
+            scale_type = "H5Z_SO_INT"
+        else:
+            raise TypeError(
+                "scale/offset filter only supported for integer and floating-point types"
+            )
+
+        scaleoffset_filter = getFilterItem(
+            "scaleoffset", options={"scaleType": scale_type, "scaleOffset": int(scaleoffset)}
+        )
         filters.append(scaleoffset_filter)
 
     if fletcher32:
@@ -174,25 +251,46 @@ def make_new_dset(
 
     # Legacy
     if compression is True:
-        compression_filter = getFilterItem("gzip")
-        if compression_opts:
-            compression_filter["level"] = compression_opts
-        filters.append(compression_filter)
-    elif compression:
-        if isinstance(compression, int):
-            compression_filter = getFilterItem("gzip")
-            compression_filter["level"] = compression
+        if compression_opts is None:
+            compression_opts = 4
+        compression = "gzip"
+
+    if isinstance(compression, int) and not isinstance(compression, bool):
+        if compression in _LEGACY_GZIP_COMPRESSION_VALS:
+            # legacy shorthand: compression is itself the gzip level
+            compression_opts = compression
+            compression = "gzip"
+        elif compression < 0:
+            raise ValueError(f"Invalid filter number: {compression}")
         else:
-            compression_filter = getFilterItem(compression)
-            if compression_opts:
-                compression_filter["level"] = compression_opts
-            # TBD: how to set options for non-gzip filters?
+            raise ValueError(f"Unknown compression filter number: {compression}")
+
+    if compression:
+        options = {}
+        if compression_opts is not None:
+            if compression in ("gzip", "deflate", "zlib", "lz4"):
+                level = compression_opts
+                if isinstance(level, (tuple, list)):
+                    level = level[0]
+                options["level"] = level
+            elif compression == "szip":
+                coding, pixels_per_block = compression_opts
+                coding_map = {"ec": "H5_SZIP_EC_OPTION_MASK", "nn": "H5_SZIP_NN_OPTION_MASK"}
+                options["coding"] = coding_map.get(coding, coding)
+                options["pixelsPerBlock"] = pixels_per_block
+            # TBD: how to set options for other filters
+        compression_filter = getFilterItem(compression, options=options)
         filters.append(compression_filter)
-    else:
-        pass  # no compression filter
 
     if filters and chunks is None:
         chunks = True  # specify chunking if filter is used
+
+    if chunks is False:
+        is_extensible = maxshape is not None and any(
+            m is None or m != s for m, s in zip(maxshape, shape)
+        )
+        if filters or is_extensible:
+            raise ValueError("Chunked format required for given storage options")
 
     # TBD - make these values part of config
     CHUNK_MIN = 512 * 1024  # Soft lower limit (512k)
@@ -340,7 +438,10 @@ class FieldsWrapper:
 
     def __getitem__(self, args):
         data = self._dset.__getitem__(args, new_dtype=self.read_dtype)
-        if self.extract_field is not None:
+        if self.extract_field is not None and getattr(data.dtype, "names", None):
+            # only extract if the returned data is still structured - a
+            # single-field selection on a non-scalar dataset already comes
+            # back as a bare (non-compound) array
             data = data[self.extract_field]
         return data
 
@@ -362,6 +463,7 @@ class PointsAccessor:
             raise TypeError("Invalid points selection")
         db = self.dset.id.db
         arr = db.getDatasetValues(self.dset.id.uuid, ps)
+        _vlenStrToBytes(arr, arr.dtype)
 
         return arr
 
@@ -825,6 +927,8 @@ class Dataset(HLObject):
         BEWARE: Modifications to the yielded data are *NOT* written to file.
         """
         shape = self.shape
+        if len(shape) == 0:
+            raise TypeError("Can't iterate over a scalar dataset")
         for i in range(shape[0]):
             yield self[i]
 
@@ -937,13 +1041,20 @@ class Dataset(HLObject):
             if query is not None:
                 raise TypeError("query is not supported for scalar datasets")
 
+            if len(args) != 0 and not (len(args) == 1 and args[0] is Ellipsis):
+                raise ValueError("Illegal slicing argument for scalar dataspace")
+
             selection = sel.select(self, args)
             self.log.info(f"selection.mshape: {selection.mshape}")
 
             sel_all = sel.select((), ...)
             arr = db.getDatasetValues(self.id.uuid, sel_all)
+            _vlenStrToBytes(arr, arr.dtype)
 
-            if selection.mshape is None:
+            if len(args) == 0:
+                # dset[()] - unwrap to a numpy scalar (matches h5py/numpy
+                # convention that indexing a 0-d array with () returns its
+                # scalar item, while dset[...] keeps the 0-d ndarray)
                 msg = f"return scalar selection of: {arr}, dtype: {arr.dtype}, shape: {arr.shape}"
                 self.log.info(msg)
                 val = arr[()]
@@ -955,21 +1066,30 @@ class Dataset(HLObject):
 
         # Perform the dataspace selection
 
+        # a narrowed (field-subset) mtype, e.g. from Dataset.fields(), restricts
+        # the read to just those fields - db.getDatasetValues() does the actual
+        # per-field narrowing based on selection.fields
+        read_fields = None
+        if mtype.names is not None and mtype.names != self.dtype.names:
+            read_fields = mtype.names
+
         if args and isinstance(args[0], numpy.ndarray) and args[0].dtype.kind == 'b':
             # use argument as a mask to create a point selection
             if args[0].shape != self.shape:
                 raise TypeError("Boolean mask shape must match dataset shape")
             # convert the boolean mask to a point selection
             points = numpy.transpose(args[0].nonzero())
-            selection = sel.select(self.shape, points)
+            selection = sel.select(self.shape, points, fields=read_fields)
         else:
             # create selection from the args
-            selection = sel.select(self.shape, args)
+            selection = sel.select(self.shape, args, fields=read_fields)
 
         if query is not None:
-            if mtype.names != self.dtype.names:
+            if read_fields is not None:
                 raise IOError("field selection not supported with query")  # TBD
-            return db.getDatasetValues(self.id.uuid, selection, query=query)
+            arr = db.getDatasetValues(self.id.uuid, selection, query=query)
+            _vlenStrToBytes(arr, arr.dtype)
+            return arr
 
         if selection.nselect == 0:
             # force compliance with h5py selection behavior
@@ -983,16 +1103,8 @@ class Dataset(HLObject):
         self.log.debug(f"dataset shape: {self.shape}")
         self.log.debug(f"mshape: {mshape}")
 
-        # Perform the actual read
-        fields = None
-
-        if mtype.names != self.dtype.names:
-            fields = ":".join(mtype.names)
-
-        if fields:
-            raise IOError("field selection not supported yet")  # TBD
-
         arr = db.getDatasetValues(self.id.uuid, selection)
+        _vlenStrToBytes(arr, arr.dtype)
 
         self.log.info(f"got arr: {arr.shape}, cleaning up shape!")
         # Patch up the output for NumPy
@@ -1121,21 +1233,19 @@ class Dataset(HLObject):
             # (self.dtype.str != val.dtype.str)
             # for cases where the val is a numpy array but different type than self?
             if len(names) == 1 and self.dtype.fields is not None:
-                # Single field selected for write, from a non-array source
+                # Single field selected for write, from a non-array source.
+                # Keep val in the field's own bare (non-compound) dtype - this
+                # matches Hdf5db.setDatasetValues()'s field-restricted dtype
+                # check, which expects a bare dtype for a single selected field.
                 if not names[0] in self.dtype.fields:
                     raise ValueError(f"No such field for indexing: {names[0]}")
                 dtype = self.dtype.fields[names[0]][0]
-                cast_compound = True
             else:
                 dtype = self.dtype
-                cast_compound = False
 
-            self.log.debug(f"asarray dtype: {dtype}, cast_compound: {cast_compound}")
+            self.log.debug(f"asarray dtype: {dtype}")
             val = numpy.asarray(val, dtype=dtype.base, order="C")
-            if cast_compound:
-                # val = val.astype(numpy.dtype([(names[0], dtype)]))
-                val = val.view(numpy.dtype([(names[0], dtype)]))
-                val = val.reshape(val.shape[:len(val.shape) - len(dtype.shape)])
+            _encodeVlenAsciiStrict(val, dtype)
 
         elif isinstance(val, numpy.ndarray):
             # convert array if needed
@@ -1181,7 +1291,7 @@ class Dataset(HLObject):
         self.log.debug(f"data dtype: {val.dtype}")
 
         # Perform the dataspace selection
-        selection = sel.select(self, args)
+        selection = sel.select(self, args, fields=names if names else None)
         self.log.debug(f"selection.mshape: {selection.mshape}")
         if selection.nselect == 0:
             return
@@ -1198,7 +1308,16 @@ class Dataset(HLObject):
             val = val2
             mshape = val.shape
 
-        val = val.reshape(selection.tgtshape)  # reshape to same rank as dataset
+        # reshape to same rank as dataset, preserving any trailing array-type
+        # sub-shape - either the whole dataset's own array dtype, or a single
+        # named field's array-type sub-dtype (e.g. a compound field declared
+        # as (float64, (3,)))
+        subarray_shape = ()
+        if len(names) == 1 and self.dtype.fields is not None:
+            subarray_shape = self.dtype.fields[names[0]][0].shape
+        elif self.dtype.subdtype is not None:
+            subarray_shape = self.dtype.subdtype[1]
+        val = val.reshape(tuple(selection.tgtshape) + subarray_shape)
         db = self.id.db
 
         db.setDatasetValues(self.id.uuid, selection, val)

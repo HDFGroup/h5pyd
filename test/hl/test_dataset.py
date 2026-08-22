@@ -1795,7 +1795,6 @@ class TestVlen(BaseDataset):
         np_dt = np.float64
         self._help_float_testing(np_dt)
 
-    @ut.expectedFailure
     def test_non_contiguous_arrays(self):
         """Test that non-contiguous arrays are stored correctly"""
         # Expected failure on HSDS; skip with h5py

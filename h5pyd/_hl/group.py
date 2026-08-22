@@ -478,17 +478,17 @@ class Group(HLObject, MutableMappingHDF5):
                 #  (and hence the http conn socket won't be closed)
                 from .files import File
                 external_domain = link_json['file']
-                reader = self.id.db.reader
+                plugin = self.id.db.plugin
 
                 if not external_domain.startswith("hdf5://") and not op.isabs(external_domain):
-                    current_domain = reader.filepath
+                    current_domain = plugin.filepath
                     external_domain = op.join(op.dirname(current_domain), external_domain)
                     external_domain = op.normpath(external_domain)
                 try:
                     kwargs = {}
-                    kwargs["endpoint"] = reader.http_conn.endpoint
-                    kwargs["username"] = reader.http_conn.username
-                    kwargs["password"] = reader.http_conn.password
+                    kwargs["endpoint"] = plugin.http_conn.endpoint
+                    kwargs["username"] = plugin.http_conn.username
+                    kwargs["password"] = plugin.http_conn.password
                     kwargs["mode"] = 'r'
                     kwargs["track_order"] = track_order
 

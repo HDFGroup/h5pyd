@@ -237,12 +237,12 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 2)
 
         # no explicit ACLs yet
-        file_acls = f.id.db.reader.getACLs()
+        file_acls = f.id.db.plugin.getACLs()
         self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl
 
         username = f.owner
 
-        file_acl = f.id.db.reader.getACL(username)
+        file_acl = f.id.db.plugin.getACL(username)
         # default owner ACL should grant full permissions
         acl_keys = ("create", "read", "update", "delete", "readACL", "updateACL")
         # self.assertEqual(file_acl["userName"], "default")
@@ -250,7 +250,7 @@ class TestFile(TestCase):
             self.assertEqual(file_acl[k], True)
 
         try:
-            default_acl = f.id.db.reader.getACL("default")
+            default_acl = f.id.db.plugin.getACL("default")
         except IOError as ioe:
             if ioe.errno == 404:
                 pass  # expected
@@ -263,7 +263,7 @@ class TestFile(TestCase):
             else:
                 default_acl[key] = False
         default_acl["userName"] = "default"
-        f.id.db.writer.putACL(default_acl)
+        f.id.db.plugin.putACL(default_acl)
 
         f.close()
 
@@ -295,7 +295,7 @@ class TestFile(TestCase):
         user2_acl["read"] = True  # allow read access
         user2_acl["update"] = True
         user2_acl["readACL"] = True
-        f.id.db.writer.putACL(user2_acl)
+        f.id.db.plugin.putACL(user2_acl)
 
         f.close()
 

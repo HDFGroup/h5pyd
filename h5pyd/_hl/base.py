@@ -23,7 +23,6 @@ from collections.abc import (
 from datetime import datetime
 
 from h5json.hdf5dtype import Reference
-from h5json.h5writer import H5NullWriter
 from .objectid import GroupID
 
 numpy_integer_types = (np.int8, np.uint8, np.int16, np.int16, np.int32, np.uint32, np.int64, np.uint64)
@@ -332,10 +331,7 @@ class HLObject(CommonStateObject):
 
     @property
     def read_only(self):
-        if isinstance(self.id.db.writer, H5NullWriter):
-            return True
-        else:
-            return False
+        return self.id.db.plugin.read_only
 
     def verifyCert(self):
         # default to validate CERT for https requests, unless

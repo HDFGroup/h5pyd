@@ -395,7 +395,8 @@ class TestMultiManager(TestCase):
             arr = f["data" + str(i)][...]
             self.assertEqual(arr.dtype, dt)
 
-            np.testing.assert_array_equal(arr, data_in_vlen)
+            decoded = np.array([s.decode() for s in arr.reshape(-1)], dtype=dt).reshape(shape)
+            np.testing.assert_array_equal(decoded, data_in_vlen)
 
     def test_multi_write_mixed_shapes(self):
         """
