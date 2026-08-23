@@ -22,7 +22,7 @@ from __future__ import absolute_import
 import numpy
 
 from h5json.hdf5dtype import special_dtype, check_dtype, guess_dtype
-from h5json.hdf5dtype import Reference
+from h5json.hdf5dtype import Reference, RegionReference
 from h5json.array_util import array_for_new_object
 
 from . import base
@@ -156,6 +156,12 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                 else:
                     ref = Reference(v)
                 return ref
+            if check_dtype(ref=dtype) is RegionReference:
+                if not v:
+                    return None  # null reference
+                if isinstance(v, RegionReference):
+                    return v
+                return RegionReference.frombytes(v)
             if isinstance(v, str):
                 # if this is not utf-8, return bytes instead
                 try:
@@ -183,6 +189,12 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
                     if isinstance(val, bytes):
                         val = val.decode("utf-8")
                     arr.flat[i] = str(val)
+
+        if check_dtype(ref=dtype) is RegionReference:
+            for i in range(arr.size):
+                val = arr.flat[i]
+                if isinstance(val, bytes):
+                    arr.flat[i] = RegionReference.frombytes(val) if val else None
 
         return arr
 
@@ -235,6 +247,8 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         # so it's caught later as a TypeError instead).
         if isinstance(data, Reference):
             dtype = special_dtype(ref=Reference)
+        elif isinstance(data, RegionReference):
+            dtype = special_dtype(ref=RegionReference)
         if not isinstance(data, Empty):
             data = array_for_new_object(data, specified_dtype=dtype)
             if data.dtype.kind == "U":

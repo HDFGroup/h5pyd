@@ -1229,13 +1229,7 @@ class TestStrings(BaseDataset):
         self.assertEqual(string_info.encoding, 'ascii')
         self.assertEqual(string_info.length, 10)
 
-    @ut.expectedFailure
     def test_fixed_utf8(self):
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
-        # TBD: Investigate
         dt = h5py.string_dtype(encoding='utf-8', length=5)
         ds = self.f.create_dataset('x', (100,), dtype=dt)
         type_json = ds.id.type_json
@@ -1572,7 +1566,6 @@ class TestZeroShape(BaseDataset):
         self.assertEqual(ds[()].dtype, arr.dtype)
 
 
-@ut.skip("RegionRefs not supported")
 class TestRegionRefs(BaseDataset):
 
     """
@@ -1598,18 +1591,24 @@ class TestRegionRefs(BaseDataset):
         # Ideally we should preserve shape (0, 100), but it seems this is lost.
 
     def test_scalar_dataset(self):
+        """ A region reference to a scalar dataset's whole dataspace
+        dereferences to the dataset's own value """
+        ds = self.f.create_dataset("scalar", data=1.0, dtype='f4')
+        ref = ds.regionref[...]
+        self.assertEqual(ds[ref], ds[()])
+
+    def test_scalar_dataset_deselected(self):
+        """ A deselected region reference on a scalar dataset dereferences
+        to Empty - h5pyd has no high-level way to create a deselected
+        reference (regionref[...] always selects the dataspace's one
+        point), so this specifically exercises real h5py's low-level API. """
+        if not config.get("use_h5py"):
+            self.skipTest("low-level api not supported")
         ds = self.f.create_dataset("scalar", data=1.0, dtype='f4')
         sid = h5py.h5s.create(h5py.h5s.SCALAR)
-
-        # Deselected
         sid.select_none()
         ref = h5py.h5r.create(ds.id, b'.', h5py.h5r.DATASET_REGION, sid)
         assert ds[ref] == h5py.Empty(np.dtype('f4'))
-
-        # Selected
-        sid.select_all()
-        ref = h5py.h5r.create(ds.id, b'.', h5py.h5r.DATASET_REGION, sid)
-        assert ds[ref] == ds[()]
 
     def test_ref_shape(self):
         """ Region reference shape and selection shape """
@@ -1617,6 +1616,25 @@ class TestRegionRefs(BaseDataset):
         ref = self.dset.regionref[slic]
         self.assertEqual(self.dset.regionref.shape(ref), self.dset.shape)
         self.assertEqual(self.dset.regionref.selection(ref), (10, 18))
+
+    def test_regref_dtype(self):
+        """ Indexing a region reference dataset returns a RegionReference instance """
+        slic = np.s_[25:35, 10:90]
+        regref = self.dset.regionref[slic]
+        dt = h5py.special_dtype(ref=h5py.RegionReference)
+        refs_dset = self.f.create_dataset("refs", (1,), dtype=dt)
+        refs_dset[0] = regref
+        self.assertEqual(type(refs_dset[0]), h5py.RegionReference)
+        self.assertArrayEqual(self.dset[refs_dset[0]], self.data[slic])
+
+    def test_regref_attribute(self):
+        """ Region references can be stored as attribute values """
+        slic = np.s_[25:35, 10:90]
+        regref = self.dset.regionref[slic]
+        self.f.attrs.create("region_attr", regref)
+        out = self.f.attrs["region_attr"]
+        self.assertEqual(type(out), h5py.RegionReference)
+        self.assertArrayEqual(self.dset[out], self.data[slic])
 
 
 class TestAstype(BaseDataset):

@@ -170,20 +170,45 @@ class _RegionProxy(object):
     """
 
     def __init__(self, obj):
+        self._obj = obj
         self.id = obj.id
-        self._name = None
 
     def __getitem__(self, args):
-        pass
-        # bases classes will override
+        from .dataset import Dataset
+        from h5json import selections as sel
+        from h5json.hdf5dtype import RegionReference
+
+        if not isinstance(self._obj, Dataset):
+            raise TypeError("Region references can only be made to datasets")
+
+        selection = sel.select(self._obj, args)
+        return RegionReference(self._obj.id.uuid, selection)
+
+    def _target_dataset(self, ref):
+        """ Return a Dataset instance for the object a region reference points to """
+        from .dataset import Dataset
+        from .objectid import DatasetID
+
+        if ref.id is None:
+            raise ValueError("Cannot dereference a null region reference")
+        # ref.id is already the canonical "d-<uuid>" hashtag form
+        dsetid = DatasetID(None, ref.id, db=self.id.db)
+        return Dataset(dsetid)
 
     def shape(self, ref):
-        pass
+        """ Get the shape of the target dataspace referred to by *ref*. """
+        return self._target_dataset(ref).shape
 
     def selection(self, ref):
         """ Get the shape of the target dataspace selection referred to by *ref*
         """
-        pass
+        from h5json.selections import Selection
+
+        if ref.selection_bytes is None:
+            # no selection was bound - the whole dataset is referenced
+            return self._target_dataset(ref).shape
+        selection = Selection.frombytes(ref.selection_bytes)
+        return selection.mshape
 
 
 class ACL(object):
@@ -296,8 +321,7 @@ class HLObject(CommonStateObject):
         (via .shape property), or the shape of the selection (via the
         .selection property).
         """
-        return "todo"
-        # return _RegionProxy(self)
+        return _RegionProxy(self)
 
     @property
     def attrs(self):

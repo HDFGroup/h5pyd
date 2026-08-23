@@ -111,6 +111,84 @@ def _encodeVlenAsciiStrict(arr, dt):
                 arr[idx] = v.encode("ascii")
 
 
+def _encodeFixedUtf8(val, dtype):
+    """Recursively encode any str element to UTF-8 bytes, for a value being
+    written to a fixed-length, UTF8-declared string dataset (see
+    string_dtype()'s 'h5py_encoding' metadata).
+
+    numpy's own str -> fixed 'S' dtype conversion is always ASCII-only
+    (numpy has no notion of the dtype's declared charset), so without this,
+    writing a plain Python str to a UTF8-declared fixed-length dataset
+    raises UnicodeEncodeError instead of encoding as UTF-8 like h5py does.
+
+    A 'U'-kind (fixed-length unicode) source array is rejected outright,
+    matching h5py - there's no implicit numpy-unicode-to-HDF5 conversion. """
+    if isinstance(val, str):
+        return val.encode("utf-8")
+    if isinstance(val, bytes):
+        return val
+    if isinstance(val, numpy.ndarray):
+        if val.dtype.kind == "U":
+            raise TypeError(f"No conversion path for dtype: {val.dtype!r}")
+        if val.dtype.kind == "O":
+            out = numpy.empty(val.shape, dtype=object)
+            flat_out = out.reshape(-1)
+            flat_in = val.reshape(-1)
+            for i in range(flat_in.size):
+                flat_out[i] = _encodeFixedUtf8(flat_in[i], dtype)
+            return out
+        return val
+    if isinstance(val, (list, tuple)):
+        return [_encodeFixedUtf8(v, dtype) for v in val]
+    return val
+
+
+def _regionRefBytesToObj(arr, dt):
+    """Recursively convert any RegionReference element of dt within arr from
+    its raw RegionReference.tobytes()-encoded bytes to an actual
+    RegionReference instance, in place (an empty/null bytes value becomes
+    None).
+
+    h5json's dataset binary buffer format (array_util.readElement) returns a
+    region reference as raw bytes - this bridges that gap at the h5pyd
+    boundary, mirroring how a plain object Reference already round-trips as
+    a bare uuid string that Group.__getitem__ understands directly. """
+    if len(dt) > 0:
+        for name in dt.names:
+            _regionRefBytesToObj(arr[name], dt[name])
+        return
+    if check_dtype(ref=dt) is RegionReference:
+        for idx in numpy.ndindex(arr.shape):
+            v = arr[idx]
+            if isinstance(v, bytes):
+                arr[idx] = RegionReference.frombytes(v) if v else None
+            elif v == 0:
+                # uninitialized element - see array_util.getElementSize()
+                arr[idx] = None
+
+
+def _regionRefObjToBytes(arr, dt):
+    """Recursively convert any RegionReference element of dt within arr to
+    its raw RegionReference.tobytes()-encoded bytes, in place (None becomes
+    an empty/null bytes value).
+
+    Unlike attribute JSON encoding (array_util.bytesArrayToList), which
+    accepts a RegionReference instance directly, h5json's dataset binary
+    buffer format (array_util.copyElement/getElementSize) requires region
+    references to already be serialized to bytes. """
+    if len(dt) > 0:
+        for name in dt.names:
+            _regionRefObjToBytes(arr[name], dt[name])
+        return
+    if check_dtype(ref=dt) is RegionReference:
+        for idx in numpy.ndindex(arr.shape):
+            v = arr[idx]
+            if isinstance(v, RegionReference):
+                arr[idx] = v.tobytes()
+            elif v is None:
+                arr[idx] = b""
+
+
 def make_new_dset(
     parent,
     shape=None,
@@ -343,6 +421,7 @@ def make_new_dset(
     if data is not None and not isinstance(data, Empty):
         # init data
         sel_all = sel.select(tuple(shape), ...)
+        _regionRefObjToBytes(data, data.dtype)
         parent.id.db.setDatasetValues(dset_uuid, sel_all, data)
 
     dset = DatasetID(parent, dset_uuid)
@@ -464,6 +543,7 @@ class PointsAccessor:
         db = self.dset.id.db
         arr = db.getDatasetValues(self.dset.id.uuid, ps)
         _vlenStrToBytes(arr, arr.dtype)
+        _regionRefBytesToObj(arr, arr.dtype)
 
         return arr
 
@@ -475,6 +555,7 @@ class PointsAccessor:
         if values.shape != ps.mshape:
             raise ValueError(f"Expected data shape {ps.mshape}, got {values.shape}")
 
+        _regionRefObjToBytes(values, values.dtype)
         db = self.dset.id.db
         db.setDatasetValues(self.dset.id.uuid, ps, values)
 
@@ -1041,20 +1122,29 @@ class Dataset(HLObject):
             if query is not None:
                 raise TypeError("query is not supported for scalar datasets")
 
-            if len(args) != 0 and not (len(args) == 1 and args[0] is Ellipsis):
+            is_region_ref = len(args) == 1 and isinstance(args[0], RegionReference)
+            if not is_region_ref and len(args) != 0 and not (len(args) == 1 and args[0] is Ellipsis):
                 raise ValueError("Illegal slicing argument for scalar dataspace")
 
             selection = sel.select(self, args)
             self.log.info(f"selection.mshape: {selection.mshape}")
 
+            if is_region_ref and selection.nselect == 0:
+                # a deselected (H5S_SEL_NONE) region reference on a scalar
+                # dataspace refers to nothing
+                return Empty(self.dtype)
+
             sel_all = sel.select((), ...)
             arr = db.getDatasetValues(self.id.uuid, sel_all)
             _vlenStrToBytes(arr, arr.dtype)
+            _regionRefBytesToObj(arr, arr.dtype)
 
-            if len(args) == 0:
+            if len(args) == 0 or is_region_ref:
                 # dset[()] - unwrap to a numpy scalar (matches h5py/numpy
                 # convention that indexing a 0-d array with () returns its
-                # scalar item, while dset[...] keeps the 0-d ndarray)
+                # scalar item, while dset[...] keeps the 0-d ndarray) - a
+                # region reference reads the same way, since it can only
+                # ever select the dataspace's one point (or none, above)
                 msg = f"return scalar selection of: {arr}, dtype: {arr.dtype}, shape: {arr.shape}"
                 self.log.info(msg)
                 val = arr[()]
@@ -1081,19 +1171,27 @@ class Dataset(HLObject):
             points = numpy.transpose(args[0].nonzero())
             selection = sel.select(self.shape, points, fields=read_fields)
         else:
-            # create selection from the args
-            selection = sel.select(self.shape, args, fields=read_fields)
+            # create selection from the args - pass self (not self.shape) so
+            # a RegionReference argument can be validated against this
+            # dataset's own id
+            selection = sel.select(self, args, fields=read_fields)
 
         if query is not None:
             if read_fields is not None:
                 raise IOError("field selection not supported with query")  # TBD
             arr = db.getDatasetValues(self.id.uuid, selection, query=query)
             _vlenStrToBytes(arr, arr.dtype)
+            _regionRefBytesToObj(arr, arr.dtype)
             return arr
 
         if selection.nselect == 0:
-            # force compliance with h5py selection behavior
-            shape = numpy.empty(self.shape)[args].shape
+            if len(args) == 1 and isinstance(args[0], RegionReference):
+                # args[0] isn't something numpy indexing understands -
+                # the selection's own mshape already has the answer
+                shape = selection.mshape
+            else:
+                # force compliance with h5py selection behavior
+                shape = numpy.empty(self.shape)[args].shape
             return numpy.ndarray(shape, dtype=new_dtype)
         # Up-converting to (1,) so that numpy.ndarray correctly creates
         # np.void rows in case of multi-field dtype. (issue 135)
@@ -1105,6 +1203,7 @@ class Dataset(HLObject):
 
         arr = db.getDatasetValues(self.id.uuid, selection)
         _vlenStrToBytes(arr, arr.dtype)
+        _regionRefBytesToObj(arr, arr.dtype)
 
         self.log.info(f"got arr: {arr.shape}, cleaning up shape!")
         # Patch up the output for NumPy
@@ -1155,6 +1254,10 @@ class Dataset(HLObject):
             # h5pyd References are just strings
             self.log.info("converting Reference to string")
             val = val.tolist()
+
+        if self.dtype.kind == "S" and self.dtype.metadata and \
+                self.dtype.metadata.get("h5py_encoding") == "utf-8" and not isinstance(val, Empty):
+            val = _encodeFixedUtf8(val, self.dtype)
 
         # Sort field indices from the slicing
         names = tuple(x for x in args if isinstance(x, str))
@@ -1246,6 +1349,7 @@ class Dataset(HLObject):
             self.log.debug(f"asarray dtype: {dtype}")
             val = numpy.asarray(val, dtype=dtype.base, order="C")
             _encodeVlenAsciiStrict(val, dtype)
+            _regionRefObjToBytes(val, dtype)
 
         elif isinstance(val, numpy.ndarray):
             # convert array if needed
