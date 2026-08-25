@@ -54,15 +54,17 @@ class TestTable(TestCase):
         self.assertEqual(num_rows, count)
 
         # try the same thing using cursor object
-        cursor = table.create_cursor()
         num_rows = 0
-        for row in cursor:
+        for row in table.read():
             self.assertEqual(len(row), 2)
             num_rows += 1
         self.assertEqual(num_rows, count)
 
-        arr = table.read(start=5, stop=6)
-        self.assertEqual(arr.shape, (1,))
+        num_rows = 0
+        for row in table.read(start=5, stop=6):
+            self.assertEqual(len(row), 2)
+            num_rows += 1
+        self.assertEqual(num_rows, 1)
 
         f.close()
 
@@ -103,9 +105,8 @@ class TestTable(TestCase):
                 # first two columns will come back as bytes, not strs
                 self.assertEqual(row[col], item[col])
 
-        cursor = table.create_cursor()
         indx = 0
-        for row in cursor:
+        for row in table.read():
             item = data[indx]
             for col in range(2, 3):
                 # first two columns will come back as bytes, not strs
@@ -113,9 +114,8 @@ class TestTable(TestCase):
             indx += 1
         self.assertEqual(indx, len(data))
 
-        cursor = table.create_cursor(start=2, stop=5)
         indx = 2
-        for row in cursor:
+        for row in table.read(start=2, stop=5):
             item = data[indx]
             for col in range(2, 3):
                 # first two columns will come back as bytes, not strs
@@ -124,36 +124,38 @@ class TestTable(TestCase):
         self.assertEqual(indx, 5)
 
         condition = "symbol == b'AAPL'"
-        quotes = table.read_where(condition)
-        self.assertEqual(len(quotes), 4)
         expected_indices = [1, 4, 7, 10]
-        for i in range(4):
-            quote = quotes[i]
-            self.assertEqual(len(quote), 5)
-            self.assertEqual(quote[0], expected_indices[i])
-            self.assertEqual(quote[1], b'AAPL')
+        count = 0
+        for row in table.read_where(condition):
+            expected = data[expected_indices[count]]
+            self.assertEqual(len(row), 4)
+            self.assertEqual(row[0], b'AAPL')
+            self.assertEqual(row[1], expected[1].encode())
+            self.assertEqual(row[2], expected[2])
+            self.assertEqual(row[3], expected[3])
+            count += 1
+        self.assertEqual(count, len(expected_indices))
+
+        indices = table.get_where_list(condition)
+        self.assertEqual(indices, expected_indices)
 
         # read up to 2 rows
-        quotes = table.read_where(condition, limit=2)
-        self.assertEqual(len(quotes), 2)
-
-        # use a query cursor
-        cursor = table.create_cursor(condition=condition)
-        num_rows = 0
-        for row in cursor:
-            self.assertEqual(len(row), 5)
-            num_rows += 1
-        self.assertEqual(num_rows, 4)
+        count = 0
+        limit = 2
+        for row in table.read_where(condition, limit=limit):
+            self.assertEqual(row[0], b'AAPL')
+            count += 1
+        self.assertEqual(count, 2)
+        indices = table.get_where_list(condition, limit=2)
+        self.assertEqual(len(indices), 2)
 
         # try a compound query
         condition = "(open > 3000) & (open < 3100)"
-        quotes = table.read_where(condition)
-
-        self.assertEqual(len(quotes), 5)
-        for i in range(4):
-            quote = quotes[i]
-            self.assertTrue(quote[3] > 3000)
-            self.assertTrue(quote[3] < 3100)
+        count = 0
+        for row in table.read_where(condition):
+            self.assertTrue(row[2] > 3000)
+            self.assertTrue(row[2] < 3100)
+            count += 1
 
         # try modifying specific rows
         condition = "symbol == b'AAPL'"
@@ -161,7 +163,7 @@ class TestTable(TestCase):
         indices = table.update_where(condition, update_val)
         self.assertEqual(len(indices), 4)
         self.assertEqual(list(indices), [1, 4, 7, 10])
-
+        f.flush()
         row = tuple(table[4])
         self.assertEqual(row, (b'AAPL', b'20170103', 123, 3034))
 

@@ -119,9 +119,11 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
         dtype = arr.dtype
         shape = arr.shape
 
-        # HDF5 has no native complex type - h5json represents complex
-        # numbers as a compound with 'r'/'i' float fields (see create()) -
-        # convert back to a genuine complex dtype on read.
+        # HDF5 does have a native complex type now, but h5py hasn't been
+        # updated to use it yet - for compatibility, h5json represents
+        # complex numbers the way h5py itself does: a compound with 'r'/'i'
+        # float fields (see create()). Convert back to a genuine complex
+        # dtype on read.
         if dtype.names == ("r", "i") and all(dtype[n].kind == "f" for n in ("r", "i")) \
                 and dtype["r"] == dtype["i"]:
             byteorder = dtype["r"].byteorder
@@ -290,9 +292,10 @@ class AttributeManager(base.MutableMappingHDF5, base.CommonStateObject):
             dtype = numpy.dtype(dtype)  # In case a string, e.g. 'i8' is passed
 
         if not use_htype and dtype.kind == 'c':
-            # HDF5 has no native complex type - h5json represents complex
-            # numbers as a compound with 'r'/'i' float fields (matching
-            # h5py's own convention), so convert both the dtype and the
+            # HDF5 does have a native complex type now, but h5py hasn't been
+            # updated to use it yet - for compatibility, h5json represents
+            # complex numbers the way h5py itself does: a compound with
+            # 'r'/'i' float fields. Convert both the dtype and the
             # underlying data the same way before handing off.
             if dtype.itemsize == 8:
                 float_dt = numpy.dtype('f4').newbyteorder(dtype.byteorder)

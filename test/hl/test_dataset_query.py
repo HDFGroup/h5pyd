@@ -25,12 +25,13 @@ from common import ut, TestCase
 class TestQueryDataset(TestCase):
 
     def test_query_simple_dset(self):
+        expr = "_ > 100.0 AND _ < 200.0"
+
         def doQuery(dset):
             if h5py.__name__ != "h5pyd":
                 return  # only test h5pyd query
 
             # test h5pyd query
-            expr = "_ > 100.0 AND _ < 200.0"
             indices = dset.query(expr)
             self.assertEqual(len(indices), expected_count)
             for index in indices:
@@ -95,6 +96,20 @@ class TestQueryDataset(TestCase):
         self.assertEqual(str(dset.dtype), 'float32')
 
         doQuery(dset)
+
+        with self.assertRaises(IOError):
+            dset.query(expr, update_value=0.0)  # no write intent
+        f.close()
+
+        # re-open with modify
+        f = h5py.File(filename, "r+")
+        dset = f['/simple_dset']
+
+        # set the query values to -1.0
+        if h5py.__name__ == "h5pyd":
+            indices = dset.query(expr, update_value=-1.0)
+            self.assertEqual(len(indices), expected_count)
+
         f.close()
 
 

@@ -277,6 +277,23 @@ def make_new_dset(
         if dtype.kind == "U":
             raise TypeError("Fixed-length unicode data is not supported")
 
+        if dtype.kind == "c":
+            # HDF5 does have a native complex type now, but h5py hasn't been
+            # updated to use it yet - for compatibility, h5json represents
+            # complex numbers the way h5py itself does: a compound with
+            # 'r'/'i' float fields. Convert both the dtype and the
+            # underlying data (if given) the same way.
+            if dtype.itemsize == 8:
+                float_dt = numpy.dtype('f4').newbyteorder(dtype.byteorder)
+            elif dtype.itemsize == 16:
+                float_dt = numpy.dtype('f8').newbyteorder(dtype.byteorder)
+            else:
+                raise TypeError(f"Unsupported dtype for complex numbers: {dtype}")
+            compound_dt = numpy.dtype([('r', float_dt), ('i', float_dt)])
+            if data is not None and hasattr(data, "view"):
+                data = data.view(compound_dt)
+            dtype = compound_dt
+
         if dtype.kind == "O" and dtype.metadata and "ref" in dtype.metadata:
             type_json = {}
             type_json["class"] = "H5T_REFERENCE"
@@ -1193,13 +1210,9 @@ class Dataset(HLObject):
                 # force compliance with h5py selection behavior
                 shape = numpy.empty(self.shape)[args].shape
             return numpy.ndarray(shape, dtype=new_dtype)
-        # Up-converting to (1,) so that numpy.ndarray correctly creates
-        # np.void rows in case of multi-field dtype. (issue 135)
-        single_element = selection.mshape == () or numpy.prod(selection.mshape) == 1
-        mshape = (1,) if single_element else selection.mshape
 
         self.log.debug(f"dataset shape: {self.shape}")
-        self.log.debug(f"mshape: {mshape}")
+        self.log.debug(f"selection.mshape: {selection.mshape}")
 
         arr = db.getDatasetValues(self.id.uuid, selection)
         _vlenStrToBytes(arr, arr.dtype)
@@ -1209,13 +1222,28 @@ class Dataset(HLObject):
         # Patch up the output for NumPy
         if len(names) == 1:
             arr = arr[names[0]]  # Single-field recarray convention
+        if selection.select_type in (sel.H5S_SEL_ALL, sel.H5S_SEL_HYPERSLABS):
+            # A plain hyperslab selection's array *sometimes* still has one
+            # axis per dataset dimension, including any that were indexed
+            # with a bare integer (a "scalar" axis, always size 1) - drop
+            # exactly those, matching numpy's basic-indexing rule that an
+            # integer index removes its axis while a slice never does, even
+            # a single-element one like [0:1]. Whether those axes are still
+            # present depends on where arr came from: freshly-initialized
+            # or locally-pending data keeps them (Hdf5db.getDatasetValues()'s
+            # own init_arr() sizes arr from selection.count), while data
+            # fetched from the server already has them collapsed away
+            # (HsdsPlugin.getDatasetValues() sizes arr from selection.mshape
+            # instead) - so only squeeze when arr's leading dimensions (an
+            # array-typed field can add trailing ones of its own) actually
+            # still match selection.count. This is a view, not a copy.
+            rank = len(selection.scalar)
+            if tuple(arr.shape[:rank]) == tuple(selection.count):
+                scalar_axes = tuple(i for i, is_scalar in enumerate(selection.scalar) if is_scalar)
+                if scalar_axes:
+                    arr = numpy.squeeze(arr, axis=scalar_axes)
         if arr.shape == ():
             return arr[()]   # 0 dim array -> numpy scalar
-        elif single_element:
-            arr = arr.reshape(())
-            arr = arr[()]  # 1 element array -> numpy scalar
-        elif len(arr.shape) > 1:
-            arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
 
         return arr
 
@@ -1402,10 +1430,8 @@ class Dataset(HLObject):
 
         # Broadcast scalars if necessary.
         if mshape == () and selection.mshape is not None and selection.mshape != ():
-
             if self.dtype.subdtype is not None:
                 raise TypeError("Scalar broadcasting is not supported for array dtypes")
-
             self.log.debug("broadcast scalar on client")
             val2 = numpy.empty(selection.mshape, dtype=val.dtype)
             val2[...] = val
@@ -1426,7 +1452,7 @@ class Dataset(HLObject):
 
         db.setDatasetValues(self.id.uuid, selection, val)
 
-    def query(self, query, selection=None, limit=0):
+    def query(self, query, selection=None, limit=0, update_value=None):
         """Query the dataset for elements matching the given query expression.
 
         query
@@ -1446,6 +1472,9 @@ class Dataset(HLObject):
         if not isinstance(query, str):
             raise TypeError("query must be a string")
 
+        if update_value is not None and self.read_only:
+            raise IOError("No write intent")
+
         db = self.id.db
 
         if selection is None:
@@ -1453,7 +1482,7 @@ class Dataset(HLObject):
         else:
             query_sel = sel.select(self.shape, selection)
 
-        return db.queryDataset(self.id.uuid, query, sel=query_sel, limit=limit)
+        return db.queryDataset(self.id.uuid, query, sel=query_sel, limit=limit, update_value=update_value)
 
     def read_direct(self, dest, source_sel=None, dest_sel=None):
         """Read data directly from HDF5 into an existing NumPy array.

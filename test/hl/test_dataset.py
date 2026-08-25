@@ -1699,13 +1699,7 @@ class TestVlen(BaseDataset):
         ds = self.f.create_dataset('vlen', (1,), dtype=dt)
         self.f.create_dataset('vlen2', (1,), ds[()].dtype)
 
-    @ut.expectedFailure
     def test_reuse_struct_from_other(self):
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
-        # TBD: unable to resstore object array from mem buffer
         dt = [('a', int), ('b', h5py.vlen_dtype(int))]
         self.f.create_dataset('vlen', (1,), dtype=dt)
         fname = self.f.filename

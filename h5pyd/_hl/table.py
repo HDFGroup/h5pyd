@@ -13,34 +13,8 @@
 from __future__ import absolute_import
 import numpy
 
-from h5json.hdf5dtype import Reference, check_dtype, getItemSize
-from h5json import selections as sel
-from h5json.hdf5db import _decode
-from h5json.array_util import bytesToArray
-
 from .dataset import Dataset
 from .objectid import DatasetID
-
-
-def getQueryDtype(dt):
-    """
-    Return dtype with field added for Index values
-    """
-    field_names = dt.names
-    #  make up a index field name that doesn't conflict with existing names
-    index_name = "index"
-    for i in range(len(field_names)):
-        if index_name in field_names:
-            index_name = "_" + index_name
-        else:
-            break
-
-    dt_fields = [(index_name, 'uint64'),]
-    for i in range(len(dt)):
-        dt_fields.append((dt.names[i], dt[i]))
-    query_dt = numpy.dtype(dt_fields)
-
-    return query_dt
 
 
 class Cursor():
@@ -49,7 +23,7 @@ class Cursor():
       buffer_rows can be used to control how many rows
       will be fetched from the server
     """
-    def __init__(self, table, query=None, start=None, stop=None, buffer_rows=None):
+    def __init__(self, table, query=None, start=None, stop=None, limit=0, field=None, condvars=None, buffer_rows=None):
         self._table = table
         self._query = query
         DEFAULT_BUFFER_BYTES = 1000000
@@ -67,6 +41,9 @@ class Cursor():
             self._stop = table.nrows
         else:
             self._stop = stop
+        self._limit = limit
+        self._field = field
+        self._condvars = condvars
 
     def __iter__(self):
         """ Iterate over the first axis.  TypeError if scalar.
@@ -77,6 +54,7 @@ class Cursor():
 
         arr = None
         query_complete = False
+        rows_read = 0
 
         for indx in range(self._stop - self._start):
             if indx % self._buffer_rows == 0:
@@ -84,18 +62,22 @@ class Cursor():
                 read_count = self._buffer_rows
                 if nrows - indx < read_count:
                     read_count = nrows - indx
+                slices = (slice(indx + self._start, read_count + indx + self._start),)
                 if self._query is None:
-                    arr = self._table[indx + self._start:read_count + indx + self._start]
+                    arr = self._table.__getitem__(slices)
                 else:
                     # call table to return query result
                     if query_complete:
                         arr = None  # nothing more to fetch
                     else:
-                        arr = self._table.read_where(self._query, start=indx + self._start, limit=read_count)
+                        arr = self._table.__getitem__(slices, query=self._query)
                         if arr is not None and arr.shape[0] < read_count:
                             query_complete = True  # we've gotten all the rows
             if arr is not None and indx % self._buffer_rows < arr.shape[0]:
+                if self._limit > 0 and rows_read >= self._limit:
+                    break
                 yield arr[indx % self._buffer_rows]
+                rows_read += 1
 
 
 class Table(Dataset):
@@ -103,7 +85,7 @@ class Table(Dataset):
     """
         Represents an HDF5 dataset
     """
-    def __init__(self, bind, track_order=None):
+    def __init__(self, bind, track_order=None, fields=None):
         """ Create a new Table object by binding to a low-level DatasetID.
         """
 
@@ -117,325 +99,94 @@ class Table(Dataset):
         if self.id.rank > 1:
             raise ValueError("Table must be one-dimensional")
 
+        colnames = []
+        for field in self._dtype.descr:
+            # each element should be a tuple ('fieldname', dt)
+            name = field[0]
+            colnames.append(field[0])
+        if fields is not None:
+            for name in fields:
+                if name not in colnames:
+                    raise ValueError(f"{name} not found")
+            self._fields = fields  # restrict this view of the dataset to just these fields
+        else:
+            self._fields = colnames
+
     @property
     def colnames(self):
         """Numpy-style attribute giving the number of dimensions"""
-        names = []
-        for field in self._dtype.descr:
-            # each element should be a tuple ('fieldname', dt)
-            names.append(field[0])
-        return names
+
+        return self._fields
 
     @property
     def nrows(self):
         return self.shape[0]
 
-    def read(self, start=None, stop=None, step=None, field=None, out=None):
-        if start is None:
-            start = 0
+    def read(self, start=0, stop=None, field=None, out=None):
+        """Read rows from table
+        """
         if stop is None:
             stop = self.shape[0]
-        if step is None:
-            step = 1
-        arr = self[start:stop:step]
-        if field is not None:
-            # TBD - read just the field once the service supports it
-            tmp = arr[field]
-            arr = tmp
-        if out is not None:
-            # TBD - read direct
-            numpy.copyto(out, arr)
-        else:
-            return arr
+        return Cursor(self, start=start, stop=stop, field=field).__iter__()
 
-    def read_where(self, condition, condvars=None, field=None,
-                   start=None, stop=None, step=None, limit=0, include_index=True):
+    def read_where(self, condition, field=None,
+                   start=0, stop=None, limit=0):
         """Read rows from table using pytable-style condition
         """
-        names = ()  # todo
-
-        def readtime_dtype(basetype, names):
-            """ Make a NumPy dtype appropriate for reading """
-
-            if len(names) == 0:  # Not compound, or we want all fields
-                return basetype
-
-            if basetype.names is None:  # Names provided, but not compound
-                raise ValueError("Field names only allowed for compound types")
-
-            for name in names:  # Check all names are legal
-                if name not in basetype.names:
-                    raise ValueError(f"Field {name} does not appear in this type.")
-
-            return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
-
-        new_dtype = getattr(self._local, 'astype', None)
-        if new_dtype is not None:
-            mtype = readtime_dtype(new_dtype, names)
-        else:
-            # This is necessary because in the case of array types, NumPy
-            # discards the array information at the top level.
-            mtype = readtime_dtype(self.dtype, names)
-        # todo - will need the following once we have binary transfers
-        # mtype = h5t.py_create(new_dtype)
-        rsp_type = getQueryDtype(mtype)
-
-        # Perform the dataspace selection
-        if start or stop:
-            if not start:
-                start = 0
-            if not stop:
-                stop = self.shape[0]
-        else:
-            start = 0
+        # unlike a plain hyperslab read, the rows a query matches aren't
+        # known ahead of time - flush any pending local changes first so
+        # the query runs against a single, consistent (server) state
+        # rather than having to reconcile local vs. remote row-by-row
+        self.id.db.flush()
+        if stop is None:
             stop = self.shape[0]
+        kwargs = {'start': start, 'stop': stop, 'query': condition}
+        if field is not None:
+            kwargs['field'] = field
+        if limit > 0:
+            kwargs['limit'] = limit
+        return Cursor(self, **kwargs).__iter__()
 
-        selection_arg = slice(start, stop)
-        selection = sel.select(self, selection_arg)
-
-        if selection.nselect == 0:
-            return numpy.ndarray(selection.mshape, dtype=mtype)
-
-        # setup for pagination in case we can't read everthing in one go
-        data = []  # one ndarray for each request response
-        cursor = start
-        page_size = stop - start
-        total_rows = 0
-
-        while True:
-            # Perfom the actual read
-            req = "/datasets/" + self.id.uuid + "/value"
-            params = {}
-            params["query"] = condition
-            if limit > 0:
-                params["Limit"] = limit - total_rows
-            self.log.info(f"req - cursor: {cursor} page_size: {page_size}")
-            end_row = cursor + page_size
-            if end_row > stop:
-                end_row = stop
-            selection_arg = slice(cursor, end_row)
-            selection = sel.select(self, selection_arg)
-
-            sel_param = selection.query_string
-            self.log.debug(f"query param: {sel_param}")
-            if sel_param:
-                params["select"] = sel_param
-            try:
-                self.log.debug(f"params: {params}")
-                rsp = self.GET(req, params=params)
-                if isinstance(rsp, bytes):
-                    # binary response
-                    arr = bytesToArray(rsp, rsp_type, None)
-                    count = len(arr)
-                    self.log.info(f"got {count} rows binary data")
-                else:
-                    values = rsp["value"]
-                    count = len(values)
-                    if "index" in rsp:
-                        # older server version that returns index as a seperate key
-                        indices = rsp["index"]
-                        if len(indices) != count:
-                            raise ValueError(f"expected {count} indicies, but got: {len(indices)}")
-                    else:
-                        indices = None
-                    count = len(values)
-                    self.log.info(f"got {count} rows json data")
-                    # convert to numpy array
-                    arr = numpy.empty((count,), dtype=rsp_type)
-                    for i in range(count):
-                        if indices is not None:
-                            e = [indices[i],]
-                            e.extend(values[i])
-                        else:
-                            e = values[i]
-                        arr[i] = tuple(e)
-
-                    self.log.info(f"got {count} rows")
-                total_rows += count
-                data.append(arr)
-
-                # advance to next page
-                cursor += page_size
-            except IOError as ioe:
-                if ioe.errno == 413 and page_size > 1024:
-                    # too large a query target, try reducing the page size
-                    # if it is not already relatively small (1024)
-                    page_size //= 2
-                    page_size += 1  # bump up to avoid tiny pages in the last iteration
-                    self.log.info(f"Got 413, reducing page_size to: {page_size}")
-                else:
-                    # otherwise, just raise the exception
-                    self.log.info(f"Unexpected exception: {ioe.errno}")
-                    raise ioe
-            if cursor >= stop or (limit > 0 and total_rows == limit):
-                self.log.info(f"completed iteration, returning: {len(data)} rows")
-                break
-
-        # need some special conversion for compound types --
-        # each element must be a tuple, but the JSON decoder
-        # gives us a list instead.
-
-        if len(data) == 0:
-            raise ValueError("unexpected list size")
-        # combine arrays
-        if len(data) > 1:
-            ret_arr = numpy.empty((total_rows,), dtype=rsp_type)
-            start = 0
-            for arr in data:
-                nrows = len(arr)
-                ret_arr[start:(start + nrows)] = arr[:]
-                start += nrows
-        else:
-            ret_arr = data[0]
-
-        return ret_arr
-
-    def update_where(self, condition, value, start=None, stop=None, step=None, limit=None):
+    def update_where(self, condition, value, start=0, stop=None, limit=0):
         """Modify rows in table using pytable-style condition
         """
         if not isinstance(value, dict):
             raise ValueError("expected value to be a dict")
-
-        # Perform the dataspace selection
-        if start or stop:
-            if not start:
-                start = 0
-            if not stop:
-                stop = self.shape[0]
-        else:
-            start = 0
+        if stop is None:
             stop = self.shape[0]
+        if stop <= start:
+            raise ValueError("stop must be greater than start")
+        # flush before, for the same reason as read_where (the update
+        # starts with the same kind of query, to find matching rows) - and
+        # flush after, so the update itself is persisted immediately rather
+        # than left as a local-only pending change until some later flush
+        self.id.db.flush()
+        slices = (slice(start, stop, 1),)
+        indices = self.query(condition, selection=slices, update_value=value, limit=limit)
+        self.id.db.flush()
+        return indices
 
-        selection_arg = slice(start, stop)
-        selection = sel.select(self, selection_arg)
-        sel_param = selection.query_string
-        params = {}
-        params["query"] = condition
-        if limit:
-            params["Limit"] = limit
-        self.log.debug(f"query param: {sel_param}")
-        if sel_param:
-            params["select"] = sel_param
-
-        req = "/datasets/" + self.id.uuid + "/value"
-
-        rsp = self.PUT(req, body=value, format="json", params=params)
-        indices = None
-        arr = None
-        if "index" in rsp:
-            indices = rsp["index"]
-        elif "value" in rsp:
-            # new-style return type - index is first element in each row
-            indices = []
-            for row in rsp["value"]:
-                indices.append(row[0])
-        else:
-            raise ValueError("unexpected response from PUT query")
-        if indices:
-            arr = numpy.array(indices)
-
-        return arr
-
-    def create_cursor(self, condition=None, start=None, stop=None):
-        """Return a cursor for iteration
+    def get_where_list(self, condition, start=0, stop=None, limit=0):
+        """ Return indices of rows matching the given condition
         """
-        return Cursor(self, query=condition, start=start, stop=stop)
+        if stop is None:
+            stop = self.shape[0]
+        if stop <= start:
+            raise ValueError("stop must be greater than start")
+        slices = (slice(start, stop, 1),)
+        indices = self.query(condition, selection=slices, limit=limit)
+        # cnvert this to a list of ints (rather than a list of list),
+        # since we are dealing with a 1-d dataset
+        result = [int(index[0]) for index in indices]
+        return result
 
     def append(self, rows):
         """ Append rows to end of table
         """
         self.log.info("Table append")
-        if not self.id.uuid.startswith("d-"):
-            # Append ops only work with HSDS
-            raise ValueError("append not supported")
 
-        if getItemSize(self.id.type_json) != "H5T_VARIABLE":
-            use_base64 = True   # may need to set this to false below for some types
-        else:
-            use_base64 = False  # never use for variable length types
-            self.log.debug("Using JSON since type is variable length")
-
-        val = rows  # for compatibility with dataset code...
-        # get the val dtype if we're passed a numpy array
-        val_dtype = None
-        try:
-            val_dtype = val.dtype
-        except AttributeError:
-            pass  # not a numpy object, just leave dtype as None
-
-        if isinstance(val, Reference):
-            # h5pyd References are just strings
-            val = val.tolist()
-
-        # Generally we try to avoid converting the arrays on the Python
-        # side.  However, for compound literals this is unavoidable.
-        # For h5pyd, do extra check and convert type on client side for efficiency
-        vlen = check_dtype(vlen=self.dtype)
-        if vlen is not None and vlen not in (bytes, str):
-            self.log.debug("converting ndarray for vlen data")
-            try:
-                val = numpy.asarray(val, dtype=vlen)
-            except ValueError:
-                try:
-                    val = numpy.array([numpy.array(x, dtype=vlen)
-                                       for x in val], dtype=self.dtype)
-                except ValueError:
-                    pass
-            if vlen == val_dtype:
-                if val.ndim > 1:
-                    tmp = numpy.empty(shape=val.shape[:-1], dtype=object)
-                    tmp.ravel()[:] = [i for i in val.reshape(
-                        (numpy.product(val.shape[:-1]), val.shape[-1]))]
-                else:
-                    tmp = numpy.array([None], dtype=object)
-                    tmp[0] = val
-                val = tmp
-
-        elif isinstance(val, numpy.ndarray):
-            # convert array if needed
-            # TBD - need to handle cases where the type shape is different
-            self.log.debug("got numpy array")
-            if val.dtype != self.dtype and val.dtype.shape == self.dtype.shape:
-                self.log.info(f"converting {val.dtype} to {self.dtype}")
-                # convert array
-                tmp = numpy.empty(val.shape, dtype=self.dtype)
-                tmp[...] = val[...]
-                val = tmp
-        else:
-            val = numpy.asarray(val, order='C', dtype=self.dtype)
-
-        self.log.debug(f"rows shape: {val.shape}")
-        self.log.debug(f"data dtype: {val.dtype}")
-
-        if len(val.shape) != 1:
-            raise ValueError("rows must be one-dimensional")
-
-        numrows = val.shape[0]
-
-        req = "/datasets/" + self.id.uuid + "/value"
-
-        params = {}
-        body = {}
-
-        format = "json"
-
-        if use_base64:
-
-            # server is HSDS, use binary data, use param values for selection
-            format = "binary"
-            body = val.tobytes()
-            self.log.debug(f"writing binary data, {len(body)} bytes")
-            params["append"] = numrows
-        else:
-            if type(val) is not list:
-                val = val.tolist()
-            val = _decode(val)
-            self.log.debug(f"writing json data, {len(val)} elements")
-            body['value'] = val
-            body['append'] = numrows
-
-        self.PUT(req, body=body, format=format, params=params)
-
-        # if we get here, the request was successful, adjust the shape
-        total_rows = self.shape[0] + numrows
-        self._shape = (total_rows,)
+        count = len(rows)
+        # resize the dataset to hold the new rows
+        numrows = self.shape[0]
+        self.resize((numrows + count,))
+        self[numrows:numrows + count] = rows

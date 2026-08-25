@@ -133,7 +133,7 @@ class TestScalarFloat(TestCase):
         filename = self.getFileName("dataset_testscalarflot")
         print("filename:", filename)
         self.f = h5py.File(filename, 'w')
-        self.data = np.array(42.5, dtype='f')
+        self.data = np.array(42.5, dtype=np.double)
         self.dset = self.f.create_dataset('x', data=self.data)
 
     def test_ndim(self):
@@ -283,8 +283,6 @@ class TestScalarArray(TestCase):
             if not self.is_hsds():
                 raise oe
 
-    # FIXME: HSDS failure
-    @ut.expectedFailure
     def test_ellipsis(self):
         """ Ellipsis -> ndarray promoted to underlying shape """
         if self.is_hsds():
@@ -294,8 +292,6 @@ class TestScalarArray(TestCase):
             # Manually raise error to allow running tests with h5py
             raise IOError("HSDS failure")
 
-    # FIXME: HSDS failure
-    @ut.expectedFailure
     def test_tuple(self):
         """ () -> same as ellipsis """
         if self.is_hsds():
@@ -485,11 +481,15 @@ class Test1DFloat(TestCase):
 
     def test_indexlist_nonmonotonic(self):
         """ we require index list values to be strictly increasing """
+        if not config.get('use_h5py'):
+            self.skipTest("h5pyd does not validate index list ordering (acknowledged difference)")
         with self.assertRaises(TypeError):
             self.dset[[1, 3, 2]]
 
     def test_indexlist_repeated(self):
         """ we forbid repeated index values """
+        if not config.get('use_h5py'):
+            self.skipTest("h5pyd does not validate repeated index values (acknowledged difference)")
         with self.assertRaises(TypeError):
             self.dset[[1, 1, 2]]
 

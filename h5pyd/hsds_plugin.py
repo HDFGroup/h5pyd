@@ -871,6 +871,10 @@ class HsdsPlugin(StoragePlugin):
     def updateValue(self, dset_id, sel, arr):
         """ update the given dataset using selection and array """
         self.log.debug("hsds_plugin> updateValue")
+        if arr.size == 0:
+            # nothing to write - and HSDS rejects an empty-body PUT with 400
+            self.log.debug("hsds_plugin> updateValue - skipping empty array")
+            return
         params = {}
         data = arrayToBytes(arr)
         self.log.debug(f"writing binary data, {len(data)} bytes")
