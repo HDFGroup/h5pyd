@@ -105,6 +105,15 @@ class TestQueryDataset(TestCase):
         f = h5py.File(filename, "r+")
         dset = f['/simple_dset']
 
+        # create a regionref based on the query expression
+        regionref = dset.regionref.query(expr)
+        values = dset[regionref]
+        self.assertEqual(values.shape, (799,))
+        for value in values:
+            self.assertTrue(value > 100.0)
+            self.assertTrue(value < 200.0)
+        dset.attrs["regref"] = regionref
+
         # set the query values to -1.0
         if h5py.__name__ == "h5pyd":
             indices = dset.query(expr, update_value=-1.0)

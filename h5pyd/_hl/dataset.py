@@ -438,6 +438,14 @@ def make_new_dset(
     if data is not None and not isinstance(data, Empty):
         # init data
         sel_all = sel.select(tuple(shape), ...)
+        target_dtype = dtype.dtype if isinstance(dtype, Datatype) else dtype
+        if data.dtype != target_dtype and target_dtype.names is None and \
+                target_dtype.kind in "biufc" and data.dtype.kind in "biufc":
+            # real HDF5 converts numeric types during the low-level write, but
+            # h5json's remote backend requires an exact dtype match - cast
+            # explicitly so e.g. create_dataset(dtype='i4', data=<float64 array>)
+            # behaves the same as it would against a local HDF5 file
+            data = data.astype(target_dtype)
         _regionRefObjToBytes(data, data.dtype)
         parent.id.db.setDatasetValues(dset_uuid, sel_all, data)
 

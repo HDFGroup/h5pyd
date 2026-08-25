@@ -122,7 +122,6 @@ class TestScalarCompound(TestCase):
             np.testing.assert_array_equal(outdata, testdata[key])
             self.assertEqual(outdata.dtype, testdata[key].dtype)
 
-    @ut.expectedFailure
     def test_nested_compound_vlen(self):
         dt_inner = np.dtype([('a', h5py.vlen_dtype(np.int32)),
                             ('b', h5py.vlen_dtype(np.int32))])

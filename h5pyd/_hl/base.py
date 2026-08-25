@@ -184,6 +184,45 @@ class _RegionProxy(object):
         selection = sel.select(self._obj, args)
         return RegionReference(self._obj.id.uuid, selection)
 
+    def query(self, query, selection=None, limit=0):
+        """Query the dataset for elements matching the given query expression
+        and return a region reference to the matching elements.
+
+        query
+            A string expression, e.g. "dset > 100.0 AND dset < 200.0".
+
+        selection
+            Optional selection (anything accepted by __getitem__, e.g. a
+            slice or tuple of slices) restricting which elements are
+            queried.  If not provided, the entire dataset is queried.
+
+        limit
+            If non-zero, only return the first limit matching elements.
+
+        Returns a RegionReference with a point selection over the elements
+        that match the query.
+        """
+        from .dataset import Dataset
+        from h5json import selections as sel
+        from h5json.hdf5dtype import RegionReference
+
+        if not isinstance(self._obj, Dataset):
+            raise TypeError("Region references can only be made to datasets")
+
+        if not isinstance(query, str):
+            raise TypeError("query must be a string")
+
+        db = self.id.db
+
+        if selection is None:
+            query_sel = None
+        else:
+            query_sel = sel.select(self._obj.shape, selection)
+
+        indices = db.queryDataset(self._obj.id.uuid, query, sel=query_sel, limit=limit)
+        point_sel = sel.select(self._obj.shape, indices)
+        return RegionReference(self._obj.id.uuid, point_sel)
+
     def _target_dataset(self, ref):
         """ Return a Dataset instance for the object a region reference points to """
         from .dataset import Dataset
