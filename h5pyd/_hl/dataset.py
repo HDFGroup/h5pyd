@@ -1110,29 +1110,7 @@ class Dataset(HLObject):
 
         mtype = new_dtype
 
-        db = self.id.db
-
-        # === Special-case region references ====
-        """
-        TODO
-        if len(args) == 1 and isinstance(args[0], h5r.RegionReference):
-
-            obj = h5r.dereference(args[0], self.id)
-            if obj != self.id:
-                raise ValueError("Region reference must point to this dataset")
-
-            sid = h5r.get_region(args[0], self.id)
-            mshape = sel.guess_shape(sid)
-            if mshape is None:
-                return numpy.array((0,), dtype=new_dtype)
-            if numpy.prod(mshape) == 0:
-                return numpy.array(mshape, dtype=new_dtype)
-            out = numpy.empty(mshape, dtype=new_dtype)
-            sid_out = h5s.create_simple(mshape)
-            sid_out.select_all()
-            self.id.read(sid_out, sid, out, mtype)
-            return out
-        """
+        db = self.id.db  # get handle to HDF5DB per file instance
 
         # === Check for zero-sized datasets =====
         if self._is_empty:
