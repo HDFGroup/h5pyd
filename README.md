@@ -1,5 +1,3 @@
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/hdfgroup/h5pyd)
-
 h5pyd
 =====
 
