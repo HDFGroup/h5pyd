@@ -14,7 +14,7 @@ import sys
 import logging
 import time
 
-from ..httpconn import HttpConn
+from h5pyd.httpconn import HttpConn
 from h5pyd import Folder
 from h5pyd.version import version as h5pyd_version
 
