@@ -36,6 +36,7 @@ class SwmrReader(Process):
         self._event = event
         self._fname = fname
         self._dsetname = dsetname
+        self._block_size = block_size
         self._total_rows = block_size * loop_count
         self._sleep_time = sleep_time
         self._timeout = 5
@@ -45,6 +46,7 @@ class SwmrReader(Process):
         self.log.info("Waiting for initial event")
         assert self._event.wait(self._timeout)
         self._event.clear()
+        # time.sleep(5) works ok with the sleep
 
         self.log.info(f"Opening file {self._fname}")
         if self._fname.startswith("hdf5://"):
@@ -63,9 +65,9 @@ class SwmrReader(Process):
                 row_count = dset.shape[0]
                 if row_count > last_count:
                     self.log.info(f"Read {row_count - last_count} rows added")
-                    if row_count > last_count + block_size:
+                    if row_count > last_count + self._block_size:
                         # This selection should have data updated after a resize
-                        arr = dset[last_count:(last_count + block_size)]
+                        arr = dset[last_count:(last_count + self._block_size)]
                         self.log.info(f"Read data read, min: {arr.min()} max: {arr.max()}")
                     last_count = row_count
                 else:
@@ -99,8 +101,8 @@ class SwmrWriter(Process):
 
         try:
             kwargs = {"dtype": np.dtype("int64"), "chunks": (1024 * 256,), "maxshape": (None,)}
-            if compression:
-                kwargs["compression"] = compression
+            if self._compression:
+                kwargs["compression"] = self._compression
             dset = f.create_dataset(self._dsetname, (0,), **kwargs)
             assert not f.swmr_mode
 

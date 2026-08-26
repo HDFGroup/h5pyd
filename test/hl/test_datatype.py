@@ -139,7 +139,13 @@ class TestScalarCompound(TestCase):
                         (np.array([inner1], dtype=dt_inner), 3)],
                         dtype=dt)
 
+        filename = self.f.filename
         self.f["ds"] = data
+        self.f.close()  # flush to the server
+
+        # reopen read-only and verify against the server-persisted value,
+        # rather than data that may just be cached client side
+        self.f = h5py.File(filename, "r")
         out = self.f["ds"]
 
         # Specifying check_alignment=False because vlen fields have 8 bytes of padding

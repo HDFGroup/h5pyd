@@ -313,6 +313,13 @@ class File(Group):
         if self._swmr_mode and not value:
             msg = "SWMR mode can only be set to off by closing the file"
             raise ValueError(msg)
+        if value and not self._swmr_mode:
+            # entering SWMR mode is the writer's signal that the file's
+            # structure is now stable and safe to read concurrently - flush
+            # any pending metadata (e.g. a just-created dataset) so a reader
+            # opening the domain fresh in another process can actually see
+            # it, rather than racing the writer's next unrelated flush
+            self.id.db.flush()
         self._swmr_mode = True
 
     def _init_db(self,

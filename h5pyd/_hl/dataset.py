@@ -380,6 +380,12 @@ def make_new_dset(
     if filters and chunks is None:
         chunks = True  # specify chunking if filter is used
 
+    if initializer and chunks is None:
+        # HSDS's chunk initializers run per-chunk (see hsds/datanode_lib.py's
+        # run_chunk_initializer()) - a contiguous dataset has no chunks to
+        # initialize, so the initializer would silently never run
+        chunks = True
+
     if chunks is False:
         is_extensible = maxshape is not None and any(
             m is None or m != s for m, s in zip(maxshape, shape)
@@ -399,9 +405,12 @@ def make_new_dset(
     if filters:
         dcpl["filters"] = filters
     if initializer:
-        dcpl["initiallizer"] = initializer
-    if initializer_opts:
-        dcpl["initializer_opts"] = initializer_opts
+        # HSDS expects the initializer app name and its options combined
+        # into a single list under "initializer" (e.g. ["arange",
+        # "--start=10", "--step=2"]) - see hsds/datanode_lib.py's
+        # run_chunk_initializer(), which reads initializer[0] as the app
+        # name and initializer[1:] as its args
+        dcpl["initializer"] = [initializer] + list(initializer_opts or [])
 
     if fillvalue is not None:
         # is it compatible with the array type?

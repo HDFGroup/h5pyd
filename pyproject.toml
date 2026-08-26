@@ -8,10 +8,10 @@ build-backend = "setuptools.build_meta"
 name = "h5pyd"
 description = "h5py compatible client lib for HDF REST API"
 authors= [
-    {name = "John Readey", email = "jreadey@hdfgroup.org"},
+    {name = "The HDF Group", email = "help@hdfgroup.org"},
 ]
 maintainers = [
-    {name = "John Readey", email = "jreadey@hdfgroup.org"},
+    {name = "The HDF Group", email = "help@hdfgroup.org"},
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -29,12 +29,12 @@ classifiers = [
     "Topic :: Database",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.9"
-version = "0.21.0"
+requires-python = ">=3.11"
+version = "1.0.0"
 
 dependencies = [
     "numpy >=2.0.0rc1; python_version>='3.9'",
-    "h5json@git+https://github.com/HDFGroup/hdf5-json@abstract",
+    "h5json@git+https://github.com/HDFGroup/hdf5-json@master",
     # "h5json >= 1.0.0",
     "requests_unixsocket",
     "pytz",

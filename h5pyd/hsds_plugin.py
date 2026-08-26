@@ -417,7 +417,11 @@ class HsdsPlugin(StoragePlugin):
             pt_arr = np.zeros((sel.nselect, rank), dtype=np.uint64)
             for i in range(sel.nselect):
                 for d in range(rank):
-                    pt_arr[i, d] = sel.slices[d][i]
+                    s = sel.slices[d]
+                    # a mixed int+list selection (e.g. ds[0, [1, 2]]) leaves a
+                    # bare int (not a per-point list) for the int-indexed dim -
+                    # that coordinate is the same for every point
+                    pt_arr[i, d] = s[i] if isinstance(s, list) else s
 
             body = pt_arr.tobytes()
             try:
@@ -886,7 +890,12 @@ class HsdsPlugin(StoragePlugin):
             pt_arr = np.zeros((sel.nselect, rank), dtype=np.uint64)
             for i in range(sel.nselect):
                 for d in range(rank):
-                    pt_arr[i, d] = sel.slices[d][i]
+                    s = sel.slices[d]
+                    # a mixed int+list selection (e.g. ds[0, [1, 2]] = ...)
+                    # leaves a bare int (not a per-point list) for the
+                    # int-indexed dim - that coordinate is the same for
+                    # every point
+                    pt_arr[i, d] = s[i] if isinstance(s, list) else s
 
             points = bytesArrayToList(pt_arr)
             value_base64 = base64.b64encode(data)
