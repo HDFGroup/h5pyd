@@ -61,6 +61,18 @@ class TestScalar(BaseAttrs):
         self.assertEqual(out, data)
         self.assertEqual(out['b'], data['b'])
 
+    def test_compound_with_array_field(self):
+        """ Compound scalars with an array-typed (fixed-size subarray)
+        field can be written and read """
+        name = "compound_array_field_attr"
+        dt = np.dtype([('weight', (np.float64, 3)),
+                       ('endpoint_type', np.uint8)])
+        data = np.array(([1.5, 2.5, 3.5], 7), dtype=dt)[()]
+        self.f.attrs[name] = data
+        out = self.f.attrs[name]
+        self.assertIsInstance(out, np.void)
+        self.assertArrayEqual(out, data)
+
     def test_compound_with_vlen_fields(self):
         """ Compound scalars with vlen fields can be written and read """
         name = "compound_vlen_attr"

@@ -94,6 +94,31 @@ def getTestFileName(basename, subfolder=None):
     return filename
 
 
+def _dtypes_structurally_equal(dt1, dt2):
+    """ Compare two dtypes by field names/types/shape rather than exact
+    byte layout.
+
+    A compound dtype read back from real h5py may carry C-struct
+    alignment padding between fields (explicit field offsets/itemsize)
+    that h5pyd/h5json never produces (it has no C-struct representation
+    to begin with) - same logical type, different byte layout. Used by
+    assertArrayEqual() when check_alignment=False. """
+    if dt1.names is not None or dt2.names is not None:
+        if dt1.names is None or dt2.names is None or dt1.names != dt2.names:
+            return False
+        return all(
+            _dtypes_structurally_equal(dt1.fields[name][0], dt2.fields[name][0])
+            for name in dt1.names
+        )
+    if dt1.subdtype is not None or dt2.subdtype is not None:
+        if dt1.subdtype is None or dt2.subdtype is None:
+            return False
+        base1, shape1 = dt1.subdtype
+        base2, shape2 = dt2.subdtype
+        return shape1 == shape2 and _dtypes_structurally_equal(base1, base2)
+    return dt1 == dt2
+
+
 class TestCase(ut.TestCase):
 
     """
@@ -174,10 +199,13 @@ class TestCase(ut.TestCase):
 
             Note that dset may be a NumPy array or an HDF5 dataset.
 
-            check_alignment is accepted (and ignored) for compatibility with
-            tests ported from h5py's own suite - h5pyd never compares raw
-            struct memory layout (it has no C-struct representation to begin
-            with), so field alignment/padding is not a meaningful concept here.
+            check_alignment=False relaxes the dtype comparison to a
+            structural one (field names/types/shape), ignoring any
+            C-struct alignment padding (offsets/itemsize) real h5py may
+            add to a compound dtype - h5pyd/h5json never produces that
+            padding (no C-struct representation to begin with), so a
+            strict dtype comparison would otherwise fail for an
+            otherwise-identical compound type under real h5py.
         """
         if precision is None:
             precision = 1e-5
@@ -198,15 +226,20 @@ class TestCase(ut.TestCase):
             dset.shape == arr.shape,
             f"Shape mismatch ({dset.shape} vs {arr.shape}){message}"
         )
+        if check_alignment is False:
+            dtypes_match = _dtypes_structurally_equal(dset.dtype, arr.dtype)
+        else:
+            dtypes_match = dset.dtype == arr.dtype
         self.assertTrue(
-            dset.dtype == arr.dtype,
+            dtypes_match,
             f"Dtype mismatch ({dset.dtype} vs {arr.dtype}){message}"
         )
 
         if arr.dtype.names is not None:
             for n in arr.dtype.names:
                 message = f'[FIELD {n}] {message}'
-                self.assertArrayEqual(dset[n], arr[n], message=message, precision=precision)
+                self.assertArrayEqual(dset[n], arr[n], message=message, precision=precision,
+                                      check_alignment=check_alignment)
         elif arr.dtype.kind in ('i', 'f'):
             self.assertTrue(
                 np.all(np.abs(dset[...] - arr[...]) < precision),
@@ -217,7 +250,8 @@ class TestCase(ut.TestCase):
             # element-by-element rather than as a single ufunc call, since
             # they don't have a fixed itemsize and may recurse further.
             for v1, v2 in zip(dset.flat, arr.flat):
-                self.assertArrayEqual(v1, v2, message=message, precision=precision)
+                self.assertArrayEqual(v1, v2, message=message, precision=precision,
+                                      check_alignment=check_alignment)
         else:
             self.assertTrue(
                 np.all(dset[...] == arr[...]),

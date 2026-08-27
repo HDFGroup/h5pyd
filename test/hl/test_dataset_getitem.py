@@ -61,7 +61,24 @@ Update using new NULL dataset constructor once h5py 2.7 is out.
 """
 
 
-class TestEmpty(TestCase):
+class FlushingTestCase(TestCase):
+    """ TestCase that flushes the file at the end of every test.
+
+    A write against h5pyd is only queued locally until flushed - if the
+    server actually rejects it, that failure would otherwise only surface
+    (if at all) via common.TestCase.tearDown()'s blanket
+    "except Exception: pass" around the implicit close-time flush,
+    silently masking a real error as a passing test. Flushing here first,
+    unguarded, lets any such failure propagate as a genuine test failure.
+    Harmless for a read-only file or one with nothing pending to write.
+    """
+    def tearDown(self):
+        if self.f:
+            self.f.flush()
+        super().tearDown()
+
+
+class TestEmpty(FlushingTestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -126,7 +143,7 @@ class TestEmpty(TestCase):
             self.dset['field']
 
 
-class TestScalarFloat(TestCase):
+class TestScalarFloat(FlushingTestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -191,7 +208,7 @@ class TestScalarFloat(TestCase):
             self.dset['field']
 
 
-class TestScalarCompound(TestCase):
+class TestScalarCompound(FlushingTestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -266,7 +283,7 @@ class TestScalarCompound(TestCase):
         self.assertEqual(out, self.dset['a'])
 
 
-class TestScalarArray(TestCase):
+class TestScalarArray(FlushingTestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -276,30 +293,17 @@ class TestScalarArray(TestCase):
         self.dt = np.dtype('(3,2)f')
         self.data = np.array([(3.2, -119), (42, 99.8), (3.14, 0)], dtype='f')
         self.dset = self.f.create_dataset('x', (), dtype=self.dt)
-        try:
-            self.dset[...] = self.data
-        except (IOError, OSError) as oe:
-            # TBD this is failing on HSDS
-            if not self.is_hsds():
-                raise oe
+        self.dset[...] = self.data
 
     def test_ellipsis(self):
         """ Ellipsis -> ndarray promoted to underlying shape """
-        if self.is_hsds():
-            out = self.dset[...]
-            self.assertArrayEqual(out, self.data)
-        else:
-            # Manually raise error to allow running tests with h5py
-            raise IOError("HSDS failure")
+        out = self.dset[...]
+        self.assertArrayEqual(out, self.data)
 
     def test_tuple(self):
         """ () -> same as ellipsis """
-        if self.is_hsds():
-            out = self.dset[...]
-            self.assertArrayEqual(out, self.data)
-        else:
-            # Manually raise error to allow running tests with h5py
-            raise IOError("HSDS failure")
+        out = self.dset[...]
+        self.assertArrayEqual(out, self.data)
 
     def test_slice(self):
         """ slice -> ValueError """
@@ -328,7 +332,7 @@ class TestScalarArray(TestCase):
             self.dset['field']
 
 
-class Test1DZeroFloat(TestCase):
+class Test1DZeroFloat(FlushingTestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -386,7 +390,7 @@ class Test1DZeroFloat(TestCase):
             self.dset['field']
 
 
-class Test1DFloat(TestCase):
+class Test1DFloat(FlushingTestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -513,7 +517,7 @@ class Test1DFloat(TestCase):
             self.dset['field']
 
 
-class Test2DZeroFloat(TestCase):
+class Test2DZeroFloat(FlushingTestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -535,7 +539,7 @@ class Test2DZeroFloat(TestCase):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[:, [0, 1, 2]])
 
 
-class Test2DFloat(TestCase):
+class Test2DFloat(FlushingTestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -569,7 +573,7 @@ class Test2DFloat(TestCase):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[[]])
 
 
-class Test3DFloat(TestCase):
+class Test3DFloat(FlushingTestCase):
 
     def setUp(self):
         TestCase.setUp(self)
@@ -583,7 +587,7 @@ class Test3DFloat(TestCase):
         self.assertNumpyBehavior(self.dset, self.data, np.s_[1, 2:4, 3:6])
 
 
-class TestVeryLargeArray(TestCase):
+class TestVeryLargeArray(FlushingTestCase):
 
     def setUp(self):
         TestCase.setUp(self)

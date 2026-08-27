@@ -680,35 +680,6 @@ class File(Group):
             compressors = COMPRESSION_FILTER_NAMES
         return compressors
 
-    def run_scan(self):
-        MAX_WAIT = 10
-        self._getStats(verbose=True)
-        prev_scan = self._lastScan
-        if prev_scan is None:
-            prev_scan = 0
-        self.log.debug(f"run_scan - lastScan: {prev_scan}")
-
-        # Tell server to re-run scan
-        self.log.info("sending rescan request")
-        params = {"rescan": 1}
-        req = "/"
-        self.PUT(req, params=params)
-
-        for i in range(MAX_WAIT):
-            self.log.debug("run_scan - sleeping")
-            time.sleep(1)  # give the server a chance to run scan
-            self._verboseUpdated = None  # clear verbose cache
-            self._getVerboseInfo()
-            self.log.debug(f"got new scan: {self._lastScan}")
-            if self._lastScan and self._lastScan > prev_scan:
-                self.log.info("scan has been updated")
-                break
-
-        if self._lastScan == prev_scan:
-            self.log.warning("run_scan failed to update")
-
-        return
-
     def close(self):
         """Clears reference to remote resource."""
         # this will flush any pending changes and close the http connection

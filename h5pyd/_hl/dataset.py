@@ -1375,9 +1375,13 @@ class Dataset(HLObject):
             _regionRefObjToBytes(val, dtype)
 
         elif isinstance(val, numpy.ndarray):
-            # convert array if needed
-            # TBD - need to handle cases where the type shape is different
-            if val.dtype != self.dtype and val.dtype.shape == self.dtype.shape:
+            # convert array if needed - but only for a full-record write.
+            # When a field selection (names) is active, val's dtype is
+            # expected to be a legitimate subset of self.dtype (e.g. two
+            # of three fields for ds['a', 'c'] = ...), not something to
+            # coerce into the full dataset dtype - setDatasetValues()
+            # validates val's dtype against just the selected fields.
+            if not names and val.dtype != self.dtype and val.dtype.shape == self.dtype.shape:
                 self.log.info(f"converting {val.dtype} to {self.dtype}")
 
                 # convert array
@@ -1386,20 +1390,31 @@ class Dataset(HLObject):
                 val = tmp
         else:
             self.log.debug(f"asarray for {self.dtype}")
-            val = numpy.asarray(val, order="C", dtype=self.dtype)
+            if self.dtype.subdtype is not None:
+                # for an array/subarray dtype (e.g. "3int8"), passing the
+                # subarray dtype itself to asarray() makes numpy broadcast
+                # each source element into its own copy of the subarray
+                # shape (e.g. [1, 2, 3] becomes a 3x3 array) instead of
+                # treating the whole list as one element's content - use
+                # the base dtype instead, matching what the array-dtype
+                # shape/cast handling just below already expects
+                val = numpy.asarray(val, order="C", dtype=self.dtype.subdtype[0])
+            else:
+                val = numpy.asarray(val, order="C", dtype=self.dtype)
 
         # Check for array dtype compatibility and convert
-        mshape = None
         self.log.debug(f"self.dtype.subdtype: {self.dtype.subdtype}")
         if self.dtype.subdtype is not None:
-            shp = self.dtype.subdtype[1]   # type shape
+            base_dtype, shp = self.dtype.subdtype   # type base dtype and shape
             valshp = val.shape[-len(shp):]
             if valshp != shp:  # Last dimension has to match
                 raise TypeError(f"When writing to array types,\
                                  last N dimensions have to match (got {valshp}, but should be {shp})")
-            mtype = numpy.dtype((val.dtype, shp))
-            self.log.debug(f"mtype for subdtype: {mtype}")
-            mshape = val.shape[0:len(val.shape) - len(shp)]
+            if val.dtype != base_dtype and val.dtype.kind in "biufc" and base_dtype.kind in "biufc":
+                # real HDF5 converts numeric types during the low-level write, but
+                # h5json's remote backend requires an exact dtype match - cast
+                # explicitly, mirroring make_new_dset()'s equivalent fix
+                val = val.astype(base_dtype)
 
         # Check for field selection
         if len(names) != 0:

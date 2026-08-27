@@ -156,7 +156,7 @@ class HsdsPlugin(StoragePlugin):
             if rsp.status_code != 200:
                 # file must exist
                 http_conn.close()
-                raise IOError(rsp.status_code, rsp.reason)
+                raise FileNotFoundError()
             domain_json = rsp.json()
         else:
             rsp = http_conn.GET(req, params=params)
@@ -351,7 +351,7 @@ class HsdsPlugin(StoragePlugin):
 
         return attr_json
 
-    def getDatasetValues(self, dset_id, sel=None, dtype=None, query=None):
+    def getDatasetValues(self, obj_id, sel=None, dtype=None, query=None):
         """
         Get values from dataset identified by obj_id.
         If a slices list or tuple is provided, it should have the same
@@ -359,12 +359,13 @@ class HsdsPlugin(StoragePlugin):
         If query is provided, it should be a string with a query expression.
         """
 
-        self.log.debug(f"getDatasetValues({dset_id}), sel={sel}")
-        collection = getCollectionForId(dset_id)
+        self.log.debug(f"getDatasetValues({obj_id}), sel={sel}")
+        collection = getCollectionForId(obj_id)
         if collection != "datasets":
-            msg = f"unexpected id: {dset_id} for getDatasetValues"
+            msg = f"unexpected id: {obj_id} for getDatasetValues"
             self.log.warning(msg)
             return ValueError(msg)
+        dset_id = obj_id
 
         if sel is None or sel.select_type == selections.H5S_SEL_ALL or sel.shape == sel.mshape:
             query_param = None  # just return the entire array
@@ -913,10 +914,15 @@ class HsdsPlugin(StoragePlugin):
             format = "binary"
 
         if sel.fields:
-            # TBD: field order isn't guaranteed for a multi-field selection
-            # (sel.fields is a set) - fine for the single-field case, which
-            # is all that's currently supported for writes.
-            params["fields"] = ":".join(sel.fields)
+            # sel.fields is a set, so its iteration order is arbitrary -
+            # order the "fields" param to match how `data` was actually
+            # serialized (arr.dtype.names), or the server would map the
+            # raw bytes to the wrong field names for a multi-field write
+            if len(arr.dtype) > 1:
+                field_order = [f for f in arr.dtype.names if f in sel.fields]
+            else:
+                field_order = list(sel.fields)
+            params["fields"] = ":".join(field_order)
 
         rsp = self.http_conn.PUT(req, body=body, params=params, format=format)
         if rsp.status_code != 200:
