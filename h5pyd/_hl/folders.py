@@ -17,6 +17,7 @@ import time
 import logging
 from ..httpconn import HttpConn
 from .. import config
+from .acl_manager import ACLManager
 
 
 class Folder:
@@ -184,6 +185,7 @@ class Folder:
         self.log = http_conn.logging
 
         self._http_conn = http_conn
+        self._acl_mgr = ACLManager(self._get_acl_http_conn, log=self.log)
 
         domain_json = None
 
@@ -228,7 +230,12 @@ class Folder:
                 self.log.warning(f"folder put status_code: {rsp.status_code}")
             else:
                 self.log.error(f"status_code: {rsp.status_code}")
-            raise IOError(rsp.status_code, rsp.reason)
+            if rsp.status_code in (404, 410):
+                # folder doesn't exist - use FileNotFoundError for
+                # consistency with how File handles this case
+                raise FileNotFoundError(rsp.status_code, rsp.reason)
+            else:
+                raise IOError(rsp.status_code, rsp.reason)
         domain_json = rsp.json()
         self.log.info(f"domain_json: {domain_json}")
         if "class" in domain_json:
@@ -254,45 +261,20 @@ class Folder:
         else:
             self._owner = None
 
-    def getACL(self, username):
+    def _get_acl_http_conn(self):
+        """ return the live http connection for ACL requests, raising if not open """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
-        req = "/acls/" + username
-        rsp = self._http_conn.GET(req)
-        if rsp.status_code != 200:
-            raise IOError(rsp.reason)
-        rsp_json = rsp.json()
-        acl_json = rsp_json["acl"]
-        return acl_json
+        return self._http_conn
+
+    def getACL(self, username):
+        return self._acl_mgr.getACL(username)
 
     def getACLs(self):
-        if self._http_conn is None:
-            raise IOError(400, "folder is not open")
-        req = "/acls"
-        rsp = self._http_conn.GET(req)
-        if rsp.status_code != 200:
-            raise IOError(rsp.status_code, rsp.reason)
-        rsp_json = rsp.json()
-        acls_json = rsp_json["acls"]
-        return acls_json
+        return self._acl_mgr.getACLs()
 
     def putACL(self, acl):
-        if self._http_conn is None:
-            raise IOError(400, "folder is not open")
-        if self._http_conn.mode == "r":
-            raise IOError(400, "folder is open as read-onnly")
-        if "userName" not in acl:
-            raise IOError(404, "ACL has no 'userName' key")
-        perm = {}
-        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
-            if k not in acl:
-                raise IOError(404, f"Missing ACL field: {k}")
-            perm[k] = acl[k]
-
-        req = "/acls/" + acl["userName"]
-        rsp = self._http_conn.PUT(req, body=perm)
-        if rsp.status_code != 201:
-            raise IOError(rsp.status_code, rsp.reason)
+        self._acl_mgr.putACL(acl)
 
     def _getSubdomains(self):
         if self._http_conn is None:

@@ -21,6 +21,7 @@ from h5json import selections
 from h5json.storage_plugin import StoragePlugin
 
 from .httpconn import HttpConn
+from ._hl.acl_manager import ACLManager
 
 
 class HsdsPlugin(StoragePlugin):
@@ -113,6 +114,14 @@ class HsdsPlugin(StoragePlugin):
         # read_only or append plugin never needs to force a full initial write
         self._init = False if (append or read_only) else True
         self._stats = {"created": 0, "lastModified": 0, "owner": ""}
+        self._acl_mgr = ACLManager(self._get_acl_http_conn, log=self.log)
+
+    def _get_acl_http_conn(self):
+        """ return the live http connection for ACL requests, raising if not open """
+        if self.closed:
+            self.log.warning("hsds_plugin no http connection")
+            raise IOError("plugin is closed")
+        return self.http_conn
 
     # ------------------------------------------------------------------
     # lifecycle
@@ -156,7 +165,12 @@ class HsdsPlugin(StoragePlugin):
             if rsp.status_code != 200:
                 # file must exist
                 http_conn.close()
-                raise FileNotFoundError()
+                if rsp.status_code in (404, 410):
+                    # domain doesn't exist - use FileNotFoundError for
+                    # consistency with how h5py handles this case
+                    raise FileNotFoundError(rsp.status_code, rsp.reason)
+                else:
+                    raise IOError(rsp.status_code, rsp.reason)
             domain_json = rsp.json()
         else:
             rsp = http_conn.GET(req, params=params)
@@ -472,36 +486,11 @@ class HsdsPlugin(StoragePlugin):
 
     def getACL(self, username):
         """ Return the ACL for the given username """
-
-        req = "/acls/" + username
-        try:
-            rsp = self.http_conn.GET(req)
-        except IOError as ioe:
-            self.log.info(f"got IOError: {ioe.errno}")
-            raise IOError(ioe.errno, "Error fetching ACL")
-        if rsp.status_code != 200:
-            self.log.info(f"get http error on getACL: {rsp.status_code}")
-            raise IOError(rsp.status_code, "Error fetching ACL")
-
-        acl_json = rsp.json()["acl"]
-        return acl_json
+        return self._acl_mgr.getACL(username)
 
     def getACLs(self):
         """ Return all the ACLs for the domain"""
-
-        req = "/acls"
-        try:
-            rsp = self.http_conn.GET(req)
-        except IOError as ioe:
-            self.log.info(f"got IOError: {ioe.errno}")
-            raise IOError(ioe.errno, "Error fetching ACLs")
-        if rsp.status_code != 200:
-            self.log.info(f"get http error on getACLs: {rsp.status_code}")
-            raise IOError(rsp.status_code, "Error fetching ACLs")
-
-        acls_json = rsp.json()["acls"]
-
-        return acls_json
+        return self._acl_mgr.getACLs()
 
     def getStats(self, verbose=False):
         """ return a dictionary object with at minimum the following keys:
@@ -959,27 +948,7 @@ class HsdsPlugin(StoragePlugin):
 
     def putACL(self, acl):
         """ create an ACL for the domain """
-
-        if self.closed:
-            self.log.warning("hsds_plugin> putACL called but not open")
-            raise IOError("plugin is closed")
-        if not self._http_conn:
-            self.log.warning("hsds_plugin no http connection")
-            raise IOError("no http connection")
-
-        if "userName" not in acl:
-            raise IOError(404, "ACL has no 'userName' key")
-        perm = {}
-        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
-            if k not in acl:
-                raise IOError(404, "Missing ACL field: {}".format(k))
-            perm[k] = acl[k]
-
-        req = "/acls/" + acl["userName"]
-        rsp = self.http_conn.PUT(req, body=perm)
-        if rsp.status_code not in (200, 201):
-            self.log.warning(f"PUT ACL failed with status code: {rsp.status_code}")
-            raise IOError(rsp.status_code, "Error setting ACL")
+        self._acl_mgr.putACL(acl)
 
     def flush(self):
         """ Write dirty items """

@@ -420,6 +420,9 @@ def visitDomains(domain, depth=1):
                 n = visitDomains(domain + '/' + name, depth=(depth - 1))
                 count += n
 
+    except FileNotFoundError:
+        # domain not found / recently deleted - ignore
+        pass
     except IOError as oe:
         if oe.errno in (403, 404, 410):
             # Ignore domains for which:
@@ -441,7 +444,7 @@ def checkDomain(path):
 
     path_names = path.split("/")
     h5path = ""
-    while path_names:
+    while len(path_names) > 1:
         domain_path = "/".join(path_names)
         if h5py.is_hdf5(domain_path):
             return (h5path, domain_path)
@@ -546,18 +549,18 @@ def main():
                 logging.debug(f"using h5path: {h5path} domain: {domain}")
             try:
                 f = getFile(domain)
+            except FileNotFoundError as fnfe:
+                if fnfe.errno == 410:
+                    print(f"Domain {domain} has been removed")
+                else:
+                    print(f"Domain {domain} not found")
+                continue
             except IOError as ioe:
                 if ioe.errno == 401:
                     print("Username/Password missing or invalid")
                     continue
                 if ioe.errno == 403:
                     print(f"No permission to read domain: {domain}")
-                    continue
-                elif ioe.errno == 404:
-                    print(f"Domain {domain} not found")
-                    continue
-                elif ioe.errno == 410:
-                    print(f"Domain {domain} has been removed")
                     continue
                 else:
                     print(f"Unexpected error: {ioe}")

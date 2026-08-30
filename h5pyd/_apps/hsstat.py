@@ -124,6 +124,8 @@ def getDomainInfo(domain, cfg):
                 bucket=bucket,
                 use_cache=False,
             )
+    except FileNotFoundError:
+        abort(f"domain: {domain} not found")
     except IOError as oe:
         if oe.errno in (404, 410):  # Not Found
             abort(f"domain: {domain} not found")

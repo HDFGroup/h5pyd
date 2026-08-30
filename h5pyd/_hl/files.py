@@ -240,6 +240,21 @@ class File(Group):
         if not self.id:
             raise ValueError("file is closed")
 
+    def getACL(self, username):
+        """ Return the ACL (access control list) entry for the given username """
+        self._verifyOpen()
+        return self.id.db.plugin.getACL(username)
+
+    def getACLs(self):
+        """ Return all the ACLs (access control list) for the domain """
+        self._verifyOpen()
+        return self.id.db.plugin.getACLs()
+
+    def putACL(self, acl):
+        """ Create or update an ACL (access control list) for the domain """
+        self._verifyOpen()
+        self.id.db.plugin.putACL(acl)
+
     @property
     def driver(self):
         return "rest_driver"

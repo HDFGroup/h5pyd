@@ -531,11 +531,12 @@ def main():
         # get the  domain
         try:
             fout = getFile(domain_path)
+        except FileNotFoundError:
+            msg = f"domain: {domain_path} not found"
+            logging.error(msg)
+            sys.exit(msg)
         except IOError as ioe:
-            if ioe.errno == 404:
-                msg = f"domain: {domain_path} not found"
-                logging.error(msg)
-            elif ioe.errno == 403:
+            if ioe.errno == 403:
                 msg = f"No read access to domain: {domain_path}"
                 logging.error(msg)
             else:
