@@ -365,6 +365,70 @@ class TestCreateDataset(TestCase):
 
         f.close()
 
+    def test_create_dset_blosclz(self):
+        """ blosclz (H5Z_FILTER_BLOSC) is supported by h5pyd/HSDS, but not h5py """
+        filename = self.getFileName("create_dset_blosclz")
+        print("filename:", filename)
+
+        f = h5py.File(filename, "w")
+
+        if config.get("use_h5py"):
+            return  # blosclz not supported with h5py
+
+        if "blosclz" not in f.compressors:
+            print("blosclz not supported")
+            return
+
+        dims = (40, 80)
+
+        # create some test data
+        arr = np.random.rand(dims[0], dims[1])
+
+        dset = f.create_dataset('simple_dset_blosclz', data=arr, dtype='f8',
+                                compression='blosclz', compression_opts=5)
+
+        self.assertEqual(dset.name, "/simple_dset_blosclz")
+        self.assertTrue(isinstance(dset.shape, tuple))
+        self.assertEqual(len(dset.shape), 2)
+        self.assertEqual(dset.shape[0], 40)
+        self.assertEqual(dset.shape[1], 80)
+        self.assertEqual(str(dset.dtype), 'float64')
+        self.assertTrue(isinstance(dset.maxshape, tuple))
+        self.assertEqual(len(dset.maxshape), 2)
+        self.assertEqual(dset.maxshape[0], 40)
+        self.assertEqual(dset.maxshape[1], 80)
+
+        chunks = dset.chunks  # chunk layout auto-generated
+        self.assertTrue(chunks is not None)
+        self.assertEqual(len(chunks), 2)
+        if isinstance(dset.id.id, str) and dset.id.id.startswith("d-"):
+            # HSDS will create a different chunk layout
+            self.assertEqual(chunks[0], 40)
+            self.assertEqual(chunks[1], 80)
+        else:
+            self.assertEqual(chunks[0], 20)
+            self.assertEqual(chunks[1], 40)
+        self.assertEqual(dset.compression, 'blosclz')
+        # Note: unlike lz4, HSDS doesn't currently report back the
+        # compression level for the blosc filter (the server-side filter
+        # entry for blosclz has no "level" key, though lz4's does) -
+        # compression_opts is expected to be None here rather than 5.
+        self.assertEqual(dset.compression_opts, None)
+        self.assertFalse(dset.shuffle)
+
+        # verify the data round-trips correctly through the filter
+        self.assertTrue(np.allclose(dset[...], arr))
+
+        dset_ref = f['/simple_dset_blosclz']
+        self.assertTrue(dset_ref is not None)
+        if not config.get("use_h5py"):
+            # obj ids should be the same with h5pyd (but not h5py)
+            self.assertEqual(dset.id.id, dset_ref.id.id)
+            # Check dataset's last modified time
+            self.assertTrue(isinstance(dset.modified, datetime))
+
+        f.close()
+
     def test_create_dset_gzip_and_shuffle(self):
         filename = self.getFileName("create_dset_gzip_and_shuffle")
         print("filename:", filename)
