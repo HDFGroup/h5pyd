@@ -19,6 +19,7 @@ from h5json.array_util import jsonToArray, bytesToArray, arrayToBytes, bytesArra
 from h5json.shape_util import getShapeDims, getNumElements
 from h5json import selections
 from h5json.storage_plugin import StoragePlugin
+from h5json.time_util import getNow
 
 from .httpconn import HttpConn
 from ._hl.acl_manager import ACLManager
@@ -1011,7 +1012,13 @@ class HsdsPlugin(StoragePlugin):
             self.log.debug(f"deleted ids: {self.db.deleted_objects}")
             self.deleteObjects(self.db.deleted_objects)
 
-        self._last_flush_time = time.time()
+        # Must be the same clock that stamps link/attribute "created" values in
+        # h5json (Hdf5db uses getNow() for its own _last_flush_time too). The
+        # updateLinks/updateAttributes tests above decide whether an item still
+        # needs sending via "created > _last_flush_time"; reading that from
+        # time.time() while "created" comes from getNow() compares two clocks
+        # that disagree by more than the margins being decided.
+        self._last_flush_time = getNow()
         self.log.debug("hsds_plugin> flush successful")
         # all objects written successfully
         return True
