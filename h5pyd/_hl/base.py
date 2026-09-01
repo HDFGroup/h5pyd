@@ -428,18 +428,6 @@ class HLObject(CommonStateObject):
         self.req_prefix = None  # derived class should set this to the URI of the object
         self._file = file
 
-        if not self.log.handlers:
-            # setup logging
-            log_path = os.getcwd()
-            if not os.access(log_path, os.W_OK):
-                log_path = "/tmp"
-            log_file = os.path.join(log_path, "h5pyd.log")
-            self.log.setLevel(logging.INFO)
-            fh = logging.FileHandler(log_file)
-            self.log.addHandler(fh)
-        else:
-            pass
-
         self._track_order = track_order  # TBD: set by track_order?
 
     def __hash__(self):

@@ -45,6 +45,21 @@ default_cfg = {
         "help": "storage Bucket to use (S3 Bucket, Azure Container, or top-level directory)",
         "choices": ["BUCKET",]
     },
+    "hs_ad_app_id": {
+        "default": None,
+        "flags": ["--ad-app-id",],
+        "help": "Azure AD Application ID",
+    },
+    "hs_ad_tenant_id": {
+        "default": None,
+        "flags": ["--ad-tenant-id",],
+        "help": "Azure AD Tenant ID",
+    },
+    "hs_ad_resource_id": {
+        "default": None,
+        "flags": ["--ad-resource-id",],
+        "help": "Azure AD Resource ID",
+    },
     "hs_keycloak_client_id": {
         "default": None,
         "flags": ["--keycloak-client-id",],

@@ -11,3 +11,5 @@
 ##############################################################################
 
 from __future__ import absolute_import
+import logging
+logging.getLogger("h5pyd").addHandler(logging.NullHandler())
