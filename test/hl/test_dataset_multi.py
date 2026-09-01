@@ -79,7 +79,7 @@ class TestMultiManager(TestCase):
         dt = np.int32
 
         # Create datasets
-        data_in = np.reshape(np.arange(np.prod(shape)), shape)
+        data_in = np.reshape(np.arange(np.prod(shape), dtype=dt), shape)
         datasets = []
 
         for i in range(count):
@@ -395,10 +395,8 @@ class TestMultiManager(TestCase):
             arr = f["data" + str(i)][...]
             self.assertEqual(arr.dtype, dt)
 
-            arr = arr.reshape(np.prod(shape))
-            out = np.array([s.decode() for s in arr], dtype=dt)
-            out = out.reshape(shape)
-            np.testing.assert_array_equal(out, data_in_vlen)
+            decoded = np.array([s.decode() for s in arr.reshape(-1)], dtype=dt).reshape(shape)
+            np.testing.assert_array_equal(decoded, data_in_vlen)
 
     def test_multi_write_mixed_shapes(self):
         """

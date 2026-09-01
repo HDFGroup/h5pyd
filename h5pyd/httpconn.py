@@ -2,7 +2,7 @@
 # Copyright by The HDF Group.                                                #
 # All rights reserved.                                                       #
 #                                                                            #
-# This file is part of HSDS (HDF5 REST Server) Service, Libraries and      #
+# This file is part of HSDS (HDF5 REST Server) Service, Libraries and        #
 # Utilities.  The full HDF5 REST Server copyright notice, including          #
 # terms governing use, modification, and redistribution, is contained in     #
 # the file COPYING, which can be found at the root of the source code        #
@@ -14,9 +14,9 @@ from __future__ import absolute_import
 
 import os
 import sys
-import multiprocessing
-
+import time
 import base64
+
 import requests
 import requests_unixsocket
 from requests import ConnectionError
@@ -25,10 +25,7 @@ import json
 import logging
 
 from . import openid
-from .. import config
-from . import requests_lambda
-
-MAX_CACHE_ITEM_SIZE = 10000  # max size of an item to put in the cache
+from .config import get_config
 
 
 def eprint(*args, **kwargs):
@@ -37,30 +34,19 @@ def eprint(*args, **kwargs):
 
 DEFAULT_TIMEOUT = 180  # seconds - allow time for hsds service to bounce
 
-
-class CacheResponse(object):
-    """Wrap a json response in a Requests.Response looking class.
-    Note: we don't want to keep a proper requests obj in the cache since it
-    would contain refernces to other objects
-    """
-
-    def __init__(self, rsp):
-        # just save off what we need
-        self._text = rsp.text
-        self._status_code = rsp.status_code
-        self._headers = rsp.headers
-
-    @property
-    def text(self):
-        return self._text
-
-    @property
-    def status_code(self):
-        return self._status_code
-
-    @property
-    def headers(self):
-        return self._headers
+"""
+def verifyCert(self):
+    # default to validate CERT for https requests, unless
+    # the H5PYD_VERIFY_CERT environment variable is set and True
+    #
+    # TBD: set default to True once the signing authority of data.hdfgroup.org is
+    # recognized
+    if "H5PYD_VERIFY_CERT" in os.environ:
+        verify_cert = os.environ["H5PYD_VERIFY_CERT"].upper()
+        if verify_cert.startswith('F'):
+            return False
+    return True
+"""
 
 
 def getAzureApiKey():
@@ -70,7 +56,7 @@ def getAzureApiKey():
     api_key = None
 
     # if Azure AD ids are set, pass them to HttpConn via api_key dict
-    cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
+    cfg = get_config()  # pulls in state from a .hscfg file (if found).
 
     ad_app_id = None  # Azure AD HSDS Server id
     if "HS_AD_APP_ID" in os.environ:
@@ -111,7 +97,7 @@ def getAzureApiKey():
 
 def getKeycloakApiKey():
     # check for keycloak next
-    cfg = config.get_config()  # pulls in state from a .hscfg file (if found).
+    cfg = get_config()  # pulls in state from a .hscfg file (if found).
     api_key = None
     # check to see if we are configured for keycloak authentication
     if "HS_KEYCLOAK_URI" in os.environ:
@@ -143,10 +129,121 @@ def getKeycloakApiKey():
     return api_key
 
 
+class HttpResponse:
+    """ wrapper for http request responses """
+    def __init__(self, rsp, logger=None):
+        self._rsp = rsp
+        self._logger = logger
+        if logger is None:
+            self.log = logging
+        else:
+            self.log = logging.getLogger(logger)
+        self._text = None
+
+    @property
+    def status_code(self):
+        """ return response status code """
+        return self._rsp.status_code
+
+    @property
+    def reason(self):
+        """ return response reason """
+        return self._rsp.reason
+
+    @property
+    def content_type(self):
+        """ return content type """
+        rsp = self._rsp
+        if 'Content-Type' in rsp.headers:
+            content_type = rsp.headers['Content-Type']
+        else:
+            content_type = ""
+        return content_type
+
+    @property
+    def content_length(self):
+        """ Return length of response if available """
+        if 'Content-Length' in self._rsp.headers:
+            content_length = self._rsp.headers['Content-Length']
+        else:
+            content_length = None
+        return content_length
+
+    @property
+    def is_binary(self):
+        """ return True if the response indicates binary data """
+
+        if self.content_type == "application/octet-stream":
+            return True
+        else:
+            return False
+
+    @property
+    def is_json(self):
+        """ return true if response indicates json """
+
+        if self.content_type.startswith("application/json"):
+            return True
+        else:
+            return False
+
+    @property
+    def text(self):
+        """ getresponse content as bytes """
+
+        if not self._text:
+            rsp = self._rsp
+            if not self.is_binary:
+                # hex encoded response?
+                # this is returned by API Gateway for lambda responses
+                self._text = bytes.fromhex(rsp.text)
+            else:
+                if self.content_length:
+                    self.log.debug(f"got binary response, {self.content_length} bytes")
+                else:
+                    self.log.debug("got binary response, content_length unknown")
+
+                HTTP_CHUNK_SIZE = 4096
+                http_chunks = []
+                downloaded_bytes = 0
+                for http_chunk in rsp.iter_content(chunk_size=HTTP_CHUNK_SIZE):
+                    if http_chunk:  # filter out keep alive chunks
+                        self.log.debug(f"got http_chunk - {len(http_chunk)} bytes")
+                        downloaded_bytes += len(http_chunk)
+                        http_chunks.append(http_chunk)
+                if len(http_chunks) == 0:
+                    raise IOError("no data returned")
+                if len(http_chunks) == 1:
+                    # can return first and only chunk as response
+                    self._text = http_chunks[0]
+                else:
+                    msg = f"retrieved {len(http_chunks)} http_chunks "
+                    msg += f" {downloaded_bytes} total bytes"
+                    self.log.info(msg)
+                    self._text = bytearray(downloaded_bytes)
+                    index = 0
+                    for http_chunk in http_chunks:
+                        self._text[index:(index + len(http_chunk))] = http_chunk
+                        index += len(http_chunk)
+
+        return self._text
+
+    def json(self):
+        """ Return json from response"""
+
+        rsp = self._rsp
+
+        if not self.is_json:
+            raise IOError("response is not json")
+
+        rsp_json = json.loads(rsp.text)
+        self.log.debug(f"rsp_json - {len(rsp.text)} bytes")
+        return rsp_json
+
+
 class HttpConn:
     """
     Some utility methods based on equivalents in base class.
-    TBD: Should refactor these to a common base class
     """
 
     def __init__(
@@ -158,43 +255,59 @@ class HttpConn:
         bucket=None,
         api_key=None,
         mode="a",
-        use_session=True,
-        use_cache=True,
         logger=None,
         retries=3,
         timeout=DEFAULT_TIMEOUT,
         **kwds,
     ):
-        self._domain = domain_name
-        self._mode = mode
-        self._domain_json = None
-        self._use_session = use_session
-        self._retries = retries
-        self._timeout = timeout
-        self._hsds = None
-        self._lambda = None
-        self._api_key = api_key
-        self._s = None  # Sessions
-        self._server_info = None
-        if use_cache:
-            self._cache = {}
-            self._objdb = {}
-        else:
-            self._cache = None
-            self._objdb = None
         self._logger = logger
         if logger is None:
             self.log = logging.getLogger("h5pyd")
         else:
             self.log = logger
 
-        msg = f"HttpConn.init(domain: {domain_name} use_session: {use_session} "
-        msg += f"use_cache: {use_cache} retries: {retries}"
+        cfg = get_config()  # pulls in state from a .hscfg file (if found).
+
+        if not endpoint:
+            if "hs_endpoint" in cfg:
+                endpoint = cfg["hs_endpoint"]
+
+        # remove the trailing slash on endpoint if it exists
+        if endpoint and endpoint.endswith('/'):
+            endpoint = endpoint.strip('/')
+
+        if not username:
+            if "hs_username" in cfg:
+                username = cfg["hs_username"]
+
+        if not password:
+            if "hs_password" in cfg:
+                password = cfg["hs_password"]
+
+        if not api_key and "hs_api_key" in cfg:
+            api_key = cfg["hs_api_key"]
+
+        if not bucket:
+            if "hs_bucket" in cfg:
+                bucket = cfg["hs_bucket"]
+
+        self._domain = domain_name
+        self._mode = mode
+        self._domain_json = None
+        self._retries = retries
+        self._timeout = timeout
+        self._api_key = api_key
+        self._s = None  # Sessions
+        self._server_info = None
+        self._external_refs = []
+
+        msg = f"HttpConn.init(domain: {domain_name}"
+        msg += f" retries: {retries}"
         self.log.debug(msg)
 
         if self._timeout != DEFAULT_TIMEOUT:
             self.log.info(f"HttpConn.init - timeout = {self._timeout}")
-        if endpoint is None:
+        if not endpoint:
             if "HS_ENDPOINT" in os.environ:
                 endpoint = os.environ["HS_ENDPOINT"]
 
@@ -202,82 +315,21 @@ class HttpConn:
             msg = "no endpoint set"
             raise ValueError(msg)
 
-        lambda_prefix = requests_lambda.LAMBDA_REQ_PREFIX
-
-        if endpoint.startswith(lambda_prefix):
-            # save lambda function name
-            self._lambda = endpoint[len(lambda_prefix):]
-
-        elif endpoint.startswith("local"):
-            # create a local hsds server
-            # set the number of nodes
-            # if the endpoint is of the form: "local[n]", use n as the number of nodes
-            # else set the number of nodes equal to number of cores
-            bracket_start = endpoint.find("[")
-            bracket_end = endpoint.find("]")
-            dn_count = None
-            if bracket_start > 0 and bracket_end > 0:
-                try:
-                    dn_count = int(endpoint[bracket_start + 1: bracket_end])
-                except ValueError:
-                    # if value is '*' or something just drop down to default
-                    # setup based on cpu count
-                    pass
-            if not dn_count:
-                dn_count = multiprocessing.cpu_count()
-                dn_count = -(
-                    -dn_count // 2
-                )  # get the ceiling of count / 2 (don't include hyperthreading cores)
-            if dn_count < 1:
-                dn_count = 1
-
-            try:
-                from hsds.hsds_app import HsdsApp
-            except ImportError:
-                raise IOError("unable to import HSDS package")
-
-            # path created by the python tempdir is too long for use with sockets
-            # just use /tmp for now
-            tmp_dir = "/tmp/hs"
-            if not os.path.isdir(tmp_dir):
-                os.mkdir(tmp_dir)
-            log_dir = os.path.join(tmp_dir, "hs.log")
-            hsds = HsdsApp(
-                username=username,
-                password=password,
-                dn_count=dn_count,
-                logfile=log_dir,
-                socket_dir=tmp_dir,
-            )
-            hsds.run()
-            self._hsds = hsds
-            # replace 'local' with the socket path
-            endpoint = hsds.endpoint
-            self.log.debug(f"got hsds endpoint: {endpoint} for 'local' connection")
-
         self._endpoint = endpoint
 
-        if username is None:
-            if "HS_USERNAME" in os.environ:
-                username = os.environ["HS_USERNAME"]
         if isinstance(username, str) and (not username or username.upper() == "NONE"):
             username = None
         self._username = username
 
-        if password is None:
-            if "HS_PASSWORD" in os.environ:
-                password = os.environ["HS_PASSWORD"]
         if isinstance(password, str) and (not password or password.upper() == "NONE"):
             password = None
         self._password = password
 
-        if bucket is None:
-            if "HS_BUCKET" in os.environ:
-                bucket = os.environ["HS_BUCKET"]
-            if isinstance(bucket, str) and (not bucket or bucket.upper() == "NONE"):
-                bucket = None
+        if isinstance(bucket, str) and (not bucket or bucket.upper() == "NONE"):
+            bucket = None
         self._bucket = bucket
 
+        # TBD: should this be in config?
         if api_key is None and "HS_API_KEY" in os.environ:
             api_key = os.environ["HS_API_KEY"]
         if isinstance(api_key, str) and (not api_key or api_key.upper() == "NONE"):
@@ -286,6 +338,7 @@ class HttpConn:
             api_key = getAzureApiKey()
         if not api_key:
             api_key = getKeycloakApiKey()
+        self._api_key = api_key
 
         # Convert api_key to OpenIDHandler
         if isinstance(api_key, dict):
@@ -313,20 +366,15 @@ class HttpConn:
             else:
                 self.log.error(f"Unknown openid provider: {provider}")
 
-    def __del__(self):
-        if self._hsds:
-            self.log.debug("hsds stop")
-            self._hsds.stop()
-            self._hsds = None
-        if self._s:
-            self.log.debug("close session")
-            self._s.close()
-            self._s = None
-
     def getHeaders(self, username=None, password=None, headers=None):
 
         if headers is None:
             headers = {}
+
+        # This should be the default - but explicitly set anyway
+        if "Accept-Encoding" not in headers:
+            headers['Accept-Encoding'] = "deflate, gzip"
+
         elif "Authorization" in headers:
             return headers  # already have auth key
         if username is None:
@@ -349,14 +397,14 @@ class HttpConn:
 
             if token:
                 auth_string = b"Bearer " + token.encode("ascii")
-                headers["Authorization"] = auth_string.decode("ascii")
+                headers["Authorization"] = auth_string
         elif username is not None and password is not None:
             self.log.debug(f"use basic auth with username: {username}")
             auth_string = username + ":" + password
             auth_string = auth_string.encode("utf-8")
             auth_string = base64.b64encode(auth_string)
             auth_string = b"Basic " + auth_string
-            headers["Authorization"] = auth_string.decode("utf-8")
+            headers["Authorization"] = auth_string
         else:
             self.log.debug("no auth header")
             # no auth header
@@ -401,12 +449,11 @@ class HttpConn:
                 return False
         return True
 
-    def getObjDb(self):
-        return self._objdb
-
-    def GET(self, req, format="json", params=None, headers=None, use_cache=True):
+    def GET(self, req, format="json", params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
+        if not self._s:
+            raise IOError("http session is closed")
         # check that domain is defined (except for some specific requests)
         if req not in ("/domains", "/about", "/info", "/") and self._domain is None:
             raise IOError(f"no domain defined: req: {req}")
@@ -429,38 +476,16 @@ class HttpConn:
         if format == "binary":
             headers["accept"] = "application/octet-stream"
 
-        # list of parameters which should disable cache usage
-
-        check_cache = self._cache is not None and use_cache and format == "json"
-        check_cache = check_cache and params["domain"] == self._domain
-        check_cache = check_cache and "select" not in params and "query" not in params
-        check_cache = check_cache and "follow_links" not in params and "pattern" not in params
-        check_cache = check_cache and "Limit" not in params and "Marker" not in params
-
-        if check_cache:
-            self.log.debug("httpcon - checking cache")
-            if req in self._cache:
-                self.log.debug("httpcon - returning cache result")
-                rsp = self._cache[req]
-                return rsp
-
         self.log.info(f"GET: {self._endpoint + req} [{params['domain']}] timeout: {self._timeout}")
-
         for k in params:
             if k != "domain":
                 v = params[k]
                 self.log.debug(f"GET params {k}:{v}")
 
         try:
-            if self._hsds:
-                self._hsds.run()
-
-            s = self.session
-            if self._lambda:
-                stream = False
-            else:
-                stream = True
-
+            s = self._s
+            stream = True  # tbd  - config for no streaming?
+            ts = time.time()
             rsp = s.get(
                 self._endpoint + req,
                 params=params,
@@ -469,9 +494,8 @@ class HttpConn:
                 timeout=self._timeout,
                 verify=self.verifyCert(),
             )
-            self.log.info(f"status: {rsp.status_code}")
-            if self._hsds:
-                self._hsds.run()
+            elapsed = time.time() - ts
+            self.log.info(f"status: GET {rsp.status_code}, elapsed: {elapsed:.4f}")
         except ConnectionError as ce:
             self.log.error(f"connection error: {ce}")
             raise IOError("Connection Error")
@@ -479,68 +503,21 @@ class HttpConn:
             self.log.error(f"got {type(e)} exception: {e}")
             raise IOError("Unexpected exception")
 
-        content_type = None
-        if rsp.status_code == 200 and self._cache is not None:
-            rsp_headers = rsp.headers
-            content_length = 0
-            if "Content-Length" in rsp_headers:
-                try:
-                    content_length = int(rsp_headers["Content-Length"])
-                except ValueError:
-                    content_length = MAX_CACHE_ITEM_SIZE + 1
-            self.log.debug(f"content_length: {content_length}")
+        if rsp.status_code != 200:
+            self.log.warning(f"GET {req} returned status: {rsp.status_code}")
+        else:
+            pass
 
-            if "Content-Type" in rsp_headers:
-                content_type = rsp_headers["Content-Type"]
-            self.log.debug(f"content_type: {content_type}")
-
-            add_to_cache = content_type and content_type.startswith("application/json")
-            add_to_cache = add_to_cache and content_length < MAX_CACHE_ITEM_SIZE and not req.endswith("/value")
-            add_to_cache = add_to_cache and "follow_links" not in params and "pattern" not in params
-            add_to_cache = add_to_cache and "Limit" not in params and "Marker" not in params
-
-            if add_to_cache:
-                # add to our _cache
-                cache_rsp = CacheResponse(rsp)
-                self.log.debug(f"adding {req} to cache")
-                self._cache[req] = cache_rsp
-
-            if rsp.status_code == 200 and req == "/":
-                self.log.info(f"got domain json: {len(rsp.text)} bytes")
-                self._domain_json = json.loads(rsp.text)
-
-        # when calling AWS Lambda thru API Gatway, the status_code
-        # indicates the Lambda request was successful, but not necessarily
-        # the requested HSDS action was.
-        # Check here and raise IOError is needed.
-
-        json_success = (rsp.status_code == 200) and content_type and content_type.startswith("application/json")
-
-        if json_success:
-            body = json.loads(rsp.text)
-            if "statusCode" in body:
-                status_code = body["statusCode"]
-                if status_code == 400:
-                    raise IOError("Invalid request")
-                if status_code == 403:
-                    raise IOError("Unauthorize")
-                if status_code == 404:
-                    raise IOError("Not found")
-                if status_code == 410:
-                    raise IOError("Conflict")
-                if status_code == 500:
-                    raise IOError("Unexpected error")
-
-        return rsp
+        return HttpResponse(rsp)
 
     def PUT(self, req, body=None, format="json", params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
-        if self._cache is not None:
-            # update invalidate everything in cache
-            self._cache = {}
+        if not self._s:
+            raise IOError("http session is closed")
+
         if params:
             self.log.info(f"PUT params: {params}")
         else:
@@ -572,9 +549,8 @@ class HttpConn:
         self.log.info(f"PUT: {req} format: {format} [{len(data)} bytes]")
 
         try:
-            if self._hsds:
-                self._hsds.run()
-            s = self.session
+            s = self._s
+            ts = time.time()
             rsp = s.put(
                 self._endpoint + req,
                 data=data,
@@ -583,9 +559,8 @@ class HttpConn:
                 timeout=self._timeout,
                 verify=self.verifyCert(),
             )
-            self.log.info(f"status: {rsp.status_code}")
-            if self._hsds:
-                self._hsds.run()
+            elapsed = time.time() - ts
+            self.log.info(f"status: PUT {rsp.status_code}, elapsed: {elapsed:.4f}")
         except ConnectionError as ce:
             self.log.error(f"connection error: {ce}")
             raise IOError("Connection Error")
@@ -593,18 +568,19 @@ class HttpConn:
         if rsp.status_code == 201 and req == "/":
             self.log.info("clearing domain_json cache")
             self._domain_json = None
+        if rsp.status_code not in (200, 201):
+            self.log.warning(f"got status code: {rsp.status_code} for PUT {req}")
         self.log.info(f"PUT returning: {rsp}")
-        return rsp
+
+        return HttpResponse(rsp)
 
     def POST(self, req, body=None, format="json", params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
         if self._domain is None:
             raise IOError("no domain defined")
-        if self._cache is not None:
-            # invalidate cache for updates
-            # TBD: handle special case for point selection since that doesn't modify anything
-            self._cache = {}
+        if not self._s:
+            raise IOError("http session is closed")
 
         if params is None:
             params = {}
@@ -639,13 +615,14 @@ class HttpConn:
                 self.log.error(msg)
                 raise IOError("JSON encoding error")
         if format == "binary":
-            # recieve data as binary
+            # receive data as binary
             headers["accept"] = "application/octet-stream"
 
         self.log.info("POST: " + req)
 
         try:
-            s = self.session
+            s = self._s
+            ts = time.time()
             rsp = s.post(
                 self._endpoint + req,
                 data=data,
@@ -654,20 +631,23 @@ class HttpConn:
                 timeout=self._timeout,
                 verify=self.verifyCert(),
             )
+            elapsed = time.time() - ts
+            self.log.info(f"status: POST {rsp.status_code}, elapsed: {elapsed:.4f}")
         except ConnectionError as ce:
             self.log.warning(f"connection error: {ce}")
             raise IOError(str(ce))
 
         if rsp.status_code not in (200, 201):
-            self.log.error(f"POST error: {rsp.status_code}")
+            self.log.error(f"got status_code: {rsp.status_code} for POST: {req}")
 
-        return rsp
+        return HttpResponse(rsp)
 
     def DELETE(self, req, params=None, headers=None):
         if self._endpoint is None:
             raise IOError("object not initialized")
-        if self._cache is not None:
-            self._cache = {}
+        if not self._s:
+            raise IOError("http session is closed")
+
         if req not in ("/domains", "/") and self._domain is None:
             raise IOError("no domain defined")
         if params is None:
@@ -684,13 +664,12 @@ class HttpConn:
             raise IOError("Unable perform request (No write intent on file)")
 
         # try to do a DELETE of the resource
-
         headers = self.getHeaders(headers=headers)
 
         self.log.info("DEL: " + req)
         try:
-            s = self.session
-            rsp = s.delete(
+            ts = time.time()
+            rsp = self._s.delete(
                 self._endpoint + req,
                 headers=headers,
                 params=params,
@@ -698,64 +677,66 @@ class HttpConn:
                 verify=self.verifyCert(),
             )
             self.log.info(f"status: {rsp.status_code}")
+            elapsed = time.time() - ts
+            self.log.info(f"status: DELETE {rsp.status_code}, elapsed: {elapsed:.4f}")
         except ConnectionError as ce:
             self.log.error(f"connection error: {ce}")
             raise IOError("Connection Error")
 
         if rsp.status_code == 200 and req == "/":
-            self.log.info("clearning domain_json cache")
+            self.log.info("clearing domain_json cache")
             self._domain_json = None
 
-        return rsp
+        if rsp.status_code != 200:
+            self.log.warning(f"got status_code: {rsp.status_code} for DELETE {req}")
 
-    @property
-    def session(self):
-        # create a session object to re-use http connection when possible
-        s = requests
+        return HttpResponse(rsp)
+
+    def add_external_ref(self, fid):
+        # this is used by the group class to keep references to external links open
+        if fid.__class__.__name__ != "FileID":
+            raise TypeError("add_external_ref, expected FileID type")
+        self._external_refs.append(fid)
+
+    def open(self):
+        self.log.debug("http_conn.open")
+        if self._s:
+            return  # already open
+
         retries = self._retries
         backoff_factor = 1
         status_forcelist = (500, 502, 503, 504)
-        lambda_prefix = requests_lambda.LAMBDA_REQ_PREFIX
+        if self._endpoint.startswith("http+unix://"):
+            self.log.debug(f"create unixsocket session: {self._endpoint}")
+            s = requests_unixsocket.Session()
+        else:
+            # regular request session
+            s = requests.Session()
 
-        if self._use_session:
-            if self._s is None:
-                if self._endpoint.startswith("http+unix://"):
-                    self.log.debug(f"create unixsocket session: {self._endpoint}")
-                    s = requests_unixsocket.Session()
-                elif self._endpoint.startswith(lambda_prefix):
-                    s = requests_lambda.Session()
-                else:
-                    # regular request session
-                    s = requests.Session()
-
-                retry = Retry(
-                    total=retries,
-                    read=retries,
-                    connect=retries,
-                    backoff_factor=backoff_factor,
-                    status_forcelist=status_forcelist,
-                )
-
-                s.mount(
-                    "http://",
-                    HTTPAdapter(max_retries=retry, pool_connections=16, pool_maxsize=16),
-                )
-                s.mount(
-                    "https://",
-                    HTTPAdapter(max_retries=retry, pool_connections=16, pool_maxsize=16),
-                )
-                self._s = s
-            else:
-                s = self._s
-        return s
+            retry = Retry(
+                total=retries,
+                read=retries,
+                connect=retries,
+                backoff_factor=backoff_factor,
+                status_forcelist=status_forcelist,
+            )
+            kwargs = {"max_retries": retry, "pool_connections": 16, "pool_maxsize": 16}
+            s.mount("http://", HTTPAdapter(**kwargs))
+            s.mount("https://", HTTPAdapter(**kwargs))
+        self.log.debug("Httpconn set self._s")
+        self._s = s
 
     def close(self):
         if self._s:
+            self.log.debug("http_conn.close")
             self._s.close()
             self._s = None
-        if self._hsds:
-            self._hsds.stop()
-            self._hsds = None
+
+    def isClosed(self):
+        if self._s is None:
+            return True
+        else:
+            return False
 
     @property
     def domain(self):
@@ -778,20 +759,13 @@ class HttpConn:
         return self._mode
 
     @property
-    def cache_on(self):
-        if self._cache is None:
-            return False
-        else:
-            return True
-
-    @property
     def domain_json(self):
         if self._domain_json is None:
             rsp = self.GET("/")
             if rsp.status_code != 200:
                 raise IOError(rsp.reason)
             # assume JSON
-            self._domain_json = json.loads(rsp.text)
+            self._domain_json = rsp.json()
         return self._domain_json
 
     @property

@@ -12,7 +12,6 @@
 
 import numpy as np
 import logging
-import math
 
 import config
 
@@ -26,7 +25,6 @@ from common import ut, TestCase
 
 class TestDatasetSwmrRead(TestCase):
     """ Testing SWMR functions when reading a dataset.
-    Skip this test if the HDF5 library does not have the SWMR features.
     """
 
     def setUp(self):
@@ -86,8 +84,9 @@ class TestDatasetSwmrWrite(TestCase):
         # write, but libver='latest' is required.
         self.f = h5py.File(filename, 'w', libver='latest')
 
-        self.data = np.arange(4).astype('f')
-        self.dset = self.f.create_dataset('data', shape=(0,), dtype=self.data.dtype, chunks=(2,), maxshape=(None,))
+        kwargs = {"dtype": np.int32, "shape": (0,), "maxshape": (None,), "chunks": (2,)}
+        self.dset = self.f.create_dataset('data', **kwargs)
+        self.f.flush()  # this is needed for h5pyd but apparently not with h5py
 
     def test_initial_swmr_mode_off(self):
         """ Verify that the file is not initially in SWMR mode"""
@@ -111,38 +110,87 @@ class TestDatasetSwmrWrite(TestCase):
     def test_extend_dset(self):
         """ Extend and flush a SWMR dataset
         """
-        self.f.swmr_mode = True
-        self.assertTrue(self.f.swmr_mode)
+        with h5py.File(self.f.filename, 'r', swmr=True) as f_read:
+            self.assertTrue("data" in f_read)
+            dset_read = f_read['data']
+            dt = dset_read.dtype
+            self.f.swmr_mode = True
+            self.assertTrue(self.f.swmr_mode)
 
-        self.dset.resize(self.data.shape)
-        self.dset[:] = self.data
-        self.dset.flush()
+            data = np.arange(4).astype(dt)
+            self.dset.resize(data.shape)
+            self.dset[:] = data
+            self.dset.flush()
 
-        # Refresh and read back data for assertion
-        self.dset.refresh()
-        self.assertArrayEqual(self.dset, self.data)
+            # check with the read-only dataset
+            dset_read.refresh()
+            self.assertEqual(dset_read.shape, data.shape)
+            self.assertArrayEqual(dset_read[:], data)
 
     def test_extend_dset_multiple(self):
 
-        self.f.swmr_mode = True
-        self.assertTrue(self.f.swmr_mode)
+        """ test multipe extensions of a SWMR dataset
+        """
 
-        self.dset.resize((4,))
-        self.dset[0:] = self.data
-        self.dset.flush()
+        with h5py.File(self.f.filename, 'r', swmr=True) as f_read:
+            self.assertTrue("data" in f_read)
+            dset_read = f_read['data']
+            self.f.swmr_mode = True
+            self.assertTrue(self.f.swmr_mode)
 
-        # Refresh and read back 1st data block for assertion
-        self.dset.refresh()
-        self.assertArrayEqual(self.dset, self.data)
+            self.assertEqual(self.dset.maxshape, (None,))
 
-        self.dset.resize((8,))
-        self.dset[4:] = self.data
-        self.dset.flush()
+            self.dset.resize((4,))
 
-        # Refresh and read back 1st data block for assertion
-        self.dset.refresh()
-        self.assertArrayEqual(self.dset[0:4], self.data)
-        self.assertArrayEqual(self.dset[4:8], self.data)
+            self.assertEqual(self.dset.maxshape, (None,))
+
+            self.dset[0:] = np.arange(4, 8).astype(self.dset.dtype)
+            self.dset.flush()
+
+            # Refresh and read back 1st data block for assertion
+            dset_read.refresh()
+            self.assertArrayEqual(dset_read[:], np.arange(4, 8).astype(self.dset.dtype))
+
+            self.dset.resize((8,))
+            self.dset[4:] = np.arange(8, 12).astype(self.dset.dtype)
+            self.dset.flush()
+
+            # Refresh and read back 1st data block for assertion
+            dset_read.refresh()
+            self.assertArrayEqual(dset_read[:8], np.arange(4, 12).astype(self.dset.dtype))
+
+
+class TestDatasetSwmrReadWrite(TestCase):
+    """ Testing SWMR functions when reading a dataset while the file
+    is open for writing.
+    """
+
+    def setUp(self):
+        """ First setup a file with a small chunked and empty dataset.
+        No data written yet.
+        """
+
+        filename = self.getFileName("test_data_swmr_read_write")
+        print("filename:", filename)
+
+        # Note that when creating the file, the swmr=True is not required for
+        # write, but libver='latest' is required.
+        self.f = h5py.File(filename, 'w', libver='latest')
+
+        self.data = np.asarray([1, 2, 3, 4], dtype=np.int32)
+        self.dset = self.f.create_dataset('data', data=self.data)
+        self.f.flush()  # this is needed for h5pyd but apparently not with h5py
+
+    def test_swmr_read_write(self):
+        # open the same file for read-only with swmr=True
+        fname = self.f.filename
+        f_read = h5py.File(fname, 'r', swmr=True)
+        self.assertTrue("data" in f_read)
+        dset_read = f_read['data']
+
+        dset_read.refresh()
+
+        f_read.close()
 
 
 if __name__ == '__main__':

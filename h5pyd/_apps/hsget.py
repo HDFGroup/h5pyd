@@ -100,13 +100,15 @@ def main():
     kwargs["bucket"] = cfg["hs_bucket"]
     try:
         fin = h5pyd.File(src_domain, mode='r', **kwargs)
+    except FileNotFoundError as fnfe:
+        if fnfe.errno == 410:
+            logging.error(f"Domain: {src_domain} has been recently deleted")
+        else:
+            logging.error(f"Domain: {src_domain} not found")
+        sys.exit(1)
     except IOError as ioe:
         if ioe.errno == 403:
             logging.error(f"No read access to domain: {src_domain}")
-        elif ioe.errno == 404:
-            logging.error(f"Domain: {src_domain} not found")
-        elif ioe.errno == 410:
-            logging.error(f"Domain: {src_domain} has been recently deleted")
         else:
             logging.error(f"Error opening domain {src_domain}: {ioe}")
         sys.exit(1)

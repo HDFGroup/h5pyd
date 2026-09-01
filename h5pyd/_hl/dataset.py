@@ -13,24 +13,31 @@
 from __future__ import absolute_import
 
 import posixpath as pp
-from copy import copy
 import sys
 import time
+
 import numpy
 import os
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 
-from .base import HLObject, jsonToArray, bytesToArray, arrayToBytes
-from .base import Empty, guess_dtype
-from .h5type import Reference, RegionReference
-from .base import _decode
+from h5json.hdf5dtype import Reference, RegionReference
+from h5json.hdf5dtype import createDataType, check_dtype, special_dtype, guess_dtype, getTypeItem
+from h5json.hdf5dtype import isVlen, vlenBaseType
+from h5json.hdf5db import _decode
+from h5json.shape_util import getShapeJson, getShapeClass, getMaxDims
+from h5json.dset_util import generateLayout
+from h5json.filters import getFilterItem, isCompressionFilter
+from h5json.array_util import array_for_new_object
+from h5json import selections as sel
+
+from .. import h5ds as ds
+
+from .base import HLObject
+from .base import Empty
 from .objectid import DatasetID
-from . import filters
-from . import selections as sel
 from .datatype import Datatype
-from .h5type import getTypeItem, createDataType, check_dtype, special_dtype, getItemSize
 from .. import config
 
 _LEGACY_GZIP_COMPRESSION_VALS = frozenset(range(10))
@@ -65,6 +72,123 @@ def readtime_dtype(basetype, names):
     return numpy.dtype([(name, basetype.fields[name][0]) for name in names])
 
 
+def _vlenStrToBytes(arr, dt):
+    """Recursively convert any vlen-of-str (utf-8) elements of dt within arr to
+    utf-8-encoded bytes, in place.
+
+    h5json decodes a utf-8 vlen string element to a Python str when reading,
+    but h5py's own convention is that a raw read always returns bytes for any
+    vlen string data (ascii or utf-8) - decoding to str only happens via
+    Dataset.asstr(). This bridges that gap at the h5pyd boundary. """
+    if len(dt) > 0:
+        for name in dt.names:
+            _vlenStrToBytes(arr[name], dt[name])
+        return
+    if isVlen(dt) and vlenBaseType(dt) is str:
+        for idx in numpy.ndindex(arr.shape):
+            v = arr[idx]
+            if isinstance(v, str):
+                # surrogateescape recovers the exact original bytes for a value
+                # HDF5 never validated the encoding of (see h5json's matching
+                # decode in array_util.readElement)
+                arr[idx] = v.encode("utf-8", errors="surrogateescape")
+
+
+def _encodeVlenAsciiStrict(arr, dt):
+    """Recursively encode any str element of an ascii-declared vlen (vlen: bytes)
+    field of dt within arr via the 'ascii' codec, in place.
+
+    Raises UnicodeEncodeError for non-ascii text, matching h5py's behavior of
+    not silently accepting non-ascii text for an ascii-declared string dataset. """
+    if len(dt) > 0:
+        for name in dt.names:
+            _encodeVlenAsciiStrict(arr[name], dt[name])
+        return
+    if isVlen(dt) and vlenBaseType(dt) is bytes:
+        for idx in numpy.ndindex(arr.shape):
+            v = arr[idx]
+            if isinstance(v, str):
+                arr[idx] = v.encode("ascii")
+
+
+def _encodeFixedUtf8(val, dtype):
+    """Recursively encode any str element to UTF-8 bytes, for a value being
+    written to a fixed-length, UTF8-declared string dataset (see
+    string_dtype()'s 'h5py_encoding' metadata).
+
+    numpy's own str -> fixed 'S' dtype conversion is always ASCII-only
+    (numpy has no notion of the dtype's declared charset), so without this,
+    writing a plain Python str to a UTF8-declared fixed-length dataset
+    raises UnicodeEncodeError instead of encoding as UTF-8 like h5py does.
+
+    A 'U'-kind (fixed-length unicode) source array is rejected outright,
+    matching h5py - there's no implicit numpy-unicode-to-HDF5 conversion. """
+    if isinstance(val, str):
+        return val.encode("utf-8")
+    if isinstance(val, bytes):
+        return val
+    if isinstance(val, numpy.ndarray):
+        if val.dtype.kind == "U":
+            raise TypeError(f"No conversion path for dtype: {val.dtype!r}")
+        if val.dtype.kind == "O":
+            out = numpy.empty(val.shape, dtype=object)
+            flat_out = out.reshape(-1)
+            flat_in = val.reshape(-1)
+            for i in range(flat_in.size):
+                flat_out[i] = _encodeFixedUtf8(flat_in[i], dtype)
+            return out
+        return val
+    if isinstance(val, (list, tuple)):
+        return [_encodeFixedUtf8(v, dtype) for v in val]
+    return val
+
+
+def _regionRefBytesToObj(arr, dt):
+    """Recursively convert any RegionReference element of dt within arr from
+    its raw RegionReference.tobytes()-encoded bytes to an actual
+    RegionReference instance, in place (an empty/null bytes value becomes
+    None).
+
+    h5json's dataset binary buffer format (array_util.readElement) returns a
+    region reference as raw bytes - this bridges that gap at the h5pyd
+    boundary, mirroring how a plain object Reference already round-trips as
+    a bare uuid string that Group.__getitem__ understands directly. """
+    if len(dt) > 0:
+        for name in dt.names:
+            _regionRefBytesToObj(arr[name], dt[name])
+        return
+    if check_dtype(ref=dt) is RegionReference:
+        for idx in numpy.ndindex(arr.shape):
+            v = arr[idx]
+            if isinstance(v, bytes):
+                arr[idx] = RegionReference.frombytes(v) if v else None
+            elif v == 0:
+                # uninitialized element - see array_util.getElementSize()
+                arr[idx] = None
+
+
+def _regionRefObjToBytes(arr, dt):
+    """Recursively convert any RegionReference element of dt within arr to
+    its raw RegionReference.tobytes()-encoded bytes, in place (None becomes
+    an empty/null bytes value).
+
+    Unlike attribute JSON encoding (array_util.bytesArrayToList), which
+    accepts a RegionReference instance directly, h5json's dataset binary
+    buffer format (array_util.copyElement/getElementSize) requires region
+    references to already be serialized to bytes. """
+    if len(dt) > 0:
+        for name in dt.names:
+            _regionRefObjToBytes(arr[name], dt[name])
+        return
+    if check_dtype(ref=dt) is RegionReference:
+        for idx in numpy.ndindex(arr.shape):
+            v = arr[idx]
+            if isinstance(v, RegionReference):
+                arr[idx] = v.tobytes()
+            elif v is None:
+                arr[idx] = b""
+
+
 def make_new_dset(
     parent,
     shape=None,
@@ -88,15 +212,15 @@ def make_new_dset(
     Only creates anonymous datasets.
     """
 
-    # fill in fields for the body of the POST request as we got
-    body = {}
     cfg = config.get_config()
+
+    if track_times is not None:
+        if track_times not in (True, False):
+            raise TypeError("invalid track_times")
 
     # Convert data to a C-contiguous ndarray
     if data is not None and not isinstance(data, Empty):
-        from . import base
-
-        data = base.array_for_new_object(data, specified_dtype=dtype)
+        data = array_for_new_object(data, specified_dtype=dtype)
 
     # Validate shape
     if shape is None:
@@ -107,45 +231,25 @@ def make_new_dset(
         shape = data.shape
     else:
         shape = (shape,) if isinstance(shape, int) else tuple(shape)
-        if data is not None and (
-            numpy.prod(shape, dtype=numpy.ulonglong) != numpy.prod(data.shape, dtype=numpy.ulonglong)
-        ):
-            raise ValueError("Shape tuple is incompatible with data")
-
-    if shape is None:
-        body["shape"] = "H5S_NULL"
-    else:
-        body["shape"] = shape
-
-    if track_times is not None:
-        if track_times not in (True, False):
-            raise TypeError("invalid track_times")
+        if data is not None:
+            if numpy.prod(shape, dtype=numpy.ulonglong) != numpy.prod(data.shape, dtype=numpy.ulonglong):
+                raise ValueError("Shape tuple is incompatible with data")
+            if data.shape != shape:
+                # data fits the given shape by element count, but isn't
+                # already that shape (e.g. flat data for a multi-dim shape)
+                data = data.reshape(shape)
 
     if isinstance(maxshape, int):
         maxshape = (maxshape,)
-    tmp_shape = maxshape if maxshape is not None else shape
 
-    # Validate chunk shape
-    if isinstance(chunks, int) and not isinstance(chunks, bool):
-        chunks = (chunks,)
-    if isinstance(chunks, tuple) and any(
-        chunk > dim for dim, chunk in zip(tmp_shape, chunks) if dim is not None
-    ):
-        errmsg = (
-            "Chunk shape must not be greater than data shape in any dimension. "
-            f"{chunks} is not compatible with {shape}"
-        )
-        raise ValueError(errmsg)
+    if shape is None and (chunks or maxshape is not None):
+        raise TypeError("Chunks/maxshape not allowed for null space datasets")
+    if shape == () and chunks:
+        raise TypeError("Chunks not allowed for scalar datasets")
 
-    # validate chunks is not False if maxshape or compression is set
-    if chunks is False:
-        if maxshape is not None:
-            raise ValueError("chunks must not be False with extendible datasets")
-        if compression is not None:
-            raise ValueError("chunks must not be False with compression")
-
-    if chunks and shape is None and (data is None or isinstance(data, Empty)):
-        raise TypeError("Chunk layout may not be specified with empty dataset")
+    shape_json = getShapeJson(shape, maxdims=maxshape)
+    if getShapeClass(shape_json) == "H5S_NULL":
+        shape = "H5S_NULL"  # pass this to the createDataset method
 
     if isinstance(dtype, Datatype):
         # Named types are used as-is
@@ -170,6 +274,26 @@ def make_new_dset(
         else:
             dtype = numpy.dtype(dtype)
 
+        if dtype.kind == "U":
+            raise TypeError("Fixed-length unicode data is not supported")
+
+        if dtype.kind == "c":
+            # HDF5 does have a native complex type now, but h5py hasn't been
+            # updated to use it yet - for compatibility, h5json represents
+            # complex numbers the way h5py itself does: a compound with
+            # 'r'/'i' float fields. Convert both the dtype and the
+            # underlying data (if given) the same way.
+            if dtype.itemsize == 8:
+                float_dt = numpy.dtype('f4').newbyteorder(dtype.byteorder)
+            elif dtype.itemsize == 16:
+                float_dt = numpy.dtype('f8').newbyteorder(dtype.byteorder)
+            else:
+                raise TypeError(f"Unsupported dtype for complex numbers: {dtype}")
+            compound_dt = numpy.dtype([('r', float_dt), ('i', float_dt)])
+            if data is not None and hasattr(data, "view"):
+                data = data.view(compound_dt)
+            dtype = compound_dt
+
         if dtype.kind == "O" and dtype.metadata and "ref" in dtype.metadata:
             type_json = {}
             type_json["class"] = "H5T_REFERENCE"
@@ -183,15 +307,42 @@ def make_new_dset(
                 raise ValueError(errmsg)
         else:
             type_json = getTypeItem(dtype)
-    body["type"] = type_json
 
-    layout = None
-    if chunks is not None and isinstance(chunks, dict):
-        # use the given chunk layout
-        layout = chunks
-        chunks = None
+    filters = []
+    if shuffle:
+        shuffle_filter = getFilterItem("shuffle")
+        filters.append(shuffle_filter)
 
-    compressors = parent.id.http_conn.compressors
+    if scaleoffset is not None:
+        # scaleoffset must be a non-negative number, except for integer data,
+        # for which scaleoffset == True is permissible (auto-detected precision)
+        if scaleoffset < 0:
+            raise ValueError("scale factor must be >= 0")
+
+        so_dtype = dtype.dtype if isinstance(dtype, Datatype) else dtype
+        if so_dtype.kind == "f":
+            if scaleoffset is True:
+                raise ValueError(
+                    "integer scaleoffset must be provided for floating point types"
+                )
+            scale_type = "H5Z_SO_FLOAT_DSCALE"
+        elif so_dtype.kind in ("u", "i"):
+            if scaleoffset is True:
+                scaleoffset = 0  # auto-detect precision
+            scale_type = "H5Z_SO_INT"
+        else:
+            raise TypeError(
+                "scale/offset filter only supported for integer and floating-point types"
+            )
+
+        scaleoffset_filter = getFilterItem(
+            "scaleoffset", options={"scaleType": scale_type, "scaleOffset": int(scaleoffset)}
+        )
+        filters.append(scaleoffset_filter)
+
+    if fletcher32:
+        fletcher32_filter = getFilterItem("fletcher32")
+        filters.append(fletcher32_filter)
 
     # Legacy
     if compression is True:
@@ -199,40 +350,67 @@ def make_new_dset(
             compression_opts = 4
         compression = "gzip"
 
-    # Legacy
-    if compression in _LEGACY_GZIP_COMPRESSION_VALS:
-        if compression_opts is not None:
-            raise TypeError("Conflict in compression options")
-        compression_opts = compression
-        compression = "gzip"
-
-    if compression:
-        if isinstance(compression, int):
-            if compression < 0:
-                raise ValueError(f"Invalid filter: {compression}")
-            if compression not in range(0, 10):
-                raise ValueError(f"Unknown compression: {compression}")
+    if isinstance(compression, int) and not isinstance(compression, bool):
+        if compression in _LEGACY_GZIP_COMPRESSION_VALS:
+            # legacy shorthand: compression is itself the gzip level
             compression_opts = compression
             compression = "gzip"
-        elif compression not in compressors:
-            msg = "Unknown compression, expect one of the following "
-            msg += f"values: {compressors}"
-            raise ValueError(msg)
+        elif compression < 0:
+            raise ValueError(f"Invalid filter number: {compression}")
+        else:
+            raise ValueError(f"Unknown compression filter number: {compression}")
 
-    dcpl = filters.generate_dcpl(
-        shape,
-        dtype,
-        chunks=chunks,
-        compression=compression,
-        compression_opts=compression_opts,
-        shuffle=shuffle,
-        fletcher32=fletcher32,
-        maxshape=maxshape,
-        scaleoffset=scaleoffset,
-        layout=layout,
-        initializer=initializer,
-        initializer_opts=initializer_opts
-    )
+    if compression:
+        options = {}
+        if compression_opts is not None:
+            if compression in ("gzip", "deflate", "zlib", "lz4"):
+                level = compression_opts
+                if isinstance(level, (tuple, list)):
+                    level = level[0]
+                options["level"] = level
+            elif compression == "szip":
+                coding, pixels_per_block = compression_opts
+                coding_map = {"ec": "H5_SZIP_EC_OPTION_MASK", "nn": "H5_SZIP_NN_OPTION_MASK"}
+                options["coding"] = coding_map.get(coding, coding)
+                options["pixelsPerBlock"] = pixels_per_block
+            # TBD: how to set options for other filters
+        compression_filter = getFilterItem(compression, options=options)
+        filters.append(compression_filter)
+
+    if filters and chunks is None:
+        chunks = True  # specify chunking if filter is used
+
+    if initializer and chunks is None:
+        # HSDS's chunk initializers run per-chunk (see hsds/datanode_lib.py's
+        # run_chunk_initializer()) - a contiguous dataset has no chunks to
+        # initialize, so the initializer would silently never run
+        chunks = True
+
+    if chunks is False:
+        is_extensible = maxshape is not None and any(
+            m is None or m != s for m, s in zip(maxshape, shape)
+        )
+        if filters or is_extensible:
+            raise ValueError("Chunked format required for given storage options")
+
+    # TBD - make these values part of config
+    CHUNK_MIN = 512 * 1024  # Soft lower limit (512k)
+    CHUNK_MAX = 8096 * 1024  # Hard upper limit (8M)
+    kwargs = {"chunk_min": CHUNK_MIN, "chunk_max": CHUNK_MAX, "chunks": chunks}
+    layout = generateLayout(shape_json, type_json, **kwargs)
+
+    dcpl = {}  # creation property list
+    if layout:
+        dcpl["layout"] = layout
+    if filters:
+        dcpl["filters"] = filters
+    if initializer:
+        # HSDS expects the initializer app name and its options combined
+        # into a single list under "initializer" (e.g. ["arange",
+        # "--start=10", "--step=2"]) - see hsds/datanode_lib.py's
+        # run_chunk_initializer(), which reads initializer[0] as the app
+        # name and initializer[1:] as its args
+        dcpl["initializer"] = [initializer] + list(initializer_opts or [])
 
     if fillvalue is not None:
         # is it compatible with the array type?
@@ -258,43 +436,31 @@ def make_new_dset(
     if chunks and isinstance(chunks, dict):
         dcpl["layout"] = chunks
 
-    body["creationProperties"] = dcpl
-
     if maxshape is not None and len(maxshape) > 0:
         if shape is not None:
             maxshape = tuple(m if m is not None else 0 for m in maxshape)
-            body["maxdims"] = maxshape
         else:
             print("maxshape provided but no shape")
 
-    req = "/datasets"
+    dset_uuid = parent.id.db.createDataset(shape, maxdims=maxshape, dtype=dtype, cpl=dcpl)
 
-    rsp = parent.POST(req, body=body)
-
-    json_rep = {}
-    json_rep["id"] = rsp["id"]
-
-    req = "/datasets/" + rsp["id"]
-    rsp = parent.GET(req)
-
-    json_rep["shape"] = rsp["shape"]
-    json_rep["type"] = rsp["type"]
-    json_rep["lastModified"] = rsp["lastModified"]
-    if "creationProperties" in rsp:
-        json_rep["creationProperties"] = rsp["creationProperties"]
-    else:
-        json_rep["creationProperties"] = {}
-    if "layout" in rsp:
-        json_rep["layout"] = rsp["layout"]
-
-    dset_id = DatasetID(parent, json_rep)
-
-    if data is not None:
+    if data is not None and not isinstance(data, Empty):
         # init data
-        dset = Dataset(dset_id, track_order=(track_order or cfg.track_order))
-        dset[...] = data
+        sel_all = sel.select(tuple(shape), ...)
+        target_dtype = dtype.dtype if isinstance(dtype, Datatype) else dtype
+        if data.dtype != target_dtype and target_dtype.names is None and \
+                target_dtype.kind in "biufc" and data.dtype.kind in "biufc":
+            # real HDF5 converts numeric types during the low-level write, but
+            # h5json's remote backend requires an exact dtype match - cast
+            # explicitly so e.g. create_dataset(dtype='i4', data=<float64 array>)
+            # behaves the same as it would against a local HDF5 file
+            data = data.astype(target_dtype)
+        _regionRefObjToBytes(data, data.dtype)
+        parent.id.db.setDatasetValues(dset_uuid, sel_all, data)
 
-    return dset_id
+    dset = DatasetID(parent, dset_uuid)
+
+    return dset
 
 
 class AstypeWrapper:
@@ -385,7 +551,10 @@ class FieldsWrapper:
 
     def __getitem__(self, args):
         data = self._dset.__getitem__(args, new_dtype=self.read_dtype)
-        if self.extract_field is not None:
+        if self.extract_field is not None and getattr(data.dtype, "names", None):
+            # only extract if the returned data is still structured - a
+            # single-field selection on a non-scalar dataset already comes
+            # back as a bare (non-compound) array
             data = data[self.extract_field]
         return data
 
@@ -395,6 +564,34 @@ class FieldsWrapper:
         >>> length = len(dataset.fields(['x', 'y']))
         """
         return len(self._dset)
+
+
+class PointsAccessor:
+    def __init__(self, dset: 'Dataset'):
+        self.dset = dset
+
+    def __getitem__(self, points):
+        ps = sel.select(self.dset.shape, points)
+        if ps.select_type != sel.H5S_SEL_POINTS:
+            raise TypeError("Invalid points selection")
+        db = self.dset.id.db
+        arr = db.getDatasetValues(self.dset.id.uuid, ps)
+        _vlenStrToBytes(arr, arr.dtype)
+        _regionRefBytesToObj(arr, arr.dtype)
+
+        return arr
+
+    def __setitem__(self, points, values):
+        ps = sel.select(self.dset.shape, points)
+        values = numpy.asarray(values, order='C', dtype=self.dset.dtype)
+
+        # Require shape to match exactly
+        if values.shape != ps.mshape:
+            raise ValueError(f"Expected data shape {ps.mshape}, got {values.shape}")
+
+        _regionRefObjToBytes(values, values.dtype)
+        db = self.dset.id.db
+        db.setDatasetValues(self.dset.id.uuid, ps, values)
 
 
 class ChunkIterator(object):
@@ -536,6 +733,17 @@ class Dataset(HLObject):
         return FieldsWrapper(self, _prior_dtype, names)
 
     @property
+    def points(self):
+        """Read/write data to specfied individual points within the dataset
+
+        E.g. for a 2D dataset:
+
+        >>> arr = dataset.points[[(1, 3), (5, 1), (2, 7)]]
+        >>> dataset.points[[(1, 3), (5, 1), (2, 7)]] = [4, 5, 6]
+        """
+        return PointsAccessor(self)
+
+    @property
     def dims(self):
         from .dims import DimensionManager
 
@@ -544,38 +752,28 @@ class Dataset(HLObject):
     @property
     def ndim(self):
         """Numpy-style attribute giving the number of dimensions"""
-        if self._shape is None:
+
+        shape = self.shape
+        if shape is None:
             return 0
         else:
-            return len(self._shape)
+            return len(shape)
 
     @property
     def shape(self):
         """Numpy-style shape tuple giving dataset dimensions"""
         # just return the cached shape value
         # (although potentially it could have changed on server)
-        return self._shape
 
-    def get_shape(self, check_server=False):
-        # this version will optionally refetch the shape from the server
-        # (if the dataset is resiable)
         shape_json = self.id.shape_json
         if shape_json["class"] == "H5S_NULL":
-            return None
-        if shape_json["class"] == "H5S_SCALAR":
-            return ()  # return empty
-
-        if "maxdims" not in shape_json or not check_server:
-            # not resizable, just return dims
-            dims = shape_json["dims"]
+            dims = None
+        elif shape_json["class"] == "H5S_SCALAR":
+            dims = ()  # return empty
         else:
-            # resizable, retrieve current shape
-            req = "/datasets/" + self.id.uuid + "/shape"
-            rsp = self.GET(req)
-            shape_json = rsp["shape"]
-            dims = shape_json["dims"]
-        self._shape = tuple(dims)
-        return self._shape
+            dims = tuple(shape_json["dims"])
+
+        return dims
 
     @shape.setter
     def shape(self, shape):
@@ -584,17 +782,17 @@ class Dataset(HLObject):
     @property
     def size(self):
         """Numpy-style attribute giving the total dataset size"""
-        if self._shape is None:
+        shape = self.shape
+        if shape is None:
             return None
-        return numpy.prod(self._shape, dtype=numpy.int64).item()
+        return numpy.prod(shape, dtype=numpy.int64).item()
 
     @property
     def nbytes(self):
         """Numpy-style attribute giving the raw dataset size as the number of bytes"""
         size = self.size
-        if (
-            size is None
-        ):  # if we are an empty 0-D array, then there are no bytes in the dataset
+        if (size is None):
+            # if we are an empty 0-D array, then there are no bytes in the dataset
             return 0
         return self.dtype.itemsize * size
 
@@ -604,82 +802,66 @@ class Dataset(HLObject):
         return self._dtype
 
     @property
-    def value(self):
-        """Alias for dataset[()]"""
-        DeprecationWarning(
-            "dataset.value has been deprecated. " "Use dataset[()] instead."
-        )
-        return self[()]
-
-    @property
     def chunks(self):
         """Dataset chunks (or None)"""
-        ret = self.id.chunks
-        if isinstance(ret, list):
-            ret = tuple(ret)
-        return ret
+
+        chunks = None
+        layout = self.id.layout
+
+        if layout and layout['class'] in ('H5D_CHUNKED', 'H5D_CHUNKED_REF', 'H5D_CHUNKED_REF_INDIRECT'):
+            if "dims" in layout:
+                chunks = layout['dims']
+
+        if isinstance(chunks, list):
+            chunks = tuple(chunks)
+        return chunks
 
     @property
     def compression(self):
 
         """iterate through list of filters and return compression filter
         or None if none found"""
-        compressors = self.id.http_conn.compressors
-        for filter in self._filters:
-            if isinstance(filter, str):
-                filter_name = filter
-            elif isinstance(filter, dict) and "name" in filter:
-                filter_name = filter["name"]
-            else:
-                filter_name = None
 
-            if filter_name and filter_name in compressors:
-                return filter_name
-        return None
+        compressor = None
+        filters = self.id.filters
+        for filter in filters:
+            if isCompressionFilter(filter):
+                compressor = filter["name"]
+                break
+        return compressor
 
     @property
     def compression_opts(self):
         """Compression setting.  Int(0-9) for gzip, 2-tuple for szip."""
-        compressors = self.id.http_conn.compressors
-        for filter in self._filters:
-            if isinstance(filter, str):
-                return None  # compression filter, but no options
-            elif isinstance(filter, dict) and "name" in filter:
-                filter_name = filter["name"]
-                if filter_name not in compressors:
-                    continue
-                if filter_name == "szip":
-                    opt_keys = (
-                        "bitsPerPixel",
-                        "coding",
-                        "pixelsPerBlock",
-                        "pixelsPerScanline",
-                    )
-                    opt = []
-                    for opt_key in opt_keys:
-                        if opt_key in filter:
-                            opt.append(filter[opt_key])
-                    if len(opt) == len(opt_keys):
-                        # expected number of options
-                        return tuple(opt)
-                    else:
-                        return None
-                if "level" in filter:
-                    # just return level as an int
-                    return filter["level"]
-                else:
-                    return None
 
-        return None
+        opts = None
+        filters = self.id.filters
+
+        for filter in filters:
+            if isCompressionFilter(filter):
+                if "level" in filter:
+                    # deflate and lz4 both use this filter option
+                    opts = filter["level"]
+                elif filter["class"] == "H5Z_FILTER_SZIP":
+                    # TBD - what about bitsPerScanline and coding?
+                    if "bitsPerPixel" in filter and "pixelsPerBlock" in filter:
+                        opts = []
+                        opts.append(filter["bitsPerPixel"])
+                        opts.append(filter["pixelsPerBlock"])
+                        opts = tuple(opts)
+                else:
+                    pass  # TBD: support other filter opts?
+
+        return opts
 
     @property
     def shuffle(self):
         """Shuffle filter present (T/F)"""
-        for filter in self._filters:
+
+        filters = self.id.filters
+        for filter in filters:
             # check by class or name
-            if "class" in filter and filter["class"] == "H5Z_FILTER_SHUFFLE":
-                return True
-            if "name" in filter and filter["name"] == "shuffle":
+            if filter["class"] == "H5Z_FILTER_SHUFFLE":
                 return True
 
         return False
@@ -687,7 +869,14 @@ class Dataset(HLObject):
     @property
     def fletcher32(self):
         """Fletcher32 filter is present (T/F)"""
-        return "fletcher32" in self._filters
+
+        filters = self.id.filters
+        for filter in filters:
+            # check by class or name
+            if filter["class"] == "H5Z_FILTER_FLETCHER32":
+                return True
+
+        return False
 
     @property
     def scaleoffset(self):
@@ -695,11 +884,11 @@ class Dataset(HLObject):
         the number of bits stored, or 0 for auto-detected. For floating
         point data types, this is the number of decimal places retained.
         If the scale/offset filter is not in use, this is None."""
-        for filter in self._filters:
+
+        filters = self.id.filters
+        for filter in filters:
             # check by class or name
-            if ("class" in filter and filter["class"] == "H5Z_FILTER_SCALEOFFSET") or (
-                "name" in filter and filter["name"] == "scaleoffset"
-            ):
+            if filter["class"] == "H5Z_FILTER_SCALEOFFSET":
                 if "scaleOffset" in filter:
                     return filter["scaleOffset"]
                 else:
@@ -712,34 +901,29 @@ class Dataset(HLObject):
         None have no resize limit."""
 
         shape_json = self.id.shape_json
-        if self.id.shape_json["class"] == "H5S_SCALAR":
-            return ()  # empty tuple
-
-        if "maxdims" not in shape_json:
-            # not resizable, just return dims
-            dims = shape_json["dims"]
+        shape_class = getShapeClass(shape_json)
+        if shape_class == "H5S_NULL":
+            return None
+        elif shape_class == "H5S_SCALAR":
+            return ()
         else:
-            dims = shape_json["maxdims"]
+            pass  # H5S_SIMPLE
+        dims = getMaxDims(shape_json)
 
-        # HSDS returns H5S_UNLIMITED for ulimited dims
+        # HSDS returns H5S_UNLIMITED for unlimited dims
         return tuple(x if (x != 0 and x != "H5S_UNLIMITED") else None for x in dims)
 
     @property
     def fillvalue(self):
         """Fill value for this dataset (0 by default)"""
-        dcpl = self.id.dcpl_json
+        dcpl = self.id.cpl_json
         if "fillValue" in dcpl:
             fill_value = dcpl["fillValue"]
             if isinstance(fill_value, list):
                 # convert to tuple so numpy will do the proper thing for
                 # compound types
                 fill_value = tuple(fill_value)
-            arr = numpy.asarray(
-                [
-                    fill_value,
-                ],
-                dtype=self._dtype,
-            )
+            arr = numpy.asarray([fill_value,], dtype=self._dtype)
         else:
             # create default array
             arr = numpy.zeros((1,), dtype=self.dtype)
@@ -748,8 +932,8 @@ class Dataset(HLObject):
 
     @property
     def _is_empty(self):
-        """check if this is a null-space datset"""
-        return self._shape is None
+        """check if this is a null-space dataset"""
+        return self.shape is None
 
     @property
     def num_chunks(self):
@@ -770,37 +954,18 @@ class Dataset(HLObject):
             raise ValueError(f"{bind} is not a DatasetID")
         HLObject.__init__(self, bind, track_order=track_order)
 
-        self._dcpl = self.id.dcpl_json
-        self._filters = filters.get_filters(self._dcpl)
-
-        self._local = None  # local()
-
         # make a numpy dtype out of the type json
         self._dtype = createDataType(self.id.type_json)
-        self._item_size = getItemSize(self.id.type_json)
-        if track_order is None:
-            if "CreateOrder" in self._dcpl:
-                if not self._dcpl["CreateOrder"] or self._dcpl["CreateOrder"] == "0":
-                    self._track_order = False
-                else:
-                    self._track_order = True
-        else:
-            self._track_order = track_order
 
-        self._shape = self.get_shape()
-
-        self._num_chunks = None  # aditional state we'll get when requested
+        self._num_chunks = None      # additional state we'll get when requested
         self._allocated_size = None  # as above
         self._verboseUpdated = None  # when the verbose data was fetched
-
-        # self._local.astype = None #todo
 
     def _getVerboseInfo(self):
         now = time.time()
         if (self._verboseUpdated is None or now - self._verboseUpdated > VERBOSE_REFRESH_TIME):
-            # resynch the verbose data
-            req = "/datasets/" + self.id.uuid + "?verbose=1"
-            rsp_json = self.GET(req)
+            # resync the verbose data
+            rsp_json = {}  # TBD
             if "num_chunks" in rsp_json:
                 self._num_chunks = rsp_json["num_chunks"]
             else:
@@ -839,23 +1004,19 @@ class Dataset(HLObject):
             except TypeError:
                 raise TypeError("Argument must be a single int if axis is specified")
 
-            size = list(self._shape)
+            size = list(self.shape)
             size[axis] = newlen
 
         size = tuple(size)
 
-        # send the request to the server
-        body = {"shape": size}
-        req = "/datasets/" + self.id.uuid + "/shape"
-        self.PUT(req, body=body)
-        # self.id.set_extent(size)
-        # h5f.flush(self.id)  # THG recommends
-        self._shape = size  # save the new shape
+        db = self.id.db
+
+        # update the size
+        db.resizeDataset(self.id.uuid, size)
 
     def __len__(self):
         """The size of the first axis.  TypeError if scalar.
 
-        Limited to 2**32 on 32-bit systems; Dataset.len() is preferred.
         """
         size = self.len()
         if size > sys.maxsize:
@@ -870,7 +1031,7 @@ class Dataset(HLObject):
         Use of this method is preferred to len(dset), as Python's built-in
         len() cannot handle values greater then 2**32 on 32-bit systems.
         """
-        shape = self._shape
+        shape = self.shape
         if shape is None or len(shape) == 0:
             raise TypeError("Attempt to take len() of scalar dataset")
         return shape[0]
@@ -880,25 +1041,11 @@ class Dataset(HLObject):
 
         BEWARE: Modifications to the yielded data are *NOT* written to file.
         """
-        shape = self._shape
-        # to reduce round trips, grab BUFFER_SIZE items at a time
-        # TBD: set buffersize based on size of each row
-        BUFFER_SIZE = 1000
-
-        arr = None
-        self.log.info("__iter__")
+        shape = self.shape
         if len(shape) == 0:
             raise TypeError("Can't iterate over a scalar dataset")
         for i in range(shape[0]):
-            if i % BUFFER_SIZE == 0:
-                # grab another buffer
-                numrows = BUFFER_SIZE
-                if shape[0] - i < numrows:
-                    numrows = shape[0] - i
-                self.log.debug(f"get {numrows} iter items")
-                arr = self[i: numrows + i]
-
-            yield arr[i % BUFFER_SIZE]
+            yield self[i]
 
     def iter_chunks(self, sel=None):
         """Return chunk iterator.  If set, the sel argument is a slice or
@@ -918,23 +1065,7 @@ class Dataset(HLObject):
             raise TypeError("iter_chunks not supported for zero-dimension datasets")
         return ChunkIterator(self, sel)
 
-    def _getQueryParam(self, start, stop, step=None):
-        param = ""
-        rank = len(self._shape)
-        if rank == 0:
-            return None
-        if step is None:
-            step = (1,) * rank
-        param += "["
-        for i in range(rank):
-            field = f"{start[i]}:{stop[i]}:{step[i]}"
-            param += field
-            if i != (rank - 1):
-                param += ","
-        param += "]"
-        return param
-
-    def __getitem__(self, args, new_dtype=None):
+    def __getitem__(self, args, new_dtype=None, query=None):
         """Read a slice from the HDF5 dataset.
 
         Takes slices and recarray-style field names (more than one is
@@ -944,7 +1075,15 @@ class Dataset(HLObject):
         Also supports:
 
         * Boolean "mask" array indexing
+
+        If query is provided, it should be a string representing a boolean
+        expression (see Dataset.query).  args is still used to restrict the
+        elements considered to a selection, but the return value is a 1D
+        ndarray of the (full-record) dataset values within that selection
+        that satisfy the query, rather than the values of the selection
+        itself.
         """
+
         if new_dtype is not None:
             self.log.debug(f"getitem.new_dtype: {new_dtype}")
         args = args if isinstance(args, tuple) else (args,)
@@ -975,42 +1114,12 @@ class Dataset(HLObject):
         else:
             self.log.debug(f"new_dtype: {new_dtype}")
 
-        """
-        new_dtype = getattr(self._local, "astype", None)
-        if new_dtype is not None:
-            new_dtype = readtime_dtype(new_dtype, names)
-        else:
-            # This is necessary because in the case of array types, NumPy
-            # discards the array information at the top level.
-            new_dtype = readtime_dtype(self.dtype, names)
-            self.log.debug(f"new_dtype: {new_dtype}")
-        """
         if new_dtype.kind == "S" and check_dtype(ref=self.dtype):
             new_dtype = special_dtype(ref=Reference)
 
         mtype = new_dtype
 
-        # === Special-case region references ====
-        """
-        TODO
-        if len(args) == 1 and isinstance(args[0], h5r.RegionReference):
-
-            obj = h5r.dereference(args[0], self.id)
-            if obj != self.id:
-                raise ValueError("Region reference must point to this dataset")
-
-            sid = h5r.get_region(args[0], self.id)
-            mshape = sel.guess_shape(sid)
-            if mshape is None:
-                return numpy.array((0,), dtype=new_dtype)
-            if numpy.prod(mshape) == 0:
-                return numpy.array(mshape, dtype=new_dtype)
-            out = numpy.empty(mshape, dtype=new_dtype)
-            sid_out = h5s.create_simple(mshape)
-            sid_out.select_all()
-            self.id.read(sid_out, sid, out, mtype)
-            return out
-        """
+        db = self.id.db  # get handle to HDF5DB per file instance
 
         # === Check for zero-sized datasets =====
         if self._is_empty:
@@ -1021,46 +1130,36 @@ class Dataset(HLObject):
 
         # === Scalar dataspaces =================
 
-        if self._shape == ():
+        if self.shape == ():
+            if query is not None:
+                raise TypeError("query is not supported for scalar datasets")
+
+            is_region_ref = len(args) == 1 and isinstance(args[0], RegionReference)
+            if not is_region_ref and len(args) != 0 and not (len(args) == 1 and args[0] is Ellipsis):
+                raise ValueError("Illegal slicing argument for scalar dataspace")
+
             selection = sel.select(self, args)
             self.log.info(f"selection.mshape: {selection.mshape}")
 
-            # TBD - refactor the following with the code for the non-scalar case
-            req = "/datasets/" + self.id.uuid + "/value"
-            rsp = self.GET(req, format="binary")
+            if is_region_ref and selection.nselect == 0:
+                # a deselected (H5S_SEL_NONE) region reference on a scalar
+                # dataspace refers to nothing
+                return Empty(self.dtype)
 
-            if type(rsp) in (bytes, bytearray):
-                # got binary response
-                self.log.info("got binary response for scalar selection")
-                # arr = numpy.frombuffer(rsp, dtype=new_dtype)
-                arr = bytesToArray(rsp, new_dtype, self._shape)
+            sel_all = sel.select((), ...)
+            arr = db.getDatasetValues(self.id.uuid, sel_all)
+            _vlenStrToBytes(arr, arr.dtype)
+            _regionRefBytesToObj(arr, arr.dtype)
 
-                if not self.dtype.shape:
-                    self.log.debug(f"reshape arr to: {self._shape}")
-                    arr = numpy.reshape(arr, self._shape)
-            else:
-                # got JSON response
-                # need some special conversion for compound types --
-                # each element must be a tuple, but the JSON decoder
-                # gives us a list instead.
-                data = rsp["value"]
-                self.log.info("got json response for scalar selection")
-                if len(mtype) > 1 and type(data) in (list, tuple):
-                    converted_data = []
-                    for i in range(len(data)):
-                        converted_data.append(self.toTuple(data[i]))
-                    data = tuple(converted_data)
-
-                arr = numpy.empty((), dtype=new_dtype)
-                arr[()] = data
-            if selection.mshape is None:
+            if len(args) == 0 or is_region_ref:
+                # dset[()] - unwrap to a numpy scalar (matches h5py/numpy
+                # convention that indexing a 0-d array with () returns its
+                # scalar item, while dset[...] keeps the 0-d ndarray) - a
+                # region reference reads the same way, since it can only
+                # ever select the dataspace's one point (or none, above)
                 msg = f"return scalar selection of: {arr}, dtype: {arr.dtype}, shape: {arr.shape}"
                 self.log.info(msg)
                 val = arr[()]
-                if isinstance(val, str):
-                    # h5py always returns bytes, so encode the str
-                    # TBD: what about compound types containing strings?
-                    val = val.encode("utf-8")
                 return val
 
             return arr
@@ -1068,319 +1167,79 @@ class Dataset(HLObject):
         # === Everything else ===================
 
         # Perform the dataspace selection
-        selection = sel.select(self, args)
-        self.log.debug("selection_constructor")
+
+        # a narrowed (field-subset) mtype, e.g. from Dataset.fields(), restricts
+        # the read to just those fields - db.getDatasetValues() does the actual
+        # per-field narrowing based on selection.fields
+        read_fields = None
+        if mtype.names is not None and mtype.names != self.dtype.names:
+            read_fields = mtype.names
+
+        if args and isinstance(args[0], numpy.ndarray) and args[0].dtype.kind == 'b':
+            # use argument as a mask to create a point selection
+            if args[0].shape != self.shape:
+                raise TypeError("Boolean mask shape must match dataset shape")
+            # convert the boolean mask to a point selection
+            points = numpy.transpose(args[0].nonzero())
+            selection = sel.select(self.shape, points, fields=read_fields)
+        else:
+            # create selection from the args - pass self (not self.shape) so
+            # a RegionReference argument can be validated against this
+            # dataset's own id
+            selection = sel.select(self, args, fields=read_fields)
+
+        if query is not None:
+            if read_fields is not None:
+                raise IOError("field selection not supported with query")  # TBD
+            arr = db.getDatasetValues(self.id.uuid, selection, query=query)
+            _vlenStrToBytes(arr, arr.dtype)
+            _regionRefBytesToObj(arr, arr.dtype)
+            return arr
 
         if selection.nselect == 0:
-            # force compliance with h5py selection behavior
-            shape = numpy.empty(self.shape)[args].shape
+            if len(args) == 1 and isinstance(args[0], RegionReference):
+                # args[0] isn't something numpy indexing understands -
+                # the selection's own mshape already has the answer
+                shape = selection.mshape
+            else:
+                # force compliance with h5py selection behavior
+                shape = numpy.empty(self.shape)[args].shape
             return numpy.ndarray(shape, dtype=new_dtype)
-        # Up-converting to (1,) so that numpy.ndarray correctly creates
-        # np.void rows in case of multi-field dtype. (issue 135)
-        single_element = selection.mshape == ()
-        mshape = (1,) if single_element else selection.mshape
 
-        rank = len(self._shape)
+        self.log.debug(f"dataset shape: {self.shape}")
+        self.log.debug(f"selection.mshape: {selection.mshape}")
 
-        self.log.debug(f"dataset shape: {self._shape}")
-        self.log.debug(f"mshape: {mshape}")
-
-        # Perfom the actual read
-        rsp = None
-        req = "/datasets/" + self.id.uuid + "/value"
-        params = {}
-
-        if mtype.names != self.dtype.names:
-            params["fields"] = ":".join(mtype.names)
-
-        if self.id._http_conn.mode == "r" and self.id._http_conn.cache_on:
-            # enables lambda to be used on server
-            self.log.debug("setting nonstrict parameter")
-            params["nonstrict"] = 1
-        else:
-            self.log.debug("not settng nonstrict")
-
-        if isinstance(selection, sel.SimpleSelection):
-            # Divy up large selections into pages, so no one request
-            # to the server will take unduly long to process
-            chunk_layout = self.id.chunks
-            if chunk_layout is None:
-                chunk_layout = self._shape
-            elif isinstance(chunk_layout, dict):
-                # CHUNK_REF layout
-                if "dims" not in chunk_layout:
-                    self.log.error(f"Unexpected chunk_layout: {chunk_layout}")
-                else:
-                    chunk_layout = tuple(chunk_layout["dims"])
-
-            max_chunks = 1
-            split_dim = -1
-
-            sel_start = selection.start
-            sel_step = selection.step
-            sel_stop = []
-
-            self.log.debug(f"selection._sel: {selection._sel}")
-            scalar_selection = selection._sel[3]
-            chunks_per_page = 1
-            # determine the dimension for paging
-            for i in range(rank):
-                stop = sel_start[i] + selection.count[i] * sel_step[i]
-                if stop > self._shape[i]:
-                    stop = self._shape[i]
-                sel_stop.append(stop)
-                if scalar_selection[i]:
-                    # scalar index so will hit just one chunk
-                    continue
-                count = sel_stop[i] - sel_start[i]
-                num_chunks = count // chunk_layout[i]
-                if count % chunk_layout[i] > 0:
-                    num_chunks += 1  # get the integer ceiling
-                if split_dim < 0 or num_chunks > max_chunks:
-                    max_chunks = num_chunks
-                    split_dim = i
-                chunks_per_page = max_chunks
-
-            msg = f"selection: start {sel_start} stop {sel_stop} step {sel_step}"
-            self.log.info(msg)
-            self.log.debug(f"split_dim: {split_dim}")
-            self.log.debug(f"chunks_per_page: {chunks_per_page}")
-
-            # determine which dimension of the target array to split on
-            mshape_split_dim = 0
-            for i in range(rank):
-                if scalar_selection[i]:
-                    continue
-                if i == split_dim:
-                    break
-                mshape_split_dim += 1
-
-            self.log.debug(f"mshape_split_dim: {split_dim}")
-            chunk_size = chunk_layout[split_dim]
-            self.log.debug(f"chunk size for split_dim: {chunk_size}")
-
-            arr = numpy.empty(mshape, dtype=mtype)
-
-            done = False
-            while not done:
-                num_rows = chunks_per_page * chunk_layout[split_dim]
-                self.log.debug(f"num_rows: {num_rows}")
-                page_start = list(copy(sel_start))
-
-                num_pages = max_chunks // chunks_per_page
-                if max_chunks % chunks_per_page > 0:
-                    num_pages += 1  # get the integer ceiling
-
-                des_index = 0  # this is where we'll copy to the arr for each page
-
-                self.log.debug(f"paged read, chunks_per_page: {chunks_per_page}\
-                                max_chunks: {max_chunks}, num_pages: {num_pages}")
-
-                for page_number in range(num_pages):
-                    self.log.debug(f"page_number: {page_number}")
-                    self.log.debug(f"start: {page_start}  stop: {sel_stop}")
-
-                    page_stop = list(copy(sel_stop))
-                    page_stop[split_dim] = page_start[split_dim] + num_rows
-
-                    if sel_step[split_dim] > 1:
-                        # make sure the stop is aligned with the step value
-                        rem = page_stop[split_dim] % sel_step[split_dim]
-                        if rem != 0:
-                            page_stop[split_dim] += sel_step[split_dim] - rem
-                    if page_stop[split_dim] > sel_stop[split_dim]:
-                        page_stop[split_dim] = sel_stop[split_dim]
-
-                    self.log.info(f"page_stop: {page_stop[split_dim]}")
-
-                    page_mshape = list(copy(mshape))
-                    page_mshape[mshape_split_dim] =\
-                        (1 + (page_stop[split_dim] - page_start[split_dim] - 1) // sel_step[split_dim])
-
-                    page_mshape = tuple(page_mshape)
-                    self.log.info(f"page_mshape: {page_mshape}")
-
-                    params["select"] = self._getQueryParam(page_start, page_stop, sel_step)
-                    try:
-                        rsp = self.GET(req, params=params, format="binary")
-                    except IOError as ioe:
-                        self.log.info(f"got IOError: {ioe.errno}")
-                        if ioe.errno == 413 and chunks_per_page > 1:
-                            # server rejected the request, reduce the page size
-                            chunks_per_page //= 2
-                            self.log.info(f"New chunks_per_page: {chunks_per_page}")
-                            break
-                        else:
-                            raise IOError(f"Error retrieving data: {ioe.errno}")
-                    if isinstance(rsp, str):
-                        # hexencoded response?
-                        # this is returned by API Gateway for lamba responses
-                        rsp = bytes.fromhex(rsp)
-                        # from here treat it like a byte responses
-                    if type(rsp) in (bytes, bytearray):
-                        # got binary response
-                        # TBD - check expected number of bytes
-                        self.log.info(f"binary response, {len(rsp)} bytes")
-                        arr1d = bytesToArray(rsp, mtype, page_mshape)
-                        page_arr = numpy.reshape(arr1d, page_mshape)
-                    else:
-                        # got JSON response
-                        # need some special conversion for compound types --
-                        # each element must be a tuple, but the JSON decoder
-                        # gives us a list instead.
-                        self.log.info("json response")
-
-                        data = rsp["value"]
-                        self.log.debug(data)
-
-                        page_arr = jsonToArray(page_mshape, mtype, data)
-                        self.log.debug(f"jsontoArray returned: {page_arr}")
-
-                    # get the slices to copy into the target array
-                    slices = []
-                    for i in range(len(mshape)):
-                        if i == mshape_split_dim:
-                            num_rows = page_arr.shape[mshape_split_dim]
-                            slices.append(slice(des_index, des_index + num_rows))
-                            des_index += num_rows
-                        else:
-                            slices.append(slice(0, mshape[i]))
-                    self.log.debug(f"slices: {slices}")
-                    arr[tuple(slices)] = page_arr
-
-                    page_start[split_dim] = page_stop[split_dim]
-                    self.log.debug(f"new page_start: {page_start}")
-                    rows_remaining = sel_stop[split_dim] - page_start[split_dim]
-                    if rows_remaining <= 0:
-                        self.log.debug("done = True")
-                        done = True
-                        break
-                    self.log.debug(f"{rows_remaining} rows left")
-
-        elif isinstance(selection, sel.FancySelection):
-            select = selection.getQueryParam()
-            num_coords = 0
-            for s in select:
-                if isinstance(s, list):
-                    num_coords += 1
-            if num_coords > 1:
-                # multi coordinates are only supported with recent HSDS versions, so check first
-                server_ver = self.id.http_conn.server_version()
-                if server_ver and server_ver.startswith("0.9") or server_ver.startswith("1."):
-                    pass  # ok
-                else:
-                    msg = "Fancy selection with multiple coordinates is only supported in HSDS 0.9+"
-                    self.log.warning(msg)
-                    raise IOError(msg)
-
-            params["select"] = select
-            MAX_SELECT_QUERY_LEN = 100
-            if len(select) > MAX_SELECT_QUERY_LEN:
-                # use a post method to avoid long query strings
-                self.log.info("using post select")
-                try:
-                    rsp = self.POST(req, body=params, format="binary")
-                except IOError as ioe:
-                    self.log.info(f"got IOError: {ioe.errno}")
-                    raise IOError(f"Error retrieving data: {ioe.errno}")
-            else:
-                try:
-                    rsp = self.GET(req, params=params, format="binary")
-                except IOError as ioe:
-                    self.log.info(f"got IOError: {ioe.errno}")
-                    raise IOError(f"Error retrieving data: {ioe.errno}")
-            if type(rsp) in (bytes, bytearray):
-                # got binary response
-                self.log.info(f"binary response, {len(rsp)} bytes")
-                arr = bytesToArray(rsp, mtype, mshape)
-            else:
-                # got JSON response
-                # need some special conversion for compound types --
-                # each element must be a tuple, but the JSON decoder
-                # gives us a list instead.
-                self.log.info("json response")
-
-                data = rsp["value"]
-                # self.log.debug(data)
-
-                arr = jsonToArray(mshape, mtype, data)
-                self.log.debug(f"jsontoArray returned: {arr}")
-        elif isinstance(selection, sel.PointSelection):
-            format = "binary"  # default binary
-            body = {}
-
-            points = selection.points.tolist()
-            rank = len(self._shape)
-            # verify the points are in range and strictly monotonic (for the 1d case)
-            last_point = -1
-
-            if len(points) == rank and isinstance(points[0], int) and rank > 1:
-                # Single point selection - need to wrap this in an array
-                self.log.info("single point selection")
-                points = [
-                    points,
-                ]
-            else:
-                for point in points:
-                    if isinstance(point, (list, tuple)):
-                        if not isinstance(point, (list, tuple)):
-                            raise ValueError("invalid point argument")
-                        if len(point) != rank:
-                            raise ValueError("invalid point argument")
-                        for i in range(rank):
-                            if point[i] < 0 or point[i] >= self._shape[i]:
-                                raise IndexError("point out of range")
-                        if rank == 1:
-                            if point[0] <= last_point:
-                                raise TypeError("index points must be strictly increasing")
-                            last_point = point[0]
-
-                    elif rank == 1 and isinstance(point, int):
-                        if point < 0 or point > self._shape[0]:
-                            raise IndexError("point out of range")
-                        if point <= last_point:
-                            raise TypeError("index points must be strictly increasing")
-                        last_point = point
-                    else:
-                        raise ValueError("invalid point argument")
-
-            # send points as binary request for HSDS
-            arr_points = numpy.asarray(points, dtype="u8")  # must use unsigned 64-bit int
-            body = arr_points.tobytes()
-            self.log.info(f"point select binary request, num bytes: {len(body)}")
-
-            rsp = self.POST(req, format=format, body=body)
-            if type(rsp) in (bytes, bytearray):
-                elements_received = len(rsp) // mtype.itemsize
-                elements_expected = selection.mshape[0]
-                if elements_received != elements_expected:
-                    msg = f"Expected {elements_expected} elements, but got {elements_received}"
-                    self.log.warning(msg)
-                    raise IOError(msg)
-
-                arr = numpy.frombuffer(rsp, dtype=mtype)
-            else:
-                data = rsp["value"]
-                if len(data) != selection.mshape[0]:
-                    msg = f"Expected {selection.mshape[0]} elements, but got {len(data)}"
-                    self.log.warning(msg)
-                    raise IOError(msg)
-                arr = numpy.asarray(data, dtype=mtype, order="C")
-
-        else:
-            raise ValueError("selection type not supported")
+        arr = db.getDatasetValues(self.id.uuid, selection)
+        _vlenStrToBytes(arr, arr.dtype)
+        _regionRefBytesToObj(arr, arr.dtype)
 
         self.log.info(f"got arr: {arr.shape}, cleaning up shape!")
         # Patch up the output for NumPy
         if len(names) == 1:
             arr = arr[names[0]]  # Single-field recarray convention
+        if selection.select_type in (sel.H5S_SEL_ALL, sel.H5S_SEL_HYPERSLABS):
+            # A plain hyperslab selection's array *sometimes* still has one
+            # axis per dataset dimension, including any that were indexed
+            # with a bare integer (a "scalar" axis, always size 1) - drop
+            # exactly those, matching numpy's basic-indexing rule that an
+            # integer index removes its axis while a slice never does, even
+            # a single-element one like [0:1]. Whether those axes are still
+            # present depends on where arr came from: freshly-initialized
+            # or locally-pending data keeps them (Hdf5db.getDatasetValues()'s
+            # own init_arr() sizes arr from selection.count), while data
+            # fetched from the server already has them collapsed away
+            # (HsdsPlugin.getDatasetValues() sizes arr from selection.mshape
+            # instead) - so only squeeze when arr's leading dimensions (an
+            # array-typed field can add trailing ones of its own) actually
+            # still match selection.count. This is a view, not a copy.
+            rank = len(selection.scalar)
+            if tuple(arr.shape[:rank]) == tuple(selection.count):
+                scalar_axes = tuple(i for i, is_scalar in enumerate(selection.scalar) if is_scalar)
+                if scalar_axes:
+                    arr = numpy.squeeze(arr, axis=scalar_axes)
         if arr.shape == ():
-            arr = numpy.asscalar(arr)
-        elif single_element:
-            arr = arr[0]
+            return arr[()]   # 0 dim array -> numpy scalar
 
-        # elif len(arr.shape) > 1:
-        #    arr = numpy.squeeze(arr)  # reduce dimension if there are single dimension entries
         return arr
 
     def __setitem__(self, args, val):
@@ -1404,7 +1263,7 @@ class Dataset(HLObject):
             self.log.debug("val not ndarray")
             pass  # not a numpy object, just leave dtype as None
 
-        if self._shape is None:
+        if self.shape is None:
             # null space dataset
             if isinstance(val, Empty):
                 return  # nothing to do
@@ -1419,6 +1278,10 @@ class Dataset(HLObject):
             self.log.info("converting Reference to string")
             val = val.tolist()
 
+        if self.dtype.kind == "S" and self.dtype.metadata and \
+                self.dtype.metadata.get("h5py_encoding") == "utf-8" and not isinstance(val, Empty):
+            val = _encodeFixedUtf8(val, self.dtype)
+
         # Sort field indices from the slicing
         names = tuple(x for x in args if isinstance(x, str))
         args = tuple(x for x in args if not isinstance(x, str))
@@ -1429,6 +1292,7 @@ class Dataset(HLObject):
         vlen_base_class = check_dtype(vlen=self.dtype)
         if vlen_base_class is not None and vlen_base_class not in (bytes, str):
             self.log.debug(f"asarray to base_class: {vlen_base_class}")
+
             try:
                 # Attempt to directly convert the input array of vlen data to its base class
                 val = numpy.asarray(val, dtype=vlen_base_class)
@@ -1437,13 +1301,21 @@ class Dataset(HLObject):
                 # Failed to convert input array to vlen base class directly, instead create a new array where
                 # each element is an array of the Dataset's dtype
                 try:
-                    # Force output shape
-                    tmp = numpy.empty(shape=val.shape, dtype=self.dtype)
-                    tmp[:] = [numpy.array(x, dtype=self.dtype) for x in val]
-                    val = tmp
+                    val = numpy.array([numpy.array(x, dtype=vlen_base_class)
+                                       for x in val], dtype=self.dtype)
                 except (ValueError, TypeError):
-                    msg = "ValueError converting value element by element"
-                    self.log.debug(msg)
+                    pass
+
+            if vlen_base_class == val.dtype:
+                if val.ndim > 1:
+                    tmp = numpy.empty(shape=val.shape[:-1], dtype=self.dtype)
+                    tmp.ravel()[:] = [i for i in val.reshape(
+                        (numpy.prod(val.shape[:-1]), val.shape[-1])
+                    )]
+                else:
+                    tmp = numpy.array([None], dtype=self.dtype)
+                    tmp[0] = val
+                val = tmp
 
             if vlen_base_class == val.dtype:
                 if val.ndim > 1:
@@ -1486,50 +1358,63 @@ class Dataset(HLObject):
             # TBD: Do we need something like the following in the above if condition:
             # (self.dtype.str != val.dtype.str)
             # for cases where the val is a numpy array but different type than self?
-
             if len(names) == 1 and self.dtype.fields is not None:
-                # Single field selected for write, from a non-array source
+                # Single field selected for write, from a non-array source.
+                # Keep val in the field's own bare (non-compound) dtype - this
+                # matches Hdf5db.setDatasetValues()'s field-restricted dtype
+                # check, which expects a bare dtype for a single selected field.
                 if not names[0] in self.dtype.fields:
                     raise ValueError(f"No such field for indexing: {names[0]}")
                 dtype = self.dtype.fields[names[0]][0]
-                cast_compound = True
             else:
                 dtype = self.dtype
-                cast_compound = False
 
-            self.log.debug(f"asarray dtype: {dtype}, cast_compound: {cast_compound}")
+            self.log.debug(f"asarray dtype: {dtype}")
             val = numpy.asarray(val, dtype=dtype.base, order="C")
-            if cast_compound:
-                # val = val.astype(numpy.dtype([(names[0], dtype)]))
-                val = val.view(numpy.dtype([(names[0], dtype)]))
-                val = val.reshape(val.shape[:len(val.shape) - len(dtype.shape)])
+            _encodeVlenAsciiStrict(val, dtype)
+            _regionRefObjToBytes(val, dtype)
 
         elif isinstance(val, numpy.ndarray):
-            # convert array if needed
-            # TBD - need to handle cases where the type shape is different
-            self.log.debug("got numpy array")
-            if val.dtype != self.dtype and val.dtype.shape == self.dtype.shape:
+            # convert array if needed - but only for a full-record write.
+            # When a field selection (names) is active, val's dtype is
+            # expected to be a legitimate subset of self.dtype (e.g. two
+            # of three fields for ds['a', 'c'] = ...), not something to
+            # coerce into the full dataset dtype - setDatasetValues()
+            # validates val's dtype against just the selected fields.
+            if not names and val.dtype != self.dtype and val.dtype.shape == self.dtype.shape:
                 self.log.info(f"converting {val.dtype} to {self.dtype}")
+
                 # convert array
                 tmp = numpy.empty(val.shape, dtype=self.dtype)
                 tmp[...] = val[...]
                 val = tmp
         else:
             self.log.debug(f"asarray for {self.dtype}")
-            val = numpy.asarray(val, order="C", dtype=self.dtype)
+            if self.dtype.subdtype is not None:
+                # for an array/subarray dtype (e.g. "3int8"), passing the
+                # subarray dtype itself to asarray() makes numpy broadcast
+                # each source element into its own copy of the subarray
+                # shape (e.g. [1, 2, 3] becomes a 3x3 array) instead of
+                # treating the whole list as one element's content - use
+                # the base dtype instead, matching what the array-dtype
+                # shape/cast handling just below already expects
+                val = numpy.asarray(val, order="C", dtype=self.dtype.subdtype[0])
+            else:
+                val = numpy.asarray(val, order="C", dtype=self.dtype)
 
         # Check for array dtype compatibility and convert
-        mshape = None
         self.log.debug(f"self.dtype.subdtype: {self.dtype.subdtype}")
         if self.dtype.subdtype is not None:
-            shp = self.dtype.subdtype[1]   # type shape
+            base_dtype, shp = self.dtype.subdtype   # type base dtype and shape
             valshp = val.shape[-len(shp):]
             if valshp != shp:  # Last dimension has to match
                 raise TypeError(f"When writing to array types,\
                                  last N dimensions have to match (got {valshp}, but should be {shp})")
-            mtype = numpy.dtype((val.dtype, shp))
-            self.log.debug(f"mtype for subdtype: {mtype}")
-            mshape = val.shape[0:len(val.shape) - len(shp)]
+            if val.dtype != base_dtype and val.dtype.kind in "biufc" and base_dtype.kind in "biufc":
+                # real HDF5 converts numeric types during the low-level write, but
+                # h5json's remote backend requires an exact dtype match - cast
+                # explicitly, mirroring make_new_dset()'s equivalent fix
+                val = val.astype(base_dtype)
 
         # Check for field selection
         if len(names) != 0:
@@ -1541,58 +1426,73 @@ class Dataset(HLObject):
                 mismatch = ", ".join(f"{x}" for x in mismatch)
                 raise ValueError(f"Illegal slicing argument (fields {mismatch} not in dataset type)")
 
-        # Use mtype derived from array (let DatasetID.write figure it out)
+        # Use mtype derived from array
 
         mshape = val.shape
         self.log.debug(f"mshape: {mshape}")
         self.log.debug(f"data dtype: {val.dtype}")
 
         # Perform the dataspace selection
-        selection = sel.select(self, args)
+        selection = sel.select(self, args, fields=names if names else None)
         self.log.debug(f"selection.mshape: {selection.mshape}")
         if selection.nselect == 0:
             return
 
-        req = "/datasets/" + self.id.uuid + "/value"
-
-        params = {}
-        body = {}
-
-        format = "json"
-
         # Broadcast scalars if necessary.
-
         if mshape == () and selection.mshape is not None and selection.mshape != ():
-
             if self.dtype.subdtype is not None:
                 raise TypeError("Scalar broadcasting is not supported for array dtypes")
-            server_ver = self.id.http_conn.server_version()
-            if server_ver and server_ver.startswith("0.9") or server_ver.startswith("1."):
-                # Perform the write, with broadcasting
-                self.log.debug("scalar will be broadcast on server")
-                params["element_count"] = 1
-            else:
-                self.log.debug("broadcast scalar on client")
-                val2 = numpy.empty(selection.mshape, dtype=val.dtype)
-                val2[...] = val
-                val = val2
-                mshape = val.shape
+            self.log.debug("broadcast scalar on client")
+            val2 = numpy.empty(selection.mshape, dtype=val.dtype)
+            val2[...] = val
+            val = val2
+            mshape = val.shape
 
-        # server is HSDS, use binary data, use param values for selection
-        format = "binary"
-        body = arrayToBytes(val, vlen=vlen_base_class)
-        self.log.debug(f"writing binary data, {len(body)}")
+        # reshape to same rank as dataset, preserving any trailing array-type
+        # sub-shape - either the whole dataset's own array dtype, or a single
+        # named field's array-type sub-dtype (e.g. a compound field declared
+        # as (float64, (3,)))
+        subarray_shape = ()
+        if len(names) == 1 and self.dtype.fields is not None:
+            subarray_shape = self.dtype.fields[names[0]][0].shape
+        elif self.dtype.subdtype is not None:
+            subarray_shape = self.dtype.subdtype[1]
+        val = val.reshape(tuple(selection.tgtshape) + subarray_shape)
+        db = self.id.db
 
-        if selection.select_type != sel.H5S_SELECT_ALL:
-            select_param = selection.getQueryParam()
-            self.log.debug(f"got select query param: {select_param}")
-            params["select"] = select_param
+        db.setDatasetValues(self.id.uuid, selection, val)
 
-        # Perform write to subset of named fields within compound datatype, if any
-        if len(names) > 0:
-            params["fields"] = ":".join(names)
+    def query(self, query, selection=None, limit=0, update_value=None):
+        """Query the dataset for elements matching the given query expression.
 
-        self.PUT(req, body=body, format=format, params=params)
+        query
+            A string expression, e.g. "dset > 100.0 AND dset < 200.0".
+
+        selection
+            Optional selection (anything accepted by __getitem__, e.g. a
+            slice or tuple of slices) restricting which elements are
+            queried.  If not provided, the entire dataset is queried.
+
+        limit
+            If non-zero, only return the first limit matching elements.
+
+        Returns a numpy array of indices for the elements that match the
+        query.
+        """
+        if not isinstance(query, str):
+            raise TypeError("query must be a string")
+
+        if update_value is not None and self.read_only:
+            raise IOError("No write intent")
+
+        db = self.id.db
+
+        if selection is None:
+            query_sel = None
+        else:
+            query_sel = sel.select(self.shape, selection)
+
+        return db.queryDataset(self.id.uuid, query, sel=query_sel, limit=limit, update_value=update_value)
 
     def read_direct(self, dest, source_sel=None, dest_sel=None):
         """Read data directly from HDF5 into an existing NumPy array.
@@ -1682,8 +1582,8 @@ class Dataset(HLObject):
             )
 
         # Special case for (0,)*-shape datasets
-        if self._shape is None or numpy.prod(self._shape) == 0:
-            return numpy.empty(self._shape, dtype=self.dtype if dtype is None else dtype)
+        if self.shape is None or numpy.prod(self.shape) == 0:
+            return numpy.empty(self.shape, dtype=self.dtype if dtype is None else dtype)
 
         data = self[:]
         if dtype is not None:
@@ -1702,34 +1602,35 @@ class Dataset(HLObject):
                     namestr = f'"{name}"'
                 else:
                     namestr = "/"
-            r = f'<HDF5 dataset {namestr}: shape {self._shape}, type "{self.dtype.str}">'
+            r = f'<HDF5 dataset {namestr}: shape {self.shape}, type "{self.dtype.str}">'
         return r
 
     def refresh(self):
         """Refresh the dataset metadata by reloading from the file.
         """
         self.id.refresh()
-        self._shape = self.get_shape()
-        self._num_chunks = None  # aditional state we'll get when requested
+        self._num_chunks = None  # additional state we'll get when requested
         self._allocated_size = None  # as above
         self._verboseUpdated = None  # when the verbose data was fetched
 
-    def flush(self):
-        """Flush the dataset data and metadata to the file.
-        If the dataset is chunked, raw data chunks are written to the file.
-        """
-        self.file.flush()  # this will flush any inprogress dataset updates
-
-    def make_scale(self, name=""):
+    def make_scale(self, name=''):
         """Make this dataset an HDF5 dimension scale.
 
-        You can then attach it to dimensions of other datasets like this:
+        You can then attach it to dimensions of other datasets like this::
 
             other_ds.dims[0].attach_scale(ds)
 
         You can optionally pass a name to associate with this scale.
         """
-        self.dims.create_scale(self, name=name)
+        ds.set_scale(self._id, name)
+
+    @property
+    def is_scale(self):
+        """Return ``True`` if this dataset is also a dimension scale.
+
+        Return ``False`` otherwise.
+        """
+        return ds.is_scale(self._id)
 
     """
       Convert a list to a tuple, recursively.

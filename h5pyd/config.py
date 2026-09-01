@@ -192,7 +192,7 @@ class Config:
         if "track_order" in Config._cfg:
             track = Config._cfg["track_order"]
         else:
-            track = False
+            track = None
         return track
 
     @track_order.setter
@@ -200,7 +200,7 @@ class Config:
         if isinstance(value, str):
             tokens = value.split()
             if len(tokens) == 0:
-                track = False
+                track = None
             else:
                 track = bool(tokens[0])  # strip any comments
         else:

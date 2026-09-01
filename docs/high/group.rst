@@ -68,6 +68,17 @@ Objects can be deleted from the file using the standard syntax::
     >>> del subgroup["MyDataset"]
 
 .. note::
+    Up to h5pyd 0.24.0 both of these accepted a list in place of a single
+    name, creating or deleting several links in one server request::
+
+        >>> grp[["a", "b"]] = [dset1, dset2]   # equal-length lists
+        >>> del grp[["a", "b"]]
+
+    Both forms were removed in 1.0.0. Assign and delete one name at a time
+    instead; HSDS still accepts the batched requests, so this is a gap in
+    h5pyd's API rather than the protocol.
+
+.. note::
     When using h5py from Python 3, the keys(), values() and items() methods
     will return view-like objects instead of lists.  These objects support
     membership testing and iteration, but can't be sliced like lists.
@@ -246,6 +257,17 @@ Reference
                         :class:`SoftLink` or :class:`ExternalLink` instance.
                         If ``getclass`` is also True, returns the corresponding
                         Link class without instantiating it.
+
+        .. note::
+            Up to h5pyd 0.24.0, ``get`` also had a bulk form when combined
+            with ``getlink=True``: passing ``None`` as `name` returned every
+            link in the group as a dict, and passing a list of names returned
+            just those. With ``name=None`` it additionally accepted
+            ``limit``/``marker`` (server-side pagination), ``pattern`` (glob
+            over link names), and ``follow_links=True`` (recurse into
+            subgroups, returning a dict keyed by group id). All of these were
+            removed in 1.0.0 - retrieve links one name at a time, or iterate
+            the group.
 
     .. method:: visit(callable)
 

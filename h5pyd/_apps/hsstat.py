@@ -124,6 +124,8 @@ def getDomainInfo(domain, cfg):
                 bucket=bucket,
                 use_cache=False,
             )
+    except FileNotFoundError:
+        abort(f"domain: {domain} not found")
     except IOError as oe:
         if oe.errno in (404, 410):  # Not Found
             abort(f"domain: {domain} not found")
@@ -146,7 +148,8 @@ def getDomainInfo(domain, cfg):
         print(f"    last modified:   {timestamp}")
     else:
         if "rescan" in cfg and cfg["rescan"]:
-            f.run_scan()
+            # TBD: tell HSDS to rescan the domain
+            print("rescan is not supported")
 
         # report HDF objects (groups, datasets, and named datatypes) vs. allocated chunks
         num_objects = f.num_groups + f.num_datatypes + f.num_datasets

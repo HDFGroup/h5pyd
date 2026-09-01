@@ -187,6 +187,8 @@ def main():
         else:
             f = h5pyd.File(domain, mode=mode, endpoint=cfg["hs_endpoint"],
                            username=cfg["hs_username"], password=cfg["hs_password"], bucket=cfg["hs_bucket"])
+    except FileNotFoundError:
+        abort("domain not found")
     except IOError as ioe:
         if ioe.errno in (404, 410):
             abort("domain not found")

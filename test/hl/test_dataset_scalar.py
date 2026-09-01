@@ -79,33 +79,35 @@ class TestScalarDataset(TestCase):
         dset = f.create_dataset('scalar', data=str1, dtype=dt)
 
         val = dset[()]
-        self.assertEqual(val, str1.encode("utf-8"))
+        self.compare_unicodestr(val, str1)
+
         self.assertEqual(dset.shape, ())
         self.assertEqual(dset.ndim, 0)
 
         dset[...] = str2
         val = dset[()]
-        self.assertTrue(isinstance(val, bytes))
-        self.assertEqual(val, str2.encode("utf-8"))
+        self.compare_unicodestr(val, str2)
 
-        # try will ellipsis
+        # try with ellipsis
         val = dset[...]
 
         self.assertTrue(isinstance(val, np.ndarray))
-        self.assertEqual(val, str2.encode("ascii"))
+        self.compare_unicodestr(val[()], str2)
 
         # try setting value using tuple
         dset[()] = str3
         val = dset[()]
 
-        self.assertEqual(val, str3.encode("utf-8"))
+        self.compare_unicodestr(val, str3)
 
         # try creating dataset implicitly
         g1 = f.create_group("g1")
         g1["scalar"] = str1
         dset = g1["scalar"]
         val = dset[()]
-        self.assertEqual(val, str1.encode("utf-8"))
+        self.compare_unicodestr(val, str1)
+        val = dset[()]
+        self.compare_unicodestr(val, str1)
         self.assertEqual(dset.shape, ())
         self.assertEqual(dset.ndim, 0)
 
@@ -113,6 +115,6 @@ class TestScalarDataset(TestCase):
 
 
 if __name__ == '__main__':
-    loglevel = logging.ERROR
+    loglevel = logging.DEBUG
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
     ut.main()

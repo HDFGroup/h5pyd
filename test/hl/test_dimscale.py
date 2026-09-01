@@ -45,21 +45,22 @@ class TestDimensionScale(TestCase):
             self.assertIsInstance(d, h5py._hl.dims.DimensionProxy)
 
         # Create and name dimension scales
-        dset.dims.create_scale(f['scale_x'], 'Simulation X (North) axis')
-        self.assertTrue(h5py.h5ds.is_scale(f['scale_x'].id))
-        dset.dims.create_scale(f['scale_y'], 'Simulation Y (East) axis')
-        self.assertTrue(h5py.h5ds.is_scale(f['scale_y'].id))
-        dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
-        self.assertTrue(h5py.h5ds.is_scale(f['scale_z'].id))
+        f['scale_x'].make_scale(name='Simulation X (North) axis')
+        self.assertTrue(f['scale_x'].is_scale)
+        f['scale_y'].make_scale(name='Simulation Y (East) axis')
+        self.assertTrue(f['scale_y'].is_scale)
+        f['scale_z'].make_scale(name='Simulation Z (Vertical) axis')
+        self.assertTrue(f['scale_z'].is_scale)
 
         # Try re-creating the last dimscale
-        dset.dims.create_scale(f['scale_z'], 'Simulation Z (Vertical) axis')
-        self.assertTrue(h5py.h5ds.is_scale(f['scale_z'].id))
+        f['scale_z'].make_scale(name='Simulation Z (Vertical) axis')
+        self.assertTrue(f['scale_z'].is_scale)
 
-        # Attach a non-dimension scale (and in the process make it a dimension
-        # scale)
+        # Try attaching a non-dimension scale
+        self.assertFalse(f['not_scale'].is_scale)
         dset.dims[1].attach_scale(f['not_scale'])
-        self.assertTrue(h5py.h5ds.is_scale(f['not_scale'].id))
+        # should now be a dimension scale
+        self.assertTrue(f['not_scale'].is_scale)
 
         # Cannot attach a dimension scale to another dimension scale
         with self.assertRaises(RuntimeError):
@@ -117,9 +118,12 @@ class TestDimensionScale(TestCase):
             self.assertIsInstance(s[0], str)
             self.assertEqual(s[0], 'Simulation Z (Vertical) axis')
 
+        for s in dset.dims[2].values():
+            self.assertIsInstance(s, h5py.Dataset)
+            self.assertEqual(s.name, '/scale_z')
+
         self.assertIsInstance(dset.dims[0][0], h5py.Dataset)
-        self.assertIsInstance(dset.dims[0]['Simulation X (North) axis'],
-                              h5py.Dataset)
+        self.assertIsInstance(dset.dims[0]['Simulation X (North) axis'], h5py.Dataset)
 
         with self.assertRaises(IndexError):
             dset.dims[0][10]
@@ -128,15 +132,11 @@ class TestDimensionScale(TestCase):
             dset.dims[0]['foobar']
 
         # Test dimension scale names
-        # TBD: why does this raise Unicode error for h5pyd?
-        if config.get("use_h5py"):
-            dset.dims.create_scale(f['scale_name'], '√')
-        else:
-            with self.assertRaises(UnicodeError):
-                dset.dims.create_scale(f['scale_name'], '√')
+
+        f['scale_name'].make_scale('√')
 
         with self.assertRaises((AttributeError, TypeError)):
-            dset.dims.create_scale(f['scale_name'], 67)
+            f['scale_name'].make_scale(67)
 
         f.close()
 
@@ -153,6 +153,7 @@ class TestDimensionScale(TestCase):
             else:
                 self.assertEqual(len(dimscale), 1)
                 scale = dimscale[0]
+
                 self.assertTrue(scale.name.endswith(labels[i]))
                 self.assertEqual(scale.shape, (10,))
         for s in dset.dims[2].items():

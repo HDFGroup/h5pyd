@@ -13,11 +13,11 @@
 from __future__ import absolute_import
 
 import os.path as op
-import json
 import time
 import logging
-from .httpconn import HttpConn
+from ..httpconn import HttpConn
 from .. import config
+from .acl_manager import ACLManager
 
 
 class Folder:
@@ -167,7 +167,7 @@ class Folder:
         self._batch_size = batch_size
         self._verbose = verbose
 
-        self._http_conn = HttpConn(
+        http_conn = HttpConn(
             self._domain,
             endpoint=endpoint,
             username=username,
@@ -178,7 +178,12 @@ class Folder:
             logger=logger,
             retries=retries,
         )
-        self.log = self._http_conn.logging
+        http_conn.open()
+
+        self.log = http_conn.logging
+
+        self._http_conn = http_conn
+        self._acl_mgr = ACLManager(self._get_acl_http_conn, log=self.log)
 
         domain_json = None
 
@@ -222,10 +227,15 @@ class Folder:
             if rsp.status_code < 500:
                 self.log.warning(f"folder put status_code: {rsp.status_code}")
             else:
-                self.log.error("status_code: {}".format(rsp.status_code))
-            raise IOError(rsp.status_code, rsp.reason)
-        domain_json = json.loads(rsp.text)
-        self.log.info("domain_json: {}".format(domain_json))
+                self.log.error(f"status_code: {rsp.status_code}")
+            if rsp.status_code in (404, 410):
+                # folder doesn't exist - use FileNotFoundError for
+                # consistency with how File handles this case
+                raise FileNotFoundError(rsp.status_code, rsp.reason)
+            else:
+                raise IOError(rsp.status_code, rsp.reason)
+        domain_json = rsp.json()
+        self.log.info(f"domain_json: {domain_json}")
         if "class" in domain_json:
             if domain_json["class"] != "folder":
                 self.log.warning("Not a folder domain")
@@ -249,45 +259,20 @@ class Folder:
         else:
             self._owner = None
 
-    def getACL(self, username):
+    def _get_acl_http_conn(self):
+        """ return the live http connection for ACL requests, raising if not open """
         if self._http_conn is None:
             raise IOError(400, "folder is not open")
-        req = "/acls/" + username
-        rsp = self._http_conn.GET(req)
-        if rsp.status_code != 200:
-            raise IOError(rsp.reason)
-        rsp_json = json.loads(rsp.text)
-        acl_json = rsp_json["acl"]
-        return acl_json
+        return self._http_conn
+
+    def getACL(self, username):
+        return self._acl_mgr.getACL(username)
 
     def getACLs(self):
-        if self._http_conn is None:
-            raise IOError(400, "folder is not open")
-        req = "/acls"
-        rsp = self._http_conn.GET(req)
-        if rsp.status_code != 200:
-            raise IOError(rsp.status_code, rsp.reason)
-        rsp_json = json.loads(rsp.text)
-        acls_json = rsp_json["acls"]
-        return acls_json
+        return self._acl_mgr.getACLs()
 
     def putACL(self, acl):
-        if self._http_conn is None:
-            raise IOError(400, "folder is not open")
-        if self._http_conn.mode == "r":
-            raise IOError(400, "folder is open as read-onnly")
-        if "userName" not in acl:
-            raise IOError(404, "ACL has no 'userName' key")
-        perm = {}
-        for k in ("create", "read", "update", "delete", "readACL", "updateACL"):
-            if k not in acl:
-                raise IOError(404, "Missing ACL field: {}".format(k))
-            perm[k] = acl[k]
-
-        req = "/acls/" + acl["userName"]
-        rsp = self._http_conn.PUT(req, body=perm)
-        if rsp.status_code != 201:
-            raise IOError(rsp.status_code, rsp.reason)
+        self._acl_mgr.putACL(acl)
 
     def _getSubdomains(self):
         if self._http_conn is None:
@@ -313,7 +298,7 @@ class Folder:
         rsp = self._http_conn.GET(req, params=params)
         if rsp.status_code != 200:
             raise IOError(rsp.status_code, rsp.reason)
-        rsp_json = json.loads(rsp.text)
+        rsp_json = rsp.json()
         if "domains" not in rsp_json:
             raise IOError(500, "Unexpected Error")
         domains = rsp_json["domains"]

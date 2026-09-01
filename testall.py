@@ -41,8 +41,8 @@ hl_tests = ('test_attribute',
             'test_vlentype',)
 
 
-app_tests = ('test_hsinfo', 'test_tall_inspect', 'test_diamond_inspect',
-             'test_shuffle_inspect')
+app_tests = ('test_hsinfo', 'test_hstouch', 'test_hsacl', 'test_tall_inspect',
+             'test_diamond_inspect', 'test_shuffle_inspect')
 
 run_hl = True
 run_app = True

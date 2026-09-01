@@ -118,176 +118,33 @@ class TestAttribute(TestCase):
         # close file
         f.close()
 
-    def test_create_multiple(self):
-        if config.get('use_h5py') or self.hsds_version() < "0.9.0":
-            return
-
-        filename = self.getFileName("create_attribute_multiple")
+    def test_modify(self):
+        """ Attributes are modified by the modify() method """
+        filename = self.getFileName("modify_attribute")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
 
-        g1 = f.create_group('g1')
+        f.attrs.modify('a', 3)
+        self.assertTrue('a' in f.attrs)
+        self.assertEqual(f.attrs['a'], 3)
 
-        num_attrs = 10
-        # No shape or dtype specified
-        names = ['attr' + str(i) for i in range(num_attrs)]
-        values = [np.arange(50)] * num_attrs
-        g1.attrs.create(names, values)
+        f.attrs.modify('a', 4)
+        self.assertTrue('a' in f.attrs)
+        self.assertEqual(f.attrs['a'], 4)
 
-        for i in range(num_attrs):
-            self.assertTrue(names[i] in g1.attrs)
-            self.assertTrue(np.array_equal(g1.attrs[names[i]], values[i]))
+        # if the attribute doesn't exist, create new
+        f.attrs.modify('b', 5)
+        self.assertTrue('a' in f.attrs)
+        self.assertTrue('b' in f.attrs)
+        self.assertEqual(f.attrs['a'], 4)
+        self.assertEqual(f.attrs['b'], 5)
 
-        # Test replacing existing attributes
-        new_values = [np.arange(100)] * num_attrs
-        g1.attrs.create(names, new_values)
+        # shape of new value is incompatible with the previous
+        new_value = np.arange(5)
+        with self.assertRaises(TypeError):
+            f.attrs.modify('b', new_value)
 
-        for i in range(num_attrs):
-            self.assertTrue(names[i] in g1.attrs)
-            self.assertTrue(np.array_equal(g1.attrs[names[i]], new_values[i]))
-
-        # Test creating attributes with shape and dtype specified
-        names = ['attr' + str(i) for i in range(num_attrs, 2 * num_attrs)]
-        values = [np.arange(i + 1) for i in range(num_attrs)]
-        dtypes = [np.int32] * num_attrs
-        shapes = [(i + 1,) for i in range(num_attrs)]
-        g1.attrs.create(names, values, shapes, dtypes)
-
-        for i in range(num_attrs):
-            self.assertTrue(names[i] in g1.attrs)
-            self.assertTrue(np.array_equal(g1.attrs[names[i]], values[i]))
-            self.assertEqual(g1.attrs[names[i]].dtype, dtypes[i])
-            self.assertEqual(g1.attrs[names[i]].shape, shapes[i])
-
-    def test_get_multiple(self):
-        if config.get('use_h5py') or self.hsds_version() < "0.9.0":
-            return
-
-        filename = self.getFileName("get_attribute_multiple")
-        print("filename:", filename)
-        f = h5py.File(filename, 'w')
-
-        # create attributes
-        num_attrs = 10
-        g1 = f.create_group('g1')
-        names = ['attr' + str(i) for i in range(num_attrs)]
-        values = [np.arange(50) for i in range(num_attrs)]
-
-        for i in range(10):
-            g1.attrs[names[i]] = values[i]
-
-        # get all attributes
-        values_out = g1.attrs.get_attributes()
-
-        self.assertEqual(len(values_out), 10)
-        for i in range(10):
-            self.assertTrue(names[i] in values_out)
-            self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
-
-        # get attributes from cache
-        values_out = g1.attrs.get_attributes()
-        self.assertEqual(len(values_out), 10)
-        for i in range(10):
-            self.assertTrue(names[i] in values_out)
-            self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
-
-        # get attributes that match the pattern 'attr5'
-        pattern = "attr5"
-        values_out = g1.attrs.get_attributes(pattern=pattern)
-
-        self.assertTrue("attr5" in values_out)
-        self.assertTrue(np.array_equal(values_out["attr5"], values[5]))
-
-        # get only attributes that match the pattern 'att*'
-        g1.attrs['new_attr'] = np.arange(100)
-        pattern = "att*"
-        values_out = g1.attrs.get_attributes(pattern=pattern)
-
-        self.assertEqual(len(values_out), 10)
-
-        for i in range(10):
-            self.assertTrue(names[i] in values_out)
-            self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
-
-        # get the first five attributes
-        limit = 5
-        values_out = g1.attrs.get_attributes(limit=limit)
-
-        self.assertEqual(len(values_out), 5)
-
-        for i in range(5):
-            self.assertTrue(names[i] in values_out)
-            self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
-
-        # get all attributes after 'attr4
-        marker = "attr4"
-        values_out = g1.attrs.get_attributes(marker=marker, limit=limit)
-
-        self.assertEqual(len(values_out), 5)
-
-        for i in range(6, 10):
-            self.assertTrue(names[i] in values_out)
-            self.assertTrue(np.array_equal(values_out[names[i]], values[i]))
-
-        # get set of attributes by name
-        names = ['attr5', 'attr7', 'attr9']
-
-        values_out = g1.attrs.get_attributes(names=names)
-
-        self.assertEqual(len(values_out), 3)
-
-        for name in names:
-            self.assertTrue(name in values_out)
-            i = int(name[4])
-            self.assertTrue(np.array_equal(values_out[name], values[i]))
-
-    def test_delete_multiple(self):
-        if config.get('use_h5py') or self.hsds_version() < "0.9.0":
-            return
-
-        filename = self.getFileName("delete_attribute_multiple")
-        print("filename:", filename)
-        f = h5py.File(filename, 'w')
-
-        # create attributes
-        num_attrs = 10
-        g1 = f.create_group('g1')
-        names = ['attr' + str(i) for i in range(num_attrs)]
-        values = [np.arange(50) for i in range(num_attrs)]
-
-        for i in range(10):
-            g1.attrs[names[i]] = values[i]
-
-        # delete the first five attributes
-        del g1.attrs[names[0:5]]
-
-        # check that the first five attributes are gone
-        for i in range(5):
-            self.assertFalse(names[i] in g1.attrs)
-
-        # check that the last five attributes are still there
-        for i in range(5, 10):
-            self.assertTrue(names[i] in g1.attrs)
-            self.assertTrue(np.array_equal(g1.attrs[names[i]], values[i]))
-
-        # delete single attribute
-        del g1.attrs[names[5]]
-
-        self.assertFalse(names[5] in g1.attrs)
-
-        for i in range(6, 10):
-            self.assertTrue(names[i] in g1.attrs)
-            self.assertTrue(np.array_equal(g1.attrs[names[i]], values[i]))
-
-        # delete attributes with name that must be URL-encoded
-        names = ['attr with spaces', 'attr%', 'unicode八attr']
-        for name in names:
-            g1.attrs[name] = np.arange(100)
-
-        del g1.attrs[names]
-
-        for name in names:
-            self.assertTrue(name not in g1.attrs)
+        f.close()
 
 
 class TestTrackOrder(TestCase):
@@ -319,6 +176,7 @@ class TestTrackOrder(TestCase):
         with h5py.File(filename) as f:
             grp1 = f['grp1']
             self.assertEqual(list(grp1.attrs), list(self.titles))
+
             dset1 = f['dset1']
             self.assertEqual(list(dset1.attrs), list(self.titles))
             dset2 = f['dset2']
@@ -326,7 +184,6 @@ class TestTrackOrder(TestCase):
 
     def test_track_order_cfg(self):
         filename = self.getFileName("test_test_track_order_attribute")
-        print(f"filename: {filename}")
         cfg = h5py.get_config()
         with h5py.File(filename, 'w') as f:
             cfg.track_order = True

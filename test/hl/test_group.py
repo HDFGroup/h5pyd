@@ -15,7 +15,6 @@ if config.get("use_h5py"):
     import h5py
 else:
     import h5pyd as h5py
-
 from common import ut, TestCase
 from datetime import datetime
 import os.path
@@ -28,6 +27,7 @@ class TestGroup(TestCase):
         filename = self.getFileName("create_group")
         print("filename:", filename)
         f = h5py.File(filename, 'w')
+
         is_hsds = False
         if isinstance(f.id.id, str) and f.id.id.startswith("g-"):
             is_hsds = True  # HSDS has different permission defaults
@@ -95,6 +95,9 @@ class TestGroup(TestCase):
         tmp_grp = r.create_group("tmp")
         r['g1.1'] = tmp_grp
 
+        del r['tmp']
+        self.assertEqual(len(r), 4)
+
         # try to replace the link
         try:
             r['g1.1'] = g1_1
@@ -103,9 +106,6 @@ class TestGroup(TestCase):
             pass  # expected
         except OSError:
             pass  # also acceptable
-
-        del r['tmp']
-        self.assertEqual(len(r), 4)
 
         # create a softlink
         r['mysoftlink'] = h5py.SoftLink('/g1/g1.1')
@@ -187,6 +187,7 @@ class TestGroup(TestCase):
 
         # re-open file in read-only mode
         f = h5py.File(filename, 'r')
+
         self.assertEqual(len(f), 6)
         for name in ("g1", "g2", "g4", "g1.1", "a space", "mysoftlink"):
             self.assertTrue(name in f)
@@ -194,19 +195,19 @@ class TestGroup(TestCase):
         g1_1 = f["/g1/g1.1"]
 
         if is_hsds:
-            linkee_class = r.get('mysoftlink', getclass=True)
+            linkee_class = f.get('mysoftlink', getclass=True)
             # TBD: investigate why h5py returned None here
             self.assertEqual(linkee_class, h5py.Group)
-            link_class = r.get('mysoftlink', getclass=True, getlink=True)
+            link_class = f.get('mysoftlink', getclass=True, getlink=True)
             self.assertEqual(link_class, h5py.SoftLink)
-            softlink = r.get('mysoftlink', getlink=True)
+            softlink = f.get('mysoftlink', getlink=True)
             self.assertEqual(softlink.path, '/g1/g1.1')
         linked_obj = f["mysoftlink"]
         self.assertEqual(linked_obj.id, g1_1.id)
 
         if is_hsds:
             # for h5pyd we should be able to retrieve the anon group
-            anon_group = f[f"groups/{anon_group_id}"]
+            anon_group = f[h5py.Reference(anon_group_id)]
             self.assertEqual(anon_group_id, anon_group.id.id)
         f.close()
 
@@ -307,201 +308,6 @@ class TestGroup(TestCase):
         self.assertEqual(get_count(g1_clone), 0)
 
         f.close()
-
-    def test_link_multi_create(self):
-        if config.get("use_h5py"):
-            return
-
-        filename = self.getFileName("test_link_multi_create")
-        print(f"filename: {filename}")
-
-        f = h5py.File(filename, 'w')
-        g1 = f.create_group("g1")
-
-        # Create 10 soft links
-        num_links = 10
-        names = ["link" + str(i) for i in range(num_links)]
-        links = []
-
-        for name in names:
-            new_link = h5py.SoftLink("dummy_path_" + str(name))
-            links.append(new_link)
-
-        g1[names] = links
-
-        self.assertEqual(len(g1), num_links)
-
-        for i in range(num_links):
-            name = names[i]
-            self.assertTrue(name in g1)
-            self.assertEqual(g1.get(name, getlink=True).path, links[i].path)
-
-        # Create soft and hard links
-        names = ["link" + str(i) for i in range(num_links, 2 * num_links)]
-        links = []
-
-        for i in range(num_links, 2 * num_links):
-            if i % 2 == 0:
-                new_link = h5py.SoftLink("dummy_path_" + str(i))
-            else:
-                # Hard link to g1
-                new_link = g1
-
-            links.append(new_link)
-
-        g1[names] = links
-
-        self.assertEqual(len(g1), num_links * 2)
-
-        for i in range(num_links, 2 * num_links):
-            name = "link" + str(i)
-            self.assertTrue(name in g1)
-
-            if i % 2 == 0:
-                link = g1.get(name, getlink=True)
-                self.assertEqual(link.path, links[i % num_links].path)
-            else:
-                g1_clone = g1.get(name)
-                self.assertEqual(len(g1_clone), len(g1))
-                self.assertEqual(g1_clone.id.id, g1.id.id)
-
-        # Create external links
-
-        names = ["link" + str(i) for i in range(num_links * 2, num_links * 3)]
-        links = []
-
-        for i in range(num_links * 2, num_links * 3):
-            filename = "dummy_filename_" + str(i)
-            path = "dummy_path_" + str(i)
-            new_link = h5py.ExternalLink(filename=filename, path=path)
-            links.append(new_link)
-
-        g1[names] = links
-
-        self.assertEqual(len(g1), num_links * 3)
-
-        for i in range(num_links * 2, num_links * 3):
-            name = "link" + str(i)
-            self.assertTrue(name in g1)
-
-            link = g1.get(name, getlink=True)
-            self.assertEqual(link.path, links[i % num_links]._path)
-            self.assertEqual(link.filename, links[i % num_links]._filename)
-
-    def test_link_get_multi(self):
-        if config.get("use_h5py"):
-            return
-
-        filename = self.getFileName("test_link_get_multi")
-        print(f"filename: {filename}")
-
-        f = h5py.File(filename, 'w')
-        g1 = f.create_group("g1")
-
-        # Create subgroups
-        g2 = g1.create_group("g2")
-        g3 = g2.create_group("g3")
-
-        # Create links in each group
-
-        num_links = 20
-        names = ["link" + str(i) for i in range(num_links)]
-
-        for name in names:
-            g1[name] = g1
-            g2[name] = g2
-            g3[name] = g3
-
-        # Get all links from g1 only
-        links_out = g1.get(None, getlink=True)
-
-        self.assertEqual(len(links_out), num_links + 1)
-
-        for name in names:
-            self.assertTrue(name in links_out)
-            link = links_out[name]
-            self.assertEqual(link.id, g1.id.uuid)
-
-        # Get all links from g1 and subgroups
-        links_out = g1.get(None, getlink=True, follow_links=True)
-
-        # 3 groups containing links
-        self.assertEqual(len(links_out), 3)
-
-        for group_id in [g1.id.uuid, g2.id.uuid, g3.id.uuid]:
-            self.assertTrue(group_id in links_out)
-            links = links_out[group_id]
-
-            if group_id == g3.id.uuid:
-                self.assertEqual(len(links), num_links)
-            else:
-                self.assertEqual(len(links), num_links + 1)
-
-            for name in names:
-                self.assertTrue(name in links)
-                link = links[name]
-                self.assertEqual(link.id, group_id)
-
-        # Make sure cache does not erroneously return recursive links
-        links_out = g1.get(None, getlink=True)
-        self.assertEqual(len(links_out), num_links + 1)
-
-        # Return only 5 links from group
-
-        links_out = g1.get(None, getlink=True, limit=5)
-        self.assertEqual(len(links_out), 5)
-
-        self.assertTrue("g2" in links_out)
-        for name in sorted(names)[0:4]:
-            self.assertTrue(name in links_out)
-            link = links_out[name]
-            self.assertEqual(link.id, g1.id.uuid)
-
-        # Return next 5 links via marker
-        links_out = g1.get(None, getlink=True, limit=5, marker=sorted(names)[3])
-
-        self.assertEqual(len(links_out), 5)
-
-        for name in sorted(names)[4:9]:
-            self.assertTrue(name in links_out)
-            link = links_out[name]
-            self.assertEqual(link.id, g1.id.uuid)
-
-        # Return all links in g1 besides g2
-        links_out = g1.get(None, getlink=True, pattern="link*")
-        self.assertEqual(len(links_out), 20)
-
-        for name in names:
-            if name.startswith("link1"):
-                self.assertTrue(name in links_out)
-                link = links_out[name]
-                self.assertEqual(link.id, g1.id.uuid)
-
-        # Return all links in g1/g2/g3 except for the group links
-        links_out = g1.get(None, getlink=True, follow_links=True, pattern="link*")
-        self.assertEqual(len(links_out), 3)
-
-        for group_id in [g1.id.uuid, g2.id.uuid, g3.id.uuid]:
-            self.assertTrue(group_id in links_out)
-            links = links_out[group_id]
-
-            self.assertEqual(len(links), num_links)
-
-            for name in names:
-                self.assertTrue(name in links)
-                link = links[name]
-                self.assertEqual(link.id, group_id)
-
-        # Retrieve a set of links by name
-        names = ["link" + str(i) for i in range(5, 15)]
-        links_out = g1.get(names, getlink=True)
-
-        self.assertEqual(len(links_out), 10)
-
-        for name in names:
-            self.assertTrue(name in links_out)
-            link = links_out[name]
-            self.assertEqual(link.id, g1.id.uuid)
 
 
 class TestTrackOrder(TestCase):
@@ -607,8 +413,8 @@ class TestTrackOrder(TestCase):
         with h5py.File(filename) as f:
             g = f['order']
 
-            d = g.get('dset', track_order=True)
-            self.assertEqual(list(d.attrs), list(self.titles))
+            d1 = g.get('dset', track_order=True)
+            self.assertEqual(list(d1.attrs), list(self.titles))
 
             d2 = g.get('dset2', track_order=False)
             ref = sorted(self.titles)
@@ -618,6 +424,7 @@ class TestTrackOrder(TestCase):
         # h5py does not support track_order on group.get()
         if config.get("use_h5py"):
             return
+
         filename = self.getFileName("test_get_group_track_order")
         print(f"filename: {filename}")
         with h5py.File(filename, 'w') as f:
@@ -640,5 +447,6 @@ class TestTrackOrder(TestCase):
 
 if __name__ == '__main__':
     loglevel = logging.ERROR
-    logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
+    # logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)
+    logging.basicConfig(level=loglevel)
     ut.main()

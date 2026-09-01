@@ -122,7 +122,6 @@ class TestScalarCompound(TestCase):
             np.testing.assert_array_equal(outdata, testdata[key])
             self.assertEqual(outdata.dtype, testdata[key].dtype)
 
-    @ut.expectedFailure
     def test_nested_compound_vlen(self):
         dt_inner = np.dtype([('a', h5py.vlen_dtype(np.int32)),
                             ('b', h5py.vlen_dtype(np.int32))])
@@ -140,7 +139,13 @@ class TestScalarCompound(TestCase):
                         (np.array([inner1], dtype=dt_inner), 3)],
                         dtype=dt)
 
+        filename = self.f.filename
         self.f["ds"] = data
+        self.f.close()  # flush to the server
+
+        # reopen read-only and verify against the server-persisted value,
+        # rather than data that may just be cached client side
+        self.f = h5py.File(filename, "r")
         out = self.f["ds"]
 
         # Specifying check_alignment=False because vlen fields have 8 bytes of padding

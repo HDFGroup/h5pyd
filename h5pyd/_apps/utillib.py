@@ -162,7 +162,7 @@ def get_chunk_layout(dset):
         msg = "get_chunk_layout called on hdf5 dataset"
         logging.error(msg)
         raise IOError(msg)
-    dset_json = dset.id.dcpl_json
+    dset_json = dset.id.cpl_json
     if "layout" not in dset_json:
         msg = f"expect to find layout key in dset_json: {dset_json}"
         logging.error(msg)
@@ -1244,8 +1244,12 @@ def create_dataset(dobj, ctx):
             rank = 0
         else:
             tgt_shape.extend(dobj.shape)
-            tgt_maxshape.extend(dobj.maxshape)
             rank = len(tgt_shape)
+            if rank > 0:
+                tgt_maxshape.extend(dobj.maxshape)
+            else:
+                tgt_maxshape = None
+
         if rank > 0 and ctx["extend_dim"]:
             # set maxshape to unlimited for any dimension that is the extend_dim
             if dobj.name.split("/")[-1] == ctx["extend_dim"]:
@@ -1712,6 +1716,7 @@ def create_group(gobj, ctx):
             print(f"{gobj.name} not found")
 
         grp = fout.create_group(gobj.name)
+
         srcid_desobj_map = ctx["srcid_desobj_map"]
         msg = f"adding group id {gobj.id.id} to {grp} in srcid_desobj_map"
         logging.debug(msg)
@@ -1837,7 +1842,10 @@ def load_file(
 
     def copy_attribute_helper(name, obj):
         logging.info(f"copy attribute - name: {name}  obj: {obj.name}")
+        fout = ctx["fout"]
+
         tgt = fout[name]
+
         for a in obj.attrs:
             copy_attribute(tgt, a, obj, ctx)
 
@@ -1883,10 +1891,12 @@ def load_file(
     # build a rough map of the file using the internal function above
     logging.info("creating target objects")
     fin.visititems(object_create_helper)
+    fout.flush()
 
     # copy over any attributes
     logging.info("creating target attributes")
     fin.visititems(copy_attribute_helper)
+    fout.flush()
 
     # create soft/external links (and hardlinks not already created)
     create_links(fin, fout, ctx)  # create root soft/external links

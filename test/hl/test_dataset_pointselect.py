@@ -22,6 +22,31 @@ else:
 from common import ut, TestCase
 
 
+def get_ptsel(dset, pts):
+    # return values from th dataset for the given list of points
+    dt = dset.dtype
+    if config.get("use_h5py"):
+        # h5py only supports point selection by boolean mask,
+        # so access each point separately and store in an array
+        # TBD: remove once this h5py PR is merged: https://github.com/h5py/h5py/pull/1793
+        val = np.zeros((len(pts)), dtype=dt)
+        for i in range(len(pts)):
+            val[i] = dset[pts[i]]
+    else:
+        val = dset.points[pts]
+
+    return val
+
+
+def put_ptsel(dset, pts, values):
+    # write values to the dataset for the given list of points
+    if config.get("use_h5py"):
+        for i in range(len(pts)):
+            dset[pts[i]] = values[i]
+    else:
+        dset.points[pts] = values
+
+
 class TestPointSelectDataset(TestCase):
     def test_boolean_select(self):
         filename = self.getFileName("point_select_dset")
@@ -50,46 +75,120 @@ class TestPointSelectDataset(TestCase):
         vals.reverse()
         dset1d[...] = vals
         vals = dset1d[...]
-        pts = dset1d[[2, 4, 6, 8]]
+        pts = [2, 4, 6, 8]
+        arr = get_ptsel(dset1d, pts)
         expected_vals = [7, 5, 3, 1]
         for i in range(len(expected_vals)):
-            self.assertEqual(pts[i], expected_vals[i])
+            self.assertEqual(arr[i], expected_vals[i])
+
+        f.close()
+
+        # re-open and test again
+        f = h5py.File(filename, "r")
+        dset1d = f['dset1d']
+        arr = get_ptsel(dset1d, pts)
+        for i in range(len(expected_vals)):
+            self.assertEqual(arr[i], expected_vals[i])
+
+        f.close()
+
+    def test_1d_pointwrite(self):
+        filename = self.getFileName("test_1d_pointwrite")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+        count = 10
+
+        dset1d = f.create_dataset('dset1d', (count,), dtype='i4')
+        pts = [2, 4, 6, 8]
+        values = [1, 10, 100, 1000]
+        put_ptsel(dset1d, pts, values)
+
+        arr = dset1d[...]
+        expected = 1
+        for i in range(count):
+            if i in pts:
+                self.assertEqual(arr[i], expected)
+                expected *= 10
+            else:
+                self.assertEqual(arr[i], 0)
+
+        f.close()
+
+        # re-open and test again
+        f = h5py.File(filename, "r")
+        dset1d = f['dset1d']
+        arr = dset1d[...]
+        expected = 1
+        for i in range(count):
+            if i in pts:
+                self.assertEqual(arr[i], expected)
+                expected *= 10
+            else:
+                self.assertEqual(arr[i], 0)
 
         f.close()
 
     def test_2d_pointselect(self):
         filename = self.getFileName("test_2d_pointselect")
         print("filename:", filename)
-        f = h5py.File(filename, "w")
 
-        dset2d = f.create_dataset('dset2d', (10, 20), dtype='i4')
-        vals = np.zeros((10, 20), dtype='i4')
+        f = h5py.File(filename, "w")
+        dt = np.int32
+        dset2d = f.create_dataset('dset2d', (10, 20), dtype=dt)
+        vals = np.zeros((10, 20), dtype=dt)
         for i in range(10):
             for j in range(20):
                 vals[i, j] = i * 1000 + j
 
         dset2d[...] = vals
         vals = dset2d[...]
-        # TBD: selection with a list for one axis is not working in HSDS
-        if config.get("use_h5py"):
-            pts = dset2d[5, (5, 10, 15)]
-        else:
-            # But this type of selection not working for h5py
-            # cf: https://github.com/h5py/h5py/issues/966
-            pts = dset2d[[(5, 5), (5, 10), (5, 15)]]
 
-        expected_vals = [5005, 5010, 5015]
-        for i in range(len(expected_vals)):
-            self.assertEqual(pts[i], expected_vals[i])
+        pts = [(9 - i, i) for i in range(10)]
+        val = get_ptsel(dset2d, pts)
 
-        pts = dset2d[[1, 2]]
-        if config.get("use_h5py"):
-            # TBD: fix for h5pyd
-            self.assertEqual(pts.shape, (2, 20))
-            for i in range(20):
-                self.assertEqual(pts[0, i], vals[1, i])
-                self.assertEqual(pts[1, i], vals[2, i])
+        for i in range(len(pts)):
+            self.assertEqual(val[i], (9 - i) * 1000 + i)
 
+        f.close()
+
+        # re-open and test again
+        f = h5py.File(filename, "r")
+        dset2d = f['dset2d']
+        val = get_ptsel(dset2d, pts)
+        for i in range(len(pts)):
+            self.assertEqual(val[i], (9 - i) * 1000 + i)
+        f.close()
+
+    def test_2d_pointwrite(self):
+        filename = self.getFileName("test_2d_pointwrite")
+        print("filename:", filename)
+
+        f = h5py.File(filename, "w")
+        dt = np.int32
+        dset2d = f.create_dataset('dset2d', (10, 20), dtype=dt)
+
+        pts = []
+        for i in range(10):
+            pts.append((i, i))
+        values = list(range(10))
+        put_ptsel(dset2d, pts, values)
+
+        arr = dset2d[...]
+        for i in range(10):
+            for j in range(20):
+                expected = i if i == j else 0
+                self.assertEqual(arr[i, j], expected)
+
+        f.close()
+
+        # re-open and test again
+        f = h5py.File(filename, "r")
+        dset2d = f['dset2d']
+        arr = dset2d[...]
+        for i in range(10):
+            for j in range(20):
+                expected = i if i == j else 0
+                self.assertEqual(arr[i, j], expected)
         f.close()
 
     def test_2d_pointselect_broadcast(self):
@@ -104,16 +203,15 @@ class TestPointSelectDataset(TestCase):
                 vals[i, j] = i * 1000 + j
 
         dset2d[...] = vals
-        if config.get("use_h5py"):
-            # TODO - not working for h5pyd
-            pts = dset2d[(2, 4, 7), :]
-            self.assertEqual(len(pts), 3)
-            row1 = pts[0, :]
-            self.assertEqual(list(row1), list(range(2000, 2020)))
-            row2 = pts[1, :]
-            self.assertEqual(list(row2), list(range(4000, 4020)))
-            row3 = pts[2, :]
-            self.assertEqual(list(row3), list(range(7000, 7020)))
+
+        pts = dset2d[[2, 4, 7], :]
+        self.assertEqual(len(pts), 3)
+        row1 = pts[0, :]
+        self.assertEqual(list(row1), list(range(2000, 2020)))
+        row2 = pts[1, :]
+        self.assertEqual(list(row2), list(range(4000, 4020)))
+        row3 = pts[2, :]
+        self.assertEqual(list(row3), list(range(7000, 7020)))
 
         f.close()
 

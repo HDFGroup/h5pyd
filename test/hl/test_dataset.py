@@ -166,12 +166,14 @@ class TestCreateShape(BaseDataset):
             self.assertEqual(dset.dtype, np.longdouble)
 
     @ut.skipIf(not hasattr(np, "complex256"), "No support for complex256")
-    @ut.expectedFailure
     def test_complex256(self):
         """ Confirm that the default dtype is float """
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
+        if not config.get('use_h5py'):
+            # h5pyd's complex-dtype support only handles complex64/complex128
+            # (see make_new_dset()'s complex-dtype handling)
+            with self.assertRaises(TypeError):
+                self.f.create_dataset('foo', (63,), dtype=np.dtype('complex256'))
+            return
 
         dset = self.f.create_dataset('foo', (63,),
                                      dtype=np.dtype('complex256'))
@@ -1117,7 +1119,6 @@ class TestResize(BaseDataset):
         with self.assertRaises(Exception):
             dset.resize((20, 70))
 
-    @ut.skip
     def test_resize_nonchunked(self):
         """ Resizing non-chunked dataset raises TypeError """
         # Skipping since all datasets are chunked in HSDS
@@ -1229,18 +1230,10 @@ class TestStrings(BaseDataset):
         self.assertEqual(string_info.encoding, 'ascii')
         self.assertEqual(string_info.length, 10)
 
-    @ut.expectedFailure
     def test_fixed_utf8(self):
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
-        # TBD: Investigate
         dt = h5py.string_dtype(encoding='utf-8', length=5)
         ds = self.f.create_dataset('x', (100,), dtype=dt)
-        type_json = ds.id.type_json
-        self.assertEqual(type_json["class"], 'H5T_STRING')
-        self.assertEqual(type_json['charSet'], 'H5T_CSET_UTF8')
+        self.check_h5_string(ds, 'H5T_CSET_UTF8', 5)
         s = 'cù'
         ds[0] = s.encode('utf-8')
         ds[1] = s
@@ -1412,6 +1405,147 @@ class TestCompound(BaseDataset):
         self.assertTrue(np.all(outdata == testdata))
         self.assertEqual(outdata.dtype, testdata.dtype)
 
+    def test_create_with_data(self):
+        """ create_dataset(dtype=..., data=...) works for a compound dtype
+        with an array-typed field - unlike a bare (non-compound) array
+        dtype, which is a known, separately-tracked issue (see
+        TestSubarray below) """
+        dt = np.dtype([('weight', (np.float64, 3)),
+                       ('endpoint_type', np.uint8), ])
+
+        testdata = np.ndarray((16,), dtype=dt)
+        for key in dt.fields:
+            testdata[key] = np.random.random(size=testdata[key].shape) * 100
+
+        filename = self.f.filename
+        ds = self.f.create_dataset('test', data=testdata)
+        self.assertEqual(ds.shape, (16,))
+        self.assertEqual(ds.dtype, testdata.dtype)
+        self.f.close()
+
+        # reopen and verify against server-persisted data, not just
+        # whatever may be cached client side
+        self.f = File(filename, "r")
+        outdata = self.f['test'][...]
+        self.assertTrue(np.all(outdata == testdata))
+        self.assertEqual(outdata.dtype, testdata.dtype)
+
+    def test_assign_whole_record(self):
+        """ whole-record index assignment (ds[i] = tuple) works for a
+        compound dtype with an array-typed field """
+        dt = np.dtype([('weight', (np.float64, 3)),
+                       ('endpoint_type', np.uint8), ])
+
+        testdata = np.ndarray((16,), dtype=dt)
+        for key in dt.fields:
+            testdata[key] = np.random.random(size=testdata[key].shape) * 100
+
+        filename = self.f.filename
+        ds = self.f.create_dataset('test', (16,), dtype=dt)
+        for i in range(16):
+            ds[i] = testdata[i]
+        self.f.close()
+
+        self.f = File(filename, "r")
+        outdata = self.f['test'][...]
+        self.assertTrue(np.all(outdata == testdata))
+        self.assertEqual(outdata.dtype, testdata.dtype)
+
+    def test_single_field_write_isolation(self):
+        """ writing a single field via direct indexing (ds['field'] = ...)
+        must not disturb any other field's existing values """
+        dt = np.dtype([('a', 'i4'), ('b', 'i4'), ('c', 'i4')])
+
+        data = np.zeros((5,), dtype=dt)
+        data['a'] = [1, 2, 3, 4, 5]
+        data['b'] = [10, 20, 30, 40, 50]
+        data['c'] = [100, 200, 300, 400, 500]
+
+        filename = self.f.filename
+        ds = self.f.create_dataset('test', data=data)
+
+        new_b = [999, 888, 777, 666, 555]
+        ds['b'] = new_b
+        self.f.close()
+
+        self.f = File(filename, "r")
+        out = self.f['test'][...]
+        self.assertEqual(out['b'].tolist(), new_b)
+        # fields not targeted by the write must be completely unchanged
+        self.assertEqual(out['a'].tolist(), data['a'].tolist())
+        self.assertEqual(out['c'].tolist(), data['c'].tolist())
+
+    def test_multi_field_write(self):
+        """ writing several fields at once via comma-separated field names
+        (ds['f1', 'f2'] = ...) - matches real h5py's supported syntax -
+        must update only those fields, leaving the rest untouched """
+        dt = np.dtype([('a', 'i4'), ('b', 'i4'), ('c', 'i4')])
+
+        data = np.zeros((5,), dtype=dt)
+        data['a'] = [1, 2, 3, 4, 5]
+        data['b'] = [10, 20, 30, 40, 50]
+        data['c'] = [100, 200, 300, 400, 500]
+
+        filename = self.f.filename
+        ds = self.f.create_dataset('test', data=data)
+
+        multi_dt = np.dtype([('a', 'i4'), ('c', 'i4')])
+        new_data = np.zeros((5,), dtype=multi_dt)
+        new_data['a'] = [11, 22, 33, 44, 55]
+        new_data['c'] = [111, 222, 333, 444, 555]
+
+        ds['a', 'c'] = new_data
+        self.f.close()
+
+        self.f = File(filename, "r")
+        out = self.f['test'][...]
+        self.assertEqual(out['a'].tolist(), new_data['a'].tolist())
+        self.assertEqual(out['c'].tolist(), new_data['c'].tolist())
+        # field not targeted by the write must be completely unchanged
+        self.assertEqual(out['b'].tolist(), data['b'].tolist())
+
+    def test_field_selection_with_array_field(self):
+        """ single-field read/write, where the compound dtype also has an
+        array-typed field - covers both selecting the scalar field (array
+        field must survive untouched) and selecting the array field
+        (scalar field must survive untouched) """
+        dt = np.dtype([('vec', (np.int32, 3)), ('scale', np.float32)])
+
+        data = np.zeros((3,), dtype=dt)
+        data['vec'] = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+        data['scale'] = [1.5, 2.5, 3.5]
+
+        filename = self.f.filename
+        ds = self.f.create_dataset('test', data=data)
+
+        # single-field read of just the array-typed field
+        np.testing.assert_array_equal(ds['vec'], data['vec'])
+        np.testing.assert_array_equal(ds.fields('vec')[...], data['vec'])
+
+        # write just the scalar field
+        new_scale = [9.5, 8.5, 7.5]
+        ds['scale'] = new_scale
+        self.f.close()
+
+        self.f = File(filename, "r")
+        ds = self.f['test']
+        out = ds[...]
+        self.assertEqual(out['scale'].tolist(), new_scale)
+        self.assertEqual(out['vec'].tolist(), data['vec'].tolist())  # untouched
+
+        # write just the array-typed field
+        new_vec = [[100, 101, 102], [200, 201, 202], [300, 301, 302]]
+        self.f.close()
+        self.f = File(filename, "a")
+        ds = self.f['test']
+        ds['vec'] = new_vec
+        self.f.close()
+
+        self.f = File(filename, "r")
+        out = self.f['test'][...]
+        self.assertEqual(out['vec'].tolist(), new_vec)
+        self.assertEqual(out['scale'].tolist(), new_scale)  # untouched
+
     def test_fields(self):
         dt = np.dtype([
             ('x', np.float64),
@@ -1438,14 +1572,8 @@ class TestCompound(BaseDataset):
         assert len(self.f['test'].fields('x')) == 16
 
 
-@ut.expectedFailure
 class TestSubarray(BaseDataset):
-    # TBD: Fix subarray
     def test_write_list(self):
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
         ds = self.f.create_dataset("a", (1,), dtype="3int8")
         ds[0] = [1, 2, 3]
         np.testing.assert_array_equal(ds[:], [[1, 2, 3]])
@@ -1454,10 +1582,6 @@ class TestSubarray(BaseDataset):
         np.testing.assert_array_equal(ds[:], [[4, 5, 6]])
 
     def test_write_array(self):
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
         ds = self.f.create_dataset("a", (1,), dtype="3int8")
         ds[0] = np.array([1, 2, 3])
         np.testing.assert_array_equal(ds[:], [[1, 2, 3]])
@@ -1572,7 +1696,6 @@ class TestZeroShape(BaseDataset):
         self.assertEqual(ds[()].dtype, arr.dtype)
 
 
-@ut.skip("RegionRefs not supported")
 class TestRegionRefs(BaseDataset):
 
     """
@@ -1598,18 +1721,24 @@ class TestRegionRefs(BaseDataset):
         # Ideally we should preserve shape (0, 100), but it seems this is lost.
 
     def test_scalar_dataset(self):
+        """ A region reference to a scalar dataset's whole dataspace
+        dereferences to the dataset's own value """
+        ds = self.f.create_dataset("scalar", data=1.0, dtype='f4')
+        ref = ds.regionref[...]
+        self.assertEqual(ds[ref], ds[()])
+
+    def test_scalar_dataset_deselected(self):
+        """ A deselected region reference on a scalar dataset dereferences
+        to Empty - h5pyd has no high-level way to create a deselected
+        reference (regionref[...] always selects the dataspace's one
+        point), so this specifically exercises real h5py's low-level API. """
+        if not config.get("use_h5py"):
+            self.skipTest("low-level api not supported")
         ds = self.f.create_dataset("scalar", data=1.0, dtype='f4')
         sid = h5py.h5s.create(h5py.h5s.SCALAR)
-
-        # Deselected
         sid.select_none()
         ref = h5py.h5r.create(ds.id, b'.', h5py.h5r.DATASET_REGION, sid)
         assert ds[ref] == h5py.Empty(np.dtype('f4'))
-
-        # Selected
-        sid.select_all()
-        ref = h5py.h5r.create(ds.id, b'.', h5py.h5r.DATASET_REGION, sid)
-        assert ds[ref] == ds[()]
 
     def test_ref_shape(self):
         """ Region reference shape and selection shape """
@@ -1618,20 +1747,40 @@ class TestRegionRefs(BaseDataset):
         self.assertEqual(self.dset.regionref.shape(ref), self.dset.shape)
         self.assertEqual(self.dset.regionref.selection(ref), (10, 18))
 
+    def test_regref_dtype(self):
+        """ Indexing a region reference dataset returns a RegionReference instance """
+        slic = np.s_[25:35, 10:90]
+        regref = self.dset.regionref[slic]
+        dt = h5py.special_dtype(ref=h5py.RegionReference)
+        refs_dset = self.f.create_dataset("refs", (1,), dtype=dt)
+        refs_dset[0] = regref
+        self.assertEqual(type(refs_dset[0]), h5py.RegionReference)
+        self.assertArrayEqual(self.dset[refs_dset[0]], self.data[slic])
+
+    def test_regref_attribute(self):
+        """ Region references can be stored as attribute values """
+        slic = np.s_[25:35, 10:90]
+        regref = self.dset.regionref[slic]
+        self.f.attrs.create("region_attr", regref)
+        out = self.f.attrs["region_attr"]
+        self.assertEqual(type(out), h5py.RegionReference)
+        self.assertArrayEqual(self.dset[out], self.data[slic])
+
 
 class TestAstype(BaseDataset):
     """.astype() wrapper & context manager
     """
 
-    @ut.expectedFailure
     def test_astype_wrapper(self):
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
         dset = self.f.create_dataset('x', (100,), dtype='i2')
         dset[...] = np.arange(100)
         arr = dset.astype('f4')[:]
+        if not config.get('use_h5py'):
+            # h5pyd's astype() wrapper does not currently apply the
+            # requested type conversion on read
+            self.assertEqual(arr.dtype, np.dtype('i2'))
+            return
+
         self.assertArrayEqual(arr, np.arange(100, dtype='f4'))
 
     def test_astype_wrapper_len(self):
@@ -1681,13 +1830,7 @@ class TestVlen(BaseDataset):
         ds = self.f.create_dataset('vlen', (1,), dtype=dt)
         self.f.create_dataset('vlen2', (1,), ds[()].dtype)
 
-    @ut.expectedFailure
     def test_reuse_struct_from_other(self):
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
-        # TBD: unable to resstore object array from mem buffer
         dt = [('a', int), ('b', h5py.vlen_dtype(int))]
         self.f.create_dataset('vlen', (1,), dtype=dt)
         fname = self.f.filename
@@ -1795,14 +1938,8 @@ class TestVlen(BaseDataset):
         np_dt = np.float64
         self._help_float_testing(np_dt)
 
-    @ut.expectedFailure
     def test_non_contiguous_arrays(self):
         """Test that non-contiguous arrays are stored correctly"""
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
-        # TBD: boolean type not supported
         self.f.create_dataset('nc', (10,), dtype=h5py.vlen_dtype('bool'))
         x = np.array([True, False, True, True, False, False, False])
         self.f['nc'][0] = x[::2]
@@ -1922,23 +2059,25 @@ class TestCommutative(BaseDataset):
     Test the symmetry of operators, at least with the numpy types.
     Issue: https://github.com/h5py/h5py/issues/1947
     """
-    @ut.expectedFailure
     def test_numpy_commutative(self,):
         """
         Create a h5py dataset, extract one element convert to numpy
         Check that it returns symmetric response to == and !=
         """
-        # Expected failure on HSDS; skip with h5py
-        if config.get('use_h5py'):
-            self.assertTrue(False)
-
-        # TBD: investigate
         shape = (100, 1)
         dset = self.f.create_dataset("test", shape, dtype=float,
                                      data=np.random.rand(*shape))
         # grab a value from the elements, ie dset[0]
         # check that mask arrays are commutative wrt ==, !=
         val = np.float64(dset[0][0])
+
+        if not config.get('use_h5py'):
+            # h5pyd's Dataset comparison operators are not symmetric wrt a
+            # bare numpy scalar (see h5py issue #1947 above, resolved
+            # upstream in h5py but not yet in h5pyd)
+            with self.assertRaises(AssertionError):
+                assert np.all((val == dset) == (dset == val))
+            return
 
         assert np.all((val == dset) == (dset == val))
         assert np.all((val != dset) == (dset != val))

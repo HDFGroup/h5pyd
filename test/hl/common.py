@@ -38,6 +38,34 @@ else:
     del fname
     del testfile
 
+    def get_test_user1():
+        # HS_USERNAME is the username h5pyd will look up if
+        #   if not provided in the File constructor
+        user1 = {}
+        if "HS_USERNAME" in os.environ:
+            user1["name"] = os.environ["HS_USERNAME"]
+        else:
+            user1["name"] = "test_user1"
+        if "HS_PASSWORD" in os.environ:
+            user1["password"] = os.environ["HS_PASSWORD"]
+        else:
+            # only use "test_user1/test" for desktop testing
+            user1["password"] = "test"
+        return user1
+
+    def get_test_user2():
+        user2 = {}
+        if "TEST12_USERNAME" in os.environ:
+            user2["name"] = os.environ["TEST2_USERNAME"]
+        else:
+            user2["name"] = "test_user2"
+        if "TEST2_PASSWORD" in os.environ:
+            user2["password"] = os.environ["TEST2_PASSWORD"]
+        else:
+            # only use "test_user1/test" for desktop testing
+            user2["password"] = "test"
+        return user2
+
 
 def getTestFileName(basename, subfolder=None):
     """
@@ -57,12 +85,38 @@ def getTestFileName(basename, subfolder=None):
         if "H5PYD_TEST_FOLDER" in os.environ:
             filename = os.environ["H5PYD_TEST_FOLDER"]
         else:
-            # default to the root folder
-            filename = "/"
+            # default to "/home/test_user1/h5pyd_test/"
+            test_user1 = get_test_user1()["name"]
+            filename = f"/home/{test_user1}/h5pyd_test/"
         if subfolder:
             filename = os.path.join(filename, subfolder)
         filename = os.path.join(filename, f"{basename}.h5")
     return filename
+
+
+def _dtypes_structurally_equal(dt1, dt2):
+    """ Compare two dtypes by field names/types/shape rather than exact
+    byte layout.
+
+    A compound dtype read back from real h5py may carry C-struct
+    alignment padding between fields (explicit field offsets/itemsize)
+    that h5pyd/h5json never produces (it has no C-struct representation
+    to begin with) - same logical type, different byte layout. Used by
+    assertArrayEqual() when check_alignment=False. """
+    if dt1.names is not None or dt2.names is not None:
+        if dt1.names is None or dt2.names is None or dt1.names != dt2.names:
+            return False
+        return all(
+            _dtypes_structurally_equal(dt1.fields[name][0], dt2.fields[name][0])
+            for name in dt1.names
+        )
+    if dt1.subdtype is not None or dt2.subdtype is not None:
+        if dt1.subdtype is None or dt2.subdtype is None:
+            return False
+        base1, shape1 = dt1.subdtype
+        base2, shape2 = dt2.subdtype
+        return shape1 == shape2 and _dtypes_structurally_equal(base1, base2)
+    return dt1 == dt2
 
 
 class TestCase(ut.TestCase):
@@ -85,31 +139,11 @@ class TestCase(ut.TestCase):
     def test_user1(self):
         # HS_USERNAME is the username h5pyd will look up if
         #   if not provided in the File constructor
-        user1 = {}
-        if "HS_USERNAME" in os.environ:
-            user1["name"] = os.environ["HS_USERNAME"]
-        else:
-            user1["name"] = "test_user1"
-        if "HS_PASSWORD" in os.environ:
-            user1["password"] = os.environ["HS_PASSWORD"]
-        else:
-            # only use "test_user1/test" for desktop testing
-            user1["password"] = "test"
-        return user1
+        return get_test_user1()
 
     @property
     def test_user2(self):
-        user2 = {}
-        if "TEST12_USERNAME" in os.environ:
-            user2["name"] = os.environ["TEST2_USERNAME"]
-        else:
-            user2["name"] = "test_user2"
-        if "TEST2_PASSWORD" in os.environ:
-            user2["password"] = os.environ["TEST2_PASSWORD"]
-        else:
-            # only use "test_user1/test" for desktop testing
-            user2["password"] = "test"
-        return user2
+        return get_test_user2()
 
     @classmethod
     def use_h5py():
@@ -159,11 +193,19 @@ class TestCase(ut.TestCase):
                 if not match:
                     raise AssertionError(f"Item '{x}' appears in b but not a")
 
-    def assertArrayEqual(self, dset, arr, message=None, precision=None):
+    def assertArrayEqual(self, dset, arr, message=None, precision=None, check_alignment=None):
         """ Make sure dset and arr have the same shape, dtype and contents, to
             within the given precision.
 
             Note that dset may be a NumPy array or an HDF5 dataset.
+
+            check_alignment=False relaxes the dtype comparison to a
+            structural one (field names/types/shape), ignoring any
+            C-struct alignment padding (offsets/itemsize) real h5py may
+            add to a compound dtype - h5pyd/h5json never produces that
+            padding (no C-struct representation to begin with), so a
+            strict dtype comparison would otherwise fail for an
+            otherwise-identical compound type under real h5py.
         """
         if precision is None:
             precision = 1e-5
@@ -177,30 +219,39 @@ class TestCase(ut.TestCase):
                 np.isscalar(dset) and np.isscalar(arr),
                 f'Scalar/array mismatch ("{dset}" vs "{arr}"){message}'
             )
-            self.assertTrue(
-                dset - arr < precision,
-                f"Scalars differ by more than {precision:.3}{message}"
-            )
-            return
+            dset = np.asarray(dset)
+            arr = np.asarray(arr)
 
         self.assertTrue(
             dset.shape == arr.shape,
             f"Shape mismatch ({dset.shape} vs {arr.shape}){message}"
         )
+        if check_alignment is False:
+            dtypes_match = _dtypes_structurally_equal(dset.dtype, arr.dtype)
+        else:
+            dtypes_match = dset.dtype == arr.dtype
         self.assertTrue(
-            dset.dtype == arr.dtype,
+            dtypes_match,
             f"Dtype mismatch ({dset.dtype} vs {arr.dtype}){message}"
         )
 
         if arr.dtype.names is not None:
             for n in arr.dtype.names:
                 message = f'[FIELD {n}] {message}'
-                self.assertArrayEqual(dset[n], arr[n], message=message, precision=precision)
+                self.assertArrayEqual(dset[n], arr[n], message=message, precision=precision,
+                                      check_alignment=check_alignment)
         elif arr.dtype.kind in ('i', 'f'):
             self.assertTrue(
                 np.all(np.abs(dset[...] - arr[...]) < precision),
                 f"Arrays differ by more than {precision:.3}{message}"
             )
+        elif arr.dtype.kind == 'O':
+            # vlen fields (e.g. vlen ints, or vlen compounds) - compare
+            # element-by-element rather than as a single ufunc call, since
+            # they don't have a fixed itemsize and may recurse further.
+            for v1, v2 in zip(dset.flat, arr.flat):
+                self.assertArrayEqual(v1, v2, message=message, precision=precision,
+                                      check_alignment=check_alignment)
         else:
             self.assertTrue(
                 np.all(dset[...] == arr[...]),
@@ -263,6 +314,15 @@ class TestCase(ut.TestCase):
             path = path[:-1]
 
         return path
+
+    def compare_unicodestr(self, val, expected):
+        if expected == 0:
+            # unwritten vlen bytes default value
+            self.assertTrue(isinstance(val, bytes))
+            self.assertEqual(val, b'')
+        else:
+            self.assertTrue(isinstance(val, bytes))
+            self.assertEqual(val, expected.encode("utf-8"))
 
     def is_hsds(self, id=None):
         """ Return True if the given identifier is HSDS (i.e. a string),

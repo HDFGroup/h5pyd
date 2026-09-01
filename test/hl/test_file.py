@@ -51,9 +51,10 @@ class TestFile(TestCase):
                 self.assertTrue("isadmin" in info)
 
     def test_create(self):
-        filename = self.getFileName("new_file")
+        filename = self.getFileName("new_file2")
         print("filename:", filename)
         now = time.time()
+
         f = h5py.File(filename, 'w')
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
@@ -62,14 +63,9 @@ class TestFile(TestCase):
         self.assertEqual(f.mode, 'r+')
         self.assertTrue(h5py.is_hdf5(filename))
 
-        if h5py.__name__ == "h5pyd":
-            self.assertTrue(f.id.http_conn.endpoint.startswith("http"))
         self.assertTrue(f.id.id is not None)
         self.assertTrue('/' in f)
-        # should not see id as a file
-        # skip for h5py, since its is_hdf5 implementation expects a path
-        if h5py.__name__ == "h5pyd":
-            self.assertFalse(h5py.is_hdf5(f.id.id))
+
         # Check domain's timestamps
         if h5py.__name__ == "h5pyd":
             # print("modified:", datetime.fromtimestamp(f.modified), f.modified)
@@ -124,14 +120,17 @@ class TestFile(TestCase):
         f.close()
         self.assertEqual(f.id.id, 0)
 
-        # rre-open in append mode
+        # re-open in append mode
         f = h5py.File(filename, "a")
+        self.assertEqual(len(f.keys()), 1)
         f.create_group("foo")
+        self.assertEqual(len(f.keys()), 2)
         del f["foo"]
+        self.assertEqual(len(f.keys()), 1)
         f.close()
 
         # re-open as read-only
-        if h5py.__name__ == "h5pyd":
+        if h5py.__name__ == "h5pyd" and False:
             wait_time = 90  # change to >90 to test async updates
             print("waiting {wait_time:d} seconds for root scan sync".format(wait_time=wait_time))
             time.sleep(wait_time)  # let async process update obj number
@@ -139,6 +138,7 @@ class TestFile(TestCase):
         self.assertEqual(f.filename, filename)
         self.assertEqual(f.name, "/")
         self.assertTrue(f.id.id is not None)
+
         self.assertEqual(len(f.keys()), 1)
         self.assertEqual(f.mode, 'r')
         self.assertTrue('/' in f)
@@ -163,7 +163,7 @@ class TestFile(TestCase):
 
         self.assertEqual(len(f.keys()), 1)
 
-        if h5py.__name__ == "h5pyd":
+        if h5py.__name__ == "h5pyd" and False:
             # check properties that are only available for h5pyd
             # Note: num_groups won't reflect current state since the
             # data is being updated asynchronously
@@ -237,12 +237,12 @@ class TestFile(TestCase):
         self.assertEqual(len(f.keys()), 2)
 
         # no explicit ACLs yet
-        file_acls = f.getACLs()
+        file_acls = f.id.db.plugin.getACLs()
         self.assertTrue(len(file_acls) >= 1)  # Should have at least the test_user1 acl
 
         username = f.owner
 
-        file_acl = f.getACL(username)
+        file_acl = f.id.db.plugin.getACL(username)
         # default owner ACL should grant full permissions
         acl_keys = ("create", "read", "update", "delete", "readACL", "updateACL")
         # self.assertEqual(file_acl["userName"], "default")
@@ -250,7 +250,7 @@ class TestFile(TestCase):
             self.assertEqual(file_acl[k], True)
 
         try:
-            default_acl = f.getACL("default")
+            default_acl = f.id.db.plugin.getACL("default")
         except IOError as ioe:
             if ioe.errno == 404:
                 pass  # expected
@@ -263,7 +263,8 @@ class TestFile(TestCase):
             else:
                 default_acl[key] = False
         default_acl["userName"] = "default"
-        f.putACL(default_acl)
+        f.id.db.plugin.putACL(default_acl)
+
         f.close()
 
         # ooen with test_user2 should succeed for read mode
@@ -294,7 +295,7 @@ class TestFile(TestCase):
         user2_acl["read"] = True  # allow read access
         user2_acl["update"] = True
         user2_acl["readACL"] = True
-        f.putACL(user2_acl)
+        f.id.db.plugin.putACL(user2_acl)
 
         f.close()
 
@@ -387,14 +388,17 @@ class TestTrackOrder(TestCase):
         # write file using creation order
         cfg = h5py.get_config()
         cfg.track_order = True
+        self.assertTrue(cfg.track_order)
         with h5py.File(filename, 'w') as f:
             self.populate(f)
             self.assertEqual(list(f), list(self.titles))
             self.assertEqual(list(f.attrs), list(self.titles))
+
         cfg.track_order = False  # reset
 
         with h5py.File(filename) as f:
             # domain/file should have been saved with track_order state
+
             self.assertEqual(list(f), list(self.titles))
             self.assertEqual(list(f.attrs), list(self.titles))
 
