@@ -6,7 +6,7 @@ h5py==3.16.0
 idna==3.19
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
-numpy==2.5.2
+numpy==2.4.6
 packaging==26.3
 pytz==2026.3.post1
 referencing==0.37.0
