@@ -1,12 +1,17 @@
-certifi==2025.8.3
-charset-normalizer==3.4.3
-h5py==3.14.0
-idna==3.15
-numpy==2.2.6
-packaging==25.0
-pyproject_hooks==1.2.0
-pytz==2025.2
-requests==2.33.0
+attrs==26.1.0
+certifi==2026.7.22
+charset-normalizer==3.5.1
+h5json @ git+https://github.com/HDFGroup/hdf5-json@master
+h5py==3.16.0
+idna==3.19
+jsonschema==4.26.0
+jsonschema-specifications==2025.9.1
+numpy==2.5.2
+packaging==26.3
+pytz==2026.3.post1
+referencing==0.37.0
+requests==2.34.2
 requests-unixsocket==0.4.1
-tomli==2.2.1
+rpds-py==2026.6.3
+typing_extensions==4.16.0
 urllib3==2.7.0
