@@ -1,0 +1,240 @@
+name: Release
+
+# Cuts a release from a pushed tag: builds the distributions, attaches them to
+# a GitHub release whose notes are generated from the commits/PRs since the
+# previous release, and uploads them to PyPI (https://pypi.org/project/h5pyd/).
+#
+# conda-forge is not driven from here. h5pyd-feedstock watches PyPI and opens
+# its own update PR once a new version lands there.
+#
+# To cut a release:
+#   1. Bump the version in pyproject.toml (the SSOT) AND the matching
+#      `version` in h5pyd/version.py - the `version` job fails if the two
+#      disagree, since version.py is what h5pyd.__version__ reports at runtime
+#      while pyproject.toml names the wheel.
+#   2. git tag -a v1.0.0 -m "v1.0.0" && git push origin v1.0.0
+#
+# `workflow_dispatch` runs the validation and build half only (publishes
+# nothing), so the version/tag checks can be rehearsed off a branch before
+# tagging.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+[abrc]*[0-9]*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate only - publish nothing"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Single place to change if the release pipeline moves to a newer Python.
+  # Needs >= 3.11 for tomllib in release_version.py. This is only the version
+  # that builds the release; the wheel is pure-Python and carries its own
+  # requires-python, so it is not tied to this.
+  BUILD_PYTHON_VERSION: "3.12"
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Resolve and validate the version before anything is published, so a tag
+  # that disagrees with the source tree fails fast rather than producing a
+  # release that misstates its own version.
+  # ---------------------------------------------------------------------
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ssot.outputs.version }}
+      tag: ${{ steps.ssot.outputs.tag }}
+      prerelease: ${{ steps.ssot.outputs.prerelease }}
+      dry_run: ${{ steps.mode.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.BUILD_PYTHON_VERSION }}
+
+      - name: Determine run mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Read version from SSOT and validate against tag
+        id: ssot
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: python .github/scripts/release_version.py
+
+      - name: Summary
+        run: |
+          {
+            echo "### Release ${{ steps.ssot.outputs.tag }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Version | \`${{ steps.ssot.outputs.version }}\` |"
+            echo "| Tag | \`${{ steps.ssot.outputs.tag }}\` |"
+            echo "| Pre-release | \`${{ steps.ssot.outputs.prerelease }}\` |"
+            echo "| Dry run | \`${{ steps.mode.outputs.dry_run }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------
+  # Build once. The same sdist/wheel are attached to the GitHub release and
+  # uploaded to PyPI - never rebuilt per target, so the two can't disagree.
+  # Runs on a dry run too, so `workflow_dispatch` rehearses the build and
+  # metadata checks rather than only the version validation.
+  # ---------------------------------------------------------------------
+  build:
+    name: Build distributions
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.BUILD_PYTHON_VERSION }}
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+
+      - name: Check metadata
+        run: python -m twine check --strict dist/*
+
+      - name: Verify built version matches the tag
+        env:
+          EXPECTED: ${{ needs.version.outputs.version }}
+        run: |
+          # Guards against a stale build backend or leftover dist/ contents
+          # silently shipping the wrong version.
+          if ! ls "dist/h5pyd-${EXPECTED}.tar.gz" >/dev/null 2>&1; then
+            echo "::error::expected dist/h5pyd-${EXPECTED}.tar.gz, got:"
+            ls -1 dist/
+            exit 1
+          fi
+
+      - name: Smoke test the wheel
+        env:
+          EXPECTED: ${{ needs.version.outputs.version }}
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+          /tmp/smoke/bin/hsls --help > /dev/null
+          # Resolve every console script's target without executing it. Only a
+          # few are safe to actually run: hsconfigure prompts for input, and
+          # hsload/hsmv/hsdiff exit non-zero on --help.
+          /tmp/smoke/bin/python - <<'PY'
+          import h5pyd
+          from importlib.metadata import entry_points
+          import os
+
+          expected = os.environ["EXPECTED"]
+          # The installed package must report the version it was built as -
+          # h5pyd.__version__ comes from h5pyd/version.py, not from the wheel
+          # metadata, so this catches the two drifting apart at runtime.
+          assert h5pyd.__version__ == expected, (
+              f"h5pyd.__version__ is {h5pyd.__version__}, expected {expected}"
+          )
+
+          eps = [e for e in entry_points(group="console_scripts")
+                 if e.module.startswith("h5pyd")]
+          assert eps, "no h5pyd console scripts in the installed metadata"
+          for ep in sorted(eps, key=lambda e: e.name):
+              ep.load()  # imports the module, resolves the attr, does not call
+              print(f"entry point ok: {ep.name} -> {ep.value}")
+          print(f"{len(eps)} entry points resolved, __version__ = {h5pyd.__version__}")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------
+  # GitHub release. Notes come from --generate-notes (commits/PRs since the
+  # previous release) rather than a hand-maintained CHANGELOG, which h5pyd
+  # does not have. The built dists are attached alongside.
+  # ---------------------------------------------------------------------
+  github-release:
+    name: GitHub release
+    needs: [version, build]
+    if: needs.version.outputs.dry_run == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        run: |
+          args=(--title "$TAG" --verify-tag --generate-notes)
+          if [ "$PRERELEASE" = "true" ]; then
+            args+=(--prerelease)
+          fi
+          gh release create "$TAG" "${args[@]}" dist/*
+
+  # ---------------------------------------------------------------------
+  # PyPI. Uses Trusted Publishing (OIDC) - no long-lived API token in repo
+  # secrets. Requires a one-time publisher config on PyPI plus a `pypi`
+  # environment on this repo; both are spelled out in the Publish step below.
+  # ---------------------------------------------------------------------
+  # Runs after github-release rather than alongside it. The two publish to
+  # places with very different undo stories: a GitHub release can be deleted
+  # and recreated, while PyPI permanently burns a version number - a deleted
+  # release cannot be re-uploaded. Ordering it this way means a failure in the
+  # recoverable half stops the irreversible half from happening at all.
+  pypi:
+    name: Publish to PyPI
+    needs: [version, github-release]
+    if: needs.version.outputs.dry_run == 'false'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/h5pyd/${{ needs.version.outputs.version }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # Trusted Publishing is configured at
+        # https://pypi.org/manage/project/h5pyd/settings/publishing/
+        #   owner: HDFGroup   repo: h5pyd
+        #   workflow: release.yml   environment: pypi
+        #
+        # To use an API token instead, drop the `id-token: write` permission
+        # above and add:
+        #   with:
+        #     password: ${{ secrets.PYPI_API_TOKEN }}
