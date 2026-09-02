@@ -16,7 +16,7 @@ from packaging.version import parse
 import sys
 import numpy
 
-version = "0.24.0"
+version = "1.0.0"
 
 hdf5_version = "REST"
 
