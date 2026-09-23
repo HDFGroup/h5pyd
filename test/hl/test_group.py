@@ -348,6 +348,22 @@ class TestGroup(TestCase):
 
         f.close()
 
+    def test_delete_link_after_reopen(self):
+        # a link deleted after the file is reopened should stay deleted
+        filename = self.getFileName("delete_link_after_reopen")
+        print("filename:", filename)
+        with h5py.File(filename, 'w') as f:
+            f.create_group('g1')
+            f.create_group('g2')
+
+        with h5py.File(filename, 'a') as f:
+            del f['g1']
+            self.assertNotIn('g1', f)
+
+        with h5py.File(filename, 'r') as f:
+            self.assertNotIn('g1', f)
+            self.assertIn('g2', f)
+
 
 class TestTrackOrder(TestCase):
     titles = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")

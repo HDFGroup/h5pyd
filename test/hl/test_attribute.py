@@ -146,6 +146,22 @@ class TestAttribute(TestCase):
 
         f.close()
 
+    def test_delete_after_reopen(self):
+        # an attribute deleted after the file is reopened should stay deleted
+        filename = self.getFileName("delete_attribute_after_reopen")
+        print("filename:", filename)
+        with h5py.File(filename, 'w') as f:
+            f.attrs['a1'] = 42
+            f.attrs['a2'] = 84
+
+        with h5py.File(filename, 'a') as f:
+            del f.attrs['a1']
+            self.assertNotIn('a1', f.attrs)
+
+        with h5py.File(filename, 'r') as f:
+            self.assertNotIn('a1', f.attrs)
+            self.assertEqual(f.attrs['a2'], 84)
+
 
 class TestTrackOrder(TestCase):
 
