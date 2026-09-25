@@ -619,6 +619,9 @@ class HsdsPlugin(StoragePlugin):
                     if shape_json["class"] == "H5S_SIMPLE":
                         dims = shape_json["dims"]
                         item[key] = dims
+                    elif shape_json["class"] == "H5S_NULL":
+                        # HSDS treats a missing shape as scalar
+                        item[key] = "H5S_NULL"
                     if "maxdims" in shape_json:
                         maxdims = shape_json["maxdims"]
                         item["maxdims"] = maxdims

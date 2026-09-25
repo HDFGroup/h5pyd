@@ -260,6 +260,24 @@ class TestCreateData(BaseDataset):
         self.f.create_dataset('foo', data=h5py.Empty(dtype='f'))
         self.assertTrue(is_empty_dataspace(self.f['foo'].id))
 
+    def test_empty_create_persisted(self):
+        """ null space datasets stay null (not scalar) after a reopen """
+        filename = self.f.filename
+        self.f.create_dataset('via_none', dtype='f')
+        self.f.create_dataset('via_empty', data=h5py.Empty(dtype='?'))
+        self.f.create_dataset('scalar', data=np.float32(1.0))
+        self.f.close()
+
+        # reopen and verify against server-persisted data, not just
+        # whatever may be cached client side
+        self.f = File(filename, "r")
+        for name in ('via_none', 'via_empty'):
+            dset = self.f[name]
+            self.assertTrue(is_empty_dataspace(dset.id), name)
+            self.assertIsNone(dset.shape, name)
+        self.assertEqual(self.f['scalar'].shape, ())
+        self.assertFalse(is_empty_dataspace(self.f['scalar'].id))
+
     def test_create_incompatible_data(self):
         # Shape tuple is incompatible with data
         with self.assertRaises(ValueError):
