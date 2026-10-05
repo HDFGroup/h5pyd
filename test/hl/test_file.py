@@ -22,6 +22,7 @@ from common import ut, TestCase
 from copy import copy
 import time
 import logging
+from unittest.mock import patch
 
 
 class TestFile(TestCase):
@@ -33,6 +34,28 @@ class TestFile(TestCase):
         self.assertTrue(n >= 1)
         m = version[(n + 1):].find('.')
         self.assertTrue(m >= 1)
+
+    def test_file_does_not_change_root_logger(self):
+        if h5py.__name__ != "h5pyd":
+            return
+
+        root_logger = logging.getLogger()
+        original_level = root_logger.level
+        root_logger.setLevel(logging.INFO)
+
+        try:
+            with patch.object(
+                h5py.File,
+                '_init_db',
+                side_effect=RuntimeError("stop")
+            ):
+                with self.assertRaises(RuntimeError):
+                    h5py.File("/test-domain")
+
+            self.assertEqual(root_logger.level, logging.INFO)
+        finally:
+            root_logger.setLevel(original_level)
+
 
     def test_serverinfo(self):
         if h5py.__name__ == "h5pyd":
