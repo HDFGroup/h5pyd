@@ -30,10 +30,10 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -50,7 +50,7 @@ jobs:
           flake8 . --count --max-complexity=10 --max-line-length=127 --statistics # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
 
       - name: Checkout HSDS 
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: HDFGroup/hsds
           path: ${{github.workspace}}/hsds
