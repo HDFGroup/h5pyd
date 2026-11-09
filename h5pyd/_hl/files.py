@@ -518,9 +518,12 @@ class File(Group):
             Timeout value in seconds
         """
 
-        self.log = logging.getLogger()
-
-        self.log.setLevel(logging.ERROR)
+        if logger is None:
+            self.log = logging.getLogger("h5pyd")
+        elif isinstance(logger, str):
+            self.log = logging.getLogger(logger)
+        else:
+            self.log = logger
 
         # if we're passed a GroupId as domain, just initialize the file object
         # with that.  This will be faster and enable the File object to share the same http connection.
