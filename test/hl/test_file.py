@@ -56,7 +56,6 @@ class TestFile(TestCase):
         finally:
             root_logger.setLevel(original_level)
 
-
     def test_serverinfo(self):
         if h5py.__name__ == "h5pyd":
             info = h5py.getServerInfo()
