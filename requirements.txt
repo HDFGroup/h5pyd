@@ -14,4 +14,4 @@ requests==2.34.2
 requests-unixsocket==0.4.1
 rpds-py==2026.6.3
 typing_extensions==4.16.0
-urllib3==2.7.0
+urllib3==2.8.0
