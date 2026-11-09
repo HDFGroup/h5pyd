@@ -1,8 +1,10 @@
 name: Release
 
-# Cuts a release from a pushed tag: builds the distributions, attaches them to
-# a GitHub release whose notes are generated from the commits/PRs since the
-# previous release, and uploads them to PyPI (https://pypi.org/project/h5pyd/).
+# Cuts a release when dispatched by hand from master: reads the version from
+# pyproject.toml, builds the distributions, creates the `v<version>` tag,
+# attaches the distributions to a GitHub release whose notes are generated
+# from the commits/PRs since the previous release, and uploads them to PyPI
+# (https://pypi.org/project/h5pyd/).
 #
 # conda-forge is not driven from here. h5pyd-feedstock watches PyPI and opens
 # its own update PR once a new version lands there.
@@ -12,11 +14,12 @@ name: Release
 #      `version` in h5pyd/version.py - the `version` job fails if the two
 #      disagree, since version.py is what h5pyd.__version__ reports at runtime
 #      while pyproject.toml names the wheel.
-#   2. git tag -a v1.0.0 -m "v1.0.0" && git push origin v1.0.0
+#   2. Run this workflow from master with `dry_run` unchecked. It creates and
+#      pushes the `v<version>` tag itself.
 #
-# `workflow_dispatch` runs the validation and build half only (publishes
-# nothing), so the version/tag checks can be rehearsed off a branch before
-# tagging.
+# A dry run (the default) runs the validation and build half only and
+# publishes nothing, so the version checks can be rehearsed from any branch.
+# A real release runs only from master.
 
 on:
   workflow_dispatch:
@@ -42,9 +45,9 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------
-  # Resolve and validate the version before anything is published, so a tag
-  # that disagrees with the source tree fails fast rather than producing a
-  # release that misstates its own version.
+  # Resolve and validate the version before anything is published, so a
+  # version that is malformed or disagrees with h5pyd/version.py fails fast
+  # rather than producing a release that misstates its own version.
   # ---------------------------------------------------------------------
   version:
     name: Resolve version
@@ -63,26 +66,41 @@ jobs:
 
       - name: Determine run mode
         id: mode
-        run: echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
-
-      - name: Read version from SSOT and validate against tag
-        id: ssot
         env:
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          EVENT_NAME: ${{ github.event_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
+
+      # Every later job needs this one, so failing here stops the whole run.
+      - name: Require master for a real release
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$DRY_RUN" != "true" ] && [ "$REF" != "refs/heads/master" ]; then
+            echo "::error::releases run only from master (this run is on ${REF}); use a dry run to test a branch"
+            exit 1
+          fi
+
+      - name: Read and validate version from SSOT
+        id: ssot
         run: python .github/scripts/release_version.py
 
       - name: Summary
+        env:
+          VERSION: ${{ steps.ssot.outputs.version }}
+          TAG: ${{ steps.ssot.outputs.tag }}
+          PRERELEASE: ${{ steps.ssot.outputs.prerelease }}
+          DRY_RUN: ${{ steps.mode.outputs.dry_run }}
         run: |
           {
-            echo "### Release ${{ steps.ssot.outputs.tag }}"
+            echo "### Release ${TAG}"
             echo ""
             echo "| | |"
             echo "|---|---|"
-            echo "| Version | \`${{ steps.ssot.outputs.version }}\` |"
-            echo "| Tag | \`${{ steps.ssot.outputs.tag }}\` |"
-            echo "| Pre-release | \`${{ steps.ssot.outputs.prerelease }}\` |"
-            echo "| Dry run | \`${{ steps.mode.outputs.dry_run }}\` |"
+            echo "| Version | \`${VERSION}\` |"
+            echo "| Tag | \`${TAG}\` |"
+            echo "| Pre-release | \`${PRERELEASE}\` |"
+            echo "| Dry run | \`${DRY_RUN}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ---------------------------------------------------------------------
@@ -268,7 +286,7 @@ jobs:
           path: dist
 
       - name: Publish
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         # Trusted Publishing is configured at
         # https://pypi.org/manage/project/h5pyd/settings/publishing/
         #   owner: HDFGroup   repo: h5pyd
