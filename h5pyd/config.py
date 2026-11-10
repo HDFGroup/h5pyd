@@ -12,6 +12,8 @@
 import os
 import json
 
+from ._credentials import check_config_file_mode, check_cwd_config
+
 
 class Config:
     """
@@ -26,10 +28,12 @@ class Config:
             self._config_file = config_file
         elif os.path.isfile(".hscfg"):
             self._config_file = ".hscfg"
+            check_cwd_config(self._config_file)
         else:
             self._config_file = os.path.expanduser("~/.hscfg")
         # process config file if found
         if os.path.isfile(self._config_file):
+            check_config_file_mode(self._config_file)
             line_number = 0
             with open(self._config_file) as f:
                 for line in f:

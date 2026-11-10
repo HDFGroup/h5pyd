@@ -30,6 +30,9 @@ except ModuleNotFoundError:
 
 
 from . import config as hsconfig
+from ._credentials import check_token_cache_mode, warn_plaintext_credentials, write_private_file
+
+DEFAULT_TIMEOUT = 180  # seconds - for requests to an identity provider
 
 
 class OpenIDHandler(ABC):
@@ -56,6 +59,7 @@ class OpenIDHandler(ABC):
                 file_key = username + '@' + endpoint
             else:
                 file_key = endpoint
+            check_token_cache_mode(self._token_cache_file)
             with open(self._token_cache_file, 'r') as token_file:
                 self._token = json.load(token_file).get(file_key, None)
 
@@ -106,27 +110,24 @@ class OpenIDHandler(ABC):
         else:
             file_key = self._endpoint
 
-        # Create a new cache file.
-        if not cache_exists and self._token is not None:
-            with open(self._token_cache_file, 'w') as token_file:
-                json.dump({file_key: self._token}, token_file)
-
-        # Update an exisiting cache file.
-        elif cache_exists:
-            with open(self._token_cache_file, 'r+') as token_file:
+        # The cache holds bearer tokens: it's written readable by the owner only, and
+        # an existing cache is set to that mode when it's rewritten.
+        if not cache_exists:
+            if self._token is None:
+                return
+            cache = {}
+        else:
+            with open(self._token_cache_file, 'r') as token_file:
                 cache = json.loads(token_file.read())
 
-                # Store valid tokens.
-                if self._token is not None:
-                    cache[file_key] = self._token
+        if self._token is not None:
+            # Store valid tokens.
+            cache[file_key] = self._token
+        elif file_key in cache:
+            # Delete invalid tokens.
+            del cache[file_key]
 
-                # Delete invalid tokens.
-                elif file_key in cache:
-                    del cache[file_key]
-
-                token_file.seek(0)
-                token_file.truncate(0)
-                json.dump(cache, token_file)
+        write_private_file(self._token_cache_file, json.dumps(cache))
 
 
 class AzureOpenID(OpenIDHandler):
@@ -180,7 +181,7 @@ class AzureOpenID(OpenIDHandler):
         authority_uri = self.AUTHORITY_URI + '/' + tenant_id
 
         # Try to get a token using different oauth flows.
-        context = adal.AuthenticationContext(authority_uri, enable_pii=True, api_version=None)
+        context = adal.AuthenticationContext(authority_uri, enable_pii=False, api_version=None)
 
         try:
             if client_secret is not None:
@@ -342,11 +343,13 @@ class GoogleOpenID(OpenIDHandler):
 
 class KeycloakOpenID(OpenIDHandler):
 
-    def __init__(self, endpoint, config=None, scopes=None, username=None, password=None):
+    def __init__(self, endpoint, config=None, scopes=None, username=None, password=None,
+                 timeout=DEFAULT_TIMEOUT):
         """Store configuration."""
 
         # Configuration manager
         hs_config = hsconfig.get_config()
+        self._timeout = timeout
 
         if scopes is None:
             scopes = hs_config.get('hs_keycloak_scopes', 'openid').split()
@@ -422,7 +425,8 @@ class KeycloakOpenID(OpenIDHandler):
         body["password"] = self._password
         body["grant_type"] = "password"
         body["client_id"] = self.config.get("keycloak_client_id")
-        rsp = requests.post(keycloak_url, data=body, headers=headers)
+        warn_plaintext_credentials(keycloak_url, what="the Keycloak password")
+        rsp = requests.post(keycloak_url, data=body, headers=headers, timeout=self._timeout)
 
         if rsp.status_code not in (200, 201):
             print(f"POST error: {rsp.status_code}")

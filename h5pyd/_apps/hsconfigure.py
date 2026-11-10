@@ -1,8 +1,10 @@
 import os
 import json
 import sys
+import getpass
 
 import h5pyd
+from h5pyd._credentials import write_private_file
 if __name__ == "__main__":
     from config import Config
 else:
@@ -21,6 +23,24 @@ def get_input(prompt):
     return result
 
 
+def get_secret(prompt):
+    """ read a secret without echoing it when stdin is a terminal """
+    try:
+        interactive = sys.stdin.isatty()
+    except (AttributeError, ValueError):
+        interactive = False
+    if interactive:
+        return getpass.getpass(prompt)
+    return get_input(prompt)
+
+
+def masked(value):
+    """ how a secret is shown as a default """
+    if not value or value == "None":
+        return "None"
+    return "****"
+
+
 #
 # Save configuration file
 #
@@ -28,24 +48,13 @@ def saveConfig(username, password, endpoint, api_key):
 
     filepath = os.path.expanduser('~/.hscfg')
     print(f"Saving config file to: {filepath}")
-    with open(filepath, 'w') as file:
-        file.write("# HDFCloud configuration file\n")
-        if endpoint:
-            file.write(f"hs_endpoint = {endpoint}\n")
-        else:
-            file.write("hs_endpoint = \n")
-        if username:
-            file.write(f"hs_username = {username}\n")
-        else:
-            file.write("hs_username = \n")
-        if password:
-            file.write(f"hs_password = {password}\n")
-        else:
-            file.write("hs_password = \n")
-        if api_key:
-            file.write(f"hs_api_key = {api_key}\n")
-        else:
-            file.write("hs_api_key = \n")
+    lines = ["# HDFCloud configuration file"]
+    lines.append(f"hs_endpoint = {endpoint if endpoint else ''}")
+    lines.append(f"hs_username = {username if username else ''}")
+    lines.append(f"hs_password = {password if password else ''}")
+    lines.append(f"hs_api_key = {api_key if api_key else ''}")
+    # the file holds the password - create it readable by the owner only
+    write_private_file(filepath, "\n".join(lines) + "\n")
 
 
 #
@@ -89,6 +98,8 @@ def pingServer(username, password, endpoint, api_key):
 #
 def main():
     cfg = Config()
+    if cfg.config_file:
+        print(f"Using config file: {os.path.abspath(cfg.config_file)}")
 
     hs_endpoint = cfg["hs_endpoint"]
     if not hs_endpoint:
@@ -121,15 +132,15 @@ def main():
             hs_username = new_username
             dirty = True
 
-        new_password = get_input(f"Password [{hs_password}]: ")
+        new_password = get_secret(f"Password [{masked(hs_password)}]: ")
         if new_password:
-            print(f"Updated password: [{new_password}]")
+            print("Updated password")
             hs_password = new_password
             dirty = True
 
-        new_api_key = get_input(f"API Key [{hs_api_key}]: ")
+        new_api_key = get_secret(f"API Key [{masked(hs_api_key)}]: ")
         if new_api_key:
-            print(f"Updated api key: [{new_api_key}]")
+            print("Updated api key")
             hs_api_key = new_api_key
             dirty = True
         if hs_api_key and hs_api_key.lower() == "none":

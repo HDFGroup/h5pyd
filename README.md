@@ -184,6 +184,25 @@ Several utility applications are included with this package:
 
 Use the ``--help`` option to get usage information for each command.
 
+Credentials
+-----------
+
+``hsconfigure`` saves your password in ``~/.hscfg``, readable only by you. If you write
+``~/.hscfg`` by hand, run ``chmod 600 ~/.hscfg``. h5pyd warns when a config file that holds a
+password or API key can be read by other users.
+
+A password given with ``-p`` is visible to other users in the process list. Set
+``HS_PASSWORD`` instead, or use ``--password-stdin`` to read it from standard input. If you
+give ``-u`` with no password from any source, the tools prompt for one when run in a terminal.
+
+h5pyd warns when it's about to send a password or API key over plain ``http`` to another
+machine. Use an ``https`` endpoint. If the network is trusted (for example, a Kubernetes
+cluster-internal address), set ``H5PYD_ALLOW_HTTP_AUTH=1`` to turn the warning off.
+
+h5pyd also warns when credentials from ``~/.hscfg`` or the environment are sent to an endpoint
+other than the configured ``hs_endpoint``. Pass a username and password for that endpoint to
+avoid it.
+
 Testing
 -------
 

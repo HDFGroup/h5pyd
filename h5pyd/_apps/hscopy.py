@@ -13,6 +13,7 @@
 import sys
 import logging
 import h5pyd
+from h5pyd._credentials import warn_endpoint_mismatch
 
 if __name__ == "__main__":
     from config import Config
@@ -66,6 +67,9 @@ def getFile(domain):
     bucket = cfg["src_bucket"]
     if not bucket:
         bucket = cfg["hs_bucket"]
+    if cfg["src_endpoint"] and not cfg["src_password"] and password:
+        # the shared password goes to this side's own endpoint
+        warn_endpoint_mismatch(endpoint, cfg["hs_endpoint"])
 
     fh = h5pyd.File(domain,
                     mode='r',
@@ -91,6 +95,9 @@ def createFile(domain, linked_domain=None, no_clobber=False):
     bucket = cfg["des_bucket"]
     if not bucket:
         bucket = cfg["hs_bucket"]
+    if cfg["des_endpoint"] and not cfg["des_password"] and password:
+        # the shared password goes to this side's own endpoint
+        warn_endpoint_mismatch(endpoint, cfg["hs_endpoint"])
     if cfg["no_clobber"]:
         mode = "x"
     else:
