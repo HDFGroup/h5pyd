@@ -19,14 +19,18 @@ import base64
 
 import requests
 import requests_unixsocket
-from requests import ConnectionError
+from requests import ConnectionError, RequestException
 from requests.adapters import HTTPAdapter, Retry
 import json
 import logging
 
 from . import openid
 from .config import get_config
-from ._credentials import redact, warn_plaintext_credentials, warn_endpoint_mismatch
+from ._credentials import redact, warn_plaintext_credentials, warn_endpoint_mismatch, RedactingFilter
+
+# urllib3 logs each request URL, which carries a string api_key as a query parameter - at
+# DEBUG for every request, and at WARNING for each retry
+logging.getLogger("urllib3.connectionpool").addFilter(RedactingFilter())
 
 
 def eprint(*args, **kwargs):
@@ -289,11 +293,11 @@ class HttpConn:
         def is_set(value):
             return bool(value) and not (isinstance(value, str) and value.upper() == "NONE")
 
-        creds_from_config = False  # True if any credential comes from the config or environment
+        # True if a secret (password or API key) comes from the config or environment
+        creds_from_config = False
         if not username:
             if "hs_username" in cfg:
                 username = cfg["hs_username"]
-                creds_from_config |= is_set(username)
 
         if not password:
             if "hs_password" in cfg:
@@ -488,8 +492,7 @@ class HttpConn:
 
         headers = self.getHeaders(headers=headers)
 
-        if params is None:
-            params = {}
+        params = dict(params) if params else {}  # don't add api_key to the caller's dict
         if "domain" not in params:
             params["domain"] = self._domain
         if "bucket" not in params and self._bucket:
@@ -546,8 +549,7 @@ class HttpConn:
 
         if params:
             self.log.info(f"PUT params: {redact(params)}")
-        else:
-            params = {}
+        params = dict(params) if params else {}  # don't add api_key to the caller's dict
 
         if "domain" not in params:
             params["domain"] = self._domain
@@ -590,6 +592,10 @@ class HttpConn:
         except ConnectionError as ce:
             self.log.error(f"connection error: {redact(ce)}")
             raise IOError("Connection Error")
+        except RequestException as rqe:
+            # e.g. RetryError once 5xx retries run out - its message holds the request URL
+            self.log.error(f"PUT {req} failed: {redact(rqe)}")
+            raise IOError(redact(rqe))
 
         if rsp.status_code == 201 and req == "/":
             self.log.info("clearing domain_json cache")
@@ -608,8 +614,7 @@ class HttpConn:
         if not self._s:
             raise IOError("http session is closed")
 
-        if params is None:
-            params = {}
+        params = dict(params) if params else {}  # don't add api_key to the caller's dict
         if "domain" not in params:
             params["domain"] = self._domain
         if "bucket" not in params and self._bucket:
@@ -659,7 +664,7 @@ class HttpConn:
             )
             elapsed = time.time() - ts
             self.log.info(f"status: POST {rsp.status_code}, elapsed: {elapsed:.4f}")
-        except ConnectionError as ce:
+        except RequestException as ce:
             self.log.warning(f"connection error: {redact(ce)}")
             raise IOError(redact(ce))
 
@@ -676,8 +681,7 @@ class HttpConn:
 
         if req not in ("/domains", "/") and self._domain is None:
             raise IOError("no domain defined")
-        if params is None:
-            params = {}
+        params = dict(params) if params else {}  # don't add api_key to the caller's dict
         if "domain" not in params:
             params["domain"] = self._domain
         if "bucket" not in params and self._bucket:
@@ -708,6 +712,10 @@ class HttpConn:
         except ConnectionError as ce:
             self.log.error(f"connection error: {redact(ce)}")
             raise IOError("Connection Error")
+        except RequestException as rqe:
+            # e.g. RetryError once 5xx retries run out - its message holds the request URL
+            self.log.error(f"DELETE {req} failed: {redact(rqe)}")
+            raise IOError(redact(rqe))
 
         if rsp.status_code == 200 and req == "/":
             self.log.info("clearing domain_json cache")

@@ -56,17 +56,19 @@ def write_private_file(path, text):
     """ Write text to path, readable and writable only by the owner (on POSIX).
 
     A new file is created with mode 0600, and an existing file is set to 0600 before it is
-    written, so the secret is never in a file that others can read. """
+    written, so the secret is never in a file that others can read.  If the mode can't be set
+    (the file belongs to another user), raises PermissionError and leaves the file as it was. """
     if os.name != "posix":
         with open(path, "w") as f:
             f.write(text)
         return
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    try:
-        os.fchmod(fd, 0o600)
-    except OSError as e:
-        log.warning(f"unable to set mode 0600 on {path}: {e}")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0o600)
     with os.fdopen(fd, "w") as f:
+        try:
+            os.fchmod(fd, 0o600)
+        except OSError as e:
+            raise PermissionError(f"not writing secrets to {path}: unable to make it private ({e})")
+        f.truncate(0)
         f.write(text)
 
 
@@ -220,12 +222,26 @@ def warn_endpoint_mismatch(endpoint, configured_endpoint):
 # ----------------------------------------------------------------------------
 
 _API_KEY_RE = re.compile(r"(api_key=)[^&\s'\"]*")
+_API_KEY_REPR_RE = re.compile(r"""(['"]api_key['"]\s*:\s*)(['"]).*?\2""")  # in a dict's repr
 _USERINFO_RE = re.compile(r"(\w[\w+.-]*://)[^/@\s'\"]+@")
+
+
+class RedactingFilter(logging.Filter):
+    """ Redacts api_key values and URL userinfo in log records - for other libraries' loggers,
+    such as urllib3's, which log the request URL """
+
+    def filter(self, record):
+        msg = record.getMessage()
+        if "api_key" in msg or "@" in msg:
+            record.msg = redact(msg)
+            record.args = ()
+        return True
 
 
 def redact(text):
     """ return text with api_key query values and URL userinfo replaced by *** """
     text = str(text)
     text = _API_KEY_RE.sub(r"\1***", text)
+    text = _API_KEY_REPR_RE.sub(r"\1\2***\2", text)
     text = _USERINFO_RE.sub(r"\1***@", text)
     return text

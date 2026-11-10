@@ -16,7 +16,10 @@ import json
 import logging
 import getpass
 
-from h5pyd._credentials import check_config_file_mode, check_cwd_config
+from h5pyd._credentials import check_config_file_mode, check_cwd_config, warn_endpoint_mismatch
+
+# options that can only be set on the command line, never from an environment variable
+FLAG_ONLY_OPTIONS = ("password_stdin",)
 
 default_cfg = {
     "hs_endpoint": {
@@ -196,6 +199,8 @@ class Config:
                     self._values[k] = v
         # override any config values with environment variable if found
         for k in self._names:
+            if k in FLAG_ONLY_OPTIONS:
+                continue
             if k.upper() in os.environ:
                 v = os.environ[k.upper()]
                 if name in self._choices:
@@ -323,6 +328,7 @@ class Config:
         """
         options = []
         user_flag_given = False
+        before_flags = dict(self._values)  # values from the config file and environment
         argn = 0
         while argn < len(args):
             arg = args[argn]
@@ -361,7 +367,22 @@ class Config:
                         user_flag_given = True
                     argn += 2
         self._resolve_password(user_flag_given)
+        self._check_endpoint_credentials(before_flags)
         return options
+
+    def _check_endpoint_credentials(self, before_flags):
+        """ warn when -e names an endpoint other than the configured one and the password or
+        API key it will be sent with came from the config file or environment """
+        endpoint = self._values.get("hs_endpoint")
+        configured = before_flags.get("hs_endpoint")
+        if not endpoint or endpoint == configured:
+            return
+        if self._has_value("hs_api_key") and self._values["hs_api_key"] != before_flags.get("hs_api_key"):
+            return  # an API key given on the command line is used instead of the password
+        for name in ("hs_password", "hs_api_key"):
+            if self._has_value(name) and self._values.get(name) == before_flags.get(name):
+                warn_endpoint_mismatch(endpoint, configured)
+                return
 
     @property
     def config_file(self):

@@ -52,7 +52,8 @@ class TestRedact(unittest.TestCase):
         self.assertEqual(redact("http://user:pw@host:5101/about"), "http://***@host:5101/about")
         self.assertEqual(redact("https://user@host/about"), "https://***@host/about")
         self.assertEqual(redact("user@domain.org owns /home/x"), "user@domain.org owns /home/x")
-        self.assertEqual(redact({"api_key": "x"}), "{'api_key': 'x'}")  # only query strings are matched
+        self.assertEqual(redact({"domain": "/d", "api_key": "x"}), "{'domain': '/d', 'api_key': '***'}")
+        self.assertEqual(redact('{"api_key": "x"}'), '{"api_key": "***"}')
 
     def _failing_requests(self, conn):
         """ run each request against a closed port, returning the exception messages """
@@ -111,6 +112,57 @@ class TestRedact(unittest.TestCase):
                 conn.close()
         sent = [r[2].get("api_key") for r in srv.requests]
         self.assertEqual(sent, [SECRET, SECRET, None, None, None, None])
+
+
+class TestRedactRequests(unittest.TestCase):
+    """ redaction in places that don't go through a connection error """
+
+    def _serve(self, status):
+        return StubServer(lambda method, path, params, body: (status, {}))
+
+    def test_params_dict_not_logged_or_modified(self):
+        # a caller's params dict is reused across requests, as HsdsPlugin.open() does
+        with scratch_home(), self._serve(200) as srv:
+            conn = HttpConn("/home/u/x.h5", endpoint=srv.endpoint, api_key=SECRET, retries=0)
+            conn.open()
+            params = {"getobjs": 1}
+            with self.assertLogs("h5pyd", level="DEBUG") as logs:
+                conn.GET("/", params=params)
+                conn.DELETE("/", params=params)
+                conn.PUT("/", params=params, body={})
+                conn.POST("/groups", params=params, body={})
+            conn.close()
+        self.assertEqual(params, {"getobjs": 1})
+        self.assertNotIn(SECRET, "\n".join(logs.output))
+        self.assertEqual([r[2].get("api_key") for r in srv.requests], [SECRET] * 4)
+
+    def test_retries_exhausted(self):
+        # once 5xx retries run out, requests raises RetryError, whose message has the URL
+        with scratch_home(), self._serve(503) as srv:
+            conn = HttpConn("/home/u/x.h5", endpoint=srv.endpoint, api_key=SECRET, retries=1)
+            conn.open()
+            messages = []
+            for call in (lambda: conn.PUT("/", body={}), lambda: conn.DELETE("/")):
+                with self.assertLogs("h5pyd", level="DEBUG") as logs:
+                    with self.assertRaises(IOError) as cm:
+                        call()
+                messages.append(str(cm.exception))
+                messages.extend(logs.output)
+            conn.close()
+        text = "\n".join(messages)
+        self.assertIn("api_key=***", text)
+        self.assertNotIn(SECRET, text)
+
+    def test_urllib3_log_redacted(self):
+        with scratch_home(), self._serve(200) as srv:
+            conn = HttpConn("/home/u/x.h5", endpoint=srv.endpoint, api_key=SECRET, retries=0)
+            conn.open()
+            with self.assertLogs("urllib3", level="DEBUG") as logs:
+                conn.GET("/about")
+            conn.close()
+        text = "\n".join(logs.output)
+        self.assertIn("api_key=***", text)
+        self.assertNotIn(SECRET, text)
 
 
 if __name__ == "__main__":

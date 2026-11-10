@@ -17,6 +17,7 @@ import time
 import logging
 from ..httpconn import HttpConn
 from .. import config
+from .._credentials import warn_endpoint_mismatch
 from .acl_manager import ACLManager
 
 
@@ -149,11 +150,18 @@ class Folder:
         if username is None and "hs_username" in cfg:
             username = cfg["hs_username"]
 
+        secret_from_config = False  # a password or API key taken from the config or environment
         if password is None and "hs_password" in cfg:
             password = cfg["hs_password"]
+            secret_from_config |= bool(password)
 
         if api_key is None and "hs_api_key" in cfg:
             api_key = cfg["hs_api_key"]
+            secret_from_config |= bool(api_key)
+
+        if secret_from_config:
+            # HttpConn can't tell these came from the config, since they're passed explicitly
+            warn_endpoint_mismatch(endpoint, cfg.get("hs_endpoint", None))
 
         if bucket is None and "hs_bucket" in cfg:
             bucket = cfg["hs_bucket"]
