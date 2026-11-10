@@ -13,6 +13,7 @@
 from __future__ import absolute_import
 
 import os.path as op
+import posixpath
 import numpy
 import collections
 from h5json.objid import isValidUuid, getCollectionForId, getHashTagForId
@@ -477,13 +478,17 @@ class Group(HLObject, MutableMappingHDF5):
                 # Note: set use_session to false since file.close won't be called
                 #  (and hence the http conn socket won't be closed)
                 from .files import File
-                external_domain = link_json['file']
+                # earlier HSDS storage formats used h5domain, rather than file
+                external_domain = link_json.get("file") or link_json.get("h5domain")
+                if not external_domain or "h5path" not in link_json:
+                    raise KeyError(f"Unexpected link format: {link_json}")
                 plugin = self.id.db.plugin
 
-                if not external_domain.startswith("hdf5://") and not op.isabs(external_domain):
+                # domains are POSIX paths on every platform
+                if not external_domain.startswith("hdf5://") and not posixpath.isabs(external_domain):
                     current_domain = plugin.filepath
-                    external_domain = op.join(op.dirname(current_domain), external_domain)
-                    external_domain = op.normpath(external_domain)
+                    external_domain = posixpath.join(posixpath.dirname(current_domain), external_domain)
+                    external_domain = posixpath.normpath(external_domain)
                 try:
                     kwargs = {}
                     kwargs["endpoint"] = plugin.http_conn.endpoint
@@ -495,7 +500,7 @@ class Group(HLObject, MutableMappingHDF5):
                     f = File(external_domain, **kwargs)
                 except IOError:
                     # unable to find external link
-                    raise KeyError("Unable to open file: " + link_json['file'])
+                    raise KeyError("Unable to open file: " + external_domain)
                 return f[link_json['h5path']]
             elif link_class == 'H5L_TYPE_USER_DEFINED':
                 raise IOError("Unable to fetch user-defined link")
