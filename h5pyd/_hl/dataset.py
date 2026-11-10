@@ -1242,6 +1242,42 @@ class Dataset(HLObject):
 
         return arr
 
+    def _broadcast_to_selection(self, val, selection, subarray_shape):
+        """ Broadcast val to the shape of selection, following h5py's rules.
+
+        Broadcasting is done on the client, so the server receives a single
+        request with the full selection's data.  If val already has as many
+        elements as the selection, it's returned unchanged and the caller's
+        reshape handles it.
+        """
+        nsub = len(subarray_shape)
+        val_shape = val.shape[:val.ndim - nsub]  # element-level shape
+        target = tuple(selection.mshape)
+
+        if val_shape == target or numpy.prod(val_shape) == numpy.prod(target):
+            return val
+
+        if selection.select_type in (sel.H5S_SEL_FANCY, sel.H5S_SEL_POINTS):
+            raise TypeError("Broadcasting is not supported for complex selections")
+        if val_shape == () and nsub:
+            raise TypeError("Scalar broadcasting is not supported for array dtypes")
+
+        msg = f"Can't broadcast {val_shape} -> {target}"
+        extra = len(val_shape) - len(target)
+        if extra > 0:
+            # leading dims beyond the selection's rank must all be 1
+            if any(n != 1 for n in val_shape[:extra]):
+                raise TypeError(msg)
+            val = val.reshape(val.shape[extra:])
+        try:
+            bcast = numpy.broadcast_to(val, target + subarray_shape)
+        except ValueError:
+            raise TypeError(msg) from None
+        self.log.debug(f"broadcast {val_shape} -> {target} on client")
+        # broadcast_to returns a read-only view that repeats elements
+        # through zero strides - copy it into a regular array
+        return numpy.ascontiguousarray(bcast)
+
     def __setitem__(self, args, val):
         """Write to the HDF5 dataset from a Numpy array.
 
@@ -1438,25 +1474,19 @@ class Dataset(HLObject):
         if selection.nselect == 0:
             return
 
-        # Broadcast scalars if necessary.
-        if mshape == () and selection.mshape is not None and selection.mshape != ():
-            if self.dtype.subdtype is not None:
-                raise TypeError("Scalar broadcasting is not supported for array dtypes")
-            self.log.debug("broadcast scalar on client")
-            val2 = numpy.empty(selection.mshape, dtype=val.dtype)
-            val2[...] = val
-            val = val2
-            mshape = val.shape
-
-        # reshape to same rank as dataset, preserving any trailing array-type
-        # sub-shape - either the whole dataset's own array dtype, or a single
-        # named field's array-type sub-dtype (e.g. a compound field declared
-        # as (float64, (3,)))
+        # trailing array-type sub-shape of each element - either the whole
+        # dataset's own array dtype, or a single named field's array-type
+        # sub-dtype (e.g. a compound field declared as (float64, (3,)))
         subarray_shape = ()
         if len(names) == 1 and self.dtype.fields is not None:
             subarray_shape = self.dtype.fields[names[0]][0].shape
         elif self.dtype.subdtype is not None:
             subarray_shape = self.dtype.subdtype[1]
+
+        if selection.mshape is not None:
+            val = self._broadcast_to_selection(val, selection, subarray_shape)
+
+        # reshape to same rank as dataset, preserving the array-type sub-shape
         val = val.reshape(tuple(selection.tgtshape) + subarray_shape)
         db = self.id.db
 
