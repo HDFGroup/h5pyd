@@ -13,6 +13,7 @@
 import sys
 import logging
 import os.path as op
+import posixpath
 import h5pyd
 
 if __name__ == "__main__":
@@ -174,11 +175,15 @@ def main():
         usage()
 
     if src_domain[-1] == '/':
-        print("folder can not be used for src domain")
+        sys.exit("folder can not be used for src domain")
 
     if des_domain[-1] == '/':
         # add on the filename from source to folder path
         des_domain += op.basename(src_domain)
+
+    if posixpath.normpath(src_domain) == posixpath.normpath(des_domain):
+        # creating the target would replace the source, which is then deleted
+        sys.exit(f"source and target are the same domain: {src_domain}")
 
     logging.info(f"source domain: {src_domain}")
     logging.info(f"target domain: {des_domain}")
@@ -192,7 +197,8 @@ def main():
         logging.error(msg)
         sys.exit(str(oe))
 
-    logging.info(f"src root id: {fin.id.id}")
+    src_root_id = fin.id.id
+    logging.info(f"src root id: {src_root_id}")
     fin.close()
 
     # create a new file using the src domain for the root group
@@ -204,8 +210,16 @@ def main():
         logging.error(msg)
         sys.exit(str(oe))
 
+    des_root_id = fout.id.id
+    fout.close()
+    logging.info(f"des root id: {des_root_id}")
+    if des_root_id != src_root_id:
+        # the target doesn't share the source's root - deleting the source would lose its data
+        msg = f"Error: {des_domain} was not created from {src_domain}, source domain not removed"
+        logging.error(msg)
+        sys.exit(msg)
+
     cfg.print(f"{src_domain} copied to {des_domain}")
-    logging.info(f"des root id: {fout.id.id}")
 
     try:
         deleteDomain(src_domain, keep_root=True)

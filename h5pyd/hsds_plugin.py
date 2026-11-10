@@ -112,8 +112,9 @@ class HsdsPlugin(StoragePlugin):
         self._root_id = None
         self._last_flush_time = 0
         # True until the first flush() completes - matches H5pyPlugin's convention: a
-        # read_only or append plugin never needs to force a full initial write
-        self._init = False if (append or read_only) else True
+        # read_only or append plugin never needs to force a full initial write.  Neither does
+        # a domain created from a linked domain: its objects already exist on the server.
+        self._init = False if (append or read_only or linked_domain) else True
         self._stats = {"created": 0, "lastModified": 0, "owner": ""}
         self._acl_mgr = ACLManager(self._get_acl_http_conn, log=self.log)
 

@@ -350,6 +350,8 @@ class File(Group):
                  getobjs=True,
                  retries=10,
                  timeout=180,
+                 owner=None,
+                 linked_domain=None,
                  **kwds,
                  ):
         # initialize h5db using domain path
@@ -421,6 +423,10 @@ class File(Group):
             kwargs["timeout"] = timeout
         if track_order:
             kwargs["track_order"] = track_order
+        if owner:
+            kwargs["owner"] = owner
+        if linked_domain:
+            kwargs["linked_domain"] = linked_domain
 
         new_domain = False
 
@@ -469,6 +475,7 @@ class File(Group):
         track_order=None,
         retries=10,
         timeout=180,
+        linked_domain=None,
         **kwds,
     ):
         """Create a new file object.
@@ -553,6 +560,8 @@ class File(Group):
                 kwargs["password"] = password
             if owner:
                 kwargs["owner"] = owner
+            if linked_domain:
+                kwargs["linked_domain"] = linked_domain
             if swmr:
                 kwargs["swmr"] = swmr
             if bucket:
