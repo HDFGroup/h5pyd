@@ -98,8 +98,12 @@ def pingServer(username, password, endpoint, api_key):
 #
 def main():
     cfg = Config()
+    home_config = os.path.expanduser("~/.hscfg")
     if cfg.config_file:
-        print(f"Using config file: {os.path.abspath(cfg.config_file)}")
+        config_path = os.path.abspath(cfg.config_file)
+        print(f"Reading settings from: {config_path}")
+        if os.path.realpath(config_path) != os.path.realpath(home_config):
+            print(f"Changes are saved to: {home_config}")
 
     hs_endpoint = cfg["hs_endpoint"]
     if not hs_endpoint:
@@ -153,7 +157,10 @@ def main():
         if dirty:
             update = get_input("Save changes? (Y/N)")
             if update in ("Y", "y"):
-                saveConfig(hs_username, hs_password, hs_endpoint, hs_api_key)
+                try:
+                    saveConfig(hs_username, hs_password, hs_endpoint, hs_api_key)
+                except PermissionError as e:
+                    eprint(f"Config not saved: {e}")
                 break
 
         quit = get_input("Quit? (Y/N)")

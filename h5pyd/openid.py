@@ -3,6 +3,7 @@ import sys
 import json
 import requests
 import time
+import warnings
 from abc import ABC, abstractmethod
 from datetime import datetime
 
@@ -127,7 +128,11 @@ class OpenIDHandler(ABC):
             # Delete invalid tokens.
             del cache[file_key]
 
-        write_private_file(self._token_cache_file, json.dumps(cache))
+        try:
+            write_private_file(self._token_cache_file, json.dumps(cache))
+        except PermissionError as e:
+            # the token still works for this process; it just isn't cached
+            warnings.warn(str(e), UserWarning, stacklevel=2)
 
 
 class AzureOpenID(OpenIDHandler):

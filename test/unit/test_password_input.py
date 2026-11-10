@@ -72,6 +72,14 @@ class TestPasswordInput(unittest.TestCase):
             cfg, _, _ = self._parse(["-u", "bob", "-p", "flag", "/home/bob/x.h5"], FakeStdin(tty=True))
             self.assertEqual(cfg["hs_password"], "flag")
 
+    def test_password_stdin_not_from_environment(self):
+        with scratch_home():
+            os.environ["PASSWORD_STDIN"] = "0"
+            stdin = FakeStdin("not a password\n")
+            cfg, _, _ = self._parse(["-u", "bob", "/home/bob/x.h5"], stdin)
+            self.assertIn(cfg["hs_password"], (None, ""))
+            self.assertEqual(stdin.read(), "not a password\n")  # stdin left alone
+
     def test_no_prompt_without_user_flag_or_with_api_key(self):
         with scratch_home():
             self._parse(["/home/bob/x.h5"], FakeStdin(tty=True))
@@ -118,6 +126,24 @@ class TestHsconfigure(unittest.TestCase):
                 self.assertNotIn("TopSecret1", out)
                 self.assertNotIn("APIKEY99", out)
                 self.assertIn("Password [****]", out)
+
+
+class TestHsconfigureFiles(unittest.TestCase):
+
+    def test_reports_where_changes_go(self):
+        # a ./.hscfg supplies the defaults, but changes are saved to ~/.hscfg
+        with scratch_home() as (home, cwd):
+            with open(os.path.join(cwd, ".hscfg"), "w") as f:
+                f.write("hs_endpoint = https://hsds.example.org\n")
+            stdout = io.StringIO()
+            with mock.patch("sys.stdin", FakeStdin(tty=False)), \
+                    mock.patch.object(hsconfigure, "get_input", side_effect=["", "", "", "", "Y"]), \
+                    mock.patch.object(hsconfigure, "pingServer", return_value=True), \
+                    contextlib.redirect_stdout(stdout):
+                hsconfigure.main()
+        out = stdout.getvalue()
+        self.assertIn("Reading settings from:", out)
+        self.assertIn(f"Changes are saved to: {os.path.join(home, '.hscfg')}", out)
 
 
 if __name__ == "__main__":

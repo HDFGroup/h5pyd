@@ -16,6 +16,7 @@ import os
 import stat
 import unittest
 import warnings
+from unittest import mock
 
 from stubs import scratch_home
 
@@ -82,6 +83,27 @@ class TestSecretFiles(unittest.TestCase):
             handler._token = {"accessToken": "tok2"}
             handler.write_token_cache()
             self.assertEqual(file_mode(path), 0o600)
+
+    def test_unprotectable_file_not_written(self):
+        # a file whose mode can't be set (another user's) is left untouched
+        with scratch_home() as (home, cwd):
+            path = os.path.join(home, ".hscfg")
+            write(path, "hs_endpoint = https://old.example.org\n", 0o644)
+            with mock.patch("os.fchmod", side_effect=PermissionError(1, "Operation not permitted")):
+                with self.assertRaises(PermissionError):
+                    hsconfigure.saveConfig("u", "pw", "https://hsds.example.org", None)
+                with open(path) as f:
+                    self.assertEqual(f.read(), "hs_endpoint = https://old.example.org\n")
+
+                # the token cache skips caching, with a warning, and the token still works
+                cache = os.path.join(home, ".hstokencfg")
+                write(cache, "{}", 0o644)
+                handler = StubOpenID("https://hsds.example.org")
+                msgs = self._warnings(lambda: self.assertEqual(handler.token, "tok"))
+                self.assertEqual(len(msgs), 1, msgs)
+                self.assertIn("not writing secrets", msgs[0])
+                with open(cache) as f:
+                    self.assertEqual(f.read(), "{}")
 
     def test_readable_config_with_secret_warns_once(self):
         with scratch_home() as (home, cwd):

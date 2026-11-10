@@ -21,7 +21,10 @@ from unittest import mock
 
 import requests
 
-from stubs import scratch_home
+from stubs import StubServer, scratch_home
+
+import h5pyd
+from h5pyd._apps.config import Config as AppConfig
 
 from h5pyd import _credentials
 from h5pyd.httpconn import HttpConn
@@ -109,11 +112,11 @@ class TestEndpointMismatch(unittest.TestCase):
     def setUp(self):
         _credentials._reset_warnings()
 
-    def _with_config(self, fn):
+    def _with_config(self, fn, text="hs_endpoint = https://a.example.org\nhs_username = u\nhs_password = pw\n"):
         with scratch_home() as (home, cwd):
             path = os.path.join(home, ".hscfg")
             with open(path, "w") as f:
-                f.write("hs_endpoint = https://a.example.org\nhs_username = u\nhs_password = pw\n")
+                f.write(text)
             os.chmod(path, 0o600)
             return caught_warnings(fn)
 
@@ -132,6 +135,56 @@ class TestEndpointMismatch(unittest.TestCase):
     def test_explicit_credentials_no_warning(self):
         msgs = self._with_config(lambda: HttpConn("/home/u/x.h5", endpoint="https://b.example.org",
                                                   username="v", password="other"))
+        self.assertEqual(msgs, [])
+
+
+class TestEndpointMismatchCallers(unittest.TestCase):
+    """ callers that read the config themselves and pass the credentials on """
+
+    CONFIG = "hs_endpoint = https://a.example.org\nhs_username = u\nhs_password = pw\n"
+
+    def setUp(self):
+        _credentials._reset_warnings()
+
+    def _with_config(self, fn, text=CONFIG):
+        with scratch_home() as (home, cwd):
+            path = os.path.join(home, ".hscfg")
+            with open(path, "w") as f:
+                f.write(text)
+            os.chmod(path, 0o600)
+            return caught_warnings(fn)
+
+    def test_folder(self):
+        def handler(method, path, params, body):
+            return 200, {"class": "folder", "owner": "u"} if path == "/" else {}
+
+        def open_folder(**kwargs):
+            with StubServer(handler) as srv:
+                h5pyd.Folder("/home/u/", endpoint=srv.endpoint, retries=0, **kwargs).close()
+
+        msgs = self._with_config(open_folder)
+        self.assertEqual(len(msgs), 1, msgs)
+        self.assertIn("https://a.example.org", msgs[0])
+        _credentials._reset_warnings()
+        self.assertEqual(self._with_config(lambda: open_folder(username="v", password="x")), [])
+
+    def test_app_endpoint_flag(self):
+        def parse(*args):
+            return lambda: AppConfig().set_cmd_flags(list(args) + ["/home/u/x.h5"])
+
+        msgs = self._with_config(parse("-e", "https://b.example.org"))
+        self.assertEqual(len(msgs), 1, msgs)
+        self.assertIn("https://b.example.org", msgs[0])
+        for args in (("-e", "https://a.example.org"), (),
+                     ("-e", "https://b.example.org", "-u", "v", "-p", "x"),
+                     ("-e", "https://b.example.org", "--api_key", "KEY")):
+            _credentials._reset_warnings()
+            self.assertEqual(self._with_config(parse(*args)), [], args)
+
+    def test_config_username_alone_isnt_a_secret(self):
+        msgs = self._with_config(lambda: HttpConn("/home/u/x.h5", endpoint="https://b.example.org",
+                                                  api_key="EXPLICIT"),
+                                 text="hs_endpoint = https://a.example.org\nhs_username = u\n")
         self.assertEqual(msgs, [])
 
 
