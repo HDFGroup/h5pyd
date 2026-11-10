@@ -344,6 +344,9 @@ class Folder:
             raise IOError(400, "folder is not open")
         if self._http_conn.mode == "r":
             raise IOError(400, "folder is open as read-onnly")
+        if not isinstance(name, str) or any(seg in ("", ".", "..") for seg in name.split("/")):
+            # a name is relative to this folder - ".." and empty segments would reach outside it
+            raise ValueError(f"invalid name: {name!r}")
         if self._domain:
             domain = self._domain + "/" + name
         else:
