@@ -10,6 +10,7 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 import os
+import re
 import sys
 import json
 import logging
@@ -107,6 +108,21 @@ default_cfg = {
         "help": "don't exit on error"
     }
 }
+
+_CONTROL_CHARS = re.compile("[\x00-\x1f\x7f-\x9f]")
+_CONTROL_CHARS_MULTILINE = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f]")  # keeps \t and \n
+
+
+def safe_str(value, multiline=False):
+    """ str(value) with C0, C1 and DEL control characters replaced by \\xNN.
+
+    Use for names and values that come from a server before printing them, so they can't
+    move the cursor, rewrite the title, set the clipboard or otherwise drive the terminal.
+    With multiline=True, tab and newline are kept: for values such as multi-line string
+    attributes and numpy reprs that wrap.  Names should always be fully escaped. """
+    pattern = _CONTROL_CHARS_MULTILINE if multiline else _CONTROL_CHARS
+    return pattern.sub(lambda m: f"\\x{ord(m.group()):02x}", str(value))
+
 
 hscmds = ("hsinfo", "hsconfigure", "hsls", "hstouch", "hsload", "hsget", "hsacl", "hsrm", "hsdiff")
 

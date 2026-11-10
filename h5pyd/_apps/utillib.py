@@ -10,6 +10,9 @@
 # request a copy from help@hdfgroup.org.                                     #
 ##############################################################################
 
+import ntpath
+import os
+import posixpath
 import sys
 import logging
 
@@ -1447,12 +1450,50 @@ def create_dataset(dobj, ctx):
 
 
 # ----------------------------------------------------------------------------------
+def get_external_sources(dset):
+    """ Return a description of each file, other than its own, that an h5py dataset's
+    values are read from: external raw data storage and virtual dataset sources. """
+    if not is_h5py(dset):
+        return []
+    sources = []
+    for name, _offset, _size in dset.external or ():
+        sources.append(f"external file {os.fsdecode(name)!r}")
+    if dset.is_virtual:
+        # Every source counts, including ones in this file ("."): such a source can itself
+        # be external storage or a virtual dataset, or be reached through an external link,
+        # and following those chains reliably isn't worth the risk of missing one.
+        for vds in dset.virtual_sources():
+            where = "this file" if vds.file_name == "." else repr(vds.file_name)
+            sources.append(f"virtual source in {where}, dataset {vds.dset_name!r}")
+    return list(dict.fromkeys(sources))  # drop repeats, keep order
+
+
+def leaves_directory(filename):
+    """ True if a link target names a file outside the directory of the file holding the link:
+    an absolute path (POSIX or Windows, including drive-relative and UNC), or one with "..".
+    Checked the same on every platform, since HDF5 on Windows also accepts "/" paths. """
+    drive, _ = ntpath.splitdrive(filename)
+    name = filename.replace("\\", "/")
+    return bool(drive) or os.path.isabs(filename) or posixpath.isabs(name) or ".." in name.split("/")
+
+
 def write_dataset(src, tgt, ctx):
     """write values from src dataset to target dataset."""
     msg = f"write_dataset src: {src.name} to tgt: {tgt.name}, shape: {src.shape}, type: {src.dtype}"
     logging.info(msg)
     if ctx["verbose"]:
         print(msg)
+
+    # Values stored in other files are read from wherever the input file says they are.
+    # Always say which files those are, since the input file may not be trusted.
+    sources = get_external_sources(src)
+    for source in sources:
+        sys.stderr.write(f"dataset {src.name!r}: values are read from {source}\n")
+    # with --no-external-sources, the target is still resized for append/extend below, so it
+    # stays in step with the other datasets, but no values are read or written
+    skip_values = bool(sources) and ctx.get("no_external_sources")
+    if skip_values:
+        sys.stderr.write(f"dataset {src.name!r}: values not copied (--no-external-sources)\n")
     if src.shape is None:
         # null space dataset
         msg = f"no data for null space dataset: {src.name}"
@@ -1462,6 +1503,8 @@ def write_dataset(src, tgt, ctx):
         return  # no data
 
     if len(src.shape) == 0:
+        if skip_values:
+            return
         # scalar dataset
         x = src[()]
         msg = f"writing for scalar dataset: {src.name}"
@@ -1529,6 +1572,9 @@ def write_dataset(src, tgt, ctx):
         if ctx["verbose"]:
             print(msg)
         resize_dataset(tgt, new_extent, axis=0)
+
+    if skip_values:
+        return
 
     if not is_h5py(tgt) and get_chunk_layout_class(tgt) != "H5D_CHUNKED":
         # this is one of the ref layouts
@@ -1669,6 +1715,11 @@ def create_links(gsrc, gdes, ctx):
                 print(msg)
             logging.info(msg)
             if is_h5py(gdes):
+                # the link is written into a local file - say if it points outside the
+                # directory that file is in, since the source domain chose the filename
+                filename = lnk.filename
+                if leaves_directory(filename):
+                    sys.stderr.write(f"link {title!r} in {gdes.name!r}: external link to {filename!r}\n")
                 ext_link = h5py.ExternalLink(lnk.filename, lnk.path)
             else:
                 ext_link = h5pyd.ExternalLink(lnk.filename, lnk.path)
@@ -1804,6 +1855,7 @@ def load_file(
     extend_dim=None,
     extend_offset=0,
     ignore_error=False,
+    no_external_sources=False,
 ):
 
     logging.info(f"input file: {fin.filename}")
@@ -1839,6 +1891,7 @@ def load_file(
     ctx["extend_offset"] = extend_offset
     ctx["srcid_desobj_map"] = {}
     ctx["ignore_error"] = ignore_error
+    ctx["no_external_sources"] = no_external_sources
 
     def copy_attribute_helper(name, obj):
         logging.info(f"copy attribute - name: {name}  obj: {obj.name}")

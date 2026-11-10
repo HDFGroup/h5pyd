@@ -14,9 +14,9 @@ import sys
 import logging
 import h5pyd
 if __name__ == "__main__":
-    from config import Config
+    from config import Config, safe_str
 else:
-    from .config import Config
+    from .config import Config, safe_str
 
 
 def eprint(*args, **kwargs):
@@ -54,7 +54,7 @@ def getACL(f, username="default"):
         elif ioe.errno == 404 or not ioe.errno:
             return None
         else:
-            eprint(f"unexpected error: {ioe}")
+            eprint(f"unexpected error: {safe_str(ioe)}")
             sys.exit(1)
     if acl and "domain" in acl:
         # remove the domain key
@@ -195,7 +195,7 @@ def main():
         elif ioe.errno in (401, 403):
             abort("access is not authorized")
         else:
-            abort(f"Unexpected error: {ioe}")
+            abort(f"Unexpected error: {safe_str(ioe)}")
 
     # update/add ACL if permission flags have been set
     if perm:
@@ -232,7 +232,7 @@ def main():
                 if ioe.errno in (401, 403):
                     abort("access is not authorized")
                 else:
-                    abort("Unexpected error:", ioe)
+                    abort(f"Unexpected error: {safe_str(ioe)}")
     #
     # read the acls
     #
@@ -247,11 +247,11 @@ def main():
             elif ioe.errno == 401:
                 abort("username/password needs to be provided")
             else:
-                abort(f"Unexpected error: {ioe}")
+                abort(f"Unexpected error: {safe_str(ioe)}")
         print("%015s   %08s  %08s  %08s  %08s  %08s  %08s " % fields)
         print("-" * 80)
         for acl in acls:
-            vals = (acl["userName"], acl["create"], acl["read"],
+            vals = (safe_str(acl["userName"]), acl["create"], acl["read"],
                     acl["update"], acl["delete"], acl["readACL"], acl["updateACL"])
             print("%015s   %08s  %08s  %08s  %08s  %08s  %08s " % vals)
     else:
@@ -263,7 +263,7 @@ def main():
                     print("%015s   %08s  %08s  %08s  %08s  %08s  %08s " % fields)
                     print("-" * 80)
                     header_printed = True
-                vals = (acl["userName"], acl["create"], acl["read"],
+                vals = (safe_str(acl["userName"]), acl["create"], acl["read"],
                         acl["update"], acl["delete"], acl["readACL"], acl["updateACL"])
                 print("%015s   %08s  %08s  %08s  %08s  %08s  %08s " % vals)
             except IOError as ioe:
@@ -275,7 +275,7 @@ def main():
                 elif ioe.errno == 404:
                     abort(f"{username} not found")
                 else:
-                    abort(f"Unexpected error: {ioe}")
+                    abort(f"Unexpected error: {safe_str(ioe)}")
 
     f.close()
 
