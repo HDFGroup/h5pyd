@@ -44,7 +44,7 @@ class Config:
                     if s[0] == '#':
                         # comment line
                         continue
-                    fields = s.split('=')
+                    fields = s.split('=', 1)  # values (passwords, keys) may contain '='
                     if len(fields) < 2:
                         print(f"config file: {self._config_file} line: {line_number} is not valid")
                         continue
