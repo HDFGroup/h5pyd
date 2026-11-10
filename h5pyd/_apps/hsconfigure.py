@@ -46,7 +46,7 @@ def masked(value):
 #
 def saveConfig(username, password, endpoint, api_key):
 
-    filepath = os.path.expanduser('~/.hscfg')
+    filepath = os.path.join(os.path.expanduser("~"), ".hscfg")
     print(f"Saving config file to: {filepath}")
     lines = ["# HDFCloud configuration file"]
     lines.append(f"hs_endpoint = {endpoint if endpoint else ''}")
@@ -98,7 +98,7 @@ def pingServer(username, password, endpoint, api_key):
 #
 def main():
     cfg = Config()
-    home_config = os.path.expanduser("~/.hscfg")
+    home_config = os.path.join(os.path.expanduser("~"), ".hscfg")
     if cfg.config_file:
         config_path = os.path.abspath(cfg.config_file)
         print(f"Reading settings from: {config_path}")
