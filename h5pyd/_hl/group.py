@@ -484,8 +484,11 @@ class Group(HLObject, MutableMappingHDF5):
                     raise KeyError(f"Unexpected link format: {link_json}")
                 plugin = self.id.db.plugin
 
-                # domains are POSIX paths on every platform
-                if not external_domain.startswith("hdf5://") and not posixpath.isabs(external_domain):
+                # A target is absolute by either the platform's rule or POSIX's: on Windows a
+                # path from os.path.abspath() has a drive letter, which File() strips.  A
+                # relative target is joined with POSIX paths, since domains are POSIX paths.
+                is_abs = op.isabs(external_domain) or posixpath.isabs(external_domain)
+                if not external_domain.startswith("hdf5://") and not is_abs:
                     current_domain = plugin.filepath
                     external_domain = posixpath.join(posixpath.dirname(current_domain), external_domain)
                     external_domain = posixpath.normpath(external_domain)
