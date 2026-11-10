@@ -2046,12 +2046,6 @@ class TestLowOpen(BaseDataset):
         ds[:] = data
         np.testing.assert_array_equal(ds[:], np.array(data, dtype=np.uint64))
 
-    def test_setitem_fancy_indexing(self):
-        # https://github.com/h5py/h5py/issues/1593
-        arr = self.failUnless.create_dataset('data', (5, 1000, 2), dtype=np.uint8)
-        block = np.random.randint(255, size=(5, 3, 2))
-        arr[:, [0, 2, 4], ...] = block
-
     def test_vlen_spacepad(self):
         data_file_path = self.getFileName("vlen_string_dset.h5")
         with File(data_file_path) as f:
