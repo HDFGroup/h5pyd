@@ -34,7 +34,7 @@ version = "1.0.0"
 
 dependencies = [
     "numpy >=2.0.0",
-    "h5json >= 2.0.0",
+    "h5json >= 2.0.0, < 3",
     "requests_unixsocket",
     "pytz",
     "packaging"

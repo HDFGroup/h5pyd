@@ -164,6 +164,32 @@ def _expand_index_list(args, rank):
     return args
 
 
+def _expand_selection(selection, rank):
+    """ _expand_index_list for a selection given as a single argument (a tuple or not), as
+    regionref[...] and the selection= parameters take it """
+    args = selection if isinstance(selection, tuple) else (selection,)
+    return _expand_index_list(args, rank)
+
+
+def _is_index_list(arg):
+    """ True for a list of integers or a 1-D integer array """
+    if isinstance(arg, numpy.ndarray):
+        return arg.ndim == 1 and arg.dtype.kind in "iu"
+    if isinstance(arg, list):
+        return all(isinstance(x, (int, numpy.integer)) and not isinstance(x, (bool, numpy.bool_)) for x in arg)
+    return False
+
+
+def _has_repeated_index(args):
+    """ True if an index list in args repeats an index """
+    for arg in args:
+        if _is_index_list(arg):
+            indices = [int(x) for x in arg]
+            if len(set(indices)) != len(indices):
+                return True
+    return False
+
+
 def _regionRefBytesToObj(arr, dt):
     """Recursively convert any RegionReference element of dt within arr from
     its raw RegionReference.tobytes()-encoded bytes to an actual
@@ -1197,6 +1223,11 @@ class Dataset(HLObject):
             read_fields = mtype.names
 
         args = _expand_index_list(args, len(self.shape))
+        if _has_repeated_index(args) and db.is_dirty(self.id.uuid):
+            # Reading repeated indices while the dataset has unflushed changes returns wrong
+            # values (h5json merges pending updates into such a read incorrectly), so write
+            # the changes first and read from the server, which gets it right.
+            db.flush()
 
         if args and isinstance(args[0], numpy.ndarray) and args[0].dtype.kind == 'b':
             # use argument as a mask to create a point selection
@@ -1545,7 +1576,7 @@ class Dataset(HLObject):
         if selection is None:
             query_sel = None
         else:
-            query_sel = sel.select(self.shape, selection)
+            query_sel = sel.select(self.shape, _expand_selection(selection, len(self.shape)))
 
         return db.queryDataset(self.id.uuid, query, sel=query_sel, limit=limit, update_value=update_value)
 
