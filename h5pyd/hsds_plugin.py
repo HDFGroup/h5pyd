@@ -22,6 +22,7 @@ from h5json.storage_plugin import StoragePlugin
 from h5json.time_util import getNow
 
 from .httpconn import HttpConn
+from ._credentials import redact
 from ._hl.acl_manager import ACLManager
 
 
@@ -66,7 +67,7 @@ class HsdsPlugin(StoragePlugin):
         self.log.debug(f"    append: {append}")
         self.log.debug(f"    read_only: {read_only}")
         if endpoint:
-            self.log.debug(f"    endpoint: {endpoint}")
+            self.log.debug(f"    endpoint: {redact(endpoint)}")
             http_kwargs["endpoint"] = endpoint
         if username:
             self.log.debug(f"    username: {username}")

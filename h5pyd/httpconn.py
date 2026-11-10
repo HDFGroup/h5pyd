@@ -26,6 +26,7 @@ import logging
 
 from . import openid
 from .config import get_config
+from ._credentials import redact, warn_plaintext_credentials, warn_endpoint_mismatch
 
 
 def eprint(*args, **kwargs):
@@ -285,16 +286,23 @@ class HttpConn:
         if endpoint and endpoint.endswith('/'):
             endpoint = endpoint.strip('/')
 
+        def is_set(value):
+            return bool(value) and not (isinstance(value, str) and value.upper() == "NONE")
+
+        creds_from_config = False  # True if any credential comes from the config or environment
         if not username:
             if "hs_username" in cfg:
                 username = cfg["hs_username"]
+                creds_from_config |= is_set(username)
 
         if not password:
             if "hs_password" in cfg:
                 password = cfg["hs_password"]
+                creds_from_config |= is_set(password)
 
         if not api_key and "hs_api_key" in cfg:
             api_key = cfg["hs_api_key"]
+            creds_from_config |= is_set(api_key)
 
         if not bucket:
             if "hs_bucket" in cfg:
@@ -341,13 +349,22 @@ class HttpConn:
         # TBD: should this be in config?
         if api_key is None and "HS_API_KEY" in os.environ:
             api_key = os.environ["HS_API_KEY"]
+            creds_from_config |= is_set(api_key)
         if isinstance(api_key, str) and (not api_key or api_key.upper() == "NONE"):
             api_key = None
         if not api_key:
             api_key = getAzureApiKey()
+            creds_from_config |= bool(api_key)
         if not api_key:
             api_key = getKeycloakApiKey()
+            creds_from_config |= bool(api_key)
         self._api_key = api_key
+
+        # Warn about where credentials are going.  This doesn't change what is sent.
+        if self._password or self._api_key:
+            warn_plaintext_credentials(endpoint)
+            if creds_from_config:
+                warn_endpoint_mismatch(endpoint, cfg.get("hs_endpoint", None))
 
         # Convert api_key to OpenIDHandler
         if isinstance(api_key, dict):
@@ -370,7 +387,7 @@ class HttpConn:
 
                 # for Keycloak, pass in username and password
                 self._api_key = openid.KeycloakOpenID(
-                    endpoint, config=api_key, username=username, password=password
+                    endpoint, config=api_key, username=username, password=password, timeout=self._timeout
                 )
             else:
                 self.log.error(f"Unknown openid provider: {provider}")
@@ -477,7 +494,7 @@ class HttpConn:
             params["domain"] = self._domain
         if "bucket" not in params and self._bucket:
             params["bucket"] = self._bucket
-        if self._api_key and not isinstance(self._api_key, dict):
+        if isinstance(self._api_key, str):
             params["api_key"] = self._api_key
         domain = params["domain"]
         self.log.debug(f"GET: {req} [{domain}] bucket: {self._bucket}")
@@ -485,9 +502,9 @@ class HttpConn:
         if format == "binary":
             headers["accept"] = "application/octet-stream"
 
-        self.log.info(f"GET: {self._endpoint + req} [{params['domain']}] timeout: {self._timeout}")
+        self.log.info(f"GET: {redact(self._endpoint + req)} [{params['domain']}] timeout: {self._timeout}")
         for k in params:
-            if k != "domain":
+            if k not in ("domain", "api_key"):
                 v = params[k]
                 self.log.debug(f"GET params {k}:{v}")
 
@@ -506,10 +523,10 @@ class HttpConn:
             elapsed = time.time() - ts
             self.log.info(f"status: GET {rsp.status_code}, elapsed: {elapsed:.4f}")
         except ConnectionError as ce:
-            self.log.error(f"connection error: {ce}")
+            self.log.error(f"connection error: {redact(ce)}")
             raise IOError("Connection Error")
         except Exception as e:
-            self.log.error(f"got {type(e)} exception: {e}")
+            self.log.error(f"got {type(e)} exception: {redact(e)}")
             raise IOError("Unexpected exception")
 
         if rsp.status_code != 200:
@@ -528,7 +545,7 @@ class HttpConn:
             raise IOError("http session is closed")
 
         if params:
-            self.log.info(f"PUT params: {params}")
+            self.log.info(f"PUT params: {redact(params)}")
         else:
             params = {}
 
@@ -536,7 +553,7 @@ class HttpConn:
             params["domain"] = self._domain
         if "bucket" not in params and self._bucket:
             params["bucket"] = self._bucket
-        if self._api_key:
+        if isinstance(self._api_key, str):
             params["api_key"] = self._api_key
 
         # verify the file was open for modification
@@ -571,7 +588,7 @@ class HttpConn:
             elapsed = time.time() - ts
             self.log.info(f"status: PUT {rsp.status_code}, elapsed: {elapsed:.4f}")
         except ConnectionError as ce:
-            self.log.error(f"connection error: {ce}")
+            self.log.error(f"connection error: {redact(ce)}")
             raise IOError("Connection Error")
 
         if rsp.status_code == 201 and req == "/":
@@ -597,7 +614,7 @@ class HttpConn:
             params["domain"] = self._domain
         if "bucket" not in params and self._bucket:
             params["bucket"] = self._bucket
-        if self._api_key:
+        if isinstance(self._api_key, str):
             params["api_key"] = self._api_key
 
         # verify we have write intent (unless this is a dataset point selection)
@@ -643,8 +660,8 @@ class HttpConn:
             elapsed = time.time() - ts
             self.log.info(f"status: POST {rsp.status_code}, elapsed: {elapsed:.4f}")
         except ConnectionError as ce:
-            self.log.warning(f"connection error: {ce}")
-            raise IOError(str(ce))
+            self.log.warning(f"connection error: {redact(ce)}")
+            raise IOError(redact(ce))
 
         if rsp.status_code not in (200, 201):
             self.log.error(f"got status_code: {rsp.status_code} for POST: {req}")
@@ -665,7 +682,7 @@ class HttpConn:
             params["domain"] = self._domain
         if "bucket" not in params and self._bucket:
             params["bucket"] = self._bucket
-        if self._api_key:
+        if isinstance(self._api_key, str):
             params["api_key"] = self._api_key
 
         # verify we have write intent
@@ -689,7 +706,7 @@ class HttpConn:
             elapsed = time.time() - ts
             self.log.info(f"status: DELETE {rsp.status_code}, elapsed: {elapsed:.4f}")
         except ConnectionError as ce:
-            self.log.error(f"connection error: {ce}")
+            self.log.error(f"connection error: {redact(ce)}")
             raise IOError("Connection Error")
 
         if rsp.status_code == 200 and req == "/":

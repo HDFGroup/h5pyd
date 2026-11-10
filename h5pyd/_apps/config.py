@@ -13,12 +13,15 @@ import os
 import sys
 import json
 import logging
+import getpass
+
+from h5pyd._credentials import check_config_file_mode, check_cwd_config
 
 default_cfg = {
     "hs_endpoint": {
         "default": None,
         "flags": ["-e", "--endpoint"],
-        "help": "server endpoint, e.g. http://hsdshdflab.hdfgroup.org",
+        "help": "server endpoint, e.g. https://hsds.example.org",
         "choices": ["ENDPOINT",]
     },
     "hs_username": {
@@ -30,8 +33,14 @@ default_cfg = {
     "hs_password": {
         "default": None,
         "flags": ["-p", "--password"],
-        "help": "password credential",
+        "help": "password credential (visible to other users in the process list - prefer "
+                "HS_PASSWORD or --password-stdin)",
         "choices": ["PASSWORD",]
+    },
+    "password_stdin": {
+        "default": False,
+        "flags": ["--password-stdin",],
+        "help": "read the password from the first line of stdin",
     },
     "hs_api_key": {
         "default": None,
@@ -136,10 +145,12 @@ class Config:
             self._config_file = config_file
         elif os.path.isfile(".hscfg"):
             self._config_file = ".hscfg"
+            check_cwd_config(self._config_file)
         else:
             self._config_file = os.path.expanduser("~/.hscfg")
         # process config file if found
         if os.path.isfile(self._config_file):
+            check_config_file_mode(self._config_file)
             line_number = 0
             with open(self._config_file) as f:
                 for line in f:
@@ -150,7 +161,7 @@ class Config:
                     if s[0] == '#':
                         # comment line
                         continue
-                    fields = s.split('=')
+                    fields = s.split('=', 1)  # values (passwords, keys) may contain '='
                     if len(fields) < 2:
                         print(f"config file: {self._config_file} line: {line_number} is not valid")
                         continue
@@ -295,6 +306,7 @@ class Config:
             return any place argument as a list
         """
         options = []
+        user_flag_given = False
         argn = 0
         while argn < len(args):
             arg = args[argn]
@@ -329,8 +341,42 @@ class Config:
                         if choices and len(choices) > 1 and val not in self._choices.get(name):
                             raise ValueError(f"option value must be one of {self._choices.get(name)}")
                     self._values[name] = val
+                    if name == "hs_username":
+                        user_flag_given = True
                     argn += 2
+        self._resolve_password(user_flag_given)
         return options
+
+    @property
+    def config_file(self):
+        """ path of the config file that was read, or None """
+        if os.path.isfile(self._config_file):
+            return self._config_file
+        return None
+
+    def _has_value(self, name):
+        v = self._values.get(name)
+        return bool(v) and not (isinstance(v, str) and v.upper() == "NONE")
+
+    def _resolve_password(self, user_flag_given):
+        """ set hs_password from stdin with --password-stdin, or prompt for it when a user
+        was given with -u and no password, API key or Azure AD config is set """
+        if self._values.get("password_stdin"):
+            line = sys.stdin.readline()
+            self._values["hs_password"] = line.rstrip("\r\n")
+            return
+        if not user_flag_given or self._has_value("hs_password"):
+            return
+        if self._has_value("hs_api_key") or self._has_value("hs_ad_app_id"):
+            return  # these don't use a password
+        try:
+            interactive = sys.stdin.isatty()
+        except (AttributeError, ValueError):
+            interactive = False
+        if not interactive:
+            return  # never block a script waiting for input
+        username = self._values.get("hs_username")
+        self._values["hs_password"] = getpass.getpass(f"Password for {username}: ")
 
     def get_loglevel(self):
         val = self._values["loglevel"]

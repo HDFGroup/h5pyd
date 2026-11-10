@@ -12,6 +12,8 @@
 import os
 import json
 
+from ._credentials import check_config_file_mode, check_cwd_config
+
 
 class Config:
     """
@@ -26,10 +28,12 @@ class Config:
             self._config_file = config_file
         elif os.path.isfile(".hscfg"):
             self._config_file = ".hscfg"
+            check_cwd_config(self._config_file)
         else:
             self._config_file = os.path.expanduser("~/.hscfg")
         # process config file if found
         if os.path.isfile(self._config_file):
+            check_config_file_mode(self._config_file)
             line_number = 0
             with open(self._config_file) as f:
                 for line in f:
@@ -40,7 +44,7 @@ class Config:
                     if s[0] == '#':
                         # comment line
                         continue
-                    fields = s.split('=')
+                    fields = s.split('=', 1)  # values (passwords, keys) may contain '='
                     if len(fields) < 2:
                         print(f"config file: {self._config_file} line: {line_number} is not valid")
                         continue
