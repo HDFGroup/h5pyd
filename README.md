@@ -177,7 +177,10 @@ Several utility applications are included with this package:
 * ``hsdiff`` - compare HDF5 file with HSDS domain
 * ``hsget`` - create an HDF5 file from HSDS domain
 * ``hsinfo`` - get server status or domain details
-* ``hsload`` - upload an HDF5 file to an HSDS domain
+* ``hsload`` - upload an HDF5 file to an HSDS domain. A dataset can store its values in other
+  files (external storage or a virtual dataset), and ``hsload`` reads them from wherever the
+  input file says and names them on stderr. When loading files from untrusted sources, use
+  ``--no-external-sources`` to skip those values.
 * ``hsls`` - list contents of domain or folder
 * ``hsmv`` - change the naame of a domain
 * ``hstouch`` - create new domain or folder

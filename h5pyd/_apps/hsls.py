@@ -6,9 +6,9 @@ from datetime import datetime
 import h5pyd as h5py
 import numpy as np
 if __name__ == "__main__":
-    from config import Config
+    from config import Config, safe_str
 else:
-    from .config import Config
+    from .config import Config, safe_str
 
 #
 # Print objects in a domain in the style of the hsls utilitiy
@@ -81,17 +81,17 @@ def visititems(name, grp, visited):
             except IOError:
                 # object deleted but hardlink left?
                 desc = "{Missing hardlink object}"
-                print(f"{item_name:24} {class_name} {desc}")
+                print(f"{safe_str(item_name):24} {class_name} {safe_str(desc)}")
 
         elif class_name == "SoftLink":
             desc = '{' + item.path + '}'
-            print(f"{item_name:24} {class_name} {desc}")
+            print(f"{safe_str(item_name):24} {class_name} {safe_str(desc)}")
         elif class_name == "ExternalLink":
             desc = '{' + item.path + '//' + item.filename + '}'
-            print(f"{item_name:24} {class_name} {desc}")
+            print(f"{safe_str(item_name):24} {class_name} {safe_str(desc)}")
         else:
             desc = '{Unknown Link Type}'
-            print(f"{item_name:24} {class_name} {desc}")
+            print(f"{safe_str(item_name):24} {class_name} {safe_str(desc)}")
 
 
 def getTypeStr(dt):
@@ -107,7 +107,7 @@ def dump(name, obj, visited=None):
         obj_id = obj.id.id
         if visited and obj_id in visited:
             same_as = visited[obj_id]
-            print(f"{name:24} {class_name}, same as {same_as}")
+            print(f"{safe_str(name):24} {class_name}, same as {safe_str(same_as)}")
             return
     elif class_name in ("ExternalLink", "SoftLink"):
         pass
@@ -131,13 +131,13 @@ def dump(name, obj, visited=None):
         desc = '{' + obj.filename + '//' + obj.path + '}'
 
     if desc is None:
-        print(f"{name} {class_name}")
+        print(f"{safe_str(name)} {class_name}")
     else:
-        print(f"{name} {class_name} {desc}")
+        print(f"{safe_str(name)} {class_name} {safe_str(desc)}")
 
     if cfg["verbose"] and obj_id is not None:
         uuid_str = "UUID"
-        print(f"    {uuid_str:>32}: {obj_id}")
+        print(f"    {uuid_str:>32}: {safe_str(obj_id)}")
 
     if cfg["verbose"] and is_dataset and obj.shape is not None \
             and obj.chunks is not None:
@@ -150,7 +150,7 @@ def dump(name, obj, visited=None):
         else:
             chunk_dims = obj.chunks
             obj_layout = "H5D_CHUNKED"
-        storage_desc = f"Storage {obj_layout}"
+        storage_desc = f"Storage {safe_str(obj_layout)}"
         max_chunk_count = 1
         rank = len(obj.shape)
         for i in range(rank):
@@ -217,10 +217,10 @@ def dump(name, obj, visited=None):
         else:
             compression_opts = ""
         if obj.shuffle:
-            print(fstr.format("Filter", filter_number, "shuffle", compression_opts))
+            print(fstr.format("Filter", filter_number, "shuffle", safe_str(compression_opts)))
             filter_number += 1
         if obj.compression:
-            print(fstr.format("Filter", filter_number, obj.compression, compression_opts))
+            print(fstr.format("Filter", filter_number, safe_str(obj.compression), safe_str(compression_opts)))
 
         # display type info
 
@@ -264,7 +264,7 @@ def dumpACL(acl):
     else:
         perms += '-'
     acl_username = acl["username"]
-    print(f"    acl: {acl_username:24} {perms}")
+    print(f"    acl: {safe_str(acl_username):24} {perms}")
 
 
 def dumpAcls(obj):
@@ -290,12 +290,12 @@ def dumpAttrs(obj):
             rank = 0  # scalar data
         if rank > 1:
             val = "[" * rank + el + "]" * rank
-            print(f"   attr: {attr_name:24} {val}")
+            print(f"   attr: {safe_str(attr_name):24} {safe_str(val, multiline=True)}")
         elif rank == 1 and attr.shape[0] > 1:
             val = f"[{attr[0]},{el}]"
-            print(f"   attr: {attr_name:24} {val}")
+            print(f"   attr: {safe_str(attr_name):24} {safe_str(val, multiline=True)}")
         else:
-            print(f"   attr: {attr_name:24} {attr}")
+            print(f"   attr: {safe_str(attr_name):24} {safe_str(attr, multiline=True)}")
 
 
 def getFolder(domain):
@@ -373,8 +373,8 @@ def visitDomains(domain, depth=1):
             timestamp = datetime.fromtimestamp(int(d.modified))
 
         if not cfg["names_only"]:
-            msg = f"{owner:35} {format_size(num_bytes):15} {dir_class:8} "
-            msg += f"{timestamp} {display_name}"
+            msg = f"{safe_str(owner):35} {format_size(num_bytes):15} {dir_class:8} "
+            msg += f"{timestamp} {safe_str(display_name)}"
             print(msg)
         count += 1
         if cfg["showacls"]:
@@ -401,10 +401,10 @@ def visitDomains(domain, depth=1):
 
             if cfg["names_only"]:
                 # just print the name...
-                print(full_path)
+                print(safe_str(full_path))
             else:
-                msg = f"{owner:35} {format_size(num_bytes):15} {dir_class:8} "
-                msg += f"{timestamp} {full_path}"
+                msg = f"{safe_str(owner):35} {format_size(num_bytes):15} {safe_str(dir_class):8} "
+                msg += f"{timestamp} {safe_str(full_path)}"
                 print(msg)
             if cfg["showacls"]:
                 if dir_class == "folder":
@@ -432,7 +432,7 @@ def visitDomains(domain, depth=1):
             pass
         else:
             print("error getting domain:", domain)
-            sys.exit(str(oe))
+            sys.exit(safe_str(oe))
 
     return count
 
@@ -563,7 +563,7 @@ def main():
                     print(f"No permission to read domain: {domain}")
                     continue
                 else:
-                    print(f"Unexpected error: {ioe}")
+                    print(f"Unexpected error: {safe_str(ioe)}")
                     continue
 
             grp = f['/']
@@ -674,7 +674,7 @@ def main():
                 for k in grp:
                     if cfg["names_only"]:
                         # just print the link name
-                        print(k)
+                        print(safe_str(k))
                         continue
                     item = grp.get(k, getlink=True)
                     if item.__class__.__name__ == "HardLink":

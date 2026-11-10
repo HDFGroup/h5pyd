@@ -16,9 +16,9 @@ from datetime import datetime
 import h5pyd
 
 if __name__ == "__main__":
-    from config import Config
+    from config import Config, safe_str
 else:
-    from .config import Config
+    from .config import Config, safe_str
 
 #
 # Print objects in a domain in the style of the hsls utilitiy
@@ -134,7 +134,7 @@ def getDomainInfo(domain, cfg):
         elif oe.errno == 403:  # Forbidden
             abort("Not allowed")
         else:
-            abort(f"Unexpected error: {oe}")
+            abort(f"Unexpected error: {safe_str(oe)}")
 
     timestamp = datetime.fromtimestamp(int(f.modified))
     if not is_folder and f.last_scan:
@@ -144,7 +144,7 @@ def getDomainInfo(domain, cfg):
 
     if is_folder:
         print(f"folder: {domain}")
-        print(f"    owner:           {f.owner}")
+        print(f"    owner:           {safe_str(f.owner)}")
         print(f"    last modified:   {timestamp}")
     else:
         if "rescan" in cfg and cfg["rescan"]:
@@ -160,13 +160,13 @@ def getDomainInfo(domain, cfg):
             num_chunks = f.num_objects - num_objects
 
         print(f"domain: {domain}")
-        print(f"    owner:           {f.owner}")
-        print(f"    id:              {f.id.id}")
+        print(f"    owner:           {safe_str(f.owner)}")
+        print(f"    id:              {safe_str(f.id.id)}")
         print(f"    last modified:   {timestamp}")
         if last_scan:
             print(f"    last scan:       {last_scan}")
         if f.md5_sum:
-            print(f"    md5 sum:         {f.md5_sum}")
+            print(f"    md5 sum:         {safe_str(f.md5_sum)}")
         print(f"    total_size:      {format_size(f.total_size)}")
         print(f"    allocated_bytes: {format_size(f.allocated_bytes)}")
         if f.metadata_bytes:

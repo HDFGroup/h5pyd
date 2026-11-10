@@ -29,9 +29,9 @@ except ImportError:
     S3FS_IMPORT = False
 
 if __name__ == "__main__":
-    from config import Config
+    from config import Config, safe_str
 else:
-    from .config import Config
+    from .config import Config, safe_str
 
 cfg = Config()
 
@@ -55,7 +55,7 @@ def diff_attrs(src, tgt, ctx):
         msg = f"<{src.name}> have a different number of attribute from <{tgt.name}>"
         logging.info(msg)
         if not ctx["quiet"]:
-            print(msg)
+            print(safe_str(msg))
         ctx["differences"] += 1
         return False
 
@@ -63,12 +63,12 @@ def diff_attrs(src, tgt, ctx):
         msg = f"checking attribute {name} of {src.name}"
         logging.debug(msg)
         if ctx["verbose"]:
-            print(msg)
+            print(safe_str(msg))
         if name not in tgt.attrs:
             msg = f"<{src.name}>  has attribute {name} not found in <{tgt.name}>"
             logging.info(msg)
             if not ctx["quiet"]:
-                print(msg)
+                print(safe_str(msg))
             ctx["differences"] += 1
             return False
         src_attr = src.attrs[name]
@@ -79,20 +79,20 @@ def diff_attrs(src, tgt, ctx):
                 msg = f"Type of attribute {name} of <{src.name}> is different"
                 logging.info(msg)
                 if not ctx["quiet"]:
-                    print(msg)
+                    print(safe_str(msg))
                 ctx["differences"] += 1
                 return False
             if src_attr.shape != tgt_attr.shape:
                 msg = f"Shape of attribute {name} of <{src.name}> is different"
                 logging.info(msg)
                 if not ctx["quiet"]:
-                    print(msg)
+                    print(safe_str(msg))
                 ctx["differences"] += 1
                 return False
             if hash(src_attr.tobytes()) != hash(tgt_attr.tobytes()):
                 msg = f"values for attribute {name} of <{src.name}> differ"
                 if not ctx["quiet"]:
-                    print(msg)
+                    print(safe_str(msg))
                 ctx["differences"] += 1
                 return False
         elif src_attr != tgt_attr:
@@ -101,7 +101,7 @@ def diff_attrs(src, tgt, ctx):
             logging.info(msg)
 
             if not ctx["quiet"]:
-                print(msg)
+                print(safe_str(msg))
             ctx["differences"] += 1
             return False
 
@@ -114,7 +114,7 @@ def diff_group(src, ctx):
     msg = f"checking group <{src.name}>"
     logging.info(msg)
     if ctx["verbose"]:
-        print(msg)
+        print(safe_str(msg))
 
     fout = ctx["fout"]
 
@@ -122,7 +122,7 @@ def diff_group(src, ctx):
         msg = f"<{src.name}> not found in target"
         logging.info(msg)
         if not ctx["quiet"]:
-            print(msg)
+            print(safe_str(msg))
         ctx["differences"] += 1
         return False
 
@@ -134,23 +134,23 @@ def diff_group(src, ctx):
         msg = f"{src.name} group have a different number of links from {tgt.name}"
         logging.info(msg)
         if ctx["verbose"]:
-            print(msg)
+            print(safe_str(msg))
         if not ctx["quiet"]:
-            print(output)
+            print(safe_str(output))
         ctx["differences"] += 1
         return False
 
     for title in src:
         if ctx["verbose"]:
-            print(f"got link: '{title}' of group <{src.name}>")
+            print(safe_str(f"got link: '{title}' of group <{src.name}>"))
         if title not in tgt:
             msg = f"<{src.name}> group has link {title} not found in <{tgt.name}>"
 
             logging.info(msg)
             if ctx["verbose"]:
-                print(msg)
+                print(safe_str(msg))
             if not ctx["quiet"]:
-                print(output)
+                print(safe_str(output))
             ctx["differences"] += 1
             return False
 
@@ -162,9 +162,9 @@ def diff_group(src, ctx):
             msg = f"<{src.name}> group has link {title} of different type than found in <{tgt.name}>"
             logging.info(msg)
             if ctx["verbose"]:
-                print(msg)
+                print(safe_str(msg))
             if not ctx["quiet"]:
-                print(output)
+                print(safe_str(output))
             ctx["differences"] += 1
             return False
 
@@ -174,42 +174,42 @@ def diff_group(src, ctx):
         elif lnk_src_type == "SoftLink":
             msg = f"Got SoftLink({lnk_src.path}) with title: {title}"
             if ctx["verbose"]:
-                print(msg)
+                print(safe_str(msg))
             logging.info(msg)
             if lnk_src.path != lnk_tgt.path:
                 msg = f"<{src.name}> group has link {title} with different path than <{tgt.name}>"
                 if ctx["verbose"]:
-                    print(msg)
+                    print(safe_str(msg))
                 if not ctx["quiet"]:
-                    print(output)
+                    print(safe_str(output))
                 ctx["differences"] += 1
                 return False
         elif lnk_src_type == "ExternalLink":
             msg = f"<{src.name}> group has ExternalLink {title} ({lnk_src.filename}, {lnk_src.path})"
             if ctx["verbose"]:
-                print(msg)
+                print(safe_str(msg))
             logging.info(msg)
             if lnk_src.filename != lnk_tgt.filename:
                 msg = f"<{src.name}> group has external link {title} with different filename than <{tgt.name}>"
                 if ctx["verbose"]:
-                    print(msg)
+                    print(safe_str(msg))
                 if not ctx["quiet"]:
-                    print(output)
+                    print(safe_str(output))
                 ctx["differences"] += 1
                 return False
             if lnk_src.path != lnk_tgt.path:
                 msg = f"<{src.name}> group has external link {title} with different path than <{tgt.name}>"
                 if ctx["verbose"]:
-                    print(msg)
+                    print(safe_str(msg))
                 if not ctx["quiet"]:
-                    print(output)
+                    print(safe_str(output))
                 ctx["differences"] += 1
                 return False
         else:
             msg = f"Unexpected link type: {lnk_src_type}"
             logging.warning(msg)
             if ctx["verbose"]:
-                print(msg)
+                print(safe_str(msg))
     # end link iteration
 
     if not ctx["noattr"]:
@@ -224,7 +224,7 @@ def diff_datatype(src, ctx):
     msg = f"checking datatype <{src.name}>"
     logging.info(msg)
     if ctx["verbose"]:
-        print(msg)
+        print(safe_str(msg))
 
     fout = ctx["fout"]
 
@@ -232,7 +232,7 @@ def diff_datatype(src, ctx):
         msg = f"<{src.name}> not found in target"
         logging.info(msg)
         if not ctx["quiet"]:
-            print(msg)
+            print(safe_str(msg))
         ctx["differences"] += 1
         return False
     tgt = fout[src.name]
@@ -241,7 +241,7 @@ def diff_datatype(src, ctx):
         msg = f"Type of <{src.name}> is different"
         logging.info(msg)
         if not ctx["quiet"]:
-            print(msg)
+            print(safe_str(msg))
         ctx["differences"] += 1
         return False
 
@@ -257,7 +257,7 @@ def diff_dataset(src, ctx):
     msg = f"checking dataset <{src.name}>"
     logging.info(msg)
     if ctx["verbose"]:
-        print(msg)
+        print(safe_str(msg))
 
     fout = ctx["fout"]
 
@@ -265,7 +265,7 @@ def diff_dataset(src, ctx):
         msg = f"<{src.name}> not found in target"
         logging.info(msg)
         if not ctx["quiet"]:
-            print(msg)
+            print(safe_str(msg))
         ctx["differences"] += 1
         return False
     tgt = fout[src.name]
@@ -276,7 +276,7 @@ def diff_dataset(src, ctx):
         msg = f"<{src.name}> in target not a dataset"
         logging.info(msg)
         if not ctx["quiet"]:
-            print(msg)
+            print(safe_str(msg))
         ctx["differences"] += 1
         return False
 
@@ -286,7 +286,7 @@ def diff_dataset(src, ctx):
         msg = f"Shape of <{src.name}> is different"
         logging.info(msg)
         if not ctx["quiet"]:
-            print(output)
+            print(safe_str(output))
         ctx["differences"] += 1
 
         return False
@@ -295,7 +295,7 @@ def diff_dataset(src, ctx):
         msg = f"Type of <{src.name}> is different"
         logging.info(msg)
         if not ctx["quiet"]:
-            print(output)
+            print(safe_str(output))
         ctx["differences"] += 1
         return False
 
@@ -321,7 +321,7 @@ def diff_dataset(src, ctx):
             msg = f"values for scalar datasets {src.name} differ"
             logging.info(msg)
             if not ctx["quiet"]:
-                print(msg)
+                print(safe_str(msg))
             else:
                 print("quiet output differ")
             ctx["differences"] += 1
@@ -341,7 +341,7 @@ def diff_dataset(src, ctx):
             msg = f"values for datasets {src.name} differ"
             logging.info(msg)
             if not ctx["quiet"]:
-                print(msg)
+                print(safe_str(msg))
             ctx["differences"] += 1
             return False
 
@@ -377,14 +377,14 @@ def diff_dataset(src, ctx):
                 msg = f"values for dataset {src.name} differ for slice: {s}"
                 logging.info(msg)
                 if not ctx["quiet"]:
-                    print(msg)
+                    print(safe_str(msg))
                 ctx["differences"] += 1
                 return False
 
     except (IOError, TypeError) as e:
         msg = f"ERROR : failed to copy dataset data : {str(e)}"
         logging.error(msg)
-        print(msg)
+        print(safe_str(msg))
 
     if not ctx["noattr"]:
         result = diff_attrs(src, tgt, ctx)
@@ -512,7 +512,7 @@ def main():
                 sys.exit(1)
 
             if not s3:
-                s3 = s3fs.S3FileSystem(use_ssl=False)
+                s3 = s3fs.S3FileSystem()
             try:
                 fin = h5py.File(s3.open(file_path, "rb"), mode="r")
             except IOError as ioe:
@@ -540,7 +540,7 @@ def main():
                 msg = f"No read access to domain: {domain_path}"
                 logging.error(msg)
             else:
-                msg = f"Error opening file: {domain_path}: {ioe}"
+                msg = f"Error opening file: {domain_path}: {safe_str(ioe)}"
                 logging.error(msg)
             sys.exit(msg)
 

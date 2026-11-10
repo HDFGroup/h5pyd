@@ -96,6 +96,30 @@ def usage():
 # end print_usage
 
 
+def get_s3_filesystem():
+    """ return an s3fs filesystem for reading the source file, using AWS credentials from the
+    environment if set (anonymous otherwise) and AWS_GATEWAY as the endpoint if set """
+    kwargs = {}
+    key = os.environ.get("AWS_ACCESS_KEY_ID")
+    secret = os.environ.get("AWS_SECRET_ACCESS_KEY")
+
+    if not key or not secret:
+        kwargs["anon"] = True
+    else:
+        kwargs["key"] = key
+        kwargs["secret"] = secret
+
+    client_kwargs = {}
+    aws_s3_gateway = os.environ.get("AWS_GATEWAY")
+    if aws_s3_gateway:
+        # an http:// gateway (e.g. MinIO) is used as given
+        client_kwargs["endpoint_url"] = aws_s3_gateway
+    if client_kwargs:
+        kwargs["client_kwargs"] = client_kwargs
+
+    return s3fs.S3FileSystem(**kwargs)
+
+
 # ----------------------------------------------------------------------------------
 def main():
 
@@ -122,6 +146,8 @@ def main():
     cfg.setitem("compression", None, flags=["--compression",], choices=COMPRESSION_FILTERS,
                 help="use the given compression algorithm for -z option (lz4 is default)")
     cfg.setitem("ignorefilters", False, flags=["--ignore-filters"], help="ignore any filters used by source dataset")
+    cfg.setitem("no_external_sources", False, flags=["--no-external-sources"],
+                help="don't copy values of datasets stored in other files (external storage or virtual datasets)")
     cfg.setitem("retries", 3, flags=["--retries",], choices=["N",], help="Set number of server retry attempts")
     cfg.setitem("help", False, flags=["-h", "--help"], help="this message")
 
@@ -199,24 +225,7 @@ def main():
                     sys.exit(1)
 
                 if not s3:
-                    kwargs = {"use_ssl": False}
-                    key = os.environ.get("AWS_ACCESS_KEY_ID")
-                    secret = os.environ.get("AWS_SECRET_ACCESS_KEY")
-
-                    if not key or not secret:
-                        kwargs["anon"] = True
-                    else:
-                        kwargs["key"] = key
-                        kwargs["secret"] = secret
-
-                    client_kwargs = {}
-                    aws_s3_gateway = os.environ.get("AWS_GATEWAY")
-                    if aws_s3_gateway:
-                        client_kwargs["endpoint_url"] = aws_s3_gateway
-                    if client_kwargs:
-                        kwargs["client_kwargs"] = client_kwargs
-
-                    s3 = s3fs.S3FileSystem(**kwargs)
+                    s3 = get_s3_filesystem()
                 try:
                     fs = s3.open(src_file, "rb")  # get s3 file handle
                     if cfg["h5image"]:
@@ -323,6 +332,7 @@ def main():
                     "extend_offset": cfg["extend_offset"],
                     "ignore_error": cfg["ignore_error"],
                     "no_clobber": no_clobber,
+                    "no_external_sources": cfg["no_external_sources"],
                 }
                 load_file(fin, fout, **kwargs)
 

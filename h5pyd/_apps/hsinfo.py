@@ -19,9 +19,9 @@ from h5pyd import Folder
 from h5pyd.version import version as h5pyd_version
 
 if __name__ == "__main__":
-    from config import Config
+    from config import Config, safe_str
 else:
-    from .config import Config
+    from .config import Config, safe_str
 
 #
 # Get server status info
@@ -100,32 +100,32 @@ def getServerInfo(cfg):
         info = http_conn.serverInfo()
 
         info_name = info["name"]
-        print(f"server name: {info_name}")
+        print(f"server name: {safe_str(info_name)}")
         if "state" in info:
             info_state = info["state"]
-            print(f"server state: {info_state}")
+            print(f"server state: {safe_str(info_state)}")
         print(f"endpoint: {endpoint}")
         if "isadmin" in info and info["isadmin"]:
             admin_tag = "(admin)"
         else:
             admin_tag = ""
         info_username = info["username"]
-        print(f"username: {info_username} {admin_tag}")
+        print(f"username: {safe_str(info_username)} {admin_tag}")
 
         if info["state"] == "READY":
             try:
                 home_folder = getHomeFolder()
                 if home_folder:
-                    print(f"home: {home_folder}")
+                    print(f"home: {safe_str(home_folder)}")
             except IOError:
                 print("home: NO ACCESS")
 
         if "hsds_version" in info:
             info_hsds_version = info["hsds_version"]
-            print(f"server version: {info_hsds_version}")
+            print(f"server version: {safe_str(info_hsds_version)}")
         if "node_count" in info:
             info_node_count = info["node_count"]
-            print(f"node count: {info_node_count}")
+            print(f"node count: {safe_str(info_node_count)}")
         if "start_time" in info:
             uptime = getUpTime(info["start_time"])
             print(f"up: {uptime}")
@@ -139,7 +139,7 @@ def getServerInfo(cfg):
                 # authentication error with openid or app token
                 print("authentication failure")
         else:
-            print(f"Error: {ioe}")
+            print(f"Error: {safe_str(ioe)}")
     finally:
         if http_conn:
             http_conn.close()
