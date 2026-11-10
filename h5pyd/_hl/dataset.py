@@ -143,6 +143,27 @@ def _encodeFixedUtf8(val, dtype):
     return val
 
 
+def _expand_index_list(args, rank):
+    """ Return args with a lone index list on a rank > 1 dataset turned into (list, ...).
+
+    In h5py and numpy, d[[1, 4]] selects rows 1 and 4 of a 2-D dataset.  sel.select reads a
+    list whose length equals the rank as the coordinates of one point, so pass the list on
+    as a selection along the first axis instead.  dset.points[...] is the API for points.
+    A boolean list or array is left alone, as is a nested list.
+    """
+    if rank < 2 or len(args) != 1:
+        return args
+    arg = args[0]
+    if isinstance(arg, numpy.ndarray):
+        if arg.ndim == 1 and arg.dtype.kind in "iu":
+            return (arg, Ellipsis)
+        return args
+    if isinstance(arg, list):
+        if all(isinstance(x, (int, numpy.integer)) and not isinstance(x, (bool, numpy.bool_)) for x in arg):
+            return (arg, Ellipsis)
+    return args
+
+
 def _regionRefBytesToObj(arr, dt):
     """Recursively convert any RegionReference element of dt within arr from
     its raw RegionReference.tobytes()-encoded bytes to an actual
@@ -1175,6 +1196,8 @@ class Dataset(HLObject):
         if mtype.names is not None and mtype.names != self.dtype.names:
             read_fields = mtype.names
 
+        args = _expand_index_list(args, len(self.shape))
+
         if args and isinstance(args[0], numpy.ndarray) and args[0].dtype.kind == 'b':
             # use argument as a mask to create a point selection
             if args[0].shape != self.shape:
@@ -1202,8 +1225,9 @@ class Dataset(HLObject):
                 # the selection's own mshape already has the answer
                 shape = selection.mshape
             else:
-                # force compliance with h5py selection behavior
-                shape = numpy.empty(self.shape)[args].shape
+                # force compliance with h5py selection behavior - index a
+                # zero-strided view, so nothing the size of the dataset is allocated
+                shape = numpy.broadcast_to(numpy.empty(()), self.shape)[args].shape
             return numpy.ndarray(shape, dtype=new_dtype)
 
         self.log.debug(f"dataset shape: {self.shape}")
@@ -1321,6 +1345,7 @@ class Dataset(HLObject):
         # Sort field indices from the slicing
         names = tuple(x for x in args if isinstance(x, str))
         args = tuple(x for x in args if not isinstance(x, str))
+        args = _expand_index_list(args, len(self.shape))
 
         # Generally we try to avoid converting the arrays on the Python
         # side.  However, for compound literals this is unavoidable.

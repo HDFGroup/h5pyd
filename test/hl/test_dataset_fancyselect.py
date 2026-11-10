@@ -144,6 +144,38 @@ class TestFancySelectDataset(TestCase):
 
         f.close()
 
+    def test_rank_length_list(self):
+        # an index list whose length equals the rank selects rows, as in numpy
+        filename = self.getFileName("fancy_select_rank_length_list")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+        vals = np.arange(42, dtype='i4').reshape((6, 7))
+        dset = f.create_dataset('dset', data=vals)
+
+        for index in ([1, 4], np.array([1, 4]), [1, 4, 5], np.array([0, 2, 3])):
+            arr = dset[index]
+            self.assertEqual(arr.shape, vals[index].shape)
+            np.testing.assert_array_equal(arr, vals[index])
+
+        # writes select rows too
+        new_rows = -np.arange(14, dtype='i4').reshape((2, 7))
+        dset[[1, 4]] = new_rows
+        vals[[1, 4]] = new_rows
+        f.flush()
+        np.testing.assert_array_equal(dset[...], vals)
+
+        dset[np.array([0, 5])] = np.full((2, 7), 99, dtype='i4')
+        vals[np.array([0, 5])] = 99
+        f.flush()
+        np.testing.assert_array_equal(dset[...], vals)
+
+        if not config.get("use_h5py"):
+            # dset.points still reads a single point
+            arr = dset.points[[(1, 4)]]
+            self.assertEqual(arr.shape, (1,))
+            self.assertEqual(arr[0], vals[1, 4])
+        f.close()
+
 
 if __name__ == '__main__':
     ut.main()

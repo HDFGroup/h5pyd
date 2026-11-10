@@ -601,6 +601,23 @@ class TestVeryLargeArray(FlushingTestCase):
         self.assertEqual(self.dset.size, 2**31)
 
 
+class TestHugeEmptySelection(FlushingTestCase):
+    """ An empty selection on a huge dataset doesn't allocate the dataset's shape """
+
+    def setUp(self):
+        TestCase.setUp(self)
+        filename = self.getFileName("dataset_test_huge_empty_selection")
+        print("filename:", filename)
+        self.f = h5py.File(filename, 'w')
+        self.dset = self.f.create_dataset('x', shape=(10**12,), chunks=(1024,), dtype='f4')
+        self.dset2 = self.f.create_dataset('y', shape=(10**6, 10**6), chunks=(64, 64), dtype='f4')
+
+    def test_empty_selection_huge_shape(self):
+        self.assertEqual(self.dset[0:0].shape, (0,))
+        self.assertEqual(self.dset[5:5].shape, (0,))
+        self.assertEqual(self.dset2[0:0, :].shape, (0, 10**6))
+
+
 if __name__ == '__main__':
     loglevel = logging.ERROR
     logging.basicConfig(format='%(asctime)s %(message)s', level=loglevel)

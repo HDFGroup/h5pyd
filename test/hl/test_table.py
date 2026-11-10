@@ -20,6 +20,7 @@ if config.get("use_h5py"):
     import h5py
 else:
     import h5pyd as h5py
+    from h5pyd._hl.table import Cursor
 
 from common import ut, TestCase
 
@@ -172,6 +173,56 @@ class TestTable(TestCase):
         indices = table.update_where(condition, update_val, limit=1)
         self.assertEqual(len(indices), 1)
         self.assertEqual(list(indices), [1])
+        f.close()
+
+    def _make_query_table(self, name):
+        # 100 rows; "val" is the row index, so matches are easy to predict
+        filename = self.getFileName(name)
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+        dt = np.dtype([('idx', 'i4'), ('val', 'i4')])
+        data = np.zeros((100,), dtype=dt)
+        data['idx'] = np.arange(100)
+        data['val'] = np.arange(100)
+        table = f.create_table('t', numrows=100, dtype=dt)
+        table[:] = data
+        f.flush()
+        return f, table
+
+    def test_read_where_multi_buffer(self):
+        # matches spread over several buffers all come back, in row order
+        if config.get("use_h5py"):
+            return  # Table not supported with h5py
+        f, table = self._make_query_table("read_where_multi_buffer")
+        condition = "((val >= 3) & (val < 6)) | ((val >= 42) & (val < 45)) | (val >= 97)"
+        expected = [3, 4, 5, 42, 43, 44, 97, 98, 99]
+        self.assertEqual(table.get_where_list(condition), expected)
+        cursor = Cursor(table, query=condition, buffer_rows=10)
+        self.assertEqual([int(row['idx']) for row in cursor], expected)
+        f.close()
+
+    def test_read_where_first_buffer_empty(self):
+        # no match in the first buffer, matches in later ones
+        if config.get("use_h5py"):
+            return  # Table not supported with h5py
+        f, table = self._make_query_table("read_where_first_buffer_empty")
+        condition = "val >= 25"
+        cursor = Cursor(table, query=condition, buffer_rows=10)
+        self.assertEqual([int(row['idx']) for row in cursor], list(range(25, 100)))
+        cursor = Cursor(table, query="val > 1000", buffer_rows=10)
+        self.assertEqual(list(cursor), [])
+        f.close()
+
+    def test_read_where_limit(self):
+        # limit applies across buffers
+        if config.get("use_h5py"):
+            return  # Table not supported with h5py
+        f, table = self._make_query_table("read_where_limit")
+        condition = "((val >= 3) & (val < 6)) | ((val >= 42) & (val < 45)) | (val >= 97)"
+        cursor = Cursor(table, query=condition, buffer_rows=10, limit=5)
+        self.assertEqual([int(row['idx']) for row in cursor], [3, 4, 5, 42, 43])
+        rows = list(table.read_where(condition, limit=5))
+        self.assertEqual([int(row['idx']) for row in rows], [3, 4, 5, 42, 43])
         f.close()
 
 

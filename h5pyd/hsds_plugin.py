@@ -112,8 +112,9 @@ class HsdsPlugin(StoragePlugin):
         self._root_id = None
         self._last_flush_time = 0
         # True until the first flush() completes - matches H5pyPlugin's convention: a
-        # read_only or append plugin never needs to force a full initial write
-        self._init = False if (append or read_only) else True
+        # read_only or append plugin never needs to force a full initial write.  Neither does
+        # a domain created from a linked domain: its objects already exist on the server.
+        self._init = False if (append or read_only or linked_domain) else True
         self._stats = {"created": 0, "lastModified": 0, "owner": ""}
         self._acl_mgr = ACLManager(self._get_acl_http_conn, log=self.log)
 
@@ -464,12 +465,20 @@ class HsdsPlugin(StoragePlugin):
             self.log.info(f"got http error: {rsp.status_code}")
             raise IOError(rsp.status_code, "Error retrieving data")
 
-        if rsp.is_binary:
+        if rsp.is_binary and query:
+            # a query response is a 1D array of matching elements whose length
+            # isn't known until the data comes back, so let it infer its own shape.
+            # No matching elements comes back as an empty body.
+            data = rsp.body
+            self.log.info(f"binary query response, {len(data)} bytes")
+            if data:
+                arr = bytesToArray(data, mtype, None)
+            else:
+                arr = np.zeros((0,), dtype=mtype)
+        elif rsp.is_binary:
             # got binary response
             self.log.info(f"binary response, {len(rsp.text)} bytes")
-            # a query response is a 1D array of matching elements whose length
-            # isn't known until the data comes back, so let it infer its own shape
-            arr = bytesToArray(rsp.text, mtype, None if query else mshape)
+            arr = bytesToArray(rsp.text, mtype, mshape)
         else:
             # got JSON response
             # need some special conversion for compound types --

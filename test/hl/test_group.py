@@ -18,6 +18,7 @@ else:
 from common import ut, TestCase
 from datetime import datetime
 import os.path
+import socket
 
 
 class TestGroup(TestCase):
@@ -276,6 +277,44 @@ class TestGroup(TestCase):
             self.assertEqual(linked_obj.id.id, dset_id)
 
         f.close()
+
+    def test_external_link_follow(self):
+        # external links read back from the server can be followed
+        if config.get("use_h5py"):
+            return  # domain paths and hdf5:// targets are HSDS-only
+        target = self.getFileName("external_link_follow_target")
+        with h5py.File(target, 'w') as f:
+            f.create_group("g1").create_dataset('ds', data=[1, 2, 3])
+
+        filename = self.getFileName("external_link_follow")
+        print("filename:", filename)
+
+        # a listening socket stands in for another server: a link must never connect to it
+        other = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        other.bind(("127.0.0.1", 0))
+        other.listen(1)
+        other.setblocking(False)
+        other_url = f"http://127.0.0.1:{other.getsockname()[1]}/x.h5"
+        try:
+            with h5py.File(filename, 'w') as f:
+                f["rel"] = h5py.ExternalLink(os.path.basename(target), "/g1/ds")
+                f["abs"] = h5py.ExternalLink(target, "/g1/ds")
+                f["hdf5"] = h5py.ExternalLink("hdf5:/" + target, "/g1/ds")
+                f["other"] = h5py.ExternalLink(other_url, "/g1/ds")
+
+            with h5py.File(filename, 'r') as f:
+                for name in ("rel", "abs", "hdf5"):
+                    self.assertEqual(list(f[name][...]), [1, 2, 3])
+                self.assertEqual(f.get("abs", getlink=True).filename, target)
+                if os.name != "nt":
+                    # HSDS on Windows answers 500 for a domain path containing ":", which
+                    # the client retries for minutes before giving up
+                    with self.assertRaises(KeyError):
+                        f["other"]
+            with self.assertRaises(BlockingIOError):
+                other.accept()  # nothing connected
+        finally:
+            other.close()
 
     def test_link_removal(self):
 

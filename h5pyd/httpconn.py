@@ -188,10 +188,10 @@ class HttpResponse:
             return False
 
     @property
-    def text(self):
-        """ getresponse content as bytes """
+    def body(self):
+        """ response content as bytes - empty if the server sent no data """
 
-        if not self._text:
+        if self._text is None:
             rsp = self._rsp
             if not self.is_binary:
                 # hex encoded response?
@@ -212,8 +212,8 @@ class HttpResponse:
                         downloaded_bytes += len(http_chunk)
                         http_chunks.append(http_chunk)
                 if len(http_chunks) == 0:
-                    raise IOError("no data returned")
-                if len(http_chunks) == 1:
+                    self._text = b""
+                elif len(http_chunks) == 1:
                     # can return first and only chunk as response
                     self._text = http_chunks[0]
                 else:
@@ -227,6 +227,15 @@ class HttpResponse:
                         index += len(http_chunk)
 
         return self._text
+
+    @property
+    def text(self):
+        """ response content as bytes - raises IOError if the server sent no data """
+
+        data = self.body
+        if not data:
+            raise IOError("no data returned")
+        return data
 
     def json(self):
         """ Return json from response"""

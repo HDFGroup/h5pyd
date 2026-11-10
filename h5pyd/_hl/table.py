@@ -46,37 +46,27 @@ class Cursor():
         self._condvars = condvars
 
     def __iter__(self):
-        """ Iterate over the first axis.  TypeError if scalar.
+        """ Iterate over the rows, fetching buffer_rows rows (or the query matches among
+        them) per request.
 
         BEWARE: Modifications to the yielded data are *NOT* written to file.
         """
-        nrows = self._stop - self._start
-
-        arr = None
-        query_complete = False
         rows_read = 0
 
-        for indx in range(self._stop - self._start):
-            if indx % self._buffer_rows == 0:
-                # grab another buffer
-                read_count = self._buffer_rows
-                if nrows - indx < read_count:
-                    read_count = nrows - indx
-                slices = (slice(indx + self._start, read_count + indx + self._start),)
-                if self._query is None:
-                    arr = self._table.__getitem__(slices)
-                else:
-                    # call table to return query result
-                    if query_complete:
-                        arr = None  # nothing more to fetch
-                    else:
-                        arr = self._table.__getitem__(slices, query=self._query)
-                        if arr is not None and arr.shape[0] < read_count:
-                            query_complete = True  # we've gotten all the rows
-            if arr is not None and indx % self._buffer_rows < arr.shape[0]:
+        for buf_start in range(self._start, self._stop, self._buffer_rows):
+            buf_stop = min(buf_start + self._buffer_rows, self._stop)
+            slices = (slice(buf_start, buf_stop),)
+            if self._query is None:
+                arr = self._table.__getitem__(slices)
+            else:
+                # only the rows in this buffer that match the query
+                arr = self._table.__getitem__(slices, query=self._query)
+            if arr is None:
+                continue
+            for row in arr:
                 if self._limit > 0 and rows_read >= self._limit:
-                    break
-                yield arr[indx % self._buffer_rows]
+                    return
+                yield row
                 rows_read += 1
 
 
