@@ -176,6 +176,48 @@ class TestFancySelectDataset(TestCase):
             self.assertEqual(arr[0], vals[1, 4])
         f.close()
 
+    def test_repeated_indices(self):
+        # reads that repeat an index match numpy, including while writes are unflushed
+        filename = self.getFileName("fancy_select_repeated_indices")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+        vals = np.arange(42, dtype='i4').reshape((6, 7))
+        dset = f.create_dataset('dset', data=vals)
+        cases = ([1, 1], np.array([1, 1]), [3, 1, 3], np.s_[[1, 1], :], np.s_[0, [1, 1]],
+                 np.s_[[1, 1], 2], np.s_[:, [2, 2]])
+        for index in cases:
+            if config.get("use_h5py"):
+                break  # h5py refuses repeated indices
+            np.testing.assert_array_equal(dset[index], vals[index], str(index))
+
+        # after an unflushed write
+        dset[2:4, :] = -1
+        vals[2:4, :] = -1
+        if not config.get("use_h5py"):
+            np.testing.assert_array_equal(dset[[2, 2, 0]], vals[[2, 2, 0]])
+            np.testing.assert_array_equal(dset[[2, 0]], vals[[2, 0]])
+        f.close()
+
+    def test_rank_length_list_other_selections(self):
+        # region references and query selections also take [i, j] as rows, like dset[[i, j]]
+        if config.get("use_h5py"):
+            return  # h5pyd region reference reads and queries
+        filename = self.getFileName("fancy_select_rank_length_list_other")
+        print("filename:", filename)
+        f = h5py.File(filename, "w")
+        vals = np.arange(42, dtype='f4').reshape((6, 7))
+        dset = f.create_dataset('dset', data=vals)
+        f.flush()
+
+        ref = dset.regionref[[1, 4]]
+        np.testing.assert_array_equal(dset[ref].reshape(-1), vals[[1, 4]].reshape(-1))
+
+        indices = dset.query("_ >= 0", selection=[1, 4])
+        self.assertEqual(sorted(int(i[0]) for i in indices), [1] * 7 + [4] * 7)
+        ref = dset.regionref.query("_ >= 0", selection=[1, 4])
+        self.assertEqual(len(dset[ref]), 14)
+        f.close()
+
 
 if __name__ == '__main__':
     ut.main()

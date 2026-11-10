@@ -174,14 +174,14 @@ class _RegionProxy(object):
         self.id = obj.id
 
     def __getitem__(self, args):
-        from .dataset import Dataset
+        from .dataset import Dataset, _expand_selection
         from h5json import selections as sel
         from h5json.hdf5dtype import RegionReference
 
         if not isinstance(self._obj, Dataset):
             raise TypeError("Region references can only be made to datasets")
 
-        selection = sel.select(self._obj, args)
+        selection = sel.select(self._obj, _expand_selection(args, len(self._obj.shape)))
         return RegionReference(self._obj.id.uuid, selection)
 
     def query(self, query, selection=None, limit=0):
@@ -202,7 +202,7 @@ class _RegionProxy(object):
         Returns a RegionReference with a point selection over the elements
         that match the query.
         """
-        from .dataset import Dataset
+        from .dataset import Dataset, _expand_selection
         from h5json import selections as sel
         from h5json.hdf5dtype import RegionReference
 
@@ -217,7 +217,7 @@ class _RegionProxy(object):
         if selection is None:
             query_sel = None
         else:
-            query_sel = sel.select(self._obj.shape, selection)
+            query_sel = sel.select(self._obj.shape, _expand_selection(selection, len(self._obj.shape)))
 
         indices = db.queryDataset(self._obj.id.uuid, query, sel=query_sel, limit=limit)
         point_sel = sel.select(self._obj.shape, indices)
