@@ -41,18 +41,37 @@ hl_tests = ('test_attribute',
             'test_vlentype',)
 
 
-app_tests = ('test_hsinfo', 'test_hstouch', 'test_hsacl', 'test_tall_inspect',
-             'test_diamond_inspect', 'test_shuffle_inspect')
+def find_tests(subdir):
+    """ names of the test_*.py modules in test/<subdir>, sorted """
+    test_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test', subdir)
+    return tuple(sorted(
+        os.path.splitext(name)[0]
+        for name in os.listdir(test_dir)
+        if name.startswith('test_') and name.endswith('.py')
+    ))
 
+
+# offline tests - these don't need a running HSDS
+unit_tests = find_tests('unit')
+
+# command line tool tests - these run after load_files.py
+app_tests = find_tests('apps')
+
+run_unit = True
 run_hl = True
 run_app = True
 if len(sys.argv) > 1:
     if sys.argv[1] in ("-h", "--help"):
-        print("Usage: python testall.py [--hl_only | --app_only]")
+        print("Usage: python testall.py [--unit_only | --hl_only | --app_only]")
         sys.exit(0)
-    if sys.argv[1] == "--hl_only":
+    if sys.argv[1] == "--unit_only":
+        run_hl = False
+        run_app = False
+    elif sys.argv[1] == "--hl_only":
+        run_unit = False
         run_app = False
     elif sys.argv[1] == "--app_only":
+        run_unit = False
         run_hl = False
     else:
         print("Unexpected argument")
@@ -62,6 +81,14 @@ if len(sys.argv) > 1:
 # Run tests
 #
 os.chdir('test')
+if run_unit:
+    os.chdir('unit')
+    for test_name in unit_tests:
+        print(test_name)
+        rc = os.system('python ' + test_name + '.py')
+        if rc != 0:
+            sys.exit("Failed")
+    os.chdir('..')
 if run_hl:
     os.chdir('hl')
     for test_name in hl_tests:
