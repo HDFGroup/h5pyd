@@ -348,6 +348,52 @@ class TestGroup(TestCase):
 
         f.close()
 
+    def test_delete_link_after_reopen(self):
+        # a link deleted after the file is reopened should stay deleted
+        filename = self.getFileName("delete_link_after_reopen")
+        print("filename:", filename)
+        with h5py.File(filename, 'w') as f:
+            f.create_group('g1')
+            f.create_group('g2')
+
+        with h5py.File(filename, 'a') as f:
+            del f['g1']
+            self.assertNotIn('g1', f)
+
+        with h5py.File(filename, 'r') as f:
+            self.assertNotIn('g1', f)
+            self.assertIn('g2', f)
+
+    def test_replace_link_after_reopen(self):
+        # a dataset deleted and re-created under the same name after the
+        # file is reopened (#306)
+        filename = self.getFileName("replace_link_after_reopen")
+        print("filename:", filename)
+        with h5py.File(filename, 'w') as f:
+            f.create_dataset('x', data=[1, 2, 3])
+            f.create_group('g2')
+
+        with h5py.File(filename, 'a') as f:
+            del f['x']
+            f.create_dataset('x', data=[1, 2, 3, 4, 5])
+
+        with h5py.File(filename, 'r') as f:
+            self.assertEqual(f['x'].shape, (5,))
+            self.assertIn('g2', f)
+
+    def test_replace_link_after_flush(self):
+        # a link deleted and re-created after it has been flushed (#306)
+        filename = self.getFileName("replace_link_after_flush")
+        print("filename:", filename)
+        with h5py.File(filename, 'w') as f:
+            f.create_group('g1')
+            f.flush()
+            del f['g1']
+            f.create_dataset('g1', data=[1, 2])
+
+        with h5py.File(filename, 'r') as f:
+            self.assertIsInstance(f['g1'], h5py.Dataset)
+
 
 class TestTrackOrder(TestCase):
     titles = ("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")

@@ -80,6 +80,7 @@ class DimensionProxy(base.CommonStateObject):
                 # Remove REFERENCE_LIST attribute if this dimension scale is
                 # not attached to any dataset
                 self._id.db.deleteAttribute(scale_id.uuid, 'REFERENCE_LIST')
+                return
         else:
             # scan through list and see if this ref is already present
             for e in value:

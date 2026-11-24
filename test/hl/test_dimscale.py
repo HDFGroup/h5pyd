@@ -25,6 +25,26 @@ else:
 
 class TestDimensionScale(TestCase):
 
+    def test_detach_scale_after_reopen(self):
+        # from #306
+        filename = self.getFileName("test_detach_scale_after_reopen")
+
+        with h5py.File(filename, "w") as f:
+            dset = f.create_dataset("data", shape=(3,), dtype="f")
+            scale = f.create_dataset("scale", data=np.arange(3))
+            scale.make_scale("scale")
+            dset.dims[0].attach_scale(scale)
+
+        with h5py.File(filename, "a") as f:
+            dset = f["data"]
+            scale = f["scale"]
+            self.assertEqual(len(dset.dims[0]), 1)
+            dset.dims[0].detach_scale(scale)
+
+        with h5py.File(filename, "r") as f:
+            self.assertEqual(len(f["data"].dims[0]), 0)
+            self.assertNotIn("REFERENCE_LIST", f["scale"].attrs)
+
     def test_everything(self):
         """Everything related to dimension scales"""
         filename = self.getFileName('test_dimscale')

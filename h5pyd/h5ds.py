@@ -116,6 +116,9 @@ def is_attached(dsetid: DatasetID, dscaleid: DatasetID, idx: int) -> bool:
 
     dimlist = dsetid.db.getAttribute(dsetid.uuid, "DIMENSION_LIST")
     reflist = dscaleid.db.getAttribute(dscaleid.uuid, "REFERENCE_LIST")
+    if dimlist is None or reflist is None:
+        # REFERENCE_LIST is removed once a scale is detached from everything
+        return False
     try:
         return ([f"datasets/{dsetid.id}", idx] in
                 reflist["value"] and f"datasets/{dscaleid.id}" in dimlist["value"][idx])
