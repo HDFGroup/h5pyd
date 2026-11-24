@@ -162,6 +162,37 @@ class TestAttribute(TestCase):
             self.assertNotIn('a1', f.attrs)
             self.assertEqual(f.attrs['a2'], 84)
 
+    def test_overwrite_after_reopen(self):
+        # an existing attribute overwritten after the file is reopened (#306)
+        filename = self.getFileName("overwrite_attribute_after_reopen")
+        print("filename:", filename)
+        with h5py.File(filename, 'w') as f:
+            f.attrs['a1'] = 42
+            f.attrs['a2'] = 84
+
+        with h5py.File(filename, 'a') as f:
+            f.attrs['a1'] = 43
+
+        with h5py.File(filename, 'r') as f:
+            self.assertEqual(f.attrs['a1'], 43)
+            self.assertEqual(f.attrs['a2'], 84)
+
+    def test_overwrite_after_flush(self):
+        # an attribute overwritten after it has been flushed (#306)
+        filename = self.getFileName("overwrite_attribute_after_flush")
+        print("filename:", filename)
+        with h5py.File(filename, 'w') as f:
+            f.attrs['a1'] = 42
+            f.flush()
+            f.attrs['a1'] = 43
+            f.flush()
+            del f.attrs['a1']
+            f.flush()
+            f.attrs['a1'] = 44
+
+        with h5py.File(filename, 'r') as f:
+            self.assertEqual(f.attrs['a1'], 44)
+
 
 class TestTrackOrder(TestCase):
 

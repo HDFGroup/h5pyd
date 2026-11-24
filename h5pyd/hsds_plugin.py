@@ -19,7 +19,6 @@ from h5json.array_util import jsonToArray, bytesToArray, arrayToBytes, bytesArra
 from h5json.shape_util import getShapeDims, getNumElements
 from h5json import selections
 from h5json.storage_plugin import StoragePlugin
-from h5json.time_util import getNow
 
 from .httpconn import HttpConn
 from ._credentials import redact
@@ -111,7 +110,11 @@ class HsdsPlugin(StoragePlugin):
         self._owner = owner
         self._linked_domain = linked_domain
         self._root_id = None
-        self._last_flush_time = 0
+        # what the server holds for each object's attributes and links, as
+        # {obj_id: {"attributes": {name: created}, "links": {title: created}}}.
+        # Recorded when an object is loaded and after each write, so flush can
+        # tell new, replaced and deleted items apart without comparing clocks.
+        self._persisted = {}
         # True until the first flush() completes - matches H5pyPlugin's convention: a
         # read_only or append plugin never needs to force a full initial write.  Neither does
         # a domain created from a linked domain: its objects already exist on the server.
@@ -338,7 +341,17 @@ class HsdsPlugin(StoragePlugin):
                 del obj_json[key]
 
         self.log.debug(f"got json for id: {obj_id}: {obj_json}")
+        self._persisted[obj_id] = {
+            key: {name: item.get("created") for name, item in obj_json.get(key, {}).items()}
+            for key in ("attributes", "links")
+        }
         return obj_json
+
+    def _getPersisted(self, obj_id, key):
+        """ return the {name: created} map of attributes or links (key) that
+        the server holds for obj_id """
+        obj_persisted = self._persisted.setdefault(obj_id, {})
+        return obj_persisted.setdefault(key, {})
 
     def getAttribute(self, obj_id, name, includeData=True):
         """
@@ -688,6 +701,7 @@ class HsdsPlugin(StoragePlugin):
             http_rsp = self.http_conn.DELETE(req)
             if http_rsp.status_code not in (200, 410):
                 self.log.error(f"got {http_rsp.status_code} for DELETE {req}")
+            self._persisted.pop(obj_id, None)
 
     def resizeDatasets(self, dset_ids):
         self.log.debug("hsds_plugin> resizeDatasets")
@@ -719,15 +733,16 @@ class HsdsPlugin(StoragePlugin):
                 continue  # ignore datasets and datatypes
             grp_json = self.db.getObjectById(grp_id)
             grp_links = grp_json["links"]
+            persisted = self._getPersisted(grp_id, "links")
             link_titles = list(grp_links.keys())
             for link_title in link_titles:
                 link_json = grp_links[link_title]
                 if "created" not in link_json:
                     self.log.error(f"hsds_plugin> expected created timestamp in link: {link_json}")
-                created = link_json["created"]
+                created = link_json.get("created")
                 if "DELETED" in link_json:
-                    if created > self._last_flush_time:
-                        # link hasn't been created yet
+                    if link_title not in persisted:
+                        # link was never written to the server
                         msg = f"hsds_plugin> {grp_id}: link: {link_title} deleted before flush"
                         self.log.debug(msg)
                     else:
@@ -735,8 +750,15 @@ class HsdsPlugin(StoragePlugin):
                         if grp_id not in removals:
                             removals[grp_id] = set()
                         removals[grp_id].add(link_title)
-                elif created > self._last_flush_time:
+                elif link_title not in persisted or persisted[link_title] != created:
                     self.log.debug(f"hsds_plugin> {grp_id}: new link: {link_title}")
+                    if link_title in persisted:
+                        # the server copy is stale - HSDS has no replace option for
+                        # links (PUT of a different link with an existing title is a
+                        # 409), so delete the old one first
+                        if grp_id not in removals:
+                            removals[grp_id] = set()
+                        removals[grp_id].add(link_title)
                     count += 1
                     # new link, add to our list
                     if grp_id not in items:
@@ -775,11 +797,15 @@ class HsdsPlugin(StoragePlugin):
                 else:
                     self.log.debug(f"hsds_plugin> {grp_id} deleted {len(titles)} links")
                     self._lastModified = time.time()
-                    # remove links from link_json in db
+                    persisted = self._getPersisted(grp_id, "links")
+                    # remove deleted links from link_json in db (links being
+                    # replaced stay, and are re-created below)
                     grp_json = self.db.getObjectById(grp_id)
                     grp_links = grp_json["links"]
                     for title in titles:
-                        del grp_links[title]
+                        persisted.pop(title, None)
+                        if "DELETED" in grp_links[title]:
+                            del grp_links[title]
 
         if items:
             body = {"grp_ids": items}
@@ -788,8 +814,12 @@ class HsdsPlugin(StoragePlugin):
                 self.log.error(f"failed to update links for request: {body}")
                 raise IOError("hsds_plugin unable to update links")
             else:
-                self.log.debug(f"hsds_plugin> {grp_id} {count} links updated")
+                self.log.debug(f"hsds_plugin> {count} links updated")
                 self._lastModified = time.time()
+                for grp_id, grp_items in items.items():
+                    persisted = self._getPersisted(grp_id, "links")
+                    for title, link_json in grp_items["links"].items():
+                        persisted[title] = link_json["created"]
 
     def _deleteAttribute(self, obj_id, attr_name):
         # delete the given attribute
@@ -810,10 +840,12 @@ class HsdsPlugin(StoragePlugin):
         separator = '|'  # use this character to join attribute names for deletion
 
         count = 0
+        replace = False  # set if any attribute to be written already exists on the server
 
         for obj_id in obj_ids:
             obj_json = self.db.getObjectById(obj_id)
             obj_attrs = obj_json["attributes"]
+            persisted = self._getPersisted(obj_id, "attributes")
             for attr_name in obj_attrs:
                 attr_json = obj_attrs[attr_name]
 
@@ -823,22 +855,23 @@ class HsdsPlugin(StoragePlugin):
                     raise IOError(msg)
                 created = attr_json["created"]
                 if "DELETED" in attr_json:
-                    if created > self._last_flush_time:
-                        # attribute hasn't been created yet
+                    if attr_name not in persisted:
+                        # attribute was never written to the server
                         msg = f"hsds_plugin> {obj_id}: attr: {attr_name} deleted before flush"
                         self.log.debug(msg)
+                    elif attr_name.find(separator) != -1:
+                        # attribute has been persisted, need to delete individually
+                        self._deleteAttribute(obj_id, attr_name)
+                        persisted.pop(attr_name)
                     else:
-                        # attribute has been persisted, remove
-                        if attr_name.find(separator) != -1:
-                            # need to delete individually
-                            self._deleteAttribute(obj_id, attr_name)
-                        else:
-                            # can delete in a batch
-                            if obj_id not in removals:
-                                removals[obj_id] = set()
-                            removals[obj_id].add(attr_name)
-                elif created > self._last_flush_time:
+                        # attribute has been persisted, can delete in a batch
+                        if obj_id not in removals:
+                            removals[obj_id] = set()
+                        removals[obj_id].add(attr_name)
+                elif attr_name not in persisted or persisted[attr_name] != created:
                     self.log.debug(f"hsds_plugin> {obj_id} attribute {attr_name} created")
+                    if attr_name in persisted:
+                        replace = True  # overwrite the server's copy
                     count += 1
                     # new attribute, add to our list
                     if obj_id not in items:
@@ -846,7 +879,7 @@ class HsdsPlugin(StoragePlugin):
                     attrs = items[obj_id]["attributes"]
                     attrs[attr_name] = attr_json
                 else:
-                    self.log.debug(f"hsds_plugin> {obj_id}: attr: {attr_name} has already been deleted")
+                    self.log.debug(f"hsds_plugin> {obj_id}: attr: {attr_name} already persisted")
 
         if removals:
             # TBD: hsds doesn't have a multiple object attribute deletion operation yet
@@ -863,11 +896,15 @@ class HsdsPlugin(StoragePlugin):
                 if rsp.status_code != 200:
                     self.log.error(f"failed to delete attribute for obj: {obj_id}")
                     raise IOError("hsds_plugin failed to delete attributes")
+                persisted = self._getPersisted(obj_id, "attributes")
+                for attr_name in attr_names:
+                    persisted.pop(attr_name, None)
 
         if items:
             body = {"obj_ids": items}
             req = f"/groups/{self._root_id}/attributes"
-            put_rsp = self.http_conn.PUT(req, body=body)
+            params = {"replace": 1} if replace else None
+            put_rsp = self.http_conn.PUT(req, body=body, params=params)
             if put_rsp.status_code not in (200, 201):
                 msg = f"put {req} failed, status: {put_rsp.status_code}"
                 self.log.error(f"hsds_plugin> {msg}")
@@ -875,6 +912,10 @@ class HsdsPlugin(StoragePlugin):
             else:
                 self.log.debug(f"hsds_plugin> {count} attributes updated")
                 self._lastModified = time.time()
+                for obj_id, obj_items in items.items():
+                    persisted = self._getPersisted(obj_id, "attributes")
+                    for attr_name, attr_json in obj_items["attributes"].items():
+                        persisted[attr_name] = attr_json["created"]
 
     def updateValue(self, dset_id, sel, arr):
         """ update the given dataset using selection and array """
@@ -1025,13 +1066,6 @@ class HsdsPlugin(StoragePlugin):
             self.log.debug(f"deleted ids: {self.db.deleted_objects}")
             self.deleteObjects(self.db.deleted_objects)
 
-        # Must be the same clock that stamps link/attribute "created" values in
-        # h5json (Hdf5db uses getNow() for its own _last_flush_time too). The
-        # updateLinks/updateAttributes tests above decide whether an item still
-        # needs sending via "created > _last_flush_time"; reading that from
-        # time.time() while "created" comes from getNow() compares two clocks
-        # that disagree by more than the margins being decided.
-        self._last_flush_time = getNow()
         self.log.debug("hsds_plugin> flush successful")
         # all objects written successfully
         return True
